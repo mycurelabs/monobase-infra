@@ -26,6 +26,7 @@ tofu/**/.terragrunt-cache/
 tofu/**/*.tfstate
 tofu/**/*.tfstate.backup
 tofu/**/.terraform.lock.hcl
+tofu/**/kubeconfig.yaml
 *.tfstate
 *.tfstate.backup
 .terraform/
