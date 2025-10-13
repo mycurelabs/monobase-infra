@@ -1,0 +1,18 @@
+# Backend Configuration Example
+# Copy to backend.tf and customize
+
+terraform {
+  backend "s3" {
+    bucket         = "lfh-terraform-state"  # Change this
+    key            = "clusters/default-cluster/terraform.tfstate"
+    region         = "us-east-1"
+    encrypt        = true
+    dynamodb_table = "lfh-terraform-locks"
+  }
+}
+
+# To use this:
+# 1. Create S3 bucket: aws s3 mb s3://lfh-terraform-state
+# 2. Create DynamoDB table: aws dynamodb create-table ...
+# 3. Copy: cp backend.tf.example backend.tf
+# 4. Customize bucket name
