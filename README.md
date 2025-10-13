@@ -13,6 +13,62 @@ This repository provides production-ready, template-based Kubernetes infrastruct
 - **Modern Stack** - Gateway API, ArgoCD GitOps, External Secrets, Velero backups
 - **Scalable** - Designed for <500 users, <1TB data per client (scales further if needed)
 
+## 📦 Scope
+
+This template provides **application-layer infrastructure** for Kubernetes.
+
+### What's Included ✅
+- Application deployments (HapiHub, Syncd, MyCureApp)
+- Storage infrastructure (Longhorn distributed block storage)
+- Networking & routing (Envoy Gateway with Gateway API)
+- Security layer (NetworkPolicies, Pod Security Standards, RBAC, encryption)
+- Backup & disaster recovery (Velero 3-tier backups)
+- Monitoring stack (Prometheus + Grafana - optional)
+- GitOps deployments (ArgoCD with App-of-Apps)
+- Secrets management (External Secrets Operator + KMS)
+
+### What's NOT Included ⚠️
+- Kubernetes cluster provisioning (EKS, AKS, GKE creation)
+- Cloud infrastructure (VPC, subnets, IAM roles, security groups)
+- Node groups or worker node configuration
+- Cloud provider-specific resources
+
+### Prerequisites
+
+**Required:**
+- ✅ Existing Kubernetes cluster (EKS, AKS, GKE, or self-hosted)
+- ✅ kubectl configured and authenticated
+- ✅ Helm 3.x installed
+- ✅ Cluster meets [minimum requirements](docs/INFRASTRUCTURE-REQUIREMENTS.md)
+
+**Minimum Cluster Specs:**
+- 3 worker nodes
+- 4 CPU cores per node (12 total)
+- 16GB RAM per node (48GB total)
+- 100GB storage per node
+
+### Optional: Cluster Provisioning
+
+If you need to create Kubernetes clusters, use these tools **before** deploying this template:
+
+**Infrastructure as Code (Recommended for Production):**
+- **OpenTofu/Terraform** - Full infrastructure control
+  - [AWS EKS Module](https://registry.terraform.io/modules/terraform-aws-modules/eks/aws)
+  - [Azure AKS Module](https://registry.terraform.io/modules/Azure/aks/azurerm)
+  - [GCP GKE Module](https://registry.terraform.io/modules/terraform-google-modules/kubernetes-engine/google)
+- **Terragrunt** - DRY Terraform wrapper for multi-environment setups
+- **Pulumi** - Modern IaC with programming languages
+
+**Quick Setup (Good for Testing):**
+- **eksctl** - `eksctl create cluster --name myclient --nodes 3 --node-type m6i.xlarge`
+- **az cli** - `az aks create --resource-group rg --name myclient --node-count 3`
+- **gcloud** - `gcloud container clusters create myclient --num-nodes=3`
+
+**Complementary Framework:**
+- [k8s-iac-framework](https://github.com/malayh/k8s-iac-framework) - Full-stack IaC with OpenTofu + Terragrunt + apps
+
+**This template works with ANY Kubernetes cluster regardless of how it was provisioned.**
+
 ## 🚀 Quick Start
 
 ### 1. Fork This Repository
