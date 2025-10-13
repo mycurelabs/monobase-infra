@@ -16,11 +16,20 @@ credentials.json
 # Client-specific configurations (should be in client's fork)
 config/*/
 !config/example.com/
+!config/k3d-local/
 
-# Terraform state (if used)
+# OpenTofu/Terraform
+tofu/clusters/*/
+!tofu/clusters/default-cluster/
+tofu/**/.terraform/
+tofu/**/.terragrunt-cache/
+tofu/**/*.tfstate
+tofu/**/*.tfstate.backup
+tofu/**/.terraform.lock.hcl
 *.tfstate
 *.tfstate.backup
 .terraform/
+.terragrunt-cache/
 
 # IDE and OS files
 .vscode/
