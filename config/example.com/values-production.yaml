@@ -16,6 +16,25 @@ global:
     name: shared-gateway
     namespace: gateway-system
 
+  # Storage configuration
+  storage:
+    # Storage provider selection
+    provider: cloud-default  # Options: cloud-default, longhorn, ebs-csi, azure-disk, gcp-pd, local-path
+    # cloud-default: Use cluster's default StorageClass (EBS on EKS, Azure Disk on AKS, etc.)
+    # longhorn: Deploy Longhorn distributed storage (for on-prem)
+    # ebs-csi: AWS EBS CSI Driver with gp3
+    # azure-disk: Azure Disk CSI Driver
+    # gcp-pd: GCP Persistent Disk CSI
+    # local-path: For k3d/kind local testing
+
+    # StorageClass name (empty = auto-detect based on provider)
+    className: ""
+    # Examples:
+    # - cloud-default: "" (uses cluster default)
+    # - longhorn: "longhorn"
+    # - ebs-csi: "gp3"
+    # - local-path: "local-path"
+
 # ===== REQUIRED CORE: HapiHub API =====
 hapihub:
   enabled: true

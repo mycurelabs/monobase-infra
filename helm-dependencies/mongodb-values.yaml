@@ -21,7 +21,7 @@ auth:
 # Persistence
 persistence:
   enabled: true
-  storageClass: longhorn
+  storageClass: ""  # Uses global.storage.className (resolved by parent chart)
   size: 100Gi
   accessModes:
     - ReadWriteOnce

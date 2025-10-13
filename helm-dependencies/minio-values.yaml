@@ -21,7 +21,7 @@ auth:
 # Persistence - per node storage
 persistence:
   enabled: true
-  storageClass: longhorn
+  storageClass: ""  # Uses global.storage.className
   size: 250Gi  # 6 × 250Gi = 1.5TB raw → ~1TB usable (EC:2)
   accessModes:
     - ReadWriteOnce

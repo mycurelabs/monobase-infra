@@ -91,3 +91,23 @@ Gateway parent reference namespace
 {{- define "hapihub.gateway.namespace" -}}
 {{- default "gateway-system" .Values.global.gateway.namespace }}
 {{- end }}
+
+{{/*
+StorageClass name - auto-detects based on provider
+*/}}
+{{- define "hapihub.storageClass" -}}
+{{- if .Values.global.storage.className -}}
+{{- .Values.global.storage.className }}
+{{- else if eq .Values.global.storage.provider "longhorn" -}}
+longhorn
+{{- else if eq .Values.global.storage.provider "ebs-csi" -}}
+gp3
+{{- else if eq .Values.global.storage.provider "azure-disk" -}}
+managed-premium
+{{- else if eq .Values.global.storage.provider "gcp-pd" -}}
+pd-ssd
+{{- else if eq .Values.global.storage.provider "local-path" -}}
+local-path
+{{- else -}}
+{{- end -}}
+{{- end }}

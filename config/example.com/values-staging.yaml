@@ -16,6 +16,11 @@ global:
     name: shared-gateway
     namespace: gateway-system
 
+  # Storage configuration
+  storage:
+    provider: cloud-default  # Use cluster default (simple for staging)
+    className: ""
+
 # ===== REQUIRED CORE: HapiHub API =====
 hapihub:
   enabled: true

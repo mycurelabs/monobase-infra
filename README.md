@@ -99,6 +99,7 @@ vim config/myclient/values-production.yaml
 # Key items to configure:
 # - global.domain: your-domain.com
 # - global.namespace: myclient-prod
+# - global.storage.provider: cloud-default (EKS/AKS/GKE) or longhorn (on-prem)
 # - Image tags (replace "latest" with specific versions)
 # - Resource limits (CPU, memory)
 # - Storage sizes (MongoDB, MinIO, etc.)
