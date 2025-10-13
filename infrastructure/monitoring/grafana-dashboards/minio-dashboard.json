@@ -1,0 +1,72 @@
+{
+  "dashboard": {
+    "title": "MinIO Storage Metrics",
+    "uid": "minio-storage",
+    "timezone": "browser",
+    "schemaVersion": 16,
+    "version": 1,
+    "refresh": "30s",
+    "panels": [
+      {
+        "id": 1,
+        "title": "Storage Usage",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+        "targets": [
+          {
+            "expr": "minio_cluster_capacity_usable_total_bytes - minio_cluster_capacity_usable_free_bytes",
+            "legendFormat": "Used storage"
+          },
+          {
+            "expr": "minio_cluster_capacity_usable_total_bytes",
+            "legendFormat": "Total capacity"
+          }
+        ]
+      },
+      {
+        "id": 2,
+        "title": "Disk Status",
+        "type": "stat",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+        "targets": [
+          {
+            "expr": "minio_cluster_disk_online_total",
+            "legendFormat": "Online disks"
+          },
+          {
+            "expr": "minio_cluster_disk_offline_total",
+            "legendFormat": "Offline disks"
+          }
+        ]
+      },
+      {
+        "id": 3,
+        "title": "Request Rate",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+        "targets": [
+          {
+            "expr": "rate(minio_s3_requests_total[5m])",
+            "legendFormat": "{{api}}"
+          }
+        ]
+      },
+      {
+        "id": 4,
+        "title": "Data Transfer",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+        "targets": [
+          {
+            "expr": "rate(minio_s3_traffic_sent_bytes[5m])",
+            "legendFormat": "Egress"
+          },
+          {
+            "expr": "rate(minio_s3_traffic_received_bytes[5m])",
+            "legendFormat": "Ingress"
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,132 @@
+# Envoy GatewayClass
+# This defines the class of Gateway implementation
+
+apiVersion: gateway.networking.k8s.io/v1
+kind: GatewayClass
+metadata:
+  name: envoy-gateway
+spec:
+  controllerName: gateway.envoyproxy.io/gatewayclass-controller
+  parametersRef:
+    group: gateway.envoyproxy.io
+    kind: EnvoyProxy
+    name: default-proxy-config
+    namespace: envoy-gateway-system
+
+---
+# EnvoyProxy Configuration
+# Advanced configuration for Envoy proxy instances
+
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: EnvoyProxy
+metadata:
+  name: default-proxy-config
+  namespace: envoy-gateway-system
+spec:
+  # Provider-specific configuration
+  provider:
+    type: Kubernetes
+    kubernetes:
+      envoyDeployment:
+        replicas: 2  # HA - 2 Envoy proxy instances
+        
+        pod:
+          affinity:
+            podAntiAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+                - labelSelector:
+                    matchLabels:
+                      gateway.envoyproxy.io/owning-gateway-name: shared-gateway
+                  topologyKey: kubernetes.io/hostname
+          
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: 1
+              memory: 1Gi
+          
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 65532
+            fsGroup: 65532
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            seccompProfile:
+              type: RuntimeDefault
+      
+      envoyService:
+        type: LoadBalancer
+        annotations: {}
+        # For AWS EKS:
+        # annotations:
+        #   service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+        #   service.beta.kubernetes.io/aws-load-balancer-scheme: "internet-facing"
+        # For Azure AKS:
+        # annotations:
+        #   service.beta.kubernetes.io/azure-load-balancer-resource-group: "my-rg"
+        # For GCP GKE:
+        # annotations:
+        #   cloud.google.com/load-balancer-type: "External"
+  
+  # Logging configuration
+  logging:
+    level:
+      default: info
+  
+  # Telemetry configuration
+  telemetry:
+    accessLog:
+      settings:
+        - format:
+            type: Text
+            text: |
+              [%START_TIME%] "%REQ(:METHOD)% %REQ(X-ENVOY-ORIGINAL-PATH?:PATH)% %PROTOCOL%" %RESPONSE_CODE% %RESPONSE_FLAGS% %BYTES_RECEIVED% %BYTES_SENT% %DURATION% "%REQ(X-FORWARDED-FOR)%" "%REQ(USER-AGENT)%" "%REQ(X-REQUEST-ID)%"
+  
+  # Bootstrap configuration (advanced)
+  bootstrap:
+    type: Replace
+    value: |
+      admin:
+        address:
+          socket_address:
+            address: 127.0.0.1
+            port_value: 19000
+      static_resources:
+        listeners:
+          - name: health_check_listener
+            address:
+              socket_address:
+                address: 0.0.0.0
+                port_value: 8081
+            filter_chains:
+              - filters:
+                  - name: envoy.filters.network.http_connection_manager
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+                      stat_prefix: health_check
+                      route_config:
+                        name: local_route
+                        virtual_hosts:
+                          - name: backend
+                            domains: ["*"]
+                            routes:
+                              - match: { prefix: "/ready" }
+                                direct_response:
+                                  status: 200
+                                  body:
+                                    inline_string: "READY"
+                      http_filters:
+                        - name: envoy.filters.http.router
+                          typed_config:
+                            "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+
+# Notes:
+# 1. GatewayClass is cluster-scoped (one per cluster)
+# 2. EnvoyProxy config applies to all Gateways using this class
+# 3. Customize LoadBalancer annotations per cloud provider
+# 4. Health check endpoint: :8081/ready
+# 5. Admin endpoint: :19000 (localhost only)

@@ -1,0 +1,41 @@
+# ArgoCD Application: Typesense
+# Sync Wave 2 - Deploy search engine (optional)
+
+{{- if .Values.typesense.enabled }}
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ .Values.global.namespace }}-typesense
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  
+  source:
+    chart: typesense
+    repoURL: https://typesense.github.io/typesense-kubernetes
+    targetRevision: 0.4.0
+    helm:
+      releaseName: typesense
+      values: |
+        {{- toYaml .Values.typesense | nindent 8 }}
+  
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: {{ .Values.global.namespace }}
+  
+  syncPolicy:
+    automated:
+      prune: false
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false
+    retry:
+      limit: 5
+      backoff:
+        duration: 10s
+        maxDuration: 5m
+{{- end }}

@@ -1,0 +1,175 @@
+# Rate Limiting Policies for Gateway API
+# Protects against DDoS and abuse
+
+---
+# Global Rate Limit for MinIO (public file access)
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: BackendTrafficPolicy
+metadata:
+  name: minio-rate-limit
+  namespace: gateway-system
+spec:
+  # Apply to specific HTTPRoute via label selector
+  targetRef:
+    group: gateway.networking.k8s.io
+    kind: HTTPRoute
+    name: minio-public  # Reference MinIO HTTPRoute
+  
+  rateLimit:
+    type: Global
+    global:
+      rules:
+        # Limit per IP address
+        - limit:
+            requests: 100
+            unit: Second
+          clientSelectors:
+            - headers:
+                - name: X-Forwarded-For
+                  type: Distinct
+        
+        # Burst limit
+        - limit:
+            requests: 1000
+            unit: Minute
+          clientSelectors:
+            - headers:
+                - name: X-Forwarded-For
+                  type: Distinct
+
+---
+# API Rate Limit (HapiHub)
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: BackendTrafficPolicy
+metadata:
+  name: api-rate-limit
+  namespace: gateway-system
+spec:
+  targetRef:
+    group: gateway.networking.k8s.io
+    kind: Gateway
+    name: shared-gateway
+  
+  rateLimit:
+    type: Global
+    global:
+      rules:
+        # Authenticated API calls (higher limit)
+        - limit:
+            requests: 1000
+            unit: Minute
+          clientSelectors:
+            - headers:
+                - name: Authorization
+                  type: Distinct
+        
+        # Unauthenticated (lower limit)
+        - limit:
+            requests: 100
+            unit: Minute
+          clientSelectors:
+            - headers:
+                - name: X-Forwarded-For
+                  type: Distinct
+
+---
+# Security Headers Policy
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: SecurityPolicy
+metadata:
+  name: default-security-headers
+  namespace: gateway-system
+spec:
+  targetRef:
+    group: gateway.networking.k8s.io
+    kind: Gateway
+    name: shared-gateway
+  
+  # CORS configuration
+  cors:
+    allowOrigins:
+      - "https://app.{{ .Values.global.domain }}"
+      - "https://admin.{{ .Values.global.domain }}"
+    allowMethods:
+      - GET
+      - POST
+      - PUT
+      - DELETE
+      - PATCH
+      - OPTIONS
+    allowHeaders:
+      - Content-Type
+      - Authorization
+      - X-Request-ID
+    exposeHeaders:
+      - X-Request-ID
+      - X-RateLimit-Remaining
+    maxAge: 86400
+    allowCredentials: true
+  
+  # Security headers
+  headers:
+    set:
+      - name: X-Frame-Options
+        value: DENY
+      - name: X-Content-Type-Options
+        value: nosniff
+      - name: X-XSS-Protection
+        value: "1; mode=block"
+      - name: Strict-Transport-Security
+        value: "max-age=31536000; includeSubDomains"
+      - name: Referrer-Policy
+        value: strict-origin-when-cross-origin
+      - name: Permissions-Policy
+        value: "geolocation=(), microphone=(), camera=()"
+    
+    remove:
+      - Server
+      - X-Powered-By
+
+---
+# Client IP Detection Policy
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: ClientTrafficPolicy
+metadata:
+  name: client-ip-detection
+  namespace: gateway-system
+spec:
+  targetRef:
+    group: gateway.networking.k8s.io
+    kind: Gateway
+    name: shared-gateway
+  
+  # Detect client IP from X-Forwarded-For (behind LoadBalancer)
+  clientIPDetection:
+    xForwardedFor:
+      numTrustedHops: 1
+
+---
+# Usage Instructions:
+#
+# 1. Apply rate limiting to specific HTTPRoutes:
+#    Add label to HTTPRoute:
+#    metadata:
+#      labels:
+#        rate-limit: enabled
+#
+# 2. Customize limits per client:
+#    - Adjust requests/unit values
+#    - Add per-user limits (via JWT claims)
+#    - Add per-API-key limits
+#
+# 3. Monitor rate limiting:
+#    - Check Envoy metrics: envoy_ratelimit_*
+#    - View blocked requests in logs
+#    - Alert on high rate limit hits
+#
+# 4. DDoS Protection:
+#    - Global rate limit protects entire gateway
+#    - Per-IP limits prevent single-source attacks
+#    - Burst limits handle traffic spikes
+#
+# 5. For production:
+#    - Deploy separate rate limit service (Redis-backed)
+#    - Enable distributed rate limiting
+#    - Set up alerting for rate limit hits

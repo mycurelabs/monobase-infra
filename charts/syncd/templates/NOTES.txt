@@ -1,0 +1,35 @@
+{{- if .Values.enabled }}
+🎉 Syncd has been deployed!
+
+Chart: {{ .Chart.Name }}-{{ .Chart.Version }}
+Release: {{ .Release.Name }}
+Namespace: {{ include "syncd.namespace" . }}
+
+📋 Deployment Information:
+  - Replicas: {{ .Values.replicaCount }}
+  - Image: {{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}
+  - Service: {{ include "syncd.fullname" . }}:{{ .Values.service.port }}
+
+🌐 Access Information:
+{{- if .Values.gateway.enabled }}
+  Syncd API: https://{{ include "syncd.gateway.hostname" . }}
+  
+  Test the API:
+  curl https://{{ include "syncd.gateway.hostname" . }}/health
+{{- else }}
+  Gateway is disabled. Use port-forward to access:
+  kubectl port-forward -n {{ include "syncd.namespace" . }} svc/{{ include "syncd.fullname" . }} {{ .Values.service.port }}:{{ .Values.service.port }}
+{{- end }}
+
+🔍 Next Steps:
+  1. Verify pods are running:
+     kubectl get pods -n {{ include "syncd.namespace" . }} -l app.kubernetes.io/name={{ include "syncd.name" . }}
+
+  2. Check logs:
+     kubectl logs -n {{ include "syncd.namespace" . }} -l app.kubernetes.io/name={{ include "syncd.name" . }} --tail=50
+
+  3. Test WebSocket connection:
+     wscat -c wss://{{ include "syncd.gateway.hostname" . }}
+{{- else }}
+Syncd is disabled (enabled: false)
+{{- end }}

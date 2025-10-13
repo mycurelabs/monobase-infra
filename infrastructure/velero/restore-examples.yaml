@@ -1,0 +1,173 @@
+# Velero Restore Examples
+# Common restore scenarios and procedures
+
+---
+# Example 1: Full Namespace Restore
+# Restore entire namespace from daily backup
+apiVersion: velero.io/v1
+kind: Restore
+metadata:
+  name: full-restore-20250115
+  namespace: velero
+spec:
+  backupName: daily-full-20250115020000
+  includedNamespaces:
+    - myclient-prod
+  restorePVs: true
+  preserveNodePorts: true
+
+---
+# Example 2: Selective Resource Restore
+# Restore only specific resources (deployments and services)
+apiVersion: velero.io/v1
+kind: Restore
+metadata:
+  name: selective-restore-20250115
+  namespace: velero
+spec:
+  backupName: daily-full-20250115020000
+  includedNamespaces:
+    - myclient-prod
+  includedResources:
+    - deployments
+    - services
+    - configmaps
+  excludedResources:
+    - secrets  # Don't restore secrets (use External Secrets)
+
+---
+# Example 3: Restore to Different Namespace (DR Testing)
+apiVersion: velero.io/v1
+kind: Restore
+metadata:
+  name: dr-test-restore
+  namespace: velero
+spec:
+  backupName: weekly-archive-20250108030000
+  namespaceMapping:
+    myclient-prod: myclient-restore-test
+  restorePVs: true
+
+---
+# Example 4: Restore Single Application (HapiHub only)
+apiVersion: velero.io/v1
+kind: Restore
+metadata:
+  name: hapihub-restore
+  namespace: velero
+spec:
+  backupName: daily-full-20250115020000
+  labelSelector:
+    matchLabels:
+      app.kubernetes.io/name: hapihub
+
+---
+# Example 5: Restore with Hooks (Post-Restore Actions)
+apiVersion: velero.io/v1
+kind: Restore
+metadata:
+  name: restore-with-hooks
+  namespace: velero
+spec:
+  backupName: daily-full-20250115020000
+  hooks:
+    resources:
+      - name: mongodb-post-restore
+        includedNamespaces:
+          - myclient-prod
+        labelSelector:
+          matchLabels:
+            app.kubernetes.io/name: mongodb
+        postHooks:
+          - exec:
+              command:
+                - /bin/bash
+                - -c
+                - mongosh --eval "rs.status()"
+              onError: Continue
+              timeout: 2m
+
+---
+# Common Restore Commands (via CLI)
+
+# List available backups
+# velero backup get
+
+# Describe backup details
+# velero backup describe daily-full-20250115020000
+
+# Create restore from backup
+# velero restore create my-restore --from-backup daily-full-20250115020000
+
+# Monitor restore progress
+# velero restore describe my-restore
+
+# Get restore logs
+# velero restore logs my-restore
+
+# List all restores
+# velero restore get
+
+# Delete failed restore (to retry)
+# velero restore delete failed-restore
+
+---
+# Restore Testing Procedure
+
+# 1. Create test namespace
+# kubectl create namespace myclient-restore-test
+
+# 2. Restore to test namespace
+# velero restore create monthly-test-$(date +%Y%m) \
+#   --from-backup daily-full-latest \
+#   --namespace-mappings myclient-prod:myclient-restore-test
+
+# 3. Verify pods running
+# kubectl get pods -n myclient-restore-test
+
+# 4. Test application
+# kubectl port-forward -n myclient-restore-test svc/hapihub 7500:7500
+# curl http://localhost:7500/health
+
+# 5. Verify data integrity
+# kubectl exec -it mongodb-0 -n myclient-restore-test -- mongosh
+# db.patients.count()
+
+# 6. Document results
+# echo "$(date): Restore test PASSED" >> restore-tests.log
+
+# 7. Cleanup
+# kubectl delete namespace myclient-restore-test
+
+---
+# Disaster Recovery Scenarios
+
+# Scenario 1: Accidental Data Deletion (RTO: 1h, RPO: 24h)
+# velero restore create data-recovery --from-backup daily-full-latest
+
+# Scenario 2: Database Corruption (RTO: 2h, RPO: 24h)
+# 1. Scale down apps: kubectl scale deployment hapihub --replicas=0
+# 2. Delete corrupted DB: kubectl delete sts mongodb --cascade=false
+# 3. Restore: velero restore create --from-backup daily-full-20250114 --include-resources statefulsets,pvc --selector app=mongodb
+# 4. Scale up apps: kubectl scale deployment hapihub --replicas=3
+
+# Scenario 3: Complete Cluster Failure (RTO: 4h, RPO: 1w)
+# 1. Deploy new cluster
+# 2. Install Velero pointing to same S3 bucket
+# 3. Restore: velero restore create cluster-rebuild --from-backup weekly-archive-latest
+
+# Scenario 4: Ransomware (RTO: 8h, RPO: 1w)
+# 1. Isolate infected cluster
+# 2. Build NEW cluster
+# 3. Restore from OLDEST clean backup: velero restore create ransomware-recovery --from-backup weekly-archive-20250101
+
+---
+# Best Practices
+
+# 1. Test restores monthly
+# 2. Keep 3-tier backups (hourly, daily, weekly)
+# 3. Encrypt backups (S3 SSE + KMS)
+# 4. Monitor backup success/failure
+# 5. Document restore procedures
+# 6. Train team on DR procedures
+# 7. Maintain backup inventory

@@ -1,0 +1,208 @@
+# Default values for HapiHub chart
+# This is a YAML-formatted file with sensible defaults
+# Override these values in config/{client}/values-{env}.yaml
+
+# Global configuration (shared across charts)
+global:
+  domain: example.com
+  namespace: example-prod
+  environment: production
+  gateway:
+    name: shared-gateway
+    namespace: gateway-system
+
+# HapiHub application configuration
+enabled: true
+
+replicaCount: 2
+
+image:
+  repository: ghcr.io/mycurelabs/hapihub
+  pullPolicy: IfNotPresent
+  tag: "5.215.2"
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+podAnnotations: {}
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  fsGroup: 1000
+  seccompProfile:
+    type: RuntimeDefault
+
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+    - ALL
+  readOnlyRootFilesystem: false
+
+service:
+  type: ClusterIP
+  port: 7500
+  targetPort: 7500
+  annotations: {}
+
+# Gateway API HTTPRoute configuration
+gateway:
+  enabled: true
+  hostname: ""  # Empty = uses api.{global.domain}
+  parentRefs:
+    - name: shared-gateway
+      namespace: gateway-system
+
+resources:
+  requests:
+    cpu: 500m
+    memory: 1Gi
+  limits:
+    cpu: 2
+    memory: 4Gi
+
+livenessProbe:
+  enabled: true
+  httpGet:
+    path: /health
+    port: 7500
+  initialDelaySeconds: 30
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3
+
+readinessProbe:
+  enabled: true
+  httpGet:
+    path: /ready
+    port: 7500
+  initialDelaySeconds: 10
+  periodSeconds: 5
+  timeoutSeconds: 3
+  failureThreshold: 2
+
+autoscaling:
+  enabled: false
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity:
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        podAffinityTerm:
+          labelSelector:
+            matchExpressions:
+              - key: app.kubernetes.io/name
+                operator: In
+                values:
+                  - hapihub
+          topologyKey: kubernetes.io/hostname
+
+# Application configuration (ConfigMap)
+config:
+  NODE_ENV: production
+  LOG_LEVEL: info
+  PORT: "7500"
+  # Database URL from secrets
+  # S3 configuration from secrets/ConfigMap
+  # SMTP configuration from secrets/ConfigMap
+
+# External Secrets configuration
+externalSecrets:
+  enabled: true
+  secretStore: ""  # Uses global.namespace-secretstore
+  refreshInterval: 1h
+  secrets: []
+
+# Network Policy
+networkPolicy:
+  enabled: true
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+      - namespaceSelector:
+          matchLabels:
+            name: gateway-system
+      ports:
+      - protocol: TCP
+        port: 7500
+  egress:
+    - to:
+      - namespaceSelector: {}
+      ports:
+      - protocol: TCP
+        port: 27017  # MongoDB
+      - protocol: TCP
+        port: 8108   # Typesense
+      - protocol: TCP
+        port: 9000   # MinIO
+    - to:
+      - namespaceSelector: {}
+      ports:
+      - protocol: TCP
+        port: 53     # DNS
+      - protocol: UDP
+        port: 53     # DNS
+    - to:
+      - namespaceSelector: {}
+      ports:
+      - protocol: TCP
+        port: 443    # HTTPS (external APIs)
+
+# Service Monitor for Prometheus (if monitoring enabled)
+serviceMonitor:
+  enabled: false
+  interval: 30s
+  path: /metrics
+
+# MongoDB dependency configuration
+mongodb:
+  enabled: true
+  architecture: replicaset
+  replicaCount: 3
+  auth:
+    enabled: true
+    existingSecret: ""
+  persistence:
+    enabled: true
+    storageClass: longhorn
+    size: 50Gi
+
+# MinIO dependency configuration (optional)
+minio:
+  enabled: false
+  mode: distributed
+  replicas: 6
+  persistence:
+    enabled: true
+    storageClass: longhorn
+    size: 250Gi
+
+# Typesense dependency configuration (optional)
+typesense:
+  enabled: false
+  replicas: 3
+  persistence:
+    enabled: true
+    storageClass: longhorn
+    size: 50Gi

@@ -1,0 +1,196 @@
+# Velero Kubernetes Backup - Helm Values
+# Chart: https://vmware-tanzu.github.io/helm-charts/
+# Version: 6.x+
+
+# Velero configuration
+configuration:
+  # Backup storage locations
+  backupStorageLocation:
+    - name: default
+      provider: aws
+      bucket: ""  # Set in client config: myclient-prod-backups
+      prefix: velero  # Prefix in bucket
+      default: true
+      
+      config:
+        region: ""  # Set in client config: us-east-1
+        s3ForcePathStyle: "false"
+        s3Url: ""  # Leave empty for AWS S3
+        publicUrl: ""
+        serverSideEncryption: AES256  # Encrypted backups
+        # For SSE-KMS:
+        # kmsKeyId: "arn:aws:kms:us-east-1:123456789012:key/key-id"
+      
+      # Access mode
+      accessMode: ReadWrite
+      
+      # Validation frequency
+      validationFrequency: 24h
+    
+    # Archive location (cold storage for weekly backups)
+    - name: archive
+      provider: aws
+      bucket: ""  # Set in client config: myclient-prod-archive
+      prefix: velero-archive
+      default: false
+      
+      config:
+        region: ""
+        s3ForcePathStyle: "false"
+        serverSideEncryption: AES256
+      
+      accessMode: ReadWrite
+  
+  # Volume snapshot locations
+  volumeSnapshotLocation:
+    - name: default
+      provider: aws
+      config:
+        region: ""  # Set in client config
+  
+  # Default backup TTL
+  defaultBackupTTL: 720h  # 30 days
+  
+  # Backup storage validation
+  defaultBackupStorageLocation: default
+  defaultVolumeSnapshotLocations: aws:default
+  
+  # Resource filters
+  defaultVolumesToFsBackup: true  # Use restic/kopia for PVC backups
+  
+  # Restore settings
+  restoreResourcePriorities: |
+    namespaces,
+    storageclasses,
+    volumesnapshotclass.snapshot.storage.k8s.io,
+    volumesnapshotcontents.snapshot.storage.k8s.io,
+    volumesnapshots.snapshot.storage.k8s.io,
+    persistentvolumes,
+    persistentvolumeclaims,
+    secrets,
+    configmaps,
+    serviceaccounts,
+    limitranges,
+    pods,
+    replicasets.apps,
+    clusterclasses.cluster.x-k8s.io,
+    clusters.cluster.x-k8s.io,
+    deployments.apps,
+    jobs.batch,
+    statefulsets.apps,
+    services,
+    endpoints,
+    replicationcontrollers
+
+# Credentials (from External Secrets)
+credentials:
+  useSecret: true
+  existingSecret: velero-credentials  # Created by ExternalSecret
+  # Secret should contain:
+  # cloud: |
+  #   [default]
+  #   aws_access_key_id=AKIAIOSFODNN7EXAMPLE
+  #   aws_secret_access_key=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
+
+# Init containers (for plugins)
+initContainers:
+  - name: velero-plugin-for-aws
+    image: velero/velero-plugin-for-aws:v1.9.0
+    volumeMounts:
+      - mountPath: /target
+        name: plugins
+
+# Deploy node agent (for CSI snapshots and restic/kopia backups)
+deployNodeAgent: true
+
+nodeAgent:
+  podVolumePath: /var/lib/kubelet/pods
+  privileged: true  # Required for volume access
+  
+  resources:
+    requests:
+      cpu: 50m
+      memory: 50Mi
+    limits:
+      cpu: 200m
+      memory: 200Mi
+  
+  tolerations:
+    - operator: Exists  # Run on all nodes
+
+# Velero server resources
+resources:
+  requests:
+    cpu: 100m
+    memory: 200Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+# Metrics
+metrics:
+  enabled: true
+  serviceMonitor:
+    enabled: false  # Enable when monitoring stack is deployed
+
+# RBAC
+rbac:
+  create: true
+  clusterAdministrator: true  # Required for cluster-wide backups
+
+# Service account
+serviceAccount:
+  server:
+    create: true
+    annotations: {}
+      # For AWS IRSA:
+      # eks.amazonaws.com/role-arn: arn:aws:iam::123456789012:role/velero-role
+
+# Pod security context
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  fsGroup: 1000
+  seccompProfile:
+    type: RuntimeDefault
+
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+  readOnlyRootFilesystem: true
+
+# Affinity (not critical for single replica)
+affinity: {}
+
+# Tolerations
+tolerations: []
+
+# Node selector
+nodeSelector: {}
+
+# Upgrade settings
+upgradeCRDs: true
+
+# Cleanup settings
+cleanUpCRDs: false  # Don't delete CRDs on uninstall
+
+# Snapshot controller (for CSI snapshots)
+snapshotsEnabled: true
+
+# Configuration for CSI snapshot data movement
+features: |-
+  EnableCSI=true
+
+# Installation instructions:
+# helm repo add vmware-tanzu https://vmware-tanzu.github.io/helm-charts
+# helm install velero vmware-tanzu/velero \
+#   -n velero --create-namespace \
+#   -f helm-values.yaml
+
+# Post-installation:
+# 1. Create velero-credentials secret (via External Secrets)
+# 2. Deploy backup schedules (see backup-schedules/)
+# 3. Test backup: velero backup create test-backup --include-namespaces myclient-prod
+# 4. Verify: velero backup describe test-backup

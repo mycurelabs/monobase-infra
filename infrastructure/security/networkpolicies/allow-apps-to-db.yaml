@@ -1,0 +1,149 @@
+# Allow Applications to Access Database
+# Permits HapiHub and Syncd to connect to MongoDB
+
+---
+# Allow HapiHub → MongoDB
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-hapihub-to-mongodb
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    security-policy: allow-egress
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: mongodb
+  
+  policyTypes:
+    - Ingress
+  
+  ingress:
+    # Allow from HapiHub
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: hapihub
+      ports:
+        - protocol: TCP
+          port: 27017
+
+---
+# Allow Syncd → MongoDB
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-syncd-to-mongodb
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    security-policy: allow-egress
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: mongodb
+  
+  policyTypes:
+    - Ingress
+  
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: syncd
+      ports:
+        - protocol: TCP
+          port: 27017
+
+---
+# Egress from Apps to MongoDB
+# Allow HapiHub egress to MongoDB
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-hapihub-egress-to-mongodb
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    security-policy: allow-egress
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: hapihub
+  
+  policyTypes:
+    - Egress
+  
+  egress:
+    # To MongoDB
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: mongodb
+      ports:
+        - protocol: TCP
+          port: 27017
+    
+    # To DNS (required for service discovery)
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+        - podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    
+    # To Kubernetes API (for service discovery)
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: TCP
+          port: 443
+
+---
+# Allow Syncd egress to MongoDB
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-syncd-egress-to-mongodb
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    security-policy: allow-egress
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: syncd
+  
+  policyTypes:
+    - Egress
+  
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: mongodb
+      ports:
+        - protocol: TCP
+          port: 27017
+    
+    # DNS
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+        - podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+
+---
+# Notes:
+# 1. Only HapiHub and Syncd can access MongoDB
+# 2. MyCureApp (frontend) has NO database access (security!)
+# 3. DNS access required for service name resolution
+# 4. Kubernetes API access needed for service discovery

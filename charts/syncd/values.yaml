@@ -1,0 +1,117 @@
+# Default values for Syncd chart
+# Override these values in config/{client}/values-{env}.yaml
+
+global:
+  domain: example.com
+  namespace: example-prod
+  environment: production
+  gateway:
+    name: shared-gateway
+    namespace: gateway-system
+
+enabled: false  # Optional component - enable when needed
+
+replicaCount: 2
+
+image:
+  repository: ghcr.io/mycurelabs/syncd
+  pullPolicy: IfNotPresent
+  tag: "1.2.0"
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+podAnnotations: {}
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  fsGroup: 1000
+  seccompProfile:
+    type: RuntimeDefault
+
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+    - ALL
+  readOnlyRootFilesystem: false
+
+service:
+  type: ClusterIP
+  port: 8080
+  targetPort: 8080
+  annotations: {}
+
+gateway:
+  enabled: true
+  hostname: ""  # Empty = uses sync.{global.domain}
+  parentRefs:
+    - name: shared-gateway
+      namespace: gateway-system
+
+resources:
+  requests:
+    cpu: 500m
+    memory: 1Gi
+  limits:
+    cpu: 2
+    memory: 2Gi
+
+livenessProbe:
+  enabled: true
+  httpGet:
+    path: /health
+    port: 8080
+  initialDelaySeconds: 30
+  periodSeconds: 10
+
+readinessProbe:
+  enabled: true
+  httpGet:
+    path: /ready
+    port: 8080
+  initialDelaySeconds: 10
+  periodSeconds: 5
+
+autoscaling:
+  enabled: false
+  minReplicas: 2
+  maxReplicas: 5
+  targetCPUUtilizationPercentage: 70
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
+config:
+  NODE_ENV: production
+  LOG_LEVEL: info
+  PORT: "8080"
+
+externalSecrets:
+  enabled: true
+  secretStore: ""
+  refreshInterval: 1h
+  secrets: []
+
+networkPolicy:
+  enabled: true
+  policyTypes:
+    - Ingress
+    - Egress
+
+serviceMonitor:
+  enabled: false
+  interval: 30s
+  path: /metrics

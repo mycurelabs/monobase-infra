@@ -1,0 +1,148 @@
+# Backup Encryption Configuration
+# Ensures all backups are encrypted at rest
+
+---
+# Velero Backup Encryption (S3 Server-Side Encryption)
+# Configured in Velero helm-values.yaml:
+#
+# configuration:
+#   backupStorageLocation:
+#     config:
+#       serverSideEncryption: AES256
+#       # Or use KMS:
+#       # kmsKeyId: "arn:aws:kms:us-east-1:123456789012:key/velero-backup-key"
+
+---
+# S3 Bucket Encryption Policy
+# Apply this to Velero backup bucket
+#
+# AWS Example (via Terraform):
+# resource "aws_s3_bucket_server_side_encryption_configuration" "velero" {
+#   bucket = "myclient-prod-backups"
+#   
+#   rule {
+#     apply_server_side_encryption_by_default {
+#       sse_algorithm     = "aws:kms"
+#       kms_master_key_id = aws_kms_key.velero_backups.id
+#     }
+#     bucket_key_enabled = true
+#   }
+# }
+
+---
+# KMS Key for Backup Encryption (AWS)
+# resource "aws_kms_key" "velero_backups" {
+#   description             = "Velero backup encryption key"
+#   deletion_window_in_days = 30
+#   enable_key_rotation     = true
+#   
+#   tags = {
+#     Purpose = "velero-backups"
+#     Client  = "myclient"
+#     Environment = "production"
+#   }
+# }
+#
+# resource "aws_kms_alias" "velero_backups" {
+#   name          = "alias/myclient-prod-velero-backups"
+#   target_key_id = aws_kms_key.velero_backups.id
+# }
+
+---
+# Longhorn Backup Encryption
+# Longhorn backups inherit encryption from Longhorn volumes
+#
+# If Longhorn volume is encrypted:
+#   - Snapshots are encrypted
+#   - Backups to S3 are encrypted
+#   - Restore requires same encryption key
+#
+# Additional S3 encryption:
+#   - S3 bucket has SSE enabled
+#   - Double encryption (volume + S3)
+
+---
+# MongoDB Backup Encryption (mongodump)
+# If using CronJob backups (in addition to Velero):
+#
+# 1. Encrypt mongodump output:
+#    mongodump --archive | openssl enc -aes-256-cbc \
+#      -pass file:/secrets/backup-encryption-key \
+#      -out backup.tar.gz.enc
+#
+# 2. Upload encrypted file to S3:
+#    aws s3 cp backup.tar.gz.enc \
+#      s3://myclient-prod-backups/mongodb/
+#
+# 3. Decrypt on restore:
+#    aws s3 cp s3://myclient-prod-backups/mongodb/backup.tar.gz.enc - | \
+#      openssl enc -aes-256-cbc -d \
+#      -pass file:/secrets/backup-encryption-key | \
+#      mongorestore --archive
+
+---
+# Backup Encryption Best Practices:
+#
+# 1. Use different keys for:
+#    - Volume encryption (Longhorn)
+#    - Backup encryption (S3)
+#    - Database encryption (MongoDB)
+#    This limits blast radius if a key is compromised
+#
+# 2. Store all encryption keys in KMS
+#    - AWS KMS, Azure Key Vault, GCP KMS
+#    - Never in Git, ConfigMaps, or regular Secrets
+#
+# 3. Enable key rotation:
+#    - Automatic rotation via KMS (yearly)
+#    - Manual rotation for critical systems (90 days)
+#
+# 4. Test restore with encryption:
+#    - Monthly restore tests
+#    - Verify decryption works
+#    - Document restore procedure
+#
+# 5. Access control:
+#    - Limit who can access encryption keys
+#    - Require MFA for key access
+#    - Audit all key access (CloudTrail, etc.)
+#
+# 6. Compliance:
+#    - HIPAA requires encryption for all PHI
+#    - Document encryption in security policies
+#    - Include in BAA with cloud provider
+#    - Annual security assessments
+
+---
+# Encryption Key Hierarchy:
+#
+# KMS Master Key (AWS KMS)
+#   ├── Data Encryption Key #1 (MongoDB volume)
+#   ├── Data Encryption Key #2 (MinIO volume)
+#   ├── Data Encryption Key #3 (Typesense volume)
+#   ├── Data Encryption Key #4 (S3 backup bucket)
+#   └── Data Encryption Key #5 (Velero backups)
+#
+# Benefits:
+# - Single master key to manage
+# - Automatic key rotation at KMS level
+# - Per-resource DEKs for isolation
+# - Easy to revoke access (change IAM policy)
+
+---
+# Emergency Key Recovery:
+#
+# If encryption keys are lost, data is UNRECOVERABLE!
+#
+# Prevention:
+# 1. Backup encryption keys to secure offline location
+# 2. Use KMS with automatic backups
+# 3. Document key recovery procedures
+# 4. Test key recovery annually
+# 5. Multiple key custodians (split knowledge)
+#
+# For HIPAA:
+# - Document key management in policies
+# - Designate key custodians
+# - Annual key management review
+# - Maintain key inventory

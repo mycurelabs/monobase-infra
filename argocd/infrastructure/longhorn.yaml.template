@@ -1,0 +1,46 @@
+# ArgoCD Application: Longhorn
+# Sync Wave 1 - Deploy storage infrastructure first
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: longhorn
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  
+  source:
+    chart: longhorn
+    repoURL: https://charts.longhorn.io
+    targetRevision: 1.6.0
+    helm:
+      releaseName: longhorn
+      values: |
+        {{- toYaml .Values.longhorn | nindent 8 }}
+  
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: longhorn-system
+  
+  syncPolicy:
+    automated:
+      prune: false  # Don't auto-delete storage
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        maxDuration: 3m
+  
+  ignoreDifferences:
+    - group: apiextensions.k8s.io
+      kind: CustomResourceDefinition
+      jsonPointers:
+        - /status

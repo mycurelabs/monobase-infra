@@ -1,0 +1,43 @@
+apiVersion: v2
+name: hapihub
+description: HapiHub Healthcare API - Custom Helm chart for LFH Infrastructure
+type: application
+version: 1.0.0
+appVersion: "5.215.2"
+keywords:
+  - healthcare
+  - api
+  - hapihub
+  - mycure
+home: https://github.com/mycurelabs/lfh-infra
+sources:
+  - https://github.com/mycurelabs/hapihub
+maintainers:
+  - name: MyCureLabs
+    email: devops@mycurelabs.com
+
+# Dependencies - Using Bitnami charts for production-ready infrastructure
+dependencies:
+  # MongoDB - Primary database
+  - name: mongodb
+    version: "15.6.13"
+    repository: https://charts.bitnami.com/bitnami
+    condition: mongodb.enabled
+    tags:
+      - database
+  
+  # MinIO - Optional self-hosted S3 storage
+  - name: minio
+    version: "14.7.12"
+    repository: https://charts.bitnami.com/bitnami
+    condition: minio.enabled
+    tags:
+      - storage
+  
+  # Typesense - Optional full-text search
+  - name: typesense
+    version: "0.4.0"
+    repository: https://typesense.github.io/typesense-kubernetes
+    condition: typesense.enabled
+    tags:
+      - search

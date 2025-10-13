@@ -1,0 +1,150 @@
+# Allow Applications to Access Storage (MinIO, Typesense)
+
+---
+# Allow HapiHub → MinIO (if enabled)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-hapihub-to-minio
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    security-policy: allow-egress
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: hapihub
+  
+  policyTypes:
+    - Egress
+  
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: minio
+      ports:
+        - protocol: TCP
+          port: 9000  # S3 API
+
+---
+# Allow HapiHub → Typesense (if enabled)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-hapihub-to-typesense
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    security-policy: allow-egress
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: hapihub
+  
+  policyTypes:
+    - Egress
+  
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: typesense
+      ports:
+        - protocol: TCP
+          port: 8108
+
+---
+# Allow ingress to MinIO from HapiHub
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-minio-from-hapihub
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    security-policy: allow-ingress
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: minio
+  
+  policyTypes:
+    - Ingress
+  
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: hapihub
+      ports:
+        - protocol: TCP
+          port: 9000
+
+---
+# Allow ingress to Typesense from HapiHub
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-typesense-from-hapihub
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    security-policy: allow-ingress
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: typesense
+  
+  policyTypes:
+    - Ingress
+  
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: hapihub
+      ports:
+        - protocol: TCP
+          port: 8108
+
+---
+# Allow external HTTPS (for external APIs, SMTP, etc.)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-apps-egress-https
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    security-policy: allow-egress
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: hapihub
+  
+  policyTypes:
+    - Egress
+  
+  egress:
+    # Allow HTTPS to internet (for external APIs)
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: TCP
+          port: 443
+    
+    # Allow SMTP (if using external email service)
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: TCP
+          port: 587  # SMTP TLS
+        - protocol: TCP
+          port: 465  # SMTPS
+
+---
+# Notes:
+# 1. MinIO and Typesense are optional (check .Values before applying)
+# 2. Only HapiHub accesses these services
+# 3. MyCureApp and Syncd do NOT need storage access
+# 4. External HTTPS needed for:
+#    - Payment APIs (Stripe, PayPal)
+#    - SMS APIs (Twilio)
+#    - Email services (SendGrid, SES)
+#    - Third-party integrations

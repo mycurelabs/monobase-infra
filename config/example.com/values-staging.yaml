@@ -1,0 +1,266 @@
+# Staging Configuration for example.com
+# This is a REFERENCE configuration - copy to config/yourclient/ and customize
+
+global:
+  # Base domain for all services (can be overridden per service)
+  domain: example.com
+  
+  # Namespace for this deployment ({client}-{env} pattern)
+  namespace: example-staging
+  
+  # Environment identifier
+  environment: staging
+  
+  # Shared Gateway reference (deployed once in gateway-system namespace)
+  gateway:
+    name: shared-gateway
+    namespace: gateway-system
+
+# ===== REQUIRED CORE: HapiHub API =====
+hapihub:
+  enabled: true
+  
+  image:
+    repository: ghcr.io/mycurelabs/hapihub
+    tag: "latest"  # TODO: Replace with specific version in production
+    pullPolicy: IfNotPresent
+  
+  # Minimal replicas for staging
+  replicas: 1
+  
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: 1
+      memory: 2Gi
+  
+  # Gateway configuration
+  gateway:
+    hostname: ""  # Empty = uses api.{global.domain} → api.example.com
+    # Or set explicitly: "api-staging.example.com"
+  
+  # Application configuration (via ConfigMap)
+  config:
+    NODE_ENV: staging
+    LOG_LEVEL: debug
+    # Database connection (from secrets)
+    # S3 configuration (from secrets or ConfigMap)
+  
+  # Health checks
+  livenessProbe:
+    enabled: true
+    path: /health
+    initialDelaySeconds: 30
+    periodSeconds: 10
+  
+  readinessProbe:
+    enabled: true
+    path: /ready
+    initialDelaySeconds: 10
+    periodSeconds: 5
+
+# ===== REQUIRED CORE: MyCureApp Frontend =====
+mycureapp:
+  enabled: true
+  
+  image:
+    repository: ghcr.io/mycurelabs/mycureapp
+    tag: "latest"  # TODO: Replace with specific version
+    pullPolicy: IfNotPresent
+  
+  replicas: 1
+  
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  
+  gateway:
+    hostname: ""  # Empty = uses app.{global.domain} → app.example.com
+
+# ===== OPTIONAL: Syncd Sync Service =====
+syncd:
+  enabled: false  # Enable if offline sync is needed
+  
+  image:
+    repository: ghcr.io/mycurelabs/syncd
+    tag: "latest"
+  
+  replicas: 1
+  
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 1Gi
+  
+  gateway:
+    hostname: ""  # Empty = uses sync.{global.domain}
+
+# ===== REQUIRED CORE: MongoDB Database =====
+mongodb:
+  enabled: true
+  
+  # Bitnami MongoDB chart configuration
+  architecture: replicaset
+  replicaCount: 1  # Staging uses single instance
+  
+  auth:
+    enabled: true
+    # Credentials from External Secrets
+  
+  persistence:
+    enabled: true
+    storageClass: longhorn
+    size: 20Gi  # Small for staging
+  
+  resources:
+    requests:
+      cpu: 500m
+      memory: 2Gi
+    limits:
+      cpu: 2
+      memory: 4Gi
+  
+  # Backup configuration
+  backup:
+    enabled: false  # Disabled for staging
+
+# ===== OPTIONAL: Typesense Search =====
+typesense:
+  enabled: false  # Enable if search features needed
+  
+  replicas: 1
+  
+  persistence:
+    enabled: true
+    storageClass: longhorn
+    size: 10Gi
+  
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: 1
+      memory: 1Gi
+
+# ===== OPTIONAL: MinIO Object Storage =====
+minio:
+  enabled: false  # Enable for self-hosted S3, or use external AWS S3
+  
+  # Bitnami MinIO chart configuration
+  mode: standalone  # Staging uses standalone mode
+  
+  persistence:
+    enabled: true
+    storageClass: longhorn
+    size: 50Gi  # Small for staging
+  
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: 1
+      memory: 2Gi
+  
+  gateway:
+    hostname: ""  # Empty = uses storage.{global.domain}
+    # Or use CDN: "cdn.example.com"
+
+# ===== STAGING ONLY: Mailpit Email Testing =====
+mailpit:
+  enabled: true  # ✅ Enable for staging to test emails
+  
+  resources:
+    requests:
+      cpu: 50m
+      memory: 50Mi
+    limits:
+      cpu: 200m
+      memory: 200Mi
+  
+  gateway:
+    hostname: mail.example.com  # Web UI access
+  
+  # No persistence needed - emails are ephemeral
+
+# ===== External Secrets Operator Configuration =====
+externalSecrets:
+  enabled: true
+  
+  # Choose your secrets provider
+  provider: aws  # Options: aws, azure, gcp, sops
+  
+  # Provider-specific configuration
+  aws:
+    region: us-east-1
+    secretStore: example-staging-secretstore
+  
+  # Secret mappings (see secrets-mapping.yaml for details)
+  secrets: []  # Populated from secrets-mapping.yaml
+
+# ===== Monitoring (Optional) =====
+monitoring:
+  enabled: false  # Usually disabled in staging to save resources
+  
+  prometheus:
+    retention: 7d
+    storage: 10Gi
+  
+  grafana:
+    enabled: false
+  
+  alertmanager:
+    enabled: false
+
+# ===== Backup Configuration =====
+backup:
+  enabled: false  # Usually disabled in staging
+  
+  # Velero backup schedules
+  schedules:
+    daily:
+      enabled: false
+    hourly:
+      enabled: false
+
+# ===== Network Policies =====
+networkPolicies:
+  enabled: true  # ✅ Always enable for security
+  
+  # Default deny all traffic
+  defaultDeny: true
+  
+  # Allow specific patterns
+  allowRules:
+    - gateway-to-apps
+    - apps-to-db
+    - apps-to-storage
+
+# ===== Pod Security Standards =====
+podSecurityStandards:
+  enabled: true
+  level: restricted  # ✅ Highest security level
+
+# ===== Autoscaling =====
+autoscaling:
+  enabled: false  # Usually disabled in staging
+  
+  hapihub:
+    minReplicas: 1
+    maxReplicas: 2
+    targetCPUUtilization: 70
+  
+  mycureapp:
+    minReplicas: 1
+    maxReplicas: 2
+    targetCPUUtilization: 70

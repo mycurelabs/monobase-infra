@@ -1,0 +1,95 @@
+# Azure Key Vault SecretStore
+# Template - replace {{ .Values.* }} with actual values
+
+apiVersion: external-secrets.io/v1beta1
+kind: SecretStore
+metadata:
+  name: {{ .Values.global.namespace }}-secretstore
+  namespace: {{ .Values.global.namespace }}
+spec:
+  provider:
+    azurekv:
+      vaultUrl: {{ .Values.externalSecrets.azure.vaultUrl }}
+      tenantId: {{ .Values.externalSecrets.azure.tenantId }}
+      
+      # Authentication via Workload Identity (recommended for AKS)
+      authType: WorkloadIdentity
+      serviceAccountRef:
+        name: {{ .Values.externalSecrets.serviceAccount | default "default" }}
+
+---
+# ServiceAccount with Workload Identity annotation
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ .Values.externalSecrets.serviceAccount | default "default" }}
+  namespace: {{ .Values.global.namespace }}
+  annotations:
+    azure.workload.identity/client-id: {{ .Values.externalSecrets.azure.clientId }}
+    azure.workload.identity/tenant-id: {{ .Values.externalSecrets.azure.tenantId }}
+
+---
+# Alternative: Managed Identity authentication
+# apiVersion: external-secrets.io/v1beta1
+# kind: SecretStore
+# metadata:
+#   name: azure-keyvault-mi
+#   namespace: myclient-prod
+# spec:
+#   provider:
+#     azurekv:
+#       vaultUrl: https://my-vault.vault.azure.net/
+#       authType: ManagedIdentity
+#       identityId: /subscriptions/sub-id/resourcegroups/rg/providers/Microsoft.ManagedIdentity/userAssignedIdentities/identity-name
+
+---
+# Azure Setup Instructions:
+#
+# 1. Create Azure Key Vault:
+#    az keyvault create --name myclient-prod-kv --resource-group myclient-rg
+#
+# 2. Create Managed Identity (for Workload Identity):
+#    az identity create --name myclient-prod-identity --resource-group myclient-rg
+#
+# 3. Grant Key Vault access:
+#    az keyvault set-policy --name myclient-prod-kv \
+#      --object-id <identity-object-id> \
+#      --secret-permissions get list
+#
+# 4. Configure Workload Identity on AKS
+#
+# 5. Create secrets in Key Vault:
+#    az keyvault secret set --vault-name myclient-prod-kv \
+#      --name mongodb-root-password --value "SecurePassword123!"
+#
+# 6. Create SecretStore and ExternalSecret resources
+
+---
+# Example ExternalSecret:
+#
+# apiVersion: external-secrets.io/v1beta1
+# kind: ExternalSecret
+# metadata:
+#   name: mongodb-credentials
+#   namespace: myclient-prod
+# spec:
+#   secretStoreRef:
+#     name: myclient-prod-secretstore
+#     kind: SecretStore
+#   target:
+#     name: mongodb-credentials
+#   data:
+#     - secretKey: root-password
+#       remoteRef:
+#         key: mongodb-root-password
+#     - secretKey: replica-set-key
+#       remoteRef:
+#         key: mongodb-replica-set-key
+
+---
+# Secret naming in Azure Key Vault:
+# Use hyphens instead of slashes (Key Vault requirement)
+# Examples:
+# - mongodb-root-password
+# - hapihub-jwt-secret
+# - minio-access-key

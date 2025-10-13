@@ -1,0 +1,116 @@
+# Allow Traffic from Gateway to Applications
+# Permits Envoy Gateway to route traffic to HapiHub, Syncd, MyCureApp
+
+---
+# Allow Gateway → HapiHub
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-gateway-to-hapihub
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    security-policy: allow-ingress
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: hapihub
+  
+  policyTypes:
+    - Ingress
+  
+  ingress:
+    # Allow from Gateway namespace
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: gateway-system
+      ports:
+        - protocol: TCP
+          port: 7500
+
+---
+# Allow Gateway → Syncd
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-gateway-to-syncd
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    security-policy: allow-ingress
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: syncd
+  
+  policyTypes:
+    - Ingress
+  
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: gateway-system
+      ports:
+        - protocol: TCP
+          port: 8080
+
+---
+# Allow Gateway → MyCureApp
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-gateway-to-mycureapp
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    security-policy: allow-ingress
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: mycureapp
+  
+  policyTypes:
+    - Ingress
+  
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: gateway-system
+      ports:
+        - protocol: TCP
+          port: 8080
+
+---
+# Allow Gateway → MinIO (if enabled)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-gateway-to-minio
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    security-policy: allow-ingress
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: minio
+  
+  policyTypes:
+    - Ingress
+  
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: gateway-system
+      ports:
+        - protocol: TCP
+          port: 9000  # S3 API
+
+---
+# Notes:
+# 1. Gateway namespace must be labeled:
+#    kubectl label namespace gateway-system kubernetes.io/metadata.name=gateway-system
+#
+# 2. This allows ONLY Gateway to reach applications
+# 3. Direct pod-to-pod traffic is still blocked
+# 4. Applications can't reach each other (use allow-apps-to-apps.yaml if needed)

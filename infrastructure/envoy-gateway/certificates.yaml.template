@@ -1,0 +1,75 @@
+# TLS Certificates for Envoy Gateway
+# Template - replace {{ .Values.* }} with actual values
+
+---
+# Wildcard Certificate for all subdomains
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: wildcard-{{ .Values.global.domain | replace "." "-" }}
+  namespace: gateway-system
+  labels:
+    cert-type: wildcard
+spec:
+  secretName: wildcard-tls-{{ .Values.global.domain | replace "." "-" }}
+  issuerRef:
+    name: letsencrypt-prod
+    kind: ClusterIssuer
+  commonName: "*.{{ .Values.global.domain }}"
+  dnsNames:
+    - "{{ .Values.global.domain }}"
+    - "*.{{ .Values.global.domain }}"
+  usages:
+    - digital signature
+    - key encipherment
+    - server auth
+  privateKey:
+    algorithm: RSA
+    size: 4096
+    rotationPolicy: Always
+
+---
+# Individual certificates per service (alternative approach)
+# Use this if you need different domains per service
+
+# HapiHub API Certificate
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: hapihub-tls
+  namespace: gateway-system
+spec:
+  secretName: hapihub-tls
+  issuerRef:
+    name: letsencrypt-prod
+    kind: ClusterIssuer
+  dnsNames:
+    - api.{{ .Values.global.domain }}
+  usages:
+    - digital signature
+    - key encipherment
+    - server auth
+
+---
+# Notes:
+#
+# 1. Certificate Approach Selection:
+#    - Use wildcard certificate (recommended): Covers all *.domain.com
+#    - Use individual certificates: One cert per service (more flexible)
+#
+# 2. DNS-01 vs HTTP-01:
+#    - Wildcard requires DNS-01 challenge (needs Route53/CloudDNS access)
+#    - Individual certs can use HTTP-01 (easier, no DNS API needed)
+#
+# 3. Auto-renewal:
+#    - cert-manager renews 30 days before expiry
+#    - Let's Encrypt certs valid for 90 days
+#
+# 4. Gateway Integration:
+#    - Gateway references certificateRefs in listener
+#    - cert-manager creates Secret with tls.crt and tls.key
+#    - Gateway mounts secret automatically
+#
+# 5. Monitoring:
+#    kubectl get certificate -n gateway-system
+#    kubectl describe certificate wildcard-example-com -n gateway-system

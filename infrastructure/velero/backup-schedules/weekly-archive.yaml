@@ -1,0 +1,152 @@
+# Velero Weekly Archive Backup Schedule (Tier 3 - Long-term)
+# Weekly backups with 90-day retention for compliance
+
+apiVersion: velero.io/v1
+kind: Schedule
+metadata:
+  name: weekly-archive
+  namespace: velero
+  labels:
+    backup-tier: tier3-archive
+    backup-frequency: weekly
+spec:
+  # Schedule: Sunday at 3 AM
+  schedule: "0 3 * * 0"
+  
+  # Backup template
+  template:
+    # Backup entire client namespace
+    includedNamespaces:
+      - "{{ .Values.global.namespace }}"
+    
+    # Include cluster resources for full recovery
+    includeClusterResources: false
+    
+    # Storage location (archive - different bucket for cold storage)
+    storageLocation: archive
+    
+    # Volume snapshots
+    volumeSnapshotLocations:
+      - default
+    
+    # TTL (Time To Live) - 90 days for compliance
+    ttl: 2160h  # 2160 hours = 90 days
+    
+    # Snapshot volumes
+    snapshotVolumes: true
+    
+    # Use file-system backup
+    defaultVolumesToFsBackup: true
+    
+    # Move snapshot data to S3 (not just metadata)
+    snapshotMoveData: true
+    
+    # Ordered resources (complete backup)
+    orderedResources:
+      - customresourcedefinitions
+      - namespaces
+      - storageclasses
+      - volumesnapshotclass.snapshot.storage.k8s.io
+      - volumesnapshotcontents.snapshot.storage.k8s.io
+      - volumesnapshots.snapshot.storage.k8s.io
+      - persistentvolumes
+      - persistentvolumeclaims
+      - secrets
+      - configmaps
+      - serviceaccounts
+      - roles.rbac.authorization.k8s.io
+      - rolebindings.rbac.authorization.k8s.io
+      - networkpolicies.networking.k8s.io
+      - services
+      - deployments.apps
+      - statefulsets.apps
+      - daemonsets.apps
+      - jobs.batch
+      - cronjobs.batch
+      - ingresses.networking.k8s.io
+      - httproutes.gateway.networking.k8s.io
+    
+    # Metadata
+    labels:
+      backup-schedule: weekly-archive
+      environment: "{{ .Values.global.environment }}"
+      client: "{{ .Values.global.namespace }}"
+      backup-type: archive
+      compliance: hipaa
+
+---
+# HIPAA Compliance Notes:
+#
+# 1. Retention: 90 days minimum for audit trails
+# 2. Encryption: AES256 server-side encryption enabled
+# 3. Access Control: IAM policies restrict S3 bucket access
+# 4. Audit Logging: S3 bucket logging + CloudTrail
+# 5. Immutability: Consider S3 Object Lock for compliance
+#
+# For HIPAA, you may need:
+# - S3 Object Lock (prevents deletion/modification)
+# - MFA Delete on S3 bucket
+# - Backup encryption with KMS (not just AES256)
+# - Longer retention (6-7 years for some data)
+
+---
+# S3 Bucket Configuration for Archive (Terraform example):
+#
+# resource "aws_s3_bucket" "velero_archive" {
+#   bucket = "myclient-prod-archive"
+#   
+#   versioning {
+#     enabled = true
+#   }
+#   
+#   server_side_encryption_configuration {
+#     rule {
+#       apply_server_side_encryption_by_default {
+#         sse_algorithm     = "aws:kms"
+#         kms_master_key_id = aws_kms_key.velero.id
+#       }
+#     }
+#   }
+#   
+#   lifecycle_rule {
+#     enabled = true
+#     
+#     transition {
+#       days          = 30
+#       storage_class = "STANDARD_IA"
+#     }
+#     
+#     transition {
+#       days          = 90
+#       storage_class = "GLACIER"
+#     }
+#   }
+#   
+#   object_lock_configuration {
+#     object_lock_enabled = "Enabled"
+#     
+#     rule {
+#       default_retention {
+#         mode = "COMPLIANCE"
+#         days = 90
+#       }
+#     }
+#   }
+# }
+
+---
+# Restore Testing Schedule:
+# Test restores monthly to verify backups are working!
+#
+# 1. Create test namespace:
+#    kubectl create namespace myclient-restore-test
+#
+# 2. Restore to test namespace:
+#    velero restore create test-restore-$(date +%Y%m%d) \
+#      --from-backup weekly-archive-20250115030000 \
+#      --namespace-mappings myclient-prod:myclient-restore-test
+#
+# 3. Verify data integrity
+#
+# 4. Cleanup test namespace:
+#    kubectl delete namespace myclient-restore-test

@@ -1,0 +1,24 @@
+{{- if and .Values.enabled .Values.gateway.enabled }}
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: {{ include "mycureapp.fullname" . }}
+  namespace: {{ include "mycureapp.namespace" . }}
+  labels:
+    {{- include "mycureapp.labels" . | nindent 4 }}
+spec:
+  parentRefs:
+    - name: {{ include "mycureapp.gateway.name" . }}
+      namespace: {{ include "mycureapp.gateway.namespace" . }}
+  hostnames:
+    - {{ include "mycureapp.gateway.hostname" . }}
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      backendRefs:
+        - name: {{ include "mycureapp.fullname" . }}
+          port: {{ .Values.service.port }}
+          weight: 1
+{{- end }}

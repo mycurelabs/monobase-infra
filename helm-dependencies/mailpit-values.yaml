@@ -1,0 +1,123 @@
+# Community Mailpit Helm Chart Configuration
+# Chart: https://github.com/jouve/charts/tree/main/charts/mailpit
+# Version: 0.20.0
+
+# Mailpit is an email testing tool for dev/staging ONLY
+# NEVER enable in production - use real SMTP instead
+
+# Reference: https://artifacthub.io/packages/helm/jouve/mailpit
+
+# Single replica (dev/staging only, no HA needed)
+replicaCount: 1
+
+image:
+  repository: axllent/mailpit
+  tag: "v1.19"
+  pullPolicy: IfNotPresent
+
+# Service configuration
+service:
+  type: ClusterIP
+  ports:
+    smtp: 1025    # SMTP server
+    http: 8025    # Web UI
+
+# Resource limits (minimal for staging)
+resources:
+  requests:
+    cpu: 50m
+    memory: 50Mi
+  limits:
+    cpu: 200m
+    memory: 200Mi
+
+# Persistence (optional - emails are ephemeral)
+persistence:
+  enabled: false
+  # Enable only if you want to keep emails across restarts
+  # storageClass: longhorn
+  # size: 1Gi
+
+# Security Context
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  fsGroup: 1000
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+
+# Environment variables
+env:
+  - name: MP_SMTP_AUTH_ACCEPT_ANY
+    value: "true"  # Accept any SMTP auth (testing only)
+  
+  - name: MP_SMTP_AUTH_ALLOW_INSECURE
+    value: "true"  # Allow insecure auth (testing only)
+  
+  - name: MP_MAX_MESSAGES
+    value: "1000"  # Keep last 1000 emails
+  
+  - name: MP_UI_AUTH_FILE
+    value: ""  # No auth for staging (internal only)
+
+# Gateway API routing (web UI only)
+# Access via: https://mail.{domain}
+gateway:
+  enabled: true
+  hostname: ""  # Will be set to mail.{global.domain}
+  parentRefs:
+    - name: shared-gateway
+      namespace: gateway-system
+
+# Network Policy
+networkPolicy:
+  enabled: true
+  ingress:
+    # Allow SMTP from HapiHub
+    - from:
+      - podSelector:
+          matchLabels:
+            app.kubernetes.io/name: hapihub
+      ports:
+      - protocol: TCP
+        port: 1025
+    
+    # Allow HTTP from Gateway (web UI)
+    - from:
+      - namespaceSelector:
+          matchLabels:
+            name: gateway-system
+      ports:
+      - protocol: TCP
+        port: 8025
+
+# Health checks
+livenessProbe:
+  httpGet:
+    path: /
+    port: 8025
+  initialDelaySeconds: 10
+  periodSeconds: 10
+
+readinessProbe:
+  httpGet:
+    path: /
+    port: 8025
+  initialDelaySeconds: 5
+  periodSeconds: 5
+
+# HapiHub SMTP Configuration (when Mailpit is enabled):
+# SMTP_HOST: mailpit-svc.{namespace}.svc.cluster.local
+# SMTP_PORT: 1025
+# SMTP_SECURE: false
+# SMTP_AUTH_USER: any  # Ignored, accepts anything
+# SMTP_AUTH_PASS: any  # Ignored, accepts anything
+
+# Production SMTP alternatives:
+# - SendGrid (https://sendgrid.com)
+# - AWS SES (https://aws.amazon.com/ses/)
+# - Postmark (https://postmarkapp.com)
+# - Mailgun (https://www.mailgun.com)
+# - SparkPost (https://www.sparkpost.com)

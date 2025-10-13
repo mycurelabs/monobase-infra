@@ -1,0 +1,116 @@
+# Pod Security Standards (PSS) Configuration
+# Enforces security controls at namespace level
+# Template - replace {{ .Values.* }} with actual values
+
+---
+# Apply PSS labels to namespace
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ .Values.global.namespace }}
+  labels:
+    # Enforce restricted security profile
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/enforce-version: latest
+    
+    # Audit violations (log but don't block)
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/audit-version: latest
+    
+    # Warn on violations
+    pod-security.kubernetes.io/warn: restricted
+    pod-security.kubernetes.io/warn-version: latest
+    
+    # Additional labels for isolation
+    kubernetes.io/metadata.name: {{ .Values.global.namespace }}
+    environment: {{ .Values.global.environment }}
+
+---
+# Pod Security Standards Levels:
+#
+# 1. Privileged (permissive):
+#    - No restrictions
+#    - Use for: System components only
+#
+# 2. Baseline (minimal restrictions):
+#    - Prevents known privilege escalations
+#    - Use for: Most applications
+#
+# 3. Restricted (hardened):
+#    - Strictest security controls
+#    - Use for: Production, HIPAA compliance ✅
+#
+# We use RESTRICTED for all client namespaces!
+
+---
+# Restricted Profile Requirements:
+#
+# ✅ runAsNonRoot: true
+# ✅ allowPrivilegeEscalation: false
+# ✅ capabilities.drop: [ALL]
+# ✅ seccompProfile.type: RuntimeDefault or Localhost
+# ❌ hostNetwork: false
+# ❌ hostPID: false
+# ❌ hostIPC: false
+# ❌ privileged: false
+# ❌ hostPath volumes: not allowed
+#
+# All our Helm charts already comply with these requirements!
+
+---
+# Apply PSS labels:
+# kubectl label namespace myclient-prod \
+#   pod-security.kubernetes.io/enforce=restricted \
+#   pod-security.kubernetes.io/audit=restricted \
+#   pod-security.kubernetes.io/warn=restricted
+
+---
+# Test compliance:
+# This pod should be REJECTED:
+#
+# apiVersion: v1
+# kind: Pod
+# metadata:
+#   name: test-privileged
+#   namespace: myclient-prod
+# spec:
+#   containers:
+#   - name: test
+#     image: nginx
+#     securityContext:
+#       privileged: true  # ❌ REJECTED!
+#
+# Error: pods "test-privileged" is forbidden: violates PodSecurity "restricted:latest"
+
+---
+# This pod should be ALLOWED:
+#
+# apiVersion: v1
+# kind: Pod
+# metadata:
+#   name: test-compliant
+#   namespace: myclient-prod
+# spec:
+#   securityContext:
+#     runAsNonRoot: true
+#     runAsUser: 1000
+#     fsGroup: 1000
+#     seccompProfile:
+#       type: RuntimeDefault
+#   containers:
+#   - name: test
+#     image: nginx
+#     securityContext:
+#       allowPrivilegeEscalation: false
+#       capabilities:
+#         drop:
+#           - ALL
+#       readOnlyRootFilesystem: true  # ✅ ALLOWED!
+
+---
+# HIPAA Compliance:
+# Pod Security Standards help meet HIPAA requirements:
+# 1. Access Controls - Prevent privilege escalation
+# 2. Technical Safeguards - Hardened container security
+# 3. Integrity Controls - Read-only filesystems
+# 4. Audit Controls - PSS violations are logged

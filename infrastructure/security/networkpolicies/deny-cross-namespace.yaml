@@ -1,0 +1,89 @@
+# Deny Cross-Namespace Traffic
+# Prevents communication between different client namespaces
+# Critical for multi-tenant clusters
+
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: deny-cross-namespace
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    security-policy: deny-cross-namespace
+spec:
+  podSelector: {}  # Applies to all pods
+  
+  policyTypes:
+    - Ingress
+    - Egress
+  
+  ingress:
+    # Only allow from same namespace
+    - from:
+        - podSelector: {}
+    
+    # Allow from Gateway (exception)
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: gateway-system
+    
+    # Allow from monitoring (exception, if enabled)
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+  
+  egress:
+    # Allow to same namespace
+    - to:
+        - podSelector: {}
+    
+    # Allow to kube-system (DNS, API server)
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+    
+    # Allow to internet (HTTPS)
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: TCP
+          port: 443
+
+---
+# Why deny cross-namespace?
+#
+# 1. Multi-tenant isolation
+# 2. Prevents client A accessing client B's data
+# 3. Limits blast radius of compromised pod
+# 4. HIPAA compliance requirement
+# 5. Defense in depth
+#
+# Exceptions (allowed cross-namespace):
+# - Gateway → All client namespaces (routing)
+# - Monitoring → All namespaces (metrics collection)
+# - DNS → All namespaces (service discovery)
+
+---
+# Testing:
+# 1. Deploy in two namespaces (client-a-prod, client-b-prod)
+# 2. Try to access from client-a to client-b:
+#    kubectl run test -n client-a-prod --image=busybox -it --rm -- \
+#      wget -O- http://hapihub.client-b-prod:7500
+#    # Should FAIL!
+#
+# 3. Try to access within same namespace:
+#    kubectl run test -n client-a-prod --image=busybox -it --rm -- \
+#      wget -O- http://hapihub.client-a-prod:7500
+#    # Should work (if other policies allow)
+
+---
+# For shared services (e.g., shared monitoring):
+# Add exception to allow specific namespaces:
+#
+# egress:
+#   - to:
+#       - namespaceSelector:
+#           matchLabels:
+#             shared-service: monitoring

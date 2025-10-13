@@ -1,0 +1,93 @@
+# Envoy Gateway - Helm Values
+# Chart: https://gateway.envoyproxy.io/
+# Version: 1.0.x+
+
+# Envoy Gateway configuration
+config:
+  envoyGateway:
+    gateway:
+      controllerName: gateway.envoyproxy.io/gatewayclass-controller
+    
+    provider:
+      type: Kubernetes
+      kubernetes:
+        # Rate limiting (optional)
+        rateLimitDeployment:
+          replicas: 2
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+    
+    logging:
+      level:
+        default: info
+
+# Deployment settings
+deployment:
+  replicas: 2  # HA for gateway controller
+  
+  pod:
+    affinity:
+      podAntiAffinity:
+        preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchLabels:
+                  control-plane: envoy-gateway
+              topologyKey: kubernetes.io/hostname
+    
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+    
+    securityContext:
+      runAsNonRoot: true
+      runAsUser: 65532
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop:
+          - ALL
+      seccompProfile:
+        type: RuntimeDefault
+
+# Service settings
+service:
+  type: ClusterIP
+  annotations: {}
+
+# Create GatewayClass automatically
+createNamespace: true
+
+# RBAC
+rbac:
+  create: true
+
+# ServiceAccount
+serviceAccount:
+  create: true
+  annotations: {}
+
+# Pod Disruption Budget
+podDisruptionBudget:
+  minAvailable: 1
+
+# Monitoring
+metrics:
+  enabled: false  # Enable when monitoring stack is deployed
+  port: 8080
+
+# Notes:
+# 1. This installs the Envoy Gateway controller
+# 2. Create Gateway resource separately (see gateway.yaml)
+# 3. GatewayClass is created automatically
+# 4. Gateway creates LoadBalancer Service automatically
+# 5. HTTPRoutes are created per application (in app Helm charts)

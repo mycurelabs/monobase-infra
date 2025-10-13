@@ -1,0 +1,134 @@
+# Longhorn Distributed Block Storage - Helm Values
+# Chart: https://github.com/longhorn/charts
+# Version: 1.6.x
+
+# Default StorageClass settings
+defaultSettings:
+  # Backup target (S3 or NFS)
+  # Example: s3://backup-bucket@us-east-1/longhorn
+  backupTarget: ""  # Set in client configuration
+  backupTargetCredentialSecret: longhorn-backup-credentials
+  
+  # Replication settings
+  defaultReplicaCount: 3  # 3-way replication for HA
+  guaranteedInstanceManagerCPU: 12  # Percent
+  
+  # Snapshot settings
+  snapshotDataIntegrity: enabled
+  snapshotDataIntegrityCronjob: "0 3 */7 * *"  # Weekly integrity check
+  
+  # Performance settings
+  storageOverProvisioningPercentage: 200
+  storageMinimalAvailablePercentage: 25
+  
+  # Encryption settings
+  defaultDataLocality: disabled  # Set to "best-effort" for performance
+  
+  # Node drain settings
+  nodeDownPodDeletionPolicy: delete-both-statefulset-and-deployment-pod
+  allowNodeDrainWithLastHealthyReplica: false
+  
+  # Priority class
+  priorityClass: system-cluster-critical
+  
+  # Orphan auto-deletion
+  orphanAutoDeletion: true
+
+# Persistence settings
+persistence:
+  defaultClass: true
+  defaultFsType: ext4
+  defaultClassReplicaCount: 3
+  defaultDataLocality: disabled
+  reclaimPolicy: Retain  # Retain for safety
+  migratable: false
+  recurringJobSelector:
+    enable: true
+    jobList: []  # See backup-config.yaml for recurring jobs
+
+# Longhorn Manager (control plane)
+longhornManager:
+  priorityClass: system-cluster-critical
+  tolerations: []
+  nodeSelector: {}
+  
+# Longhorn Driver (CSI driver)
+longhornDriver:
+  priorityClass: system-cluster-critical
+  tolerations: []
+  nodeSelector: {}
+
+# Longhorn UI
+longhornUI:
+  replicas: 2  # HA for UI
+  priorityClass: system-cluster-critical
+  tolerations: []
+  nodeSelector: {}
+
+# CSI plugin settings
+csi:
+  kubeletRootDir: /var/lib/kubelet
+  attacherReplicaCount: 3
+  provisionerReplicaCount: 3
+  resizerReplicaCount: 3
+  snapshotterReplicaCount: 3
+
+# Ingress (use Gateway API HTTPRoute instead)
+ingress:
+  enabled: false  # We use Gateway API
+
+# Service settings
+service:
+  ui:
+    type: ClusterIP
+    nodePort: null
+  manager:
+    type: ClusterIP
+    nodePort: null
+
+# Network policies
+networkPolicies:
+  enabled: true
+  type: k8s  # Use Kubernetes NetworkPolicies
+
+# Resource limits
+resources:
+  limits:
+    cpu: 1
+    memory: 2Gi
+  requests:
+    cpu: 500m
+    memory: 1Gi
+
+# Monitoring
+serviceMonitor:
+  enabled: false  # Enable when monitoring stack is deployed
+
+# Upgrade strategy
+longhornUpgradeStrategy:
+  upgradeInstaller: true
+  upgradeEngine: true
+
+# Security settings
+securityContext:
+  runAsUser: 0  # Required by Longhorn
+  runAsNonRoot: false  # Longhorn requires root for device management
+  privileged: true  # Required for mounting
+
+# Enable CSI snapshot support
+enableCSISnapshot: true
+
+# System namespaces (where Longhorn will NOT provision volumes)
+ignoreReservedNamespaces: true
+systemNamespaces: "kube-system,kube-public,kube-node-lease,longhorn-system,cattle-system,cattle-fleet-system,rancher-system"
+
+# V2 Data Engine (experimental)
+v2DataEngine:
+  enabled: false  # Enable for better performance (requires kernel 5.15+)
+
+# Notes:
+# 1. Set backupTarget in client config (S3 bucket or NFS)
+# 2. Create longhorn-backup-credentials secret with S3 creds
+# 3. Enable serviceMonitor after deploying monitoring stack
+# 4. See backup-config.yaml for recurring backup jobs
+# 5. Access UI via: kubectl port-forward -n longhorn-system svc/longhorn-frontend 8080:80

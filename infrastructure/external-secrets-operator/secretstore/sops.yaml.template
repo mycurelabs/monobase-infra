@@ -1,0 +1,129 @@
+# SOPS SecretStore (for encrypted files in Git)
+# Template - replace {{ .Values.* }} with actual values
+# SOPS encrypts files using AWS KMS, GCP KMS, Azure Key Vault, or age keys
+
+apiVersion: external-secrets.io/v1beta1
+kind: SecretStore
+metadata:
+  name: {{ .Values.global.namespace }}-secretstore
+  namespace: {{ .Values.global.namespace }}
+spec:
+  provider:
+    sopssecrets:
+      provider: aws  # Options: aws, gcp, azure, age
+      
+      # AWS KMS configuration
+      aws:
+        region: {{ .Values.externalSecrets.sops.region | default "us-east-1" }}
+        kmsKeyId: {{ .Values.externalSecrets.sops.kmsKeyArn }}
+        
+        # Authentication via IRSA
+        auth:
+          jwt:
+            serviceAccountRef:
+              name: {{ .Values.externalSecrets.serviceAccount | default "default" }}
+
+---
+# Alternative: age-based encryption (no cloud dependency)
+# apiVersion: external-secrets.io/v1beta1
+# kind: SecretStore
+# metadata:
+#   name: sops-age
+#   namespace: myclient-prod
+# spec:
+#   provider:
+#     sopssecrets:
+#       provider: age
+#       age:
+#         privateKeySecretRef:
+#           name: age-private-key
+#           key: age.key
+
+---
+# Age private key Secret (if using age)
+# apiVersion: v1
+# kind: Secret
+# metadata:
+#   name: age-private-key
+#   namespace: myclient-prod
+# type: Opaque
+# stringData:
+#   age.key: |
+#     AGE-SECRET-KEY-...
+
+---
+# SOPS Setup Instructions:
+#
+# 1. Install SOPS:
+#    brew install sops  # macOS
+#    # Or download from: https://github.com/mozilla/sops
+#
+# 2. Create KMS key (AWS example):
+#    aws kms create-key --description "SOPS encryption key"
+#    aws kms create-alias --alias-name alias/sops --target-key-id <key-id>
+#
+# 3. Create .sops.yaml in repo:
+#    creation_rules:
+#      - path_regex: secrets/.*\.yaml$
+#        kms: 'arn:aws:kms:us-east-1:123456789012:key/key-id'
+#
+# 4. Encrypt secrets file:
+#    sops -e secrets/prod.yaml > secrets/prod.enc.yaml
+#
+# 5. Commit encrypted file to Git (safe!)
+#
+# 6. Create ExternalSecret pointing to encrypted file
+
+---
+# Example encrypted secrets file structure:
+#
+# # secrets/prod.yaml (before encryption)
+# mongodb:
+#   root-password: SecurePassword123!
+#   replica-set-key: ReplicaSetKey456!
+# hapihub:
+#   jwt-secret: JwtSecretToken789!
+#
+# # After encryption with SOPS:
+# # secrets/prod.enc.yaml
+# mongodb:
+#   root-password: ENC[AES256_GCM,data:...,iv:...,tag:...,type:str]
+#   replica-set-key: ENC[AES256_GCM,data:...,iv:...,tag:...,type:str]
+# hapihub:
+#   jwt-secret: ENC[AES256_GCM,data:...,iv:...,tag:...,type:str]
+# sops:
+#   kms:
+#     - arn: arn:aws:kms:us-east-1:123456789012:key/key-id
+#       created_at: '2025-01-15T10:00:00Z'
+
+---
+# Example ExternalSecret with SOPS:
+#
+# apiVersion: external-secrets.io/v1beta1
+# kind: ExternalSecret
+# metadata:
+#   name: mongodb-credentials
+#   namespace: myclient-prod
+# spec:
+#   secretStoreRef:
+#     name: myclient-prod-secretstore
+#     kind: SecretStore
+#   target:
+#     name: mongodb-credentials
+#   dataFrom:
+#     - extract:
+#         key: secrets/prod.enc.yaml
+#         property: mongodb
+
+---
+# Benefits of SOPS:
+# 1. Secrets stored in Git (encrypted)
+# 2. Version controlled
+# 3. Auditable (Git history)
+# 4. GitOps-friendly
+# 5. No separate secrets management service
+#
+# Drawbacks:
+# 1. Manual key rotation
+# 2. Need KMS access for decryption
+# 3. Secrets visible in Git (even if encrypted)

@@ -1,0 +1,39 @@
+# ArgoCD Application: Envoy Gateway
+# Sync Wave 1 - Deploy gateway infrastructure
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: envoy-gateway
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  
+  source:
+    chart: gateway-helm
+    repoURL: https://gateway.envoyproxy.io
+    targetRevision: 1.0.0
+    helm:
+      releaseName: envoy-gateway
+      values: |
+        {{- toYaml .Values.envoyGateway | nindent 8 }}
+  
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: envoy-gateway-system
+  
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        maxDuration: 3m

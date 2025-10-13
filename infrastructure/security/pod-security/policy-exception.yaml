@@ -1,0 +1,101 @@
+# Pod Security Standards Policy Exceptions
+# Use sparingly - only for components that cannot meet restricted profile
+
+# This file documents how to create exceptions for specific workloads
+# that cannot comply with the restricted Pod Security Standard
+
+---
+# Example: Exception for Longhorn (requires privileged mode)
+# Note: Longhorn is deployed in longhorn-system namespace, which should have
+# a less restrictive PSS level (baseline or privileged)
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: longhorn-system
+  labels:
+    # Longhorn requires privileged mode for device management
+    pod-security.kubernetes.io/enforce: privileged
+    pod-security.kubernetes.io/audit: privileged
+    pod-security.kubernetes.io/warn: privileged
+
+---
+# Example: Exception for specific pod via annotation
+# If you absolutely must run a pod that violates restricted profile
+
+# NOT RECOMMENDED - Fix the pod to comply instead!
+# This is for legacy applications that cannot be modified
+
+# Option 1: Relax namespace-level policy
+# (Not recommended - affects all pods in namespace)
+
+# Option 2: Use separate namespace with lower PSS level
+# kubectl create namespace special-workloads
+# kubectl label namespace special-workloads \
+#   pod-security.kubernetes.io/enforce=baseline
+
+---
+# When to Use Exceptions
+
+# ✅ System Components:
+# - CSI drivers (Longhorn, EBS CSI, etc.)
+# - Network plugins (Calico, Cilium)
+# - Monitoring agents (node exporters)
+# - Log forwarders (Fluent Bit)
+
+# ❌ Application Workloads:
+# - Never relax PSS for applications
+# - Fix the application to comply with restricted profile
+# - All HapiHub, Syncd, MyCureApp pods MUST be compliant
+
+---
+# Exception Documentation
+
+# If you create an exception, document:
+# 1. Why the exception is needed
+# 2. What specific requirement cannot be met
+# 3. Compensating controls (if any)
+# 4. Plan to remove exception (if possible)
+# 5. Risk assessment
+
+# Example Documentation:
+# 
+# Exception: Longhorn in longhorn-system namespace
+# Reason: Requires privileged mode for block device management
+# Cannot Meet: runAsNonRoot (needs root for device access)
+# Compensating Controls:
+#   - Isolated namespace (longhorn-system)
+#   - NetworkPolicies restrict traffic
+#   - RBAC limits service account permissions
+#   - Regular security updates applied
+# Removal Plan: None - inherent requirement of CSI driver
+# Risk: LOW - isolated, audited, necessary for functionality
+
+---
+# Audit Exception Usage
+
+# List all namespaces with non-restricted PSS
+# kubectl get namespaces -o json | \
+#   jq -r '.items[] | select(.metadata.labels."pod-security.kubernetes.io/enforce" != "restricted") | .metadata.name'
+
+# Expected exceptions:
+# - kube-system (privileged)
+# - longhorn-system (privileged)
+# - envoy-gateway-system (baseline)
+# - cert-manager (baseline)
+# - external-secrets-system (baseline)
+
+# All client namespaces should be: restricted ✅
+
+---
+# HIPAA Compliance Note
+
+# For HIPAA compliance:
+# - Document all PSS exceptions in System Security Plan
+# - Justify why restricted profile cannot be used
+# - Implement compensating controls
+# - Regular security reviews of excepted workloads
+# - Include in annual risk assessment
+
+# Client application namespaces MUST use restricted profile
+# No exceptions allowed for PHI-handling workloads

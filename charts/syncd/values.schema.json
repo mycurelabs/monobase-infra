@@ -1,0 +1,43 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Syncd Helm Chart Values",
+  "description": "Configuration values for Syncd real-time sync service",
+  "type": "object",
+  "properties": {
+    "global": {
+      "type": "object",
+      "required": ["domain", "namespace", "environment"],
+      "properties": {
+        "domain": {"type": "string"},
+        "namespace": {"type": "string"},
+        "environment": {"type": "string", "enum": ["development", "staging", "production"]},
+        "gateway": {
+          "type": "object",
+          "properties": {
+            "name": {"type": "string"},
+            "namespace": {"type": "string"}
+          }
+        }
+      }
+    },
+    "enabled": {"type": "boolean", "default": false, "description": "Enable Syncd (optional component)"},
+    "replicaCount": {"type": "integer", "minimum": 1, "default": 2},
+    "image": {
+      "type": "object",
+      "required": ["repository", "tag"],
+      "properties": {
+        "repository": {"type": "string"},
+        "tag": {"type": "string"},
+        "pullPolicy": {"type": "string", "enum": ["Always", "IfNotPresent", "Never"]}
+      }
+    },
+    "gateway": {
+      "type": "object",
+      "properties": {
+        "enabled": {"type": "boolean", "default": true},
+        "hostname": {"type": "string", "description": "Custom hostname or empty for sync.{global.domain}"}
+      }
+    }
+  },
+  "required": ["global", "enabled"]
+}

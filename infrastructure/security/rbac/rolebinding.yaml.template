@@ -1,0 +1,82 @@
+# RBAC Role Bindings
+# Bind service accounts to their roles
+
+---
+# HapiHub RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: hapihub
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    app.kubernetes.io/name: hapihub
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: hapihub
+subjects:
+  - kind: ServiceAccount
+    name: hapihub
+    namespace: {{ .Values.global.namespace }}
+
+---
+# Syncd RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: syncd
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    app.kubernetes.io/name: syncd
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: syncd
+subjects:
+  - kind: ServiceAccount
+    name: syncd
+    namespace: {{ .Values.global.namespace }}
+
+---
+# MyCureApp RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: mycureapp
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    app.kubernetes.io/name: mycureapp
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: mycureapp
+subjects:
+  - kind: ServiceAccount
+    name: mycureapp
+    namespace: {{ .Values.global.namespace }}
+
+---
+# External Secrets RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: external-secrets
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    app.kubernetes.io/name: external-secrets
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: external-secrets
+subjects:
+  - kind: ServiceAccount
+    name: external-secrets
+    namespace: {{ .Values.global.namespace }}
+
+---
+# Verify RBAC:
+# kubectl auth can-i get secrets --as=system:serviceaccount:myclient-prod:hapihub -n myclient-prod
+# # Should return: yes
+#
+# kubectl auth can-i delete pods --as=system:serviceaccount:myclient-prod:hapihub -n myclient-prod
+# # Should return: no

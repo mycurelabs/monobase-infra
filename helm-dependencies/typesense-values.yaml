@@ -1,0 +1,133 @@
+# Official Typesense Helm Chart Configuration
+# Chart: https://github.com/typesense/typesense-kubernetes
+# Version: 0.4.0
+
+# These values override the Typesense defaults
+# Reference: https://artifacthub.io/packages/helm/typesense/typesense
+
+# Replica count for HA
+replicaCount: 3
+
+image:
+  repository: typesense/typesense
+  tag: "26.0"  # Pin specific version
+  pullPolicy: IfNotPresent
+
+# API key authentication
+# IMPORTANT: Store in External Secrets, not in values
+env:
+  - name: TYPESENSE_API_KEY
+    valueFrom:
+      secretKeyRef:
+        name: typesense-credentials
+        key: admin-api-key
+  
+  # Data directory
+  - name: TYPESENSE_DATA_DIR
+    value: /usr/share/typesense/data
+  
+  # Enable CORS
+  - name: TYPESENSE_ENABLE_CORS
+    value: "true"
+  
+  # Performance tuning
+  - name: TYPESENSE_NUM_THREADS
+    value: "4"
+
+# Persistence
+persistence:
+  enabled: true
+  storageClass: longhorn
+  size: 50Gi
+  accessMode: ReadWriteOnce
+
+# Resource limits
+resources:
+  requests:
+    cpu: 750m
+    memory: 1.5Gi
+  limits:
+    cpu: 2
+    memory: 3Gi
+
+# Service
+service:
+  type: ClusterIP
+  port: 8108
+
+# Security Context
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 10000
+  fsGroup: 10000
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+
+# Pod Disruption Budget
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 2
+
+# Affinity - spread across nodes
+affinity:
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        podAffinityTerm:
+          labelSelector:
+            matchExpressions:
+              - key: app.kubernetes.io/name
+                operator: In
+                values:
+                  - typesense
+          topologyKey: kubernetes.io/hostname
+
+# Backup configuration
+# Typesense supports snapshot backups
+backup:
+  enabled: true
+  schedule: "0 3 * * *"  # Daily at 3 AM
+  retention: 30  # 30 days
+
+# Network access
+# Typesense is accessed internally by HapiHub only
+networkPolicy:
+  enabled: true
+  ingress:
+    - from:
+      - podSelector:
+          matchLabels:
+            app.kubernetes.io/name: hapihub
+      ports:
+      - protocol: TCP
+        port: 8108
+
+# Monitoring
+serviceMonitor:
+  enabled: false  # Enable when monitoring is enabled
+  interval: 30s
+  path: /metrics
+
+# Health checks
+livenessProbe:
+  httpGet:
+    path: /health
+    port: 8108
+  initialDelaySeconds: 30
+  periodSeconds: 10
+
+readinessProbe:
+  httpGet:
+    path: /health
+    port: 8108
+  initialDelaySeconds: 10
+  periodSeconds: 5
+
+# Notes:
+# - Typesense is a lightweight alternative to Elasticsearch
+# - Much lower resource requirements
+# - Excellent for <10M documents
+# - RESTful API with SDKs
+# - Typo tolerance, faceting, geo-search built-in

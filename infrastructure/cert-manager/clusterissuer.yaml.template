@@ -1,0 +1,149 @@
+# cert-manager ClusterIssuer Configuration
+# Automated TLS certificate management
+
+---
+# Let's Encrypt Production (Trusted Certificates)
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-prod
+spec:
+  acme:
+    # Let's Encrypt production server
+    server: https://acme-v02.api.letsencrypt.org/directory
+    
+    # Email for certificate expiry notifications
+    email: admin@{{ .Values.global.domain }}
+    
+    # Private key secret
+    privateKeySecretRef:
+      name: letsencrypt-prod-account-key
+    
+    # Solvers for domain validation
+    solvers:
+      # HTTP-01 challenge (for single domains)
+      - http01:
+          ingress:
+            class: envoy-gateway
+      
+      # DNS-01 challenge (for wildcard certificates)
+      - dns01:
+          # AWS Route53 (if using AWS)
+          route53:
+            region: {{ .Values.externalSecrets.aws.region }}
+            # IAM role via IRSA
+            auth:
+              kubernetes:
+                serviceAccountRef:
+                  name: cert-manager
+        selector:
+          dnsZones:
+            - {{ .Values.global.domain }}
+
+---
+# Let's Encrypt Staging (For Testing)
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-staging
+spec:
+  acme:
+    server: https://acme-staging-v02.api.letsencrypt.org/directory
+    email: admin@{{ .Values.global.domain }}
+    privateKeySecretRef:
+      name: letsencrypt-staging-account-key
+    solvers:
+      - http01:
+          ingress:
+            class: envoy-gateway
+      - dns01:
+          route53:
+            region: {{ .Values.externalSecrets.aws.region }}
+            auth:
+              kubernetes:
+                serviceAccountRef:
+                  name: cert-manager
+
+---
+# Self-Signed Issuer (For Development)
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: selfsigned
+spec:
+  selfSigned: {}
+
+---
+# cert-manager ServiceAccount (for DNS-01 with IRSA)
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: cert-manager
+  namespace: cert-manager
+  annotations:
+    # AWS IRSA
+    eks.amazonaws.com/role-arn: arn:aws:iam::123456789012:role/cert-manager-route53
+    # GCP Workload Identity
+    # iam.gke.io/gcp-service-account: cert-manager@project.iam.gserviceaccount.com
+    # Azure Workload Identity
+    # azure.workload.identity/client-id: "00000000-0000-0000-0000-000000000000"
+
+---
+# IAM Policy for Route53 (AWS DNS-01):
+#
+# {
+#   "Version": "2012-10-17",
+#   "Statement": [
+#     {
+#       "Effect": "Allow",
+#       "Action": [
+#         "route53:GetChange",
+#         "route53:ListHostedZones"
+#       ],
+#       "Resource": "*"
+#     },
+#     {
+#       "Effect": "Allow",
+#       "Action": "route53:ChangeResourceRecordSets",
+#       "Resource": "arn:aws:route53:::hostedzone/*"
+#     }
+#   ]
+# }
+
+---
+# Usage Examples:
+#
+# 1. Request wildcard certificate via Gateway annotation:
+#    apiVersion: gateway.networking.k8s.io/v1
+#    kind: Gateway
+#    metadata:
+#      annotations:
+#        cert-manager.io/cluster-issuer: letsencrypt-prod
+#
+# 2. Request specific certificate:
+#    apiVersion: cert-manager.io/v1
+#    kind: Certificate
+#    metadata:
+#      name: api-example-com
+#      namespace: gateway-system
+#    spec:
+#      secretName: api-example-com-tls
+#      issuerRef:
+#        name: letsencrypt-prod
+#        kind: ClusterIssuer
+#      dnsNames:
+#        - api.example.com
+#
+# 3. Wildcard certificate (requires DNS-01):
+#    spec:
+#      commonName: "*.example.com"
+#      dnsNames:
+#        - "example.com"
+#        - "*.example.com"
+
+---
+# Certificate Renewal:
+# - Certificates auto-renew 30 days before expiry
+# - Let's Encrypt certs valid for 90 days
+# - Renewal is automatic (no action needed)
+# - Monitor renewal: kubectl get certificaterequest -A

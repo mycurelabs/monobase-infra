@@ -1,0 +1,73 @@
+# Velero Hourly Backup Schedule (Tier 1 - Critical Data)
+# Fast recovery for critical data with 72-hour retention
+
+apiVersion: velero.io/v1
+kind: Schedule
+metadata:
+  name: hourly-critical
+  namespace: velero
+  labels:
+    backup-tier: tier1-fast
+    backup-frequency: hourly
+spec:
+  # Schedule: Every hour
+  schedule: "0 * * * *"
+  
+  # Backup template
+  template:
+    # Backup entire client namespace
+    includedNamespaces:
+      - "{{ .Values.global.namespace }}"
+    
+    # Don't backup cluster-scoped resources
+    includeClusterResources: false
+    
+    # Storage location
+    storageLocation: default
+    
+    # Volume snapshots
+    volumeSnapshotLocations:
+      - default
+    
+    # TTL (Time To Live)
+    ttl: 72h  # 72 hours = 3 days
+    
+    # Snapshot volumes (PVCs)
+    snapshotVolumes: true
+    
+    # Use file-system backup for volumes (restic/kopia)
+    defaultVolumesToFsBackup: true
+    
+    # Snapshot move data (for CSI)
+    snapshotMoveData: false
+    
+    # Ordered resources (backup in specific order)
+    orderedResources:
+      - secrets
+      - configmaps
+      - persistentvolumeclaims
+      - deployments.apps
+      - statefulsets.apps
+    
+    # Hooks (optional - run commands before/after backup)
+    hooks:
+      resources: []
+    
+    # Metadata
+    labels:
+      backup-schedule: hourly-critical
+      environment: "{{ .Values.global.environment }}"
+      client: "{{ .Values.global.namespace }}"
+
+---
+# Usage:
+# kubectl apply -f hourly-critical.yaml
+#
+# Verify:
+# kubectl get schedule -n velero hourly-critical
+#
+# List backups created by this schedule:
+# velero backup get --selector backup-schedule=hourly-critical
+#
+# Restore from backup:
+# velero restore create --from-backup hourly-critical-20250115120000

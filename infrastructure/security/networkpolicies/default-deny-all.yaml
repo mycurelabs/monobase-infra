@@ -1,0 +1,69 @@
+# Default Deny All Traffic
+# This is the foundation of zero-trust networking
+# Apply this FIRST, then add allow rules
+
+---
+# Deny all ingress traffic by default
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-ingress
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    security-policy: default-deny
+spec:
+  podSelector: {}  # Applies to all pods in namespace
+  policyTypes:
+    - Ingress
+
+---
+# Deny all egress traffic by default
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-egress
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    security-policy: default-deny
+spec:
+  podSelector: {}  # Applies to all pods in namespace
+  policyTypes:
+    - Egress
+
+---
+# Why default-deny?
+#
+# 1. Zero-trust security model
+# 2. Explicit allow rules required
+# 3. Prevents lateral movement
+# 4. HIPAA compliance requirement
+# 5. Limits blast radius of compromised pod
+#
+# After applying this, you MUST create allow rules or nothing will work!
+# See: allow-*.yaml files for specific allow rules
+
+---
+# Testing:
+# 1. Apply default-deny:
+#    kubectl apply -f default-deny-all.yaml
+#
+# 2. Verify pods can't communicate:
+#    kubectl run test --image=busybox -it --rm -- wget -O- http://hapihub:7500
+#    # Should fail!
+#
+# 3. Apply allow rules:
+#    kubectl apply -f allow-gateway-to-apps.yaml
+#    kubectl apply -f allow-apps-to-db.yaml
+#
+# 4. Verify communication works:
+#    kubectl run test --image=busybox -it --rm -- wget -O- http://hapihub:7500
+#    # Should succeed (if you're in gateway namespace)
+
+---
+# Emergency bypass (DO NOT USE IN PRODUCTION):
+# If you need to temporarily disable NetworkPolicies:
+#
+# kubectl delete networkpolicy default-deny-ingress -n myclient-prod
+# kubectl delete networkpolicy default-deny-egress -n myclient-prod
+#
+# ALWAYS re-apply after troubleshooting!

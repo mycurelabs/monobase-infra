@@ -1,0 +1,100 @@
+# Velero Daily Full Backup Schedule (Tier 2 - Standard Recovery)
+# Daily backups with 30-day retention
+
+apiVersion: velero.io/v1
+kind: Schedule
+metadata:
+  name: daily-full
+  namespace: velero
+  labels:
+    backup-tier: tier2-daily
+    backup-frequency: daily
+spec:
+  # Schedule: Daily at 2 AM
+  schedule: "0 2 * * *"
+  
+  # Backup template
+  template:
+    # Backup entire client namespace
+    includedNamespaces:
+      - "{{ .Values.global.namespace }}"
+    
+    # Include namespace-scoped cluster resources
+    includeClusterResources: false
+    
+    # Storage location
+    storageLocation: default
+    
+    # Volume snapshots
+    volumeSnapshotLocations:
+      - default
+    
+    # TTL (Time To Live)
+    ttl: 720h  # 720 hours = 30 days
+    
+    # Snapshot volumes
+    snapshotVolumes: true
+    
+    # Use file-system backup (more reliable than snapshots alone)
+    defaultVolumesToFsBackup: true
+    
+    # CSI snapshot data movement
+    snapshotMoveData: true  # Move snapshot data to object storage
+    
+    # Ordered resources
+    orderedResources:
+      - customresourcedefinitions
+      - namespaces
+      - storageclasses
+      - persistentvolumes
+      - persistentvolumeclaims
+      - secrets
+      - configmaps
+      - serviceaccounts
+      - services
+      - deployments.apps
+      - statefulsets.apps
+      - jobs.batch
+      - cronjobs.batch
+    
+    # Metadata
+    labels:
+      backup-schedule: daily-full
+      environment: "{{ .Values.global.environment }}"
+      client: "{{ .Values.global.namespace }}"
+      backup-type: full
+
+---
+# Pre-backup hooks (optional)
+# Run commands before backup to ensure consistency
+#
+# Example: Flush MongoDB before backup
+# apiVersion: v1
+# kind: Pod
+# metadata:
+#   name: mongodb-0
+#   namespace: myclient-prod
+#   annotations:
+#     pre.hook.backup.velero.io/command: '["/bin/bash", "-c", "mongosh --eval \"db.adminCommand({fsync: 1, lock: false})\""]'
+#     pre.hook.backup.velero.io/timeout: 30s
+
+---
+# Usage:
+# kubectl apply -f daily-full.yaml
+#
+# Manual backup (one-time):
+# velero backup create manual-$(date +%Y%m%d-%H%M%S) \
+#   --include-namespaces myclient-prod \
+#   --snapshot-volumes \
+#   --default-volumes-to-fs-backup
+#
+# Restore entire namespace:
+# velero restore create --from-backup daily-full-20250115020000
+#
+# Restore specific resources:
+# velero restore create --from-backup daily-full-20250115020000 \
+#   --include-resources deployments,services
+#
+# Restore to different namespace:
+# velero restore create --from-backup daily-full-20250115020000 \
+#   --namespace-mappings myclient-prod:myclient-dr

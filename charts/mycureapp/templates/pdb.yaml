@@ -1,0 +1,14 @@
+{{- if and .Values.enabled .Values.podDisruptionBudget.enabled }}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "mycureapp.fullname" . }}
+  namespace: {{ include "mycureapp.namespace" . }}
+  labels:
+    {{- include "mycureapp.labels" . | nindent 4 }}
+spec:
+  minAvailable: {{ .Values.podDisruptionBudget.minAvailable }}
+  selector:
+    matchLabels:
+      {{- include "mycureapp.selectorLabels" . | nindent 6 }}
+{{- end }}
