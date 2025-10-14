@@ -6,13 +6,13 @@ output "cluster_name" {
 }
 
 output "kubeconfig_file" {
-  description = "Path to kubeconfig file"
-  value       = k3d_cluster.main.credentials[0].kubeconfig_file
+  description = "Path to kubeconfig file (k3d writes to default location)"
+  value       = pathexpand("~/.kube/config")
 }
 
 output "kubeconfig" {
   description = "Kubeconfig content"
-  value       = k3d_cluster.main.credentials[0].kubeconfig_raw
+  value       = k3d_cluster.main.credentials[0].raw
   sensitive   = true
 }
 
@@ -23,5 +23,5 @@ output "cluster_endpoint" {
 
 output "configure_kubectl" {
   description = "Command to configure kubectl"
-  value       = "export KUBECONFIG=${k3d_cluster.main.credentials[0].kubeconfig_file}"
+  value       = "k3d kubeconfig merge ${k3d_cluster.main.name} --kubeconfig-switch-context"
 }

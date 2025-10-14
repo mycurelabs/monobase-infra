@@ -42,7 +42,8 @@ resource "null_resource" "install_gateway_api" {
 
   provisioner "local-exec" {
     command = <<-EOT
-      export KUBECONFIG="${k3d_cluster.main.credentials[0].kubeconfig_file}"
+      echo '${k3d_cluster.main.credentials[0].raw}' > /tmp/k3d-kubeconfig-${k3d_cluster.main.name}.yaml
+      export KUBECONFIG="/tmp/k3d-kubeconfig-${k3d_cluster.main.name}.yaml"
       kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.0.0/standard-install.yaml
     EOT
   }
