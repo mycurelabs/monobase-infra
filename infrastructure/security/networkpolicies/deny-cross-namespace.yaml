@@ -11,39 +11,39 @@ metadata:
     security-policy: deny-cross-namespace
 spec:
   podSelector: {}  # Applies to all pods
-  
+
   policyTypes:
     - Ingress
     - Egress
-  
+
   ingress:
     # Only allow from same namespace
     - from:
         - podSelector: {}
-    
+
     # Allow from Gateway (exception)
     - from:
         - namespaceSelector:
             matchLabels:
               kubernetes.io/metadata.name: gateway-system
-    
+
     # Allow from monitoring (exception, if enabled)
     - from:
         - namespaceSelector:
             matchLabels:
               kubernetes.io/metadata.name: monitoring
-  
+
   egress:
     # Allow to same namespace
     - to:
         - podSelector: {}
-    
+
     # Allow to kube-system (DNS, API server)
     - to:
         - namespaceSelector:
             matchLabels:
               kubernetes.io/metadata.name: kube-system
-    
+
     # Allow to internet (HTTPS)
     - to:
         - namespaceSelector: {}

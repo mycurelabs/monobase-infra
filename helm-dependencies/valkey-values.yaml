@@ -8,19 +8,19 @@ valkey:
   # Bitnami Valkey Helm Chart
   # Repository: https://charts.bitnami.com/bitnami
   # Chart: valkey
-  
+
   architecture: replicaset  # or standalone
-  
+
   auth:
     enabled: true
     # Password from External Secrets
     existingSecret: "valkey-credentials"
     existingSecretPasswordKey: "valkey-password"
-  
+
   master:
     persistence:
       enabled: false  # In-memory cache (no persistence)
-    
+
     resources:
       requests:
         cpu: 250m
@@ -28,12 +28,12 @@ valkey:
       limits:
         cpu: 1
         memory: 2Gi
-    
+
     service:
       type: ClusterIP
       ports:
         valkey: 6379
-  
+
   replica:
     replicaCount: 2
     persistence:
@@ -45,12 +45,12 @@ valkey:
       limits:
         cpu: 1
         memory: 2Gi
-  
+
   # Sentinel for HA (if using replicaset)
   sentinel:
     enabled: true
     quorum: 2
-  
+
   # Metrics for monitoring
   metrics:
     enabled: true

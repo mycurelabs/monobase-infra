@@ -7,7 +7,7 @@ config:
   envoyGateway:
     gateway:
       controllerName: gateway.envoyproxy.io/gatewayclass-controller
-    
+
     provider:
       type: Kubernetes
       kubernetes:
@@ -21,7 +21,7 @@ config:
             limits:
               cpu: 500m
               memory: 512Mi
-    
+
     logging:
       level:
         default: info
@@ -29,7 +29,7 @@ config:
 # Deployment settings
 deployment:
   replicas: 2  # HA for gateway controller
-  
+
   pod:
     affinity:
       podAntiAffinity:
@@ -40,7 +40,7 @@ deployment:
                 matchLabels:
                   control-plane: envoy-gateway
               topologyKey: kubernetes.io/hostname
-    
+
     resources:
       requests:
         cpu: 100m
@@ -48,7 +48,7 @@ deployment:
       limits:
         cpu: 500m
         memory: 512Mi
-    
+
     securityContext:
       runAsNonRoot: true
       runAsUser: 65532

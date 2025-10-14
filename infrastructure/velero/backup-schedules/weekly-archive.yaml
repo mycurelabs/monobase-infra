@@ -12,35 +12,35 @@ metadata:
 spec:
   # Schedule: Sunday at 3 AM
   schedule: "0 3 * * 0"
-  
+
   # Backup template
   template:
     # Backup entire client namespace
     includedNamespaces:
       - "{{ .Values.global.namespace }}"
-    
+
     # Include cluster resources for full recovery
     includeClusterResources: false
-    
+
     # Storage location (archive - different bucket for cold storage)
     storageLocation: archive
-    
+
     # Volume snapshots
     volumeSnapshotLocations:
       - default
-    
+
     # TTL (Time To Live) - 90 days for compliance
     ttl: 2160h  # 2160 hours = 90 days
-    
+
     # Snapshot volumes
     snapshotVolumes: true
-    
+
     # Use file-system backup
     defaultVolumesToFsBackup: true
-    
+
     # Move snapshot data to S3 (not just metadata)
     snapshotMoveData: true
-    
+
     # Ordered resources (complete backup)
     orderedResources:
       - customresourcedefinitions
@@ -65,7 +65,7 @@ spec:
       - cronjobs.batch
       - ingresses.networking.k8s.io
       - httproutes.gateway.networking.k8s.io
-    
+
     # Metadata
     labels:
       backup-schedule: weekly-archive
@@ -94,11 +94,11 @@ spec:
 #
 # resource "aws_s3_bucket" "velero_archive" {
 #   bucket = "myclient-prod-archive"
-#   
+#
 #   versioning {
 #     enabled = true
 #   }
-#   
+#
 #   server_side_encryption_configuration {
 #     rule {
 #       apply_server_side_encryption_by_default {
@@ -107,24 +107,24 @@ spec:
 #       }
 #     }
 #   }
-#   
+#
 #   lifecycle_rule {
 #     enabled = true
-#     
+#
 #     transition {
 #       days          = 30
 #       storage_class = "STANDARD_IA"
 #     }
-#     
+#
 #     transition {
 #       days          = 90
 #       storage_class = "GLACIER"
 #     }
 #   }
-#   
+#
 #   object_lock_configuration {
 #     object_lock_enabled = "Enabled"
-#     
+#
 #     rule {
 #       default_retention {
 #         mode = "COMPLIANCE"

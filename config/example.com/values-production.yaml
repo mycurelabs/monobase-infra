@@ -4,13 +4,13 @@
 global:
   # Base domain for all services (can be overridden per service)
   domain: example.com
-  
+
   # Namespace for this deployment ({client}-{env} pattern)
   namespace: example-prod
-  
+
   # Environment identifier
   environment: production
-  
+
   # Shared Gateway reference (deployed once in gateway-system namespace)
   gateway:
     name: shared-gateway
@@ -38,15 +38,15 @@ global:
 # ===== REQUIRED CORE: HapiHub API =====
 hapihub:
   enabled: true
-  
+
   image:
     repository: ghcr.io/mycurelabs/hapihub
     tag: "5.215.2"  # ✅ ALWAYS pin specific version in production
     pullPolicy: IfNotPresent
-  
+
   # High availability - minimum 2 replicas
   replicas: 3
-  
+
   resources:
     requests:
       cpu: 1
@@ -54,19 +54,19 @@ hapihub:
     limits:
       cpu: 2
       memory: 4Gi
-  
+
   # Gateway configuration
   gateway:
     hostname: ""  # Empty = uses api.{global.domain} → api.example.com
     # Or set explicitly for different domain: "api.custom-domain.com"
-  
+
   # Application configuration (via ConfigMap)
   config:
     NODE_ENV: production
     LOG_LEVEL: info
     # Database connection (from secrets)
     # S3 configuration (from secrets or ConfigMap)
-  
+
   # Health checks
   livenessProbe:
     enabled: true
@@ -75,7 +75,7 @@ hapihub:
     periodSeconds: 10
     timeoutSeconds: 5
     failureThreshold: 3
-  
+
   readinessProbe:
     enabled: true
     path: /ready
@@ -83,7 +83,7 @@ hapihub:
     periodSeconds: 5
     timeoutSeconds: 3
     failureThreshold: 2
-  
+
   # Pod Disruption Budget for HA
   podDisruptionBudget:
     enabled: true
@@ -92,14 +92,14 @@ hapihub:
 # ===== REQUIRED CORE: MyCureApp Frontend =====
 mycureapp:
   enabled: true
-  
+
   image:
     repository: ghcr.io/mycurelabs/mycureapp
     tag: "1.0.0"  # ✅ Pin specific version
     pullPolicy: IfNotPresent
-  
+
   replicas: 2
-  
+
   resources:
     requests:
       cpu: 200m
@@ -107,10 +107,10 @@ mycureapp:
     limits:
       cpu: 1
       memory: 1Gi
-  
+
   gateway:
     hostname: ""  # Empty = uses app.{global.domain} → app.example.com
-  
+
   podDisruptionBudget:
     enabled: true
     minAvailable: 1
@@ -118,13 +118,13 @@ mycureapp:
 # ===== OPTIONAL: Syncd Sync Service =====
 syncd:
   enabled: true  # Enable for offline/mobile sync
-  
+
   image:
     repository: ghcr.io/mycurelabs/syncd
     tag: "1.2.0"  # ✅ Pin version
-  
+
   replicas: 2
-  
+
   resources:
     requests:
       cpu: 500m
@@ -132,10 +132,10 @@ syncd:
     limits:
       cpu: 2
       memory: 2Gi
-  
+
   gateway:
     hostname: ""  # Empty = uses sync.{global.domain}
-  
+
   podDisruptionBudget:
     enabled: true
     minAvailable: 1
@@ -143,20 +143,20 @@ syncd:
 # ===== REQUIRED CORE: MongoDB Database =====
 mongodb:
   enabled: true
-  
+
   # Bitnami MongoDB chart configuration
   architecture: replicaset
   replicaCount: 3  # ✅ Production requires 3-node replica set
-  
+
   auth:
     enabled: true
     # Credentials from External Secrets
-  
+
   persistence:
     enabled: true
     storageClass: longhorn
     size: 100Gi  # Adjust based on data volume
-  
+
   resources:
     requests:
       cpu: 1.5
@@ -164,22 +164,22 @@ mongodb:
     limits:
       cpu: 3
       memory: 8Gi
-  
+
   # Encryption at rest
   encryption:
     enabled: true
     keyFile: ""  # From External Secrets
-  
+
   # TLS for connections
   tls:
     enabled: true
-  
+
   # Backup configuration
   backup:
     enabled: true
     schedule: "0 2 * * *"  # Daily at 2 AM
     retention: 30  # 30 days
-  
+
   # Pod Disruption Budget
   podDisruptionBudget:
     enabled: true
@@ -188,14 +188,14 @@ mongodb:
 # ===== OPTIONAL: Typesense Search =====
 typesense:
   enabled: true  # Enable for full-text search
-  
+
   replicas: 3  # HA for production
-  
+
   persistence:
     enabled: true
     storageClass: longhorn
     size: 50Gi
-  
+
   resources:
     requests:
       cpu: 750m
@@ -203,7 +203,7 @@ typesense:
     limits:
       cpu: 2
       memory: 3Gi
-  
+
   backup:
     enabled: true
     schedule: "0 3 * * *"
@@ -212,16 +212,16 @@ typesense:
 # ===== OPTIONAL: MinIO Object Storage =====
 minio:
   enabled: true  # Enable for self-hosted S3 (or set false for AWS S3)
-  
+
   # Bitnami MinIO chart configuration
   mode: distributed  # Production uses distributed mode
   replicas: 6  # 6 nodes for 1TB usable with EC:2 erasure coding
-  
+
   persistence:
     enabled: true
     storageClass: longhorn
     size: 250Gi  # Per node: 6 × 250Gi = 1.5TB raw → ~1TB usable
-  
+
   resources:
     requests:
       cpu: 1.5
@@ -229,17 +229,17 @@ minio:
     limits:
       cpu: 3
       memory: 6Gi
-  
+
   gateway:
     hostname: ""  # Empty = uses storage.{global.domain}
     # Or use CDN: "cdn.example.com"
-  
+
   # Rate limiting for public access
   rateLimit:
     enabled: true
     requestsPerSecond: 100
     burst: 200
-  
+
   # If using external S3 instead:
   # external:
   #   endpoint: "s3.amazonaws.com"
@@ -250,7 +250,7 @@ minio:
 # ===== PRODUCTION: NO Mailpit =====
 mailpit:
   enabled: false  # ❌ NEVER enable Mailpit in production
-  
+
   # Use real SMTP instead (configured via secrets):
   # - SendGrid
   # - AWS SES
@@ -260,26 +260,26 @@ mailpit:
 # ===== External Secrets Operator Configuration =====
 externalSecrets:
   enabled: true
-  
+
   # Choose your secrets provider
   provider: aws  # Options: aws, azure, gcp, sops
-  
+
   # Provider-specific configuration
   aws:
     region: us-east-1
     secretStore: example-prod-secretstore
-  
+
   # Secret mappings (see secrets-mapping.yaml for details)
   secrets: []  # Populated from secrets-mapping.yaml
 
 # ===== Monitoring (Optional - Enable for Production) =====
 monitoring:
   enabled: false  # Set true when needed (adds ~3-5% resource overhead)
-  
+
   prometheus:
     retention: 15d
     storage: 50Gi
-    
+
     resources:
       requests:
         cpu: 500m
@@ -287,25 +287,25 @@ monitoring:
       limits:
         cpu: 2
         memory: 4Gi
-    
+
     # Alert rules
     alerts:
       enabled: true
       # See infrastructure/monitoring/prometheus-rules.yaml
-  
+
   grafana:
     enabled: true
     persistence:
       enabled: true
       size: 10Gi
-    
+
     # Pre-configured dashboards
     dashboards:
       - kubernetes-cluster
       - mongodb
       - hapihub
       - minio
-  
+
   alertmanager:
     enabled: true
     config:
@@ -318,16 +318,16 @@ monitoring:
 # ===== Backup Configuration (Velero) =====
 backup:
   enabled: true  # ✅ Critical for production
-  
+
   # S3 bucket for backups
   s3Bucket: example-prod-backups
   region: us-east-1
-  
+
   # Encryption
   encryption:
     enabled: true
     kmsKeyId: ""  # AWS KMS key for backup encryption
-  
+
   # Velero backup schedules
   schedules:
     # Hourly critical data (72h retention)
@@ -337,7 +337,7 @@ backup:
       retention: 72h
       includedNamespaces:
         - example-prod
-    
+
     # Daily full backup (30d retention)
     daily:
       enabled: true
@@ -346,7 +346,7 @@ backup:
       includedNamespaces:
         - example-prod
       snapshotVolumes: true
-    
+
     # Weekly archive (90d retention)
     weekly:
       enabled: true
@@ -357,17 +357,17 @@ backup:
 # ===== Network Policies =====
 networkPolicies:
   enabled: true  # ✅ REQUIRED for production
-  
+
   # Default deny all traffic
   defaultDeny: true
-  
+
   # Allow specific patterns
   allowRules:
     - gateway-to-apps
     - apps-to-db
     - apps-to-storage
     - apps-to-typesense
-  
+
   # Deny cross-namespace traffic
   denyCrossNamespace: true
 
@@ -379,18 +379,18 @@ podSecurityStandards:
 # ===== Autoscaling =====
 autoscaling:
   enabled: true  # ✅ Enable HPA for production
-  
+
   hapihub:
     minReplicas: 3
     maxReplicas: 10
     targetCPUUtilization: 70
     targetMemoryUtilization: 80
-  
+
   mycureapp:
     minReplicas: 2
     maxReplicas: 5
     targetCPUUtilization: 70
-  
+
   syncd:
     minReplicas: 2
     maxReplicas: 5
@@ -399,7 +399,7 @@ autoscaling:
 # ===== Resource Quotas =====
 resourceQuotas:
   enabled: true
-  
+
   limits:
     cpu: "50"
     memory: "100Gi"
@@ -409,22 +409,22 @@ resourceQuotas:
 # ===== HIPAA Compliance =====
 hipaa:
   enabled: true  # ✅ Enable HIPAA controls
-  
+
   # Audit logging
   auditLogging:
     enabled: true
     retention: 2555d  # 7 years for HIPAA
-  
+
   # Access controls
   accessControls:
     enabled: true
     mfa: required
-  
+
   # Encryption requirements
   encryption:
     atRest: required
     inTransit: required
-  
+
   # BAA requirements
   baa:
     signed: true  # Document BAA with cloud provider

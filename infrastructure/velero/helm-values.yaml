@@ -11,7 +11,7 @@ configuration:
       bucket: ""  # Set in client config: myclient-prod-backups
       prefix: velero  # Prefix in bucket
       default: true
-      
+
       config:
         region: ""  # Set in client config: us-east-1
         s3ForcePathStyle: "false"
@@ -20,44 +20,44 @@ configuration:
         serverSideEncryption: AES256  # Encrypted backups
         # For SSE-KMS:
         # kmsKeyId: "arn:aws:kms:us-east-1:123456789012:key/key-id"
-      
+
       # Access mode
       accessMode: ReadWrite
-      
+
       # Validation frequency
       validationFrequency: 24h
-    
+
     # Archive location (cold storage for weekly backups)
     - name: archive
       provider: aws
       bucket: ""  # Set in client config: myclient-prod-archive
       prefix: velero-archive
       default: false
-      
+
       config:
         region: ""
         s3ForcePathStyle: "false"
         serverSideEncryption: AES256
-      
+
       accessMode: ReadWrite
-  
+
   # Volume snapshot locations
   volumeSnapshotLocation:
     - name: default
       provider: aws
       config:
         region: ""  # Set in client config
-  
+
   # Default backup TTL
   defaultBackupTTL: 720h  # 30 days
-  
+
   # Backup storage validation
   defaultBackupStorageLocation: default
   defaultVolumeSnapshotLocations: aws:default
-  
+
   # Resource filters
   defaultVolumesToFsBackup: true  # Use restic/kopia for PVC backups
-  
+
   # Restore settings
   restoreResourcePriorities: |
     namespaces,
@@ -106,7 +106,7 @@ deployNodeAgent: true
 nodeAgent:
   podVolumePath: /var/lib/kubelet/pods
   privileged: true  # Required for volume access
-  
+
   resources:
     requests:
       cpu: 50m
@@ -114,7 +114,7 @@ nodeAgent:
     limits:
       cpu: 200m
       memory: 200Mi
-  
+
   tolerations:
     - operator: Exists  # Run on all nodes
 

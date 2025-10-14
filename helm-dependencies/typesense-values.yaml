@@ -21,15 +21,15 @@ env:
       secretKeyRef:
         name: typesense-credentials
         key: admin-api-key
-  
+
   # Data directory
   - name: TYPESENSE_DATA_DIR
     value: /usr/share/typesense/data
-  
+
   # Enable CORS
   - name: TYPESENSE_ENABLE_CORS
     value: "true"
-  
+
   # Performance tuning
   - name: TYPESENSE_NUM_THREADS
     value: "4"

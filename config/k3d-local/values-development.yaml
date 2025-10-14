@@ -5,11 +5,11 @@ global:
   domain: local.test
   namespace: lfh-dev
   environment: development
-  
+
   gateway:
     name: shared-gateway
     namespace: gateway-system
-  
+
   # Use k3d's built-in storage
   storage:
     provider: local-path
@@ -19,10 +19,10 @@ global:
 hapihub:
   enabled: true
   replicas: 1  # Single replica for testing
-  
+
   image:
     tag: "latest"  # OK for local testing
-  
+
   resources:
     requests:
       cpu: 100m
@@ -30,10 +30,10 @@ hapihub:
     limits:
       cpu: 500m
       memory: 512Mi
-  
+
   autoscaling:
     enabled: false
-  
+
   gateway:
     hostname: api.local.test
 
@@ -41,10 +41,10 @@ hapihub:
 mycureapp:
   enabled: true
   replicas: 1
-  
+
   image:
     tag: "latest"
-  
+
   resources:
     requests:
       cpu: 50m
@@ -62,12 +62,12 @@ mongodb:
   enabled: true
   architecture: standalone  # Not replicaset (saves resources)
   replicaCount: 1
-  
+
   persistence:
     enabled: true
     storageClass: local-path
     size: 1Gi  # Minimal for testing
-  
+
   resources:
     requests:
       cpu: 250m

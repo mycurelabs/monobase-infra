@@ -15,28 +15,28 @@ parameters:
   # Replication settings
   numberOfReplicas: "3"
   staleReplicaTimeout: "30"
-  
+
   # Data locality (disabled for best HA, "best-effort" for performance)
   dataLocality: "disabled"
-  
+
   # Filesystem type
   fsType: "ext4"
-  
+
   # Disk selector (optional - use specific disks)
   # diskSelector: "ssd,fast"
-  
+
   # Node selector (optional - use specific nodes)
   # nodeSelector: "storage-node=true"
-  
+
   # Encryption settings
   # Longhorn uses Linux dm-crypt for volume encryption
   encrypted: "false"  # Set to "true" to enable encryption at rest
   # When encrypted=true, create a Secret with encryption passphrase:
   # kubectl create secret generic longhorn-crypto --from-literal=CRYPTO_KEY_VALUE=<passphrase> -n longhorn-system
-  
+
   # Backup settings
   recurringJobSelector: '[{"name":"backup-daily","isGroup":false}]'
-  
+
   # Performance settings
   replicaAutoBalance: "least-effort"
   unmapMarkSnapChainRemoved: "enabled"
@@ -78,7 +78,7 @@ parameters:
 
 ---
 # Encryption Instructions:
-# 
+#
 # To enable encryption at rest:
 # 1. Create encryption secret:
 #    kubectl create secret generic longhorn-crypto \

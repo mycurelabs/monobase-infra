@@ -13,10 +13,10 @@ spec:
   podSelector:
     matchLabels:
       app.kubernetes.io/name: hapihub
-  
+
   policyTypes:
     - Egress
-  
+
   egress:
     - to:
         - podSelector:
@@ -39,10 +39,10 @@ spec:
   podSelector:
     matchLabels:
       app.kubernetes.io/name: hapihub
-  
+
   policyTypes:
     - Egress
-  
+
   egress:
     - to:
         - podSelector:
@@ -65,10 +65,10 @@ spec:
   podSelector:
     matchLabels:
       app.kubernetes.io/name: minio
-  
+
   policyTypes:
     - Ingress
-  
+
   ingress:
     - from:
         - podSelector:
@@ -91,10 +91,10 @@ spec:
   podSelector:
     matchLabels:
       app.kubernetes.io/name: typesense
-  
+
   policyTypes:
     - Ingress
-  
+
   ingress:
     - from:
         - podSelector:
@@ -117,10 +117,10 @@ spec:
   podSelector:
     matchLabels:
       app.kubernetes.io/name: hapihub
-  
+
   policyTypes:
     - Egress
-  
+
   egress:
     # Allow HTTPS to internet (for external APIs)
     - to:
@@ -128,7 +128,7 @@ spec:
       ports:
         - protocol: TCP
           port: 443
-    
+
     # Allow SMTP (if using external email service)
     - to:
         - namespaceSelector: {}

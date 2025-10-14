@@ -23,7 +23,7 @@ spec:
           annotations:
             summary: "HapiHub is down"
             description: "HapiHub has been down for more than 5 minutes"
-        
+
         - alert: HapiHubHighErrorRate
           expr: rate(http_requests_total{job="hapihub",status=~"5.."}[5m]) > 0.05
           for: 5m
@@ -33,7 +33,7 @@ spec:
           annotations:
             summary: "HapiHub high error rate"
             description: "HapiHub error rate is {{ $value | humanizePercentage }}"
-        
+
         - alert: HapiHubHighLatency
           expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{job="hapihub"}[5m])) > 2
           for: 10m
@@ -43,7 +43,7 @@ spec:
           annotations:
             summary: "HapiHub high latency"
             description: "HapiHub p95 latency is {{ $value }}s"
-        
+
         - alert: HapiHubHighMemoryUsage
           expr: container_memory_usage_bytes{pod=~"hapihub-.*"} / container_spec_memory_limit_bytes{pod=~"hapihub-.*"} > 0.9
           for: 10m
@@ -53,7 +53,7 @@ spec:
           annotations:
             summary: "HapiHub high memory usage"
             description: "HapiHub memory usage is {{ $value | humanizePercentage }}"
-    
+
     # MongoDB Alerts
     - name: mongodb
       interval: 30s
@@ -67,7 +67,7 @@ spec:
           annotations:
             summary: "MongoDB is down"
             description: "MongoDB has been down for more than 5 minutes"
-        
+
         - alert: MongoDBReplicationLag
           expr: mongodb_replset_member_replication_lag > 10
           for: 5m
@@ -77,7 +77,7 @@ spec:
           annotations:
             summary: "MongoDB replication lag detected"
             description: "Replication lag is {{ $value }} seconds"
-        
+
         - alert: MongoDBHighConnections
           expr: mongodb_connections{state="current"} / mongodb_connections{state="available"} > 0.8
           for: 10m
@@ -87,7 +87,7 @@ spec:
           annotations:
             summary: "MongoDB high connection usage"
             description: "Connection usage is {{ $value | humanizePercentage }}"
-        
+
         - alert: MongoDBHighMemory
           expr: mongodb_memory{type="resident"} / 1024 / 1024 / 1024 > 5
           for: 10m
@@ -97,7 +97,7 @@ spec:
           annotations:
             summary: "MongoDB high memory usage"
             description: "MongoDB using {{ $value }}GB memory"
-        
+
         - alert: MongoDBSlowQueries
           expr: rate(mongodb_op_latencies_latency_total{type="command"}[5m]) > 1000
           for: 10m
@@ -107,7 +107,7 @@ spec:
           annotations:
             summary: "MongoDB slow queries detected"
             description: "Average query latency is {{ $value }}ms"
-    
+
     # MinIO Alerts
     - name: minio
       interval: 30s
@@ -121,7 +121,7 @@ spec:
           annotations:
             summary: "MinIO is down"
             description: "MinIO has been down for more than 5 minutes"
-        
+
         - alert: MinIODiskOffline
           expr: minio_cluster_disk_offline_total > 0
           for: 5m
@@ -131,7 +131,7 @@ spec:
           annotations:
             summary: "MinIO disk offline"
             description: "{{ $value }} MinIO disks are offline"
-        
+
         - alert: MinIOHighStorage
           expr: minio_cluster_capacity_usable_free_bytes / minio_cluster_capacity_usable_total_bytes < 0.2
           for: 10m
@@ -141,7 +141,7 @@ spec:
           annotations:
             summary: "MinIO storage running low"
             description: "Only {{ $value | humanizePercentage }} storage remaining"
-    
+
     # Velero Backup Alerts
     - name: velero
       interval: 60s
@@ -155,7 +155,7 @@ spec:
           annotations:
             summary: "Velero backup failed"
             description: "{{ $value }} backup failures detected"
-        
+
         - alert: VeleroBackupPartialFailure
           expr: velero_backup_partial_failure_total > 0
           for: 5m
@@ -165,7 +165,7 @@ spec:
           annotations:
             summary: "Velero backup partially failed"
             description: "{{ $value }} partial backup failures"
-        
+
         - alert: VeleroNoRecentBackup
           expr: time() - velero_backup_last_successful_timestamp > 86400
           for: 1h
@@ -175,7 +175,7 @@ spec:
           annotations:
             summary: "No recent Velero backup"
             description: "Last successful backup was {{ $value | humanizeDuration }} ago"
-    
+
     # Storage Alerts
     - name: storage
       interval: 60s
@@ -192,7 +192,7 @@ spec:
           annotations:
             summary: "PersistentVolume filling up"
             description: "PVC {{ $labels.persistentvolumeclaim }} has only {{ $value | humanizePercentage }} free space"
-        
+
         - alert: LonghornVolumeUnhealthy
           expr: longhorn_volume_robustness != 0
           for: 5m
@@ -210,7 +210,7 @@ grafana:
     repository: curlimages/curl
     tag: latest
     pullPolicy: IfNotPresent
-  
+
   # Security context
   securityContext:
     runAsNonRoot: true
@@ -218,13 +218,13 @@ grafana:
     fsGroup: 472
     seccompProfile:
       type: RuntimeDefault
-  
+
   containerSecurityContext:
     allowPrivilegeEscalation: false
     capabilities:
       drop:
         - ALL
-  
+
   # Sidecar for dashboard auto-reload
   sidecar:
     dashboards:
@@ -234,7 +234,7 @@ grafana:
 # Alertmanager
 alertmanager:
   enabled: true
-  
+
   alertmanagerSpec:
     # Storage
     storage:
@@ -245,7 +245,7 @@ alertmanager:
           resources:
             requests:
               storage: 5Gi
-    
+
     # Resources
     resources:
       requests:
@@ -254,10 +254,10 @@ alertmanager:
       limits:
         cpu: 200m
         memory: 256Mi
-    
+
     # Replicas
     replicas: 2
-    
+
     # Security context
     securityContext:
       runAsNonRoot: true
@@ -265,7 +265,7 @@ alertmanager:
       fsGroup: 2000
       seccompProfile:
         type: RuntimeDefault
-  
+
   # Configuration managed via ConfigMap or External Secrets
 
 # Exporters

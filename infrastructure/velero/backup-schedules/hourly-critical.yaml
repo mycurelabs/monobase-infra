@@ -12,35 +12,35 @@ metadata:
 spec:
   # Schedule: Every hour
   schedule: "0 * * * *"
-  
+
   # Backup template
   template:
     # Backup entire client namespace
     includedNamespaces:
       - "{{ .Values.global.namespace }}"
-    
+
     # Don't backup cluster-scoped resources
     includeClusterResources: false
-    
+
     # Storage location
     storageLocation: default
-    
+
     # Volume snapshots
     volumeSnapshotLocations:
       - default
-    
+
     # TTL (Time To Live)
     ttl: 72h  # 72 hours = 3 days
-    
+
     # Snapshot volumes (PVCs)
     snapshotVolumes: true
-    
+
     # Use file-system backup for volumes (restic/kopia)
     defaultVolumesToFsBackup: true
-    
+
     # Snapshot move data (for CSI)
     snapshotMoveData: false
-    
+
     # Ordered resources (backup in specific order)
     orderedResources:
       - secrets
@@ -48,11 +48,11 @@ spec:
       - persistentvolumeclaims
       - deployments.apps
       - statefulsets.apps
-    
+
     # Hooks (optional - run commands before/after backup)
     hooks:
       resources: []
-    
+
     # Metadata
     labels:
       backup-schedule: hourly-critical

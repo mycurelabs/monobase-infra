@@ -5,7 +5,7 @@
 # Global settings
 global:
   domain: argocd.example.com  # Set in client config
-  
+
 # High Availability mode
 redis-ha:
   enabled: true
@@ -16,12 +16,12 @@ redis-ha:
 # Controller (reconciliation engine)
 controller:
   replicas: 2  # HA
-  
+
   metrics:
     enabled: true
     serviceMonitor:
       enabled: false  # Enable when monitoring stack is deployed
-  
+
   resources:
     requests:
       cpu: 500m
@@ -29,7 +29,7 @@ controller:
     limits:
       cpu: 2
       memory: 2Gi
-  
+
   affinity:
     podAntiAffinity:
       preferredDuringSchedulingIgnoredDuringExecution:
@@ -43,18 +43,18 @@ controller:
 # Server (API and UI)
 server:
   replicas: 2  # HA
-  
+
   autoscaling:
     enabled: true
     minReplicas: 2
     maxReplicas: 5
     targetCPUUtilizationPercentage: 70
-  
+
   metrics:
     enabled: true
     serviceMonitor:
       enabled: false
-  
+
   resources:
     requests:
       cpu: 250m
@@ -62,21 +62,21 @@ server:
     limits:
       cpu: 1
       memory: 1Gi
-  
+
   # Ingress via Gateway API (see ingress.yaml)
   ingress:
     enabled: false
-  
+
   # Server configuration
   config:
     url: https://argocd.example.com  # Set in client config
-    
+
     # Git repository credentials
     repositories: |
       - type: git
         url: https://github.com/mycurelabs/lfh-infra.git
       # Add client repositories here
-    
+
     # Resource customizations
     resource.customizations: |
       argoproj.io/Application:
@@ -93,7 +93,7 @@ server:
             end
           end
           return hs
-  
+
   # RBAC configuration
   rbacConfig:
     policy.default: role:readonly
@@ -101,10 +101,10 @@ server:
       # Default policies
       p, role:readonly, applications, get, */*, allow
       p, role:readonly, projects, get, *, allow
-      
+
       # Admin role
       g, admin, role:admin
-  
+
   # Admin password (from secret)
   extraArgs:
     - --insecure  # TLS termination at Gateway
@@ -112,17 +112,17 @@ server:
 # Repo Server (Git repository interaction)
 repoServer:
   replicas: 2  # HA
-  
+
   autoscaling:
     enabled: true
     minReplicas: 2
     maxReplicas: 5
-  
+
   metrics:
     enabled: true
     serviceMonitor:
       enabled: false
-  
+
   resources:
     requests:
       cpu: 250m
@@ -130,7 +130,7 @@ repoServer:
     limits:
       cpu: 1
       memory: 1Gi
-  
+
   affinity:
     podAntiAffinity:
       preferredDuringSchedulingIgnoredDuringExecution:
@@ -145,12 +145,12 @@ repoServer:
 applicationSet:
   enabled: true
   replicas: 2
-  
+
   metrics:
     enabled: true
     serviceMonitor:
       enabled: false
-  
+
   resources:
     requests:
       cpu: 100m
@@ -162,20 +162,20 @@ applicationSet:
 # Notifications Controller
 notifications:
   enabled: true
-  
+
   argocdUrl: https://argocd.example.com
-  
+
   notifiers:
     # Slack notifications
     service.slack: |
       token: $slack-token
-    
-    # Email notifications  
+
+    # Email notifications
     service.email: |
       host: smtp.gmail.com
       port: 587
       from: argocd@example.com
-  
+
   templates:
     template.app-deployed: |
       message: |
@@ -196,7 +196,7 @@ notifications:
               "short": true
             }]
           }]
-    
+
     template.app-sync-failed: |
       message: |
         Application {{.app.metadata.name}} sync failed
@@ -212,12 +212,12 @@ notifications:
               "short": true
             }]
           }]
-  
+
   triggers:
     trigger.on-deployed: |
       - when: app.status.sync.status == 'Synced'
         send: [app-deployed]
-    
+
     trigger.on-sync-failed: |
       - when: app.status.sync.status == 'Failed'
         send: [app-sync-failed]
@@ -231,7 +231,7 @@ configs:
   secret:
     createSecret: true
     # argocdServerAdminPassword: ""  # Set via External Secrets
-  
+
   # Known hosts for Git SSH
   ssh:
     knownHosts: |
@@ -240,7 +240,7 @@ configs:
 # Redis (cache)
 redis:
   enabled: true
-  
+
   resources:
     requests:
       cpu: 100m

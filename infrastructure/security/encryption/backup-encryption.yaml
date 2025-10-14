@@ -19,7 +19,7 @@
 # AWS Example (via Terraform):
 # resource "aws_s3_bucket_server_side_encryption_configuration" "velero" {
 #   bucket = "myclient-prod-backups"
-#   
+#
 #   rule {
 #     apply_server_side_encryption_by_default {
 #       sse_algorithm     = "aws:kms"
@@ -35,7 +35,7 @@
 #   description             = "Velero backup encryption key"
 #   deletion_window_in_days = 30
 #   enable_key_rotation     = true
-#   
+#
 #   tags = {
 #     Purpose = "velero-backups"
 #     Client  = "myclient"

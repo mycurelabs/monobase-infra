@@ -40,10 +40,10 @@ jobs:
             --port "80:80@loadbalancer" \
             --port "443:443@loadbalancer" \
             --wait
-          
+
           echo "Waiting for cluster to be ready..."
           kubectl wait --for=condition=Ready nodes --all --timeout=2m
-          
+
           echo "✓ Cluster created successfully"
           kubectl get nodes
 
@@ -51,13 +51,13 @@ jobs:
         run: |
           echo "Deploying Envoy Gateway..."
           kubectl apply -f infrastructure/envoy-gateway/
-          
+
           echo "Deploying cert-manager..."
           kubectl apply -f infrastructure/cert-manager/
-          
+
           echo "Deploying namespaces..."
           kubectl apply -f infrastructure/namespaces/
-          
+
           echo "Waiting for infrastructure to be ready..."
           kubectl wait --for=condition=Available \
             --all deployments \
@@ -77,32 +77,32 @@ jobs:
       - name: Run smoke tests
         run: |
           echo "Running smoke tests..."
-          
+
           # Check if pods are running
           kubectl get pods -n example-staging
-          
+
           # Check if HapiHub pods are ready
           kubectl wait --for=condition=Ready \
             pod -l app=hapihub \
             -n example-staging \
             --timeout=5m
-          
+
           echo "✓ All pods are running"
-          
+
           # Check services
           kubectl get svc -n example-staging
-          
+
           echo "✓ Smoke tests passed"
 
       - name: Test MongoDB connection
         run: |
           echo "Testing MongoDB connectivity..."
-          
+
           # Get MongoDB pod
           MONGO_POD=$(kubectl get pod -n example-staging \
             -l app.kubernetes.io/name=mongodb \
             -o jsonpath='{.items[0].metadata.name}')
-          
+
           if [ -n "$MONGO_POD" ]; then
             echo "MongoDB pod: $MONGO_POD"
             kubectl exec -n example-staging $MONGO_POD -- \
@@ -135,7 +135,7 @@ jobs:
         run: |
           echo "Integration test results:"
           echo "k3d Full Stack: ${{ needs.k3d-full-stack.result }}"
-          
+
           if [ "${{ needs.k3d-full-stack.result }}" == "success" ]; then
             echo "✓ All integration tests passed"
           else

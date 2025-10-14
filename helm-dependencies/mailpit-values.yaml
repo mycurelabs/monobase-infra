@@ -52,13 +52,13 @@ securityContext:
 env:
   - name: MP_SMTP_AUTH_ACCEPT_ANY
     value: "true"  # Accept any SMTP auth (testing only)
-  
+
   - name: MP_SMTP_AUTH_ALLOW_INSECURE
     value: "true"  # Allow insecure auth (testing only)
-  
+
   - name: MP_MAX_MESSAGES
     value: "1000"  # Keep last 1000 emails
-  
+
   - name: MP_UI_AUTH_FILE
     value: ""  # No auth for staging (internal only)
 
@@ -83,7 +83,7 @@ networkPolicy:
       ports:
       - protocol: TCP
         port: 1025
-    
+
     # Allow HTTP from Gateway (web UI)
     - from:
       - namespaceSelector:

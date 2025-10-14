@@ -60,7 +60,7 @@ metrics:
     limits:
       cpu: 200m
       memory: 256Mi
-  
+
   # ServiceMonitor for Prometheus
   serviceMonitor:
     enabled: false  # Enable when monitoring is enabled

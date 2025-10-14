@@ -12,35 +12,35 @@ metadata:
 spec:
   # Schedule: Daily at 2 AM
   schedule: "0 2 * * *"
-  
+
   # Backup template
   template:
     # Backup entire client namespace
     includedNamespaces:
       - "{{ .Values.global.namespace }}"
-    
+
     # Include namespace-scoped cluster resources
     includeClusterResources: false
-    
+
     # Storage location
     storageLocation: default
-    
+
     # Volume snapshots
     volumeSnapshotLocations:
       - default
-    
+
     # TTL (Time To Live)
     ttl: 720h  # 720 hours = 30 days
-    
+
     # Snapshot volumes
     snapshotVolumes: true
-    
+
     # Use file-system backup (more reliable than snapshots alone)
     defaultVolumesToFsBackup: true
-    
+
     # CSI snapshot data movement
     snapshotMoveData: true  # Move snapshot data to object storage
-    
+
     # Ordered resources
     orderedResources:
       - customresourcedefinitions
@@ -56,7 +56,7 @@ spec:
       - statefulsets.apps
       - jobs.batch
       - cronjobs.batch
-    
+
     # Metadata
     labels:
       backup-schedule: daily-full

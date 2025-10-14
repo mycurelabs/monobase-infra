@@ -8,29 +8,29 @@ defaultSettings:
   # Example: s3://backup-bucket@us-east-1/longhorn
   backupTarget: ""  # Set in client configuration
   backupTargetCredentialSecret: longhorn-backup-credentials
-  
+
   # Replication settings
   defaultReplicaCount: 3  # 3-way replication for HA
   guaranteedInstanceManagerCPU: 12  # Percent
-  
+
   # Snapshot settings
   snapshotDataIntegrity: enabled
   snapshotDataIntegrityCronjob: "0 3 */7 * *"  # Weekly integrity check
-  
+
   # Performance settings
   storageOverProvisioningPercentage: 200
   storageMinimalAvailablePercentage: 25
-  
+
   # Encryption settings
   defaultDataLocality: disabled  # Set to "best-effort" for performance
-  
+
   # Node drain settings
   nodeDownPodDeletionPolicy: delete-both-statefulset-and-deployment-pod
   allowNodeDrainWithLastHealthyReplica: false
-  
+
   # Priority class
   priorityClass: system-cluster-critical
-  
+
   # Orphan auto-deletion
   orphanAutoDeletion: true
 
@@ -51,7 +51,7 @@ longhornManager:
   priorityClass: system-cluster-critical
   tolerations: []
   nodeSelector: {}
-  
+
 # Longhorn Driver (CSI driver)
 longhornDriver:
   priorityClass: system-cluster-critical

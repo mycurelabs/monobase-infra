@@ -29,7 +29,7 @@ spec:
     kubernetes:
       envoyDeployment:
         replicas: 2  # HA - 2 Envoy proxy instances
-        
+
         pod:
           affinity:
             podAntiAffinity:
@@ -38,7 +38,7 @@ spec:
                     matchLabels:
                       gateway.envoyproxy.io/owning-gateway-name: shared-gateway
                   topologyKey: kubernetes.io/hostname
-          
+
           resources:
             requests:
               cpu: 250m
@@ -46,7 +46,7 @@ spec:
             limits:
               cpu: 1
               memory: 1Gi
-          
+
           securityContext:
             runAsNonRoot: true
             runAsUser: 65532
@@ -57,7 +57,7 @@ spec:
                 - ALL
             seccompProfile:
               type: RuntimeDefault
-      
+
       envoyService:
         type: LoadBalancer
         annotations: {}
@@ -71,12 +71,12 @@ spec:
         # For GCP GKE:
         # annotations:
         #   cloud.google.com/load-balancer-type: "External"
-  
+
   # Logging configuration
   logging:
     level:
       default: info
-  
+
   # Telemetry configuration
   telemetry:
     accessLog:
@@ -85,7 +85,7 @@ spec:
             type: Text
             text: |
               [%START_TIME%] "%REQ(:METHOD)% %REQ(X-ENVOY-ORIGINAL-PATH?:PATH)% %PROTOCOL%" %RESPONSE_CODE% %RESPONSE_FLAGS% %BYTES_RECEIVED% %BYTES_SENT% %DURATION% "%REQ(X-FORWARDED-FOR)%" "%REQ(USER-AGENT)%" "%REQ(X-REQUEST-ID)%"
-  
+
   # Bootstrap configuration (advanced)
   bootstrap:
     type: Replace

@@ -59,7 +59,7 @@ metadata:
 # 5. Risk assessment
 
 # Example Documentation:
-# 
+#
 # Exception: Longhorn in longhorn-system namespace
 # Reason: Requires privileged mode for block device management
 # Cannot Meet: runAsNonRoot (needs root for device access)

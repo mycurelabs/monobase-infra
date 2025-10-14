@@ -10,7 +10,7 @@ fullnameOverride: monitoring
 # Prometheus Operator
 prometheusOperator:
   enabled: true
-  
+
   resources:
     requests:
       cpu: 100m
@@ -18,7 +18,7 @@ prometheusOperator:
     limits:
       cpu: 500m
       memory: 512Mi
-  
+
   securityContext:
     runAsNonRoot: true
     runAsUser: 65534
@@ -29,12 +29,12 @@ prometheusOperator:
 # Prometheus Server
 prometheus:
   enabled: true
-  
+
   prometheusSpec:
     # Retention
     retention: 15d
     retentionSize: "45GB"
-    
+
     # Storage
     storageSpec:
       volumeClaimTemplate:
@@ -44,7 +44,7 @@ prometheus:
           resources:
             requests:
               storage: 50Gi
-    
+
     # Resources
     resources:
       requests:
@@ -53,23 +53,23 @@ prometheus:
       limits:
         cpu: 2
         memory: 4Gi
-    
+
     # Scrape interval
     scrapeInterval: 30s
     evaluationInterval: 30s
-    
+
     # Service monitors
     serviceMonitorSelector: {}  # Select all ServiceMonitors
     podMonitorSelector: {}
-    
+
     # External labels
     externalLabels:
       cluster: {{ .Values.global.namespace }}
       environment: {{ .Values.global.environment }}
-    
+
     # Replicas for HA
     replicas: 2
-    
+
     # Anti-affinity
     affinity:
       podAntiAffinity:
@@ -80,7 +80,7 @@ prometheus:
                 matchLabels:
                   app.kubernetes.io/name: prometheus
               topologyKey: kubernetes.io/hostname
-    
+
     # Security context
     securityContext:
       runAsNonRoot: true
@@ -92,22 +92,22 @@ prometheus:
 # Grafana
 grafana:
   enabled: true
-  
+
   replicas: 1
-  
+
   # Admin credentials (from External Secrets)
   admin:
     existingSecret: grafana-credentials
     userKey: admin-user
     passwordKey: admin-password
-  
+
   # Persistence for dashboards
   persistence:
     enabled: true
     type: pvc
     storageClassName: longhorn
     size: 10Gi
-  
+
   # Resources
   resources:
     requests:
@@ -116,7 +116,7 @@ grafana:
     limits:
       cpu: 500m
       memory: 512Mi
-  
+
   # Data sources
   datasources:
     datasources.yaml:
@@ -127,7 +127,7 @@ grafana:
           url: http://monitoring-prometheus:9090
           access: proxy
           isDefault: true
-  
+
   # Dashboard providers
   dashboardProviders:
     dashboardproviders.yaml:
@@ -141,7 +141,7 @@ grafana:
           editable: true
           options:
             path: /var/lib/grafana/dashboards/default
-  
+
   # Pre-configured dashboards (from Grafana.com)
   dashboards:
     default:
@@ -150,47 +150,47 @@ grafana:
         gnetId: 7249
         revision: 1
         datasource: Prometheus
-      
+
       # Kubernetes pods
       kubernetes-pods:
         gnetId: 6417
         revision: 1
         datasource: Prometheus
-      
+
       # MongoDB monitoring
       mongodb:
         gnetId: 2583
         revision: 2
         datasource: Prometheus
-      
+
       # Node exporter
       node-exporter:
         gnetId: 1860
         revision: 31
         datasource: Prometheus
-      
+
       # MinIO dashboard
       minio:
         gnetId: 13502
         revision: 10
         datasource: Prometheus
-  
+
   # Grafana configuration
   grafana.ini:
     server:
       domain: grafana.{{ .Values.global.domain }}
       root_url: https://grafana.{{ .Values.global.domain }}
-    
+
     auth:
       disable_login_form: false
-    
+
     auth.anonymous:
       enabled: false
-    
+
     security:
       admin_user: admin
       admin_password: ""  # From secret
-  
+
   # Security context
   securityContext:
     runAsNonRoot: true
@@ -202,7 +202,7 @@ grafana:
 # Alertmanager
 alertmanager:
   enabled: true
-  
+
   alertmanagerSpec:
     # Storage
     storage:
@@ -213,7 +213,7 @@ alertmanager:
           resources:
             requests:
               storage: 5Gi
-    
+
     # Resources
     resources:
       requests:
@@ -222,10 +222,10 @@ alertmanager:
       limits:
         cpu: 200m
         memory: 256Mi
-    
+
     # Replicas for HA
     replicas: 2
-    
+
     # Security context
     securityContext:
       runAsNonRoot: true
@@ -233,41 +233,41 @@ alertmanager:
       fsGroup: 2000
       seccompProfile:
         type: RuntimeDefault
-  
+
   # Configuration (from External Secrets or ConfigMap)
   config:
     global:
       resolve_timeout: 5m
-    
+
     route:
       group_by: ['alertname', 'cluster', 'service']
       group_wait: 10s
       group_interval: 10s
       repeat_interval: 12h
       receiver: 'null'
-      
+
       routes:
         # Critical alerts → Slack + PagerDuty
         - match:
             severity: critical
           receiver: slack-critical
           continue: true
-        
+
         # Warning alerts → Slack only
         - match:
             severity: warning
           receiver: slack-warnings
-    
+
     receivers:
       - name: 'null'
-      
+
       - name: slack-critical
         slack_configs:
           - api_url: ""  # From External Secrets
             channel: '#alerts-critical'
             title: '🚨 {{ .GroupLabels.alertname }}'
             text: '{{ range .Alerts }}{{ .Annotations.description }}{{ end }}'
-      
+
       - name: slack-warnings
         slack_configs:
           - api_url: ""  # From External Secrets

@@ -14,10 +14,10 @@ spec:
   podSelector:
     matchLabels:
       app.kubernetes.io/name: hapihub
-  
+
   policyTypes:
     - Ingress
-  
+
   ingress:
     # Allow from Gateway namespace
     - from:
@@ -41,10 +41,10 @@ spec:
   podSelector:
     matchLabels:
       app.kubernetes.io/name: syncd
-  
+
   policyTypes:
     - Ingress
-  
+
   ingress:
     - from:
         - namespaceSelector:
@@ -67,10 +67,10 @@ spec:
   podSelector:
     matchLabels:
       app.kubernetes.io/name: mycureapp
-  
+
   policyTypes:
     - Ingress
-  
+
   ingress:
     - from:
         - namespaceSelector:
@@ -93,10 +93,10 @@ spec:
   podSelector:
     matchLabels:
       app.kubernetes.io/name: minio
-  
+
   policyTypes:
     - Ingress
-  
+
   ingress:
     - from:
         - namespaceSelector:

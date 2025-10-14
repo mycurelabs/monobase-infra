@@ -80,7 +80,7 @@ jobs:
           helm template test charts/${{ matrix.chart }} \
             --values config/example.com/values-${{ matrix.config }}.yaml \
             --dry-run > /tmp/${{ matrix.chart }}-${{ matrix.config }}.yaml
-          
+
           echo "✓ Template rendered successfully"
           echo "Generated $(wc -l < /tmp/${{ matrix.chart }}-${{ matrix.config }}.yaml) lines of manifests"
 
@@ -90,12 +90,12 @@ jobs:
           kubectl apply --dry-run=client \
             -f /tmp/${{ matrix.chart }}-${{ matrix.config }}.yaml \
             2>&1 | tee /tmp/validation.log
-          
+
           if grep -i "error" /tmp/validation.log; then
             echo "❌ Validation failed"
             exit 1
           fi
-          
+
           echo "✓ All manifests are valid"
 
   dependency-check:
