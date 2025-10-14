@@ -63,6 +63,10 @@ mongodb:
   architecture: standalone  # Not replicaset (saves resources)
   replicaCount: 1
 
+  # Override image to use rolling tag (fixes ImagePullBackOff)
+  image:
+    tag: "7.0"  # Rolling tag - always latest MongoDB 7.0.x
+
   persistence:
     enabled: true
     storageClass: local-path

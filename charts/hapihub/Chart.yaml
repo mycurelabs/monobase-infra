@@ -20,7 +20,7 @@ maintainers:
 dependencies:
   # MongoDB - Primary database
   - name: mongodb
-    version: "15.6.13"
+    version: "15.6.26"  # Updated to use MongoDB 7.0.14
     repository: https://charts.bitnami.com/bitnami
     condition: mongodb.enabled
     tags:

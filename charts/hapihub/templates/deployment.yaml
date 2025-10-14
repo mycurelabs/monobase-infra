@@ -67,6 +67,9 @@ spec:
         resources:
           {{- toYaml .Values.resources | nindent 12 }}
         env:
+        # Set HOME to /tmp to avoid permission denied errors when running as non-root
+        - name: HOME
+          value: "/tmp"
         # Load from ConfigMap
         - name: NODE_ENV
           valueFrom:
@@ -78,11 +81,10 @@ spec:
             configMapKeyRef:
               name: {{ include "hapihub.fullname" . }}
               key: LOG_LEVEL
-        - name: PORT
-          valueFrom:
-            configMapKeyRef:
-              name: {{ include "hapihub.fullname" . }}
-              key: PORT
+        # Override HAPIHUB_PORT to prevent yargs from reading Kubernetes service discovery value
+        # The CLI uses .env('HAPIHUB') which reads HAPIHUB_* env vars
+        - name: HAPIHUB_PORT
+          value: "7500"
         # Load from Secrets (managed by External Secrets Operator)
         {{- if .Values.externalSecrets.enabled }}
         - name: DATABASE_URL

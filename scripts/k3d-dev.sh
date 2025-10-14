@@ -92,6 +92,30 @@ check_prerequisites() {
           return 1
         fi
       fi
+
+      # Check inotify limits (critical for k3d/k3s on Ubuntu 24.04)
+      local inotify_instances=$(sysctl -n fs.inotify.max_user_instances 2>/dev/null || echo "0")
+      if [ "$inotify_instances" -lt 512 ]; then
+        log_warning "Ubuntu 24.04 detected with insufficient inotify limits"
+        echo ""
+        echo -e "${YELLOW}k3d nodes will fail to register without fixing this!${NC}"
+        echo ""
+        echo "Current: fs.inotify.max_user_instances = $inotify_instances"
+        echo "Required: 512 or higher"
+        echo ""
+        echo "Fix (run once):"
+        echo "  sudo sysctl fs.inotify.max_user_instances=512"
+        echo "  echo 'fs.inotify.max_user_instances = 512' | sudo tee /etc/sysctl.d/30-inotify-k3d.conf"
+        echo ""
+        echo "See docs/K3D_TROUBLESHOOTING.md for details"
+        echo ""
+        read -p "Continue anyway? (y/N) " -n 1 -r
+        echo
+        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+          log_error "Aborted. Apply the fix above and try again."
+          return 1
+        fi
+      fi
     fi
   fi
 

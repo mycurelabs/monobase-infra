@@ -41,6 +41,53 @@ sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
 
 ---
 
+## Critical Fix #2: inotify Limits for k3s/k3d 🔥
+
+### containerd-shim Requires More inotify Instances
+
+**Symptom:**
+```
+Nodes show "No resources found" or won't register
+Server logs show: "Waiting for containerd startup: rpc error: code = Unimplemented desc = unknown service runtime.v1.RuntimeService"
+Cluster appears to be created but kubectl get nodes returns empty
+```
+
+**Root Cause:**
+On Ubuntu 24.04 with cgroup v2, containerd-shim processes consume excessive inotify instances. The default limit of 128 is insufficient for k3s/k3d clusters. This is a known issue tracked in [k3s-io/k3s#10020](https://github.com/k3s-io/k3s/issues/10020).
+
+**The Fix (Required):**
+
+Increase inotify limits permanently:
+
+```bash
+# Increase inotify instances (most critical)
+sudo sysctl fs.inotify.max_user_instances=512
+echo 'fs.inotify.max_user_instances = 512' | sudo tee /etc/sysctl.d/30-inotify-k3d.conf
+
+# Ensure watches are also sufficient (usually already correct)
+sudo sysctl fs.inotify.max_user_watches=524288
+echo 'fs.inotify.max_user_watches = 524288' | sudo tee -a /etc/sysctl.d/30-inotify-k3d.conf
+
+# Verify settings
+sysctl fs.inotify.max_user_instances  # Should show: = 512
+sysctl fs.inotify.max_user_watches    # Should show: = 524288
+```
+
+**After applying this fix:**
+1. Delete existing cluster: `k3d cluster delete lfh-dev`
+2. Recreate cluster: `mise run dev-up`
+3. Nodes should now register successfully!
+
+**Why This Happens:**
+- k3s uses containerd as its container runtime
+- containerd-shim creates multiple inotify watches per pod/container
+- Ubuntu 24.04's default limit (128 instances) is too low for modern k3s deployments
+- This affects both k3d AND kind (both use similar architectures)
+
+**Note:** This fix is REQUIRED in addition to the AppArmor fix above. Both must be applied for k3d to work on Ubuntu 24.04.
+
+---
+
 ## Other Known Issues
 
 ### Loadbalancer Fails to Start (Legacy Issue)
