@@ -130,6 +130,25 @@ else
 fi
 """
 
+# Development
+# =============================================================================
+
+[tasks.dev-up]
+description = "Start local k3d development environment"
+run = "./scripts/k3d-dev.sh up"
+
+[tasks.dev-down]
+description = "Stop and cleanup k3d development environment"
+run = "./scripts/k3d-dev.sh down"
+
+[tasks.dev-reset]
+description = "Reset k3d development environment (fresh start)"
+run = "./scripts/k3d-dev.sh reset"
+
+[tasks.dev-status]
+description = "Show k3d development environment status"
+run = "./scripts/k3d-dev.sh status"
+
 # Utilities
 # =============================================================================
 
