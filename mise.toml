@@ -20,11 +20,11 @@ run = "terraform fmt -recursive tofu/"
 description = "Lint Terraform files with tflint"
 run = """
 echo "Linting Terraform files..."
-cd tofu/modules/aws-eks && tflint --config=../../../.tflint.hcl
-cd tofu/modules/azure-aks && tflint --config=../../../.tflint.hcl
-cd tofu/modules/gcp-gke && tflint --config=../../../.tflint.hcl
-cd tofu/modules/on-prem-k3s && tflint --config=../../../.tflint.hcl
-cd tofu/modules/k3d-local && tflint --config=../../../.tflint.hcl
+(cd tofu/modules/aws-eks && tflint --config=../../../.tflint.hcl)
+(cd tofu/modules/azure-aks && tflint --config=../../../.tflint.hcl)
+(cd tofu/modules/gcp-gke && tflint --config=../../../.tflint.hcl)
+(cd tofu/modules/on-prem-k3s && tflint --config=../../../.tflint.hcl)
+(cd tofu/modules/k3d-local && tflint --config=../../../.tflint.hcl)
 """
 
 [tasks.lint-yaml]
@@ -69,11 +69,11 @@ run = "echo '✓ All linting complete'"
 description = "Validate Terraform modules"
 run = """
 echo "Validating Terraform modules..."
-cd tofu/modules/aws-eks && terraform init -backend=false && terraform validate
-cd tofu/modules/azure-aks && terraform init -backend=false && terraform validate
-cd tofu/modules/gcp-gke && terraform init -backend=false && terraform validate
-cd tofu/modules/on-prem-k3s && terraform init -backend=false && terraform validate
-cd tofu/modules/k3d-local && terraform init -backend=false && terraform validate
+(cd tofu/modules/aws-eks && terraform init -backend=false && terraform validate)
+(cd tofu/modules/azure-aks && terraform init -backend=false && terraform validate)
+(cd tofu/modules/gcp-gke && terraform init -backend=false && terraform validate)
+(cd tofu/modules/on-prem-k3s && terraform init -backend=false && terraform validate)
+(cd tofu/modules/k3d-local && terraform init -backend=false && terraform validate)
 """
 
 [tasks.validate-helm]
