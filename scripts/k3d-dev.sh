@@ -16,6 +16,8 @@ CLUSTER_NAME="lfh-dev"
 NAMESPACE="lfh-dev"
 AGENTS=2
 VALUES_FILE="config/k3d-local/values-development.yaml"
+HTTP_PORT=8080   # Use alternative port to avoid conflict with production k8s
+HTTPS_PORT=8443  # Use alternative port to avoid conflict with production k8s
 
 # Hosts entries
 HOSTS_ENTRIES=(
@@ -84,8 +86,8 @@ create_cluster() {
 
   k3d cluster create "$CLUSTER_NAME" \
     --agents $AGENTS \
-    --port "80:80@loadbalancer" \
-    --port "443:443@loadbalancer" \
+    --port "${HTTP_PORT}:80@loadbalancer" \
+    --port "${HTTPS_PORT}:443@loadbalancer" \
     --volume /tmp/k3d-storage:/var/lib/rancher/k3s/storage@all \
     --k3s-arg "--disable=traefik@server:0" \
     --wait
@@ -95,6 +97,9 @@ create_cluster() {
 
 wait_for_cluster() {
   log_info "Waiting for cluster to be ready..."
+
+  # Switch kubectl context to k3d cluster
+  k3d kubeconfig merge "$CLUSTER_NAME" --kubeconfig-switch-context &> /dev/null
 
   local retries=30
   local count=0
@@ -199,7 +204,7 @@ show_status() {
   # Show access URLs
   echo -e "${GREEN}Access URLs:${NC}"
   for host in "${HOSTS_ENTRIES[@]}"; do
-    echo "  http://$host"
+    echo "  http://$host:${HTTP_PORT}"
   done
   echo ""
 }
@@ -251,7 +256,7 @@ cmd_up() {
   echo ""
   echo "Access your applications:"
   for host in "${HOSTS_ENTRIES[@]}"; do
-    echo "  http://$host"
+    echo "  http://$host:${HTTP_PORT}"
   done
   echo ""
   echo "Useful commands:"
