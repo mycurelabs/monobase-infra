@@ -173,7 +173,7 @@ for i in $(seq $((REPLICAS - 1)) -1 0); do
     kubectl delete pod "$POD_NAME" -n "$NAMESPACE"
     
     # Wait for pod to be ready
-    kubectl wait --for=condition=ready pod "$POD_NAME" -n "$NAMESPACE" --timeout=600s \\
+    kubectl wait --for=condition=ready pod "$POD_NAME" -n "$NAMESPACE" --timeout=600s \
         > /dev/null 2>&1 && echo -e "${GREEN}✓${NC}" || echo -e "${RED}✗ (check manually)${NC}"
     
     sleep 5

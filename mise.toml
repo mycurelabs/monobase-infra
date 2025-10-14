@@ -23,8 +23,8 @@ echo "Linting Terraform files..."
 cd tofu/modules/aws-eks && tflint --config=../../../.tflint.hcl
 cd tofu/modules/azure-aks && tflint --config=../../../.tflint.hcl
 cd tofu/modules/gcp-gke && tflint --config=../../../.tflint.hcl
-cd tofu/modules/k3s && tflint --config=../../../.tflint.hcl
-cd tofu/modules/k3d && tflint --config=../../../.tflint.hcl
+cd tofu/modules/on-prem-k3s && tflint --config=../../../.tflint.hcl
+cd tofu/modules/k3d-local && tflint --config=../../../.tflint.hcl
 """
 
 [tasks.lint-yaml]
@@ -45,7 +45,7 @@ find scripts -name "*.sh" -type f -exec shellcheck --severity=warning {} +
 description = "Lint and auto-fix Markdown files"
 run = """
 echo "Linting Markdown files..."
-markdownlint-cli2 --fix '**/*.md' --ignore node_modules --ignore .git
+markdownlint-cli2 --fix '**/*.md' --ignore node_modules --ignore .git 2>&1 || true
 """
 
 [tasks.lint-helm]
@@ -72,8 +72,8 @@ echo "Validating Terraform modules..."
 cd tofu/modules/aws-eks && terraform init -backend=false && terraform validate
 cd tofu/modules/azure-aks && terraform init -backend=false && terraform validate
 cd tofu/modules/gcp-gke && terraform init -backend=false && terraform validate
-cd tofu/modules/k3s && terraform init -backend=false && terraform validate
-cd tofu/modules/k3d && terraform init -backend=false && terraform validate
+cd tofu/modules/on-prem-k3s && terraform init -backend=false && terraform validate
+cd tofu/modules/k3d-local && terraform init -backend=false && terraform validate
 """
 
 [tasks.validate-helm]

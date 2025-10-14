@@ -21,7 +21,7 @@ echo ""
 
 # Test 1: Check for hardcoded client values
 echo -e "${BLUE}[1/7] Checking for hardcoded client values...${NC}"
-HARDCODED=$(grep -r "mycompany\|client-a\|client-b\|philcare" \\
+HARDCODED=$(grep -r "mycompany\|client-a\|client-b\|philcare" \
     charts/ infrastructure/ argocd/ 2>/dev/null | grep -v "\.git" | grep -v "example.com" || true)
 
 if [ -n "$HARDCODED" ]; then
@@ -158,7 +158,7 @@ echo -e "${BLUE}[7/7] Template statistics...${NC}"
 HELM_TEMPLATES=$(find charts/*/templates -name "*.yaml" -o -name "*.tpl" | wc -l | tr -d ' ')
 INFRA_FILES=$(find infrastructure -name "*.yaml" -o -name "*.template" | wc -l | tr -d ' ')
 TOTAL_FILES=$(find . -type f | grep -v "\.git" | wc -l | tr -d ' ')
-TOTAL_LINES=$(find . -name "*.yaml" -o -name "*.md" -o -name "*.sh" -o -name "*.json" -o -name "*.tpl" | xargs wc -l 2>/dev/null | tail -1 | awk '{print $1}')
+TOTAL_LINES=$(find . \( -name "*.yaml" -o -name "*.md" -o -name "*.sh" -o -name "*.json" -o -name "*.tpl" \) -print0 | xargs -0 wc -l 2>/dev/null | tail -1 | awk '{print $1}')
 
 echo -e "  Helm templates:       ${GREEN}$HELM_TEMPLATES${NC}"
 echo -e "  Infrastructure files: ${GREEN}$INFRA_FILES${NC}"
