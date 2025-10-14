@@ -6,6 +6,7 @@
 terraform 1.9.8
 kubectl 1.31.1
 helm 3.16.2
+k3d 5.8.3
 
 # Linters and Formatters
 tflint 0.54.0
