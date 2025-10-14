@@ -115,22 +115,23 @@ local-path
 {{/*
 MongoDB connection string - constructs DATABASE_URL from MongoDB dependency
 Supports both standalone and replicaset architectures
+Note: Always generates connection string; MongoDB may be deployed separately in GitOps
 */}}
 {{- define "hapihub.mongodb.connectionString" -}}
-{{- if .Values.mongodb.enabled -}}
 {{- $release := .Release.Name -}}
 {{- $namespace := include "hapihub.namespace" . -}}
 {{- $database := .Values.mongodb.auth.database | default "hapihub" -}}
 {{- $replicaSet := .Values.mongodb.replicaSetName | default "rs0" -}}
-{{- if eq .Values.mongodb.architecture "replicaset" -}}
+{{- $architecture := .Values.mongodb.architecture | default "replicaset" -}}
+{{- $replicaCount := .Values.mongodb.replicaCount | default 1 -}}
+{{- if eq $architecture "replicaset" -}}
 {{- $hosts := list -}}
-{{- range $i := until (int .Values.mongodb.replicaCount) -}}
+{{- range $i := until (int $replicaCount) -}}
 {{- $hosts = append $hosts (printf "%s-mongodb-%d.%s-mongodb-headless.%s.svc.cluster.local:27017" $release $i $release $namespace) -}}
 {{- end -}}
 mongodb://root:${MONGODB_ROOT_PASSWORD}@{{ join "," $hosts }}/{{ $database }}?replicaSet={{ $replicaSet }}
 {{- else -}}
 mongodb://root:${MONGODB_ROOT_PASSWORD}@{{ $release }}-mongodb.{{ $namespace }}.svc.cluster.local:27017/{{ $database }}
-{{- end -}}
 {{- end -}}
 {{- end }}
 

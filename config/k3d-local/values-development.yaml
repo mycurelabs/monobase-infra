@@ -45,7 +45,7 @@ mycureapp:
   image:
     repository: ghcr.io/mycurelabs/mycureapp
     pullPolicy: IfNotPresent
-    tag: "10.0.18"
+    tag: "10.0.19"
 
   securityContext:
     readOnlyRootFilesystem: false  # Disabled for local testing (entrypoint needs to write config.json)
