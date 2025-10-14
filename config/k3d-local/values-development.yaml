@@ -47,6 +47,11 @@ mycureapp:
     pullPolicy: IfNotPresent
     tag: "10.0.19"
 
+  podSecurityContext:
+    runAsUser: 0  # Run as root for local testing
+    runAsNonRoot: false
+    fsGroup: 101  # nginx group owns the volumes
+
   securityContext:
     readOnlyRootFilesystem: false  # Disabled for local testing (entrypoint needs to write config.json)
 
