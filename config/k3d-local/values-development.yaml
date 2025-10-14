@@ -43,7 +43,12 @@ mycureapp:
   replicas: 1
 
   image:
+    repository: ghcr.io/mycurelabs/mycureapp
+    pullPolicy: IfNotPresent
     tag: "10.0.18"
+
+  securityContext:
+    readOnlyRootFilesystem: false  # Disabled for local testing (entrypoint needs to write config.json)
 
   resources:
     requests:
