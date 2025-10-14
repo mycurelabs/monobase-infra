@@ -73,23 +73,21 @@ echo -e "New Size:     ${GREEN}$NEW_SIZE${NC}"
 echo ""
 
 # Get current replica count
-REPLICAS=$(kubectl get statefulset "$STATEFULSET_NAME" -n "$NAMESPACE" \\
-    -o jsonpath='{.spec.replicas}')
+REPLICAS=$(kubectl get statefulset "$STATEFULSET_NAME" -n "$NAMESPACE" -o jsonpath='{.spec.replicas}')
 echo -e "Current replicas: ${GREEN}$REPLICAS${NC}"
 
 # Get PVC template name
-PVC_TEMPLATE=$(kubectl get statefulset "$STATEFULSET_NAME" -n "$NAMESPACE" \\
-    -o jsonpath='{.spec.volumeClaimTemplates[0].metadata.name}')
+PVC_TEMPLATE=$(kubectl get statefulset "$STATEFULSET_NAME" -n "$NAMESPACE" -o jsonpath='{.spec.volumeClaimTemplates[0].metadata.name}')
 echo -e "PVC template: ${GREEN}$PVC_TEMPLATE${NC}"
 
 # List current PVCs
 echo ""
 echo -e "${YELLOW}Current PVCs:${NC}"
-kubectl get pvc -n "$NAMESPACE" -l app.kubernetes.io/name="$STATEFULSET_NAME" \\
+kubectl get pvc -n "$NAMESPACE" -l app.kubernetes.io/name="$STATEFULSET_NAME" \
     -o custom-columns=NAME:.metadata.name,SIZE:.spec.resources.requests.storage,STATUS:.status.phase
 
 # Get current sizes
-CURRENT_SIZE=$(kubectl get pvc "${PVC_TEMPLATE}-${STATEFULSET_NAME}-0" -n "$NAMESPACE" \\
+CURRENT_SIZE=$(kubectl get pvc "${PVC_TEMPLATE}-${STATEFULSET_NAME}-0" -n "$NAMESPACE" \
     -o jsonpath='{.spec.resources.requests.storage}' 2>/dev/null || echo "unknown")
 echo ""
 echo -e "Current size: ${YELLOW}$CURRENT_SIZE${NC} → New size: ${GREEN}$NEW_SIZE${NC}"
@@ -126,7 +124,7 @@ echo -e "${GREEN}✓ StatefulSet deleted (pods still running)${NC}"
 
 # Verify pods still running
 sleep 2
-RUNNING_PODS=$(kubectl get pods -n "$NAMESPACE" -l app.kubernetes.io/name="$STATEFULSET_NAME" \\
+RUNNING_PODS=$(kubectl get pods -n "$NAMESPACE" -l app.kubernetes.io/name="$STATEFULSET_NAME" \
     --field-selector=status.phase=Running --no-headers | wc -l | tr -d ' ')
 echo -e "  Running pods: ${GREEN}$RUNNING_PODS${NC}/$REPLICAS"
 
@@ -139,9 +137,9 @@ for i in $(seq 0 $((REPLICAS - 1))); do
     
     echo -n "  - Expanding $PVC_NAME... "
     
-    kubectl patch pvc "$PVC_NAME" -n "$NAMESPACE" \\
-        --type='json' \\
-        -p="[{\"op\": \"replace\", \"path\": \"/spec/resources/requests/storage\", \"value\": \"$NEW_SIZE\"}]" \\
+    kubectl patch pvc "$PVC_NAME" -n "$NAMESPACE" \
+        --type='json' \
+        -p="[{\"op\": \"replace\", \"path\": \"/spec/resources/requests/storage\", \"value\": \"$NEW_SIZE\"}]" \
         > /dev/null 2>&1 && echo -e "${GREEN}✓${NC}" || echo -e "${RED}✗${NC}"
 done
 

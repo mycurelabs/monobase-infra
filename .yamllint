@@ -8,6 +8,7 @@ ignore: |
   infrastructure/security/networkpolicies/
   infrastructure/security/encryption/
   infrastructure/monitoring/helm-values.yaml
+  tofu/**/.terraform/
 
 rules:
   line-length:

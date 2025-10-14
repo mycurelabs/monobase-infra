@@ -55,7 +55,7 @@ case $SERVICE in
         echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
         echo ""
         echo -e "${YELLOW}Getting admin password...${NC}"
-        PASSWORD=$(kubectl -n "$NAMESPACE" get secret argocd-initial-admin-secret \\
+        PASSWORD=$(kubectl -n "$NAMESPACE" get secret argocd-initial-admin-secret \
             -o jsonpath="{.data.password}" 2>/dev/null | base64 -d || echo "Secret not found")
         
         echo -e "Username: ${GREEN}admin${NC}"
@@ -75,7 +75,7 @@ case $SERVICE in
         echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
         echo ""
         echo -e "${YELLOW}Getting admin password...${NC}"
-        PASSWORD=$(kubectl -n "$NAMESPACE" get secret grafana-credentials \\
+        PASSWORD=$(kubectl -n "$NAMESPACE" get secret grafana-credentials \
             -o jsonpath="{.data.admin-password}" 2>/dev/null | base64 -d || echo "admin")
         
         echo -e "Username: ${GREEN}admin${NC}"
@@ -126,9 +126,9 @@ case $SERVICE in
         echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
         echo ""
         echo -e "${YELLOW}Getting credentials...${NC}"
-        MINIO_USER=$(kubectl get secret minio-credentials -n "$NAMESPACE" \\
+        MINIO_USER=$(kubectl get secret minio-credentials -n "$NAMESPACE" \
             -o jsonpath='{.data.root-user}' 2>/dev/null | base64 -d || echo "admin")
-        MINIO_PASS=$(kubectl get secret minio-credentials -n "$NAMESPACE" \\
+        MINIO_PASS=$(kubectl get secret minio-credentials -n "$NAMESPACE" \
             -o jsonpath='{.data.root-password}' 2>/dev/null | base64 -d || echo "Not found")
         
         echo -e "Username: ${GREEN}$MINIO_USER${NC}"

@@ -143,8 +143,8 @@ serviceAccount:
   server:
     create: true
     annotations: {}
-      # For AWS IRSA:
-      # eks.amazonaws.com/role-arn: arn:aws:iam::123456789012:role/velero-role
+    # For AWS IRSA:
+    # eks.amazonaws.com/role-arn: arn:aws:iam::123456789012:role/velero-role
 
 # Pod security context
 podSecurityContext:

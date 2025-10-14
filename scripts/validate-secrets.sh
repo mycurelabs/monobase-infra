@@ -88,7 +88,7 @@ for NS in $NAMESPACES; do
         echo -e "${YELLOW}  ⚠ No SecretStore found in $NS${NC}"
         WARNINGS=$((WARNINGS + 1))
     else
-        for STORE in $SECRET_STORES; then
+        for STORE in $SECRET_STORES; do
             STORE_NAME=$(echo "$STORE" | cut -d'/' -f2)
             STATUS=$(kubectl get secretstore "$STORE_NAME" -n "$NS" \
                 -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null || echo "Unknown")

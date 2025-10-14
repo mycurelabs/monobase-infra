@@ -39,12 +39,12 @@ podSecurityContext:
 serviceAccount:
   create: true
   annotations: {}
-    # For AWS IRSA (IAM Roles for Service Accounts):
-    # eks.amazonaws.com/role-arn: arn:aws:iam::123456789012:role/external-secrets-role
-    # For GCP Workload Identity:
-    # iam.gke.io/gcp-service-account: external-secrets@project-id.iam.gserviceaccount.com
-    # For Azure Workload Identity:
-    # azure.workload.identity/client-id: "00000000-0000-0000-0000-000000000000"
+  # For AWS IRSA (IAM Roles for Service Accounts):
+  # eks.amazonaws.com/role-arn: arn:aws:iam::123456789012:role/external-secrets-role
+  # For GCP Workload Identity:
+  # iam.gke.io/gcp-service-account: external-secrets@project-id.iam.gserviceaccount.com
+  # For Azure Workload Identity:
+  # azure.workload.identity/client-id: "00000000-0000-0000-0000-000000000000"
 
 # Affinity for HA
 affinity:
@@ -108,8 +108,8 @@ leaderElect: true
 
 # Extra environment variables (optional)
 extraEnv: []
-  # - name: AWS_REGION
-  #   value: us-east-1
+# - name: AWS_REGION
+#   value: us-east-1
 
 # Extra volumes (for custom CA certificates, etc.)
 extraVolumes: []

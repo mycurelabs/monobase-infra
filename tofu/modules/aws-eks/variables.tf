@@ -67,12 +67,6 @@ variable "availability_zones" {
   default     = [] # Auto-detected if empty
 }
 
-variable "enable_private_endpoint" {
-  description = "Enable private API endpoint (more secure, requires VPN/bastion)"
-  type        = bool
-  default     = false
-}
-
 variable "enable_public_endpoint" {
   description = "Enable public API endpoint"
   type        = bool

@@ -34,9 +34,9 @@ dependencies:
     tags:
       - storage
 
-  # Typesense - Optional full-text search
-  # NOTE: Helm chart repository unavailable as of 2025-01
-  # TODO: Find correct repository URL or use alternative deployment method
+# Typesense - Optional full-text search
+# NOTE: Helm chart repository unavailable as of 2025-01
+# TODO: Find correct repository URL or use alternative deployment method
   # - name: typesense
   #   version: "0.4.0"
   #   repository: https://typesense.github.io/typesense-kubernetes

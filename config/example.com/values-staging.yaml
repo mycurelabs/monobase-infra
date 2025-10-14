@@ -196,7 +196,7 @@ mailpit:
   gateway:
     hostname: mail.example.com  # Web UI access
 
-  # No persistence needed - emails are ephemeral
+    # No persistence needed - emails are ephemeral
 
 # ===== External Secrets Operator Configuration =====
 externalSecrets:

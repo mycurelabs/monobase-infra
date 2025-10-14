@@ -266,7 +266,7 @@ alertmanager:
       seccompProfile:
         type: RuntimeDefault
 
-  # Configuration managed via ConfigMap or External Secrets
+# Configuration managed via ConfigMap or External Secrets
 
 # Exporters
 nodeExporter:
