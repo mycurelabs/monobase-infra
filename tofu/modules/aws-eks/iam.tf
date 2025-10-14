@@ -118,7 +118,7 @@ resource "aws_iam_role_policy" "external_secrets" {
         "secretsmanager:DescribeSecret",
         "secretsmanager:ListSecrets"
       ]
-      Resource = "*"  # Scope this in production
+      Resource = "arn:aws:secretsmanager:${var.region}:*:secret:${var.cluster_name}/*"
     }]
   })
 }
@@ -165,18 +165,24 @@ resource "aws_iam_role_policy" "velero" {
           "ec2:CreateSnapshot",
           "ec2:DeleteSnapshot"
         ]
-        Resource = "*"
+        Resource = "*" # EC2 APIs don't support resource-level permissions
       },
       {
         Effect = "Allow"
         Action = [
           "s3:GetObject",
           "s3:PutObject",
-          "s3:DeleteObject",
+          "s3:DeleteObject"
+        ]
+        Resource = var.velero_backup_bucket != "" ? "arn:aws:s3:::${var.velero_backup_bucket}/*" : "*"
+      },
+      {
+        Effect = "Allow"
+        Action = [
           "s3:ListBucket",
           "s3:GetBucketLocation"
         ]
-        Resource = "*"  # Scope to backup bucket in production
+        Resource = var.velero_backup_bucket != "" ? "arn:aws:s3:::${var.velero_backup_bucket}" : "*"
       }
     ]
   })
@@ -213,16 +219,30 @@ resource "aws_iam_role_policy" "cert_manager" {
 
   policy = jsonencode({
     Version = "2012-10-17"
-    Statement = [{
-      Effect = "Allow"
-      Action = [
-        "route53:GetChange",
-        "route53:ListHostedZones",
-        "route53:ChangeResourceRecordSets",
-        "route53:ListResourceRecordSets"
-      ]
-      Resource = "*"
-    }]
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "route53:GetChange"
+        ]
+        Resource = "arn:aws:route53:::change/*"
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "route53:ListHostedZones"
+        ]
+        Resource = "*" # ListHostedZones doesn't support resource-level permissions
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "route53:ChangeResourceRecordSets",
+          "route53:ListResourceRecordSets"
+        ]
+        Resource = length(var.route53_zone_arns) > 0 ? var.route53_zone_arns : ["arn:aws:route53:::hostedzone/*"]
+      }
+    ]
   })
 }
 
@@ -271,20 +291,20 @@ resource "aws_iam_role_policy" "cluster_autoscaler" {
         "ec2:GetInstanceTypesFromInstanceRequirements",
         "eks:DescribeNodegroup"
       ]
-      Resource = "*"
-    },
-    {
-      Effect = "Allow"
-      Action = [
-        "autoscaling:SetDesiredCapacity",
-        "autoscaling:TerminateInstanceInAutoScalingGroup"
-      ]
-      Resource = "*"
-      Condition = {
-        StringEquals = {
-          "autoscaling:ResourceTag/k8s.io/cluster-autoscaler/${var.cluster_name}" = "owned"
+      Resource = "*" # Describe/List actions don't support resource-level permissions
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "autoscaling:SetDesiredCapacity",
+          "autoscaling:TerminateInstanceInAutoScalingGroup"
+        ]
+        Resource = "*"
+        Condition = {
+          StringEquals = {
+            "autoscaling:ResourceTag/k8s.io/cluster-autoscaler/${var.cluster_name}" = "owned"
+          }
         }
-      }
     }]
   })
 }

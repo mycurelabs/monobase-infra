@@ -1,0 +1,78 @@
+# Valkey Configuration (Redis-compatible cache)
+# Optional dependency - disabled by default
+# Enable when apps are ready to integrate caching
+
+valkey:
+  enabled: false  # Set to true when needed
+
+  # Bitnami Valkey Helm Chart
+  # Repository: https://charts.bitnami.com/bitnami
+  # Chart: valkey
+  
+  architecture: replicaset  # or standalone
+  
+  auth:
+    enabled: true
+    # Password from External Secrets
+    existingSecret: "valkey-credentials"
+    existingSecretPasswordKey: "valkey-password"
+  
+  master:
+    persistence:
+      enabled: false  # In-memory cache (no persistence)
+    
+    resources:
+      requests:
+        cpu: 250m
+        memory: 512Mi
+      limits:
+        cpu: 1
+        memory: 2Gi
+    
+    service:
+      type: ClusterIP
+      ports:
+        valkey: 6379
+  
+  replica:
+    replicaCount: 2
+    persistence:
+      enabled: false
+    resources:
+      requests:
+        cpu: 250m
+        memory: 512Mi
+      limits:
+        cpu: 1
+        memory: 2Gi
+  
+  # Sentinel for HA (if using replicaset)
+  sentinel:
+    enabled: true
+    quorum: 2
+  
+  # Metrics for monitoring
+  metrics:
+    enabled: true
+    serviceMonitor:
+      enabled: true
+      namespace: monitoring
+
+# Connection URL for applications:
+# valkey-master.{namespace}.svc.cluster.local:6379
+
+# Environment variable to add to apps:
+# VALKEY_URL: "valkey://valkey-master.{namespace}.svc.cluster.local:6379"
+
+# Example application integration (Node.js):
+# const Valkey = require('valkey');
+# const client = Valkey.createClient({
+#   url: process.env.VALKEY_URL,
+#   password: process.env.VALKEY_PASSWORD
+# });
+
+# Example usage patterns:
+# 1. Session storage
+# 2. API response caching
+# 3. Rate limiting
+# 4. Real-time analytics counters

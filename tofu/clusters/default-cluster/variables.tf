@@ -51,7 +51,7 @@ variable "node_groups" {
     min_size       = number
     disk_size      = optional(number, 100)
     labels         = optional(map(string), {})
-    taints         = optional(list(object({
+    taints = optional(list(object({
       key    = string
       value  = string
       effect = string
@@ -95,7 +95,7 @@ variable "enable_flow_logs" {
 variable "tags" {
   description = "Tags for all resources"
   type        = map(string)
-  default     = {
+  default = {
     Environment = "production"
     ManagedBy   = "opentofu"
     Project     = "lfh-infrastructure"

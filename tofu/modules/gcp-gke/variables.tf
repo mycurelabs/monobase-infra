@@ -39,7 +39,7 @@ variable "node_pools" {
   }))
   default = {
     general = {
-      machine_type = "n2-standard-8"  # 8 vCPU, 32GB
+      machine_type = "n2-standard-8" # 8 vCPU, 32GB
       node_count   = 5
       min_count    = 3
       max_count    = 20

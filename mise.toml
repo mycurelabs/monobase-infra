@@ -1,0 +1,143 @@
+# LFH Infrastructure - mise configuration
+# Tool management + task runner
+# Docs: https://mise.jdx.dev
+
+# =============================================================================
+# Tasks - Run with: mise run <task>
+# =============================================================================
+
+# Formatting
+# =============================================================================
+
+[tasks.fmt]
+description = "Format all code (Terraform)"
+run = "terraform fmt -recursive tofu/"
+
+# Linting
+# =============================================================================
+
+[tasks.lint-tf]
+description = "Lint Terraform files with tflint"
+run = """
+echo "Linting Terraform files..."
+cd tofu/modules/aws-eks && tflint --config=../../../.tflint.hcl
+cd tofu/modules/azure-aks && tflint --config=../../../.tflint.hcl
+cd tofu/modules/gcp-gke && tflint --config=../../../.tflint.hcl
+cd tofu/modules/k3s && tflint --config=../../../.tflint.hcl
+cd tofu/modules/k3d && tflint --config=../../../.tflint.hcl
+"""
+
+[tasks.lint-yaml]
+description = "Lint YAML files"
+run = """
+echo "Linting YAML files..."
+yamllint -c .yamllint .
+"""
+
+[tasks.lint-shell]
+description = "Lint shell scripts"
+run = """
+echo "Linting shell scripts..."
+find scripts -name "*.sh" -type f -exec shellcheck --severity=warning {} +
+"""
+
+[tasks.lint-md]
+description = "Lint and auto-fix Markdown files"
+run = """
+echo "Linting Markdown files..."
+markdownlint-cli2 --fix '**/*.md' --ignore node_modules --ignore .git
+"""
+
+[tasks.lint-helm]
+description = "Lint Helm charts"
+run = """
+echo "Linting Helm charts..."
+helm lint charts/hapihub
+helm lint charts/syncd
+helm lint charts/mycureapp
+"""
+
+[tasks.lint]
+description = "Run all linters"
+depends = ["lint-tf", "lint-yaml", "lint-shell", "lint-helm", "lint-md"]
+run = "echo '✓ All linting complete'"
+
+# Validation
+# =============================================================================
+
+[tasks.validate-tf]
+description = "Validate Terraform modules"
+run = """
+echo "Validating Terraform modules..."
+cd tofu/modules/aws-eks && terraform init -backend=false && terraform validate
+cd tofu/modules/azure-aks && terraform init -backend=false && terraform validate
+cd tofu/modules/gcp-gke && terraform init -backend=false && terraform validate
+cd tofu/modules/k3s && terraform init -backend=false && terraform validate
+cd tofu/modules/k3d && terraform init -backend=false && terraform validate
+"""
+
+[tasks.validate-helm]
+description = "Validate Helm charts"
+run = """
+echo "Validating Helm charts..."
+helm template test charts/hapihub --values config/profiles/staging.yaml --dry-run > /dev/null
+helm template test charts/syncd --values config/profiles/staging.yaml --dry-run > /dev/null
+helm template test charts/mycureapp --values config/profiles/staging.yaml --dry-run > /dev/null
+"""
+
+[tasks.validate]
+description = "Validate all (Terraform + Helm)"
+depends = ["validate-tf", "validate-helm"]
+run = "echo '✓ All validation complete'"
+
+# Combined
+# =============================================================================
+
+[tasks.check]
+description = "Run all checks (lint + validate)"
+depends = ["lint", "validate"]
+run = "echo '✓ All checks passed'"
+
+[tasks.fix]
+description = "Auto-fix issues where possible"
+depends = ["fmt", "lint-md"]
+run = "echo '✓ Auto-fix complete'"
+
+# Testing
+# =============================================================================
+
+[tasks.test-helm]
+description = "Run Helm unit tests"
+run = """
+echo "Running Helm unit tests..."
+if command -v helm unittest >/dev/null 2>&1; then
+    helm unittest charts/hapihub
+    helm unittest charts/syncd
+    helm unittest charts/mycureapp
+else
+    echo "⚠ helm unittest not installed. Install: helm plugin install https://github.com/helm-unittest/helm-unittest"
+fi
+"""
+
+[tasks.secrets]
+description = "Scan for secrets"
+run = """
+echo "Scanning for secrets..."
+if command -v detect-secrets >/dev/null 2>&1; then
+    detect-secrets scan --baseline .secrets.baseline || echo "Run: detect-secrets scan --update .secrets.baseline"
+else
+    echo "⚠ detect-secrets not installed. Install: pip install detect-secrets"
+fi
+"""
+
+# Utilities
+# =============================================================================
+
+[tasks.clean]
+description = "Clean up temporary files"
+run = """
+echo "Cleaning up..."
+find . -name ".terraform" -type d -exec rm -rf {} + 2>/dev/null || true
+find . -name "*.tfstate*" -type f -delete 2>/dev/null || true
+echo "✓ Cleanup complete"
+"""

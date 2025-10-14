@@ -1,9 +1,9 @@
 # On-Prem K3s Cluster Installation
 
 locals {
-  first_server = var.server_ips[0]
+  first_server       = var.server_ips[0]
   additional_servers = slice(var.server_ips, 1, length(var.server_ips))
-  ha_mode = var.enable_ha && length(var.server_ips) >= 3
+  ha_mode            = var.enable_ha && length(var.server_ips) >= 3
 }
 
 # Install K3s on first server (init)

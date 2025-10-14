@@ -1,0 +1,157 @@
+name: Helm Unit Tests
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'charts/**'
+      - 'config/**'
+      - '.github/workflows/helm-test.yml'
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'charts/**'
+      - 'config/**'
+
+jobs:
+  helm-unittest:
+    name: Helm Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: '3.14.0'
+
+      - name: Install Helm unittest plugin
+        run: |
+          helm plugin install https://github.com/helm-unittest/helm-unittest
+
+      - name: Run HapiHub unit tests
+        run: |
+          echo "Running HapiHub chart unit tests..."
+          if [ -d "charts/hapihub/tests" ]; then
+            helm unittest charts/hapihub
+          else
+            echo "⚠️ No tests found for HapiHub (charts/hapihub/tests/ not found)"
+            echo "📝 Consider adding unit tests for better coverage"
+          fi
+
+      - name: Run Syncd unit tests
+        run: |
+          echo "Running Syncd chart unit tests..."
+          if [ -d "charts/syncd/tests" ]; then
+            helm unittest charts/syncd
+          else
+            echo "⚠️ No tests found for Syncd"
+          fi
+
+      - name: Run MyCureApp unit tests
+        run: |
+          echo "Running MyCureApp chart unit tests..."
+          if [ -d "charts/mycureapp/tests" ]; then
+            helm unittest charts/mycureapp
+          else
+            echo "⚠️ No tests found for MyCureApp"
+          fi
+
+  template-validation:
+    name: Template Rendering Validation
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        chart: [hapihub, syncd, mycureapp]
+        config: [production, staging]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: '3.14.0'
+
+      - name: Test template rendering
+        run: |
+          echo "Testing ${{ matrix.chart }} with ${{ matrix.config }} config..."
+          helm template test charts/${{ matrix.chart }} \
+            --values config/example.com/values-${{ matrix.config }}.yaml \
+            --dry-run > /tmp/${{ matrix.chart }}-${{ matrix.config }}.yaml
+          
+          echo "✓ Template rendered successfully"
+          echo "Generated $(wc -l < /tmp/${{ matrix.chart }}-${{ matrix.config }}.yaml) lines of manifests"
+
+      - name: Validate generated manifests
+        run: |
+          echo "Validating Kubernetes manifests..."
+          kubectl apply --dry-run=client \
+            -f /tmp/${{ matrix.chart }}-${{ matrix.config }}.yaml \
+            2>&1 | tee /tmp/validation.log
+          
+          if grep -i "error" /tmp/validation.log; then
+            echo "❌ Validation failed"
+            exit 1
+          fi
+          
+          echo "✓ All manifests are valid"
+
+  dependency-check:
+    name: Check Helm Dependencies
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: '3.14.0'
+
+      - name: Check HapiHub dependencies
+        run: |
+          cd charts/hapihub
+          if [ -f "Chart.yaml" ] && grep -q "dependencies:" Chart.yaml; then
+            echo "Checking dependencies for HapiHub..."
+            helm dependency list
+            helm dependency build
+          else
+            echo "No dependencies defined for HapiHub"
+          fi
+
+      - name: Check Syncd dependencies
+        run: |
+          cd charts/syncd
+          if [ -f "Chart.yaml" ] && grep -q "dependencies:" Chart.yaml; then
+            echo "Checking dependencies for Syncd..."
+            helm dependency list
+            helm dependency build
+          else
+            echo "No dependencies defined for Syncd"
+          fi
+
+      - name: Check MyCureApp dependencies
+        run: |
+          cd charts/mycureapp
+          if [ -f "Chart.yaml" ] && grep -q "dependencies:" Chart.yaml; then
+            echo "Checking dependencies for MyCureApp..."
+            helm dependency list
+            helm dependency build
+          else
+            echo "No dependencies defined for MyCureApp"
+          fi
+
+  test-summary:
+    name: Test Summary
+    runs-on: ubuntu-latest
+    needs: [helm-unittest, template-validation, dependency-check]
+    if: always()
+    steps:
+      - name: Check all tests
+        run: |
+          echo "Helm test results:"
+          echo "Unit Tests: ${{ needs.helm-unittest.result }}"
+          echo "Template Validation: ${{ needs.template-validation.result }}"
+          echo "Dependency Check: ${{ needs.dependency-check.result }}"

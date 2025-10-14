@@ -24,6 +24,60 @@ Technical architecture of the LFH Infrastructure template.
 4. **Cloud-Native** - Kubernetes-native, CNCF projects preferred
 5. **Cost-Effective** - Shared infrastructure, optional components
 
+### High-Level System Architecture
+
+```mermaid
+graph TB
+    subgraph "Internet"
+        Users[👥 Users/Clients]
+    end
+    
+    subgraph "Kubernetes Cluster"
+        subgraph "gateway-system namespace"
+            Gateway[🌐 Envoy Gateway<br/>shared-gateway<br/>2 replicas]
+        end
+        
+        subgraph "client-a-prod namespace"
+            HapiHub1[⚕️ HapiHub API<br/>3 replicas]
+            MyCureApp1[📱 MyCureApp<br/>2 replicas]
+            Syncd1[🔄 Syncd<br/>2 replicas]
+            MongoDB1[(🗄️ MongoDB<br/>3-node replica)]
+            MinIO1[(📦 MinIO<br/>6-node distributed)]
+        end
+        
+        subgraph "client-b-prod namespace"
+            HapiHub2[⚕️ HapiHub API]
+            Apps2[📱 Apps...]
+        end
+        
+        subgraph "Infrastructure"
+            Longhorn[💾 Longhorn Storage]
+            ArgoCD[🔄 ArgoCD GitOps]
+            ExtSecrets[🔐 External Secrets]
+            CertMgr[🔒 cert-manager]
+            Velero[💼 Velero Backups]
+        end
+    end
+    
+    subgraph "Cloud Provider KMS"
+        KMS[🔑 AWS Secrets Manager<br/>Azure Key Vault<br/>GCP Secret Manager]
+    end
+    
+    Users -->|HTTPS| Gateway
+    Gateway -->|HTTPRoute| HapiHub1
+    Gateway -->|HTTPRoute| MyCureApp1
+    Gateway -->|HTTPRoute| HapiHub2
+    HapiHub1 --> MongoDB1
+    HapiHub1 --> MinIO1
+    Syncd1 --> MongoDB1
+    ArgoCD -.->|manages| HapiHub1
+    ArgoCD -.->|manages| MyCureApp1
+    ExtSecrets -->|fetches| KMS
+    ExtSecrets -.->|injects| HapiHub1
+    Velero -.->|backups| MongoDB1
+    Longhorn -.->|provides storage| MongoDB1
+```
+
 ### Technology Stack
 
 **Core (Always Deployed):**
@@ -54,6 +108,84 @@ Technical architecture of the LFH Infrastructure template.
 ---
 
 ## System Architecture
+
+### Request Flow Diagram
+
+```mermaid
+sequenceDiagram
+    participant U as 👤 User
+    participant DNS as 🌐 DNS
+    participant LB as ⚖️ LoadBalancer
+    participant GW as 🚪 Envoy Gateway
+    participant API as ⚕️ HapiHub API
+    participant DB as 🗄️ MongoDB
+    participant S3 as 📦 MinIO/S3
+    
+    U->>DNS: api.client-a.com
+    DNS-->>U: LoadBalancer IP
+    U->>LB: HTTPS Request
+    LB->>GW: Forward to Gateway
+    Note over GW: Rate Limiting<br/>Security Headers<br/>TLS Termination
+    GW->>GW: Match HTTPRoute<br/>(api.client-a.com)
+    GW->>API: Route to HapiHub<br/>(client-a-prod ns)
+    API->>DB: Query Data
+    DB-->>API: Response
+    API->>S3: Fetch File
+    S3-->>API: File Data
+    API-->>GW: JSON Response
+    GW-->>LB: Response
+    LB-->>U: HTTPS Response
+```
+
+### Multi-Tenant Architecture
+
+```mermaid
+graph TB
+    subgraph "Single Kubernetes Cluster"
+        subgraph "Shared Gateway"
+            GW[Envoy Gateway<br/>LoadBalancer IP: X.X.X.X]
+        end
+        
+        subgraph "client-a-prod namespace"
+            R1[HTTPRoute<br/>api.client-a.com]
+            H1[HapiHub-A]
+            DB1[(MongoDB-A)]
+        end
+        
+        subgraph "client-b-prod namespace"
+            R2[HTTPRoute<br/>api.client-b.com]
+            H2[HapiHub-B]
+            DB2[(MongoDB-B)]
+        end
+        
+        subgraph "client-c-staging namespace"
+            R3[HTTPRoute<br/>api.client-c-staging.com]
+            H3[HapiHub-C]
+            DB3[(MongoDB-C)]
+        end
+        
+        subgraph "Infrastructure (Shared)"
+            NP[NetworkPolicies<br/>Namespace Isolation]
+            Storage[Longhorn<br/>Distributed Storage]
+        end
+    end
+    
+    GW --> R1
+    GW --> R2
+    GW --> R3
+    R1 --> H1
+    R2 --> H2
+    R3 --> H3
+    H1 --> DB1
+    H2 --> DB2
+    H3 --> DB3
+    NP -.->|isolates| client-a-prod
+    NP -.->|isolates| client-b-prod
+    NP -.->|isolates| client-c-staging
+    Storage -.->|provides PVCs| DB1
+    Storage -.->|provides PVCs| DB2
+    Storage -.->|provides PVCs| DB3
+```
 
 ### Component Diagram
 

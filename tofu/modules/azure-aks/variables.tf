@@ -39,7 +39,7 @@ variable "node_pools" {
   }))
   default = {
     general = {
-      vm_size      = "Standard_D8s_v3"  # 8 vCPU, 32GB
+      vm_size      = "Standard_D8s_v3" # 8 vCPU, 32GB
       node_count   = 5
       min_count    = 3
       max_count    = 20

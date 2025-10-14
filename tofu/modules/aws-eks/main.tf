@@ -49,7 +49,7 @@ resource "aws_eks_cluster" "main" {
     subnet_ids              = concat(module.vpc.private_subnets, module.vpc.public_subnets)
     endpoint_private_access = true
     endpoint_public_access  = var.enable_public_endpoint
-    public_access_cidrs     = var.enable_public_endpoint ? ["0.0.0.0/0"] : []
+    public_access_cidrs     = var.enable_public_endpoint ? var.api_access_cidrs : []
     security_group_ids      = []
   }
 
@@ -74,7 +74,7 @@ resource "aws_eks_cluster" "main" {
 # CloudWatch Log Group for cluster logs
 resource "aws_cloudwatch_log_group" "cluster" {
   name              = "/aws/eks/${var.cluster_name}/cluster"
-  retention_in_days = 90  # HIPAA: 90 days minimum
+  retention_in_days = 90 # HIPAA: 90 days minimum
   kms_key_id        = aws_kms_key.cluster.arn
 
   tags = var.tags
@@ -98,7 +98,7 @@ resource "aws_kms_alias" "cluster" {
 
 # EKS Managed Node Groups
 resource "aws_eks_node_group" "main" {
-  for_each = var.node_groups
+  for_each = local.effective_node_groups
 
   cluster_name    = aws_eks_cluster.main.name
   node_group_name = "${var.cluster_name}-${each.key}"

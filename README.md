@@ -13,25 +13,50 @@ This repository provides production-ready, template-based Kubernetes infrastruct
 - **Modern Stack** - Gateway API, ArgoCD GitOps, External Secrets, Velero backups
 - **Scalable** - Designed for <500 users, <1TB data per client (scales further if needed)
 
-## 📦 Scope
+## 📦 Scope & Repository Structure
 
-This template provides **application-layer infrastructure** for Kubernetes.
+This repository contains **complete infrastructure** for deploying healthcare applications on Kubernetes.
+
+### Repository Structure
+
+```
+lfh-infra/
+├── tofu/                    # ← OPTIONAL: Cluster provisioning (OpenTofu/Terraform)
+│   ├── modules/             #    - AWS EKS, Azure AKS, GCP GKE
+│   │   ├── aws-eks/         #    - K3s on-premises, k3d local
+│   │   ├── azure-aks/       #    Only needed if provisioning clusters
+│   │   ├── gcp-gke/         #    Can skip if cluster already exists
+│   │   ├── on-prem-k3s/
+│   │   └── k3d-local/
+│   └── clusters/            #    Example cluster configurations
+├── charts/                  # ← CORE: Helm charts for applications
+│   ├── hapihub/
+│   ├── syncd/
+│   └── mycureapp/
+├── config/                  # ← CORE: Client configurations
+│   ├── profiles/            #    Pre-configured size profiles
+│   └── example.com/         #    Example client config
+├── infrastructure/          # ← CORE: K8s infrastructure components
+│   ├── envoy-gateway/
+│   ├── argocd/
+│   ├── longhorn/
+│   └── ...
+├── argocd/                  # ← CORE: GitOps configuration
+├── scripts/                 # ← CORE: Automation scripts
+└── docs/                    # ← CORE: Documentation
+```
 
 ### What's Included ✅
-- Application deployments (HapiHub, Syncd, MyCureApp)
-- Storage infrastructure (Longhorn distributed block storage)
-- Networking & routing (Envoy Gateway with Gateway API)
-- Security layer (NetworkPolicies, Pod Security Standards, RBAC, encryption)
-- Backup & disaster recovery (Velero 3-tier backups)
-- Monitoring stack (Prometheus + Grafana - optional)
-- GitOps deployments (ArgoCD with App-of-Apps)
-- Secrets management (External Secrets Operator + KMS)
-
-### What's NOT Included ⚠️
-- Kubernetes cluster provisioning (EKS, AKS, GKE creation)
-- Cloud infrastructure (VPC, subnets, IAM roles, security groups)
-- Node groups or worker node configuration
-- Cloud provider-specific resources
+- **Cluster Provisioning (Optional)**: OpenTofu modules for AWS/Azure/GCP/on-prem/local
+- **Application Deployments**: HapiHub, Syncd, MyCureApp Helm charts
+- **Storage Infrastructure**: Longhorn distributed block storage
+- **Networking & Routing**: Envoy Gateway with Gateway API
+- **Security Layer**: NetworkPolicies, Pod Security Standards, RBAC, encryption
+- **Backup & Disaster Recovery**: Velero 3-tier backups
+- **Monitoring Stack**: Prometheus + Grafana (optional)
+- **GitOps**: ArgoCD with App-of-Apps pattern
+- **Secrets Management**: External Secrets Operator + Cloud KMS
+- **Configuration Profiles**: Pre-configured small/medium/large deployments
 
 ### Prerequisites
 
@@ -71,33 +96,70 @@ If you need to create Kubernetes clusters, use these tools **before** deploying 
 
 ## 🚀 Quick Start
 
-### 1. Fork This Repository
+### Choose Your Path
+
+#### **Track 1: I Already Have a Kubernetes Cluster** ✅ (Most Common)
+
+If you already have an EKS/AKS/GKE/K3s cluster:
 
 ```bash
-# On GitHub/GitLab: Click "Fork" button
-git clone https://github.com/YOUR-ORG/YOUR-FORK.git
-cd YOUR-FORK
-```
+# 1. Fork and clone
+git clone https://github.com/YOUR-ORG/lfh-infra.git
+cd lfh-infra
 
-### 2. Create Your Client Configuration
-
-```bash
-# Use the bootstrap script
+# 2. Create client configuration
 ./scripts/new-client-config.sh myclient myclient.com
 
-# This creates: config/myclient/
-#   - values-staging.yaml
-#   - values-production.yaml
-#   - secrets-mapping.yaml
+# 3. Choose a deployment profile (or customize)
+cp config/profiles/production-small.yaml config/myclient/values-production.yaml
+
+# 4. Edit domain and namespace
+vim config/myclient/values-production.yaml
+# Change: global.domain and global.namespace
+
+# 5. Deploy infrastructure
+kubectl apply -f infrastructure/
+
+# 6. Deploy applications  
+helm install myclient-prod charts/hapihub \
+  --values config/myclient/values-production.yaml \
+  --namespace myclient-prod --create-namespace
 ```
 
-### 3. Customize Your Configuration
+**You can skip the `tofu/` directory entirely!**
+
+---
+
+#### **Track 2: I Need to Provision a Cluster** 🏗️ (Optional)
+
+If you need to create a Kubernetes cluster first:
 
 ```bash
-vim config/myclient/values-production.yaml
+# 1. Fork and clone (same as above)
+git clone https://github.com/YOUR-ORG/lfh-infra.git
+cd lfh-infra
 
-# Key items to configure:
-# - global.domain: your-domain.com
+# 2. Provision cluster using OpenTofu
+cd tofu/clusters/
+cp -r default-cluster myclient-cluster
+cd myclient-cluster
+
+# 3. Configure cluster
+vim terraform.tfvars
+# Set: cluster_name, region, deployment_profile (small/medium/large)
+
+# 4. Create cluster
+tofu init
+tofu plan
+tofu apply
+
+# 5. Get kubeconfig
+tofu output -raw kubeconfig > ~/.kube/myclient
+export KUBECONFIG=~/.kube/myclient
+
+# 6. Now follow Track 1 steps 2-6
+cd ../../../
+./scripts/new-client-config.sh myclient myclient.com
 # - global.namespace: myclient-prod
 # - global.storage.provider: cloud-default (EKS/AKS/GKE) or longhorn (on-prem)
 # - Image tags (replace "latest" with specific versions)

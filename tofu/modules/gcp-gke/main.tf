@@ -6,7 +6,7 @@ resource "google_container_cluster" "main" {
   project  = var.project_id
 
   min_master_version = var.kubernetes_version
-  
+
   # Use VPC-native networking
   network    = google_compute_network.main.self_link
   subnetwork = google_compute_subnetwork.nodes.self_link

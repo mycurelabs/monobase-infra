@@ -11,27 +11,27 @@ resource "k3d_cluster" "main" {
   port {
     host_port      = 80
     container_port = 80
-    node_filters = ["loadbalancer"]
+    node_filters   = ["loadbalancer"]
   }
 
   port {
     host_port      = 443
     container_port = 443
-    node_filters = ["loadbalancer"]
+    node_filters   = ["loadbalancer"]
   }
 
   # k3s server arguments
   k3s {
     extra_args {
-      arg = var.disable_traefik ? "--disable=traefik" : ""
+      arg          = var.disable_traefik ? "--disable=traefik" : ""
       node_filters = ["server:*"]
     }
   }
 
   # Volume mount for persistent data
   volume {
-    source      = "/tmp/k3d-${var.cluster_name}"
-    destination = "/var/lib/rancher/k3s/storage"
+    source       = "/tmp/k3d-${var.cluster_name}"
+    destination  = "/var/lib/rancher/k3s/storage"
     node_filters = ["all"]
   }
 }
