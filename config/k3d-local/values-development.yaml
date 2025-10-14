@@ -43,7 +43,7 @@ mycureapp:
   replicas: 1
 
   image:
-    tag: "latest"
+    tag: "10.0.18"
 
   resources:
     requests:
