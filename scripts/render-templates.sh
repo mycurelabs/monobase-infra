@@ -123,26 +123,26 @@ echo -e "${BLUE}[1/3] Rendering Helm charts...${NC}"
 
 # Render HapiHub chart
 echo -n "  - HapiHub... "
-helm template hapihub charts/hapihub \\
-    -f "$VALUES_FILE" \\
-    --namespace "$NAMESPACE" \\
-    --output-dir "$OUTPUT_DIR/charts" \\
+helm template hapihub charts/hapihub \
+    -f "$VALUES_FILE" \
+    --namespace "$NAMESPACE" \
+    --output-dir "$OUTPUT_DIR/charts" \
     > /dev/null 2>&1 && echo -e "${GREEN}✓${NC}" || echo -e "${RED}✗${NC}"
 
 # Render Syncd chart
 echo -n "  - Syncd... "
-helm template syncd charts/syncd \\
-    -f "$VALUES_FILE" \\
-    --namespace "$NAMESPACE" \\
-    --output-dir "$OUTPUT_DIR/charts" \\
+helm template syncd charts/syncd \
+    -f "$VALUES_FILE" \
+    --namespace "$NAMESPACE" \
+    --output-dir "$OUTPUT_DIR/charts" \
     > /dev/null 2>&1 && echo -e "${GREEN}✓${NC}" || echo -e "${RED}✗${NC}"
 
 # Render MyCureApp chart
 echo -n "  - MyCureApp... "
-helm template mycureapp charts/mycureapp \\
-    -f "$VALUES_FILE" \\
-    --namespace "$NAMESPACE" \\
-    --output-dir "$OUTPUT_DIR/charts" \\
+helm template mycureapp charts/mycureapp \
+    -f "$VALUES_FILE" \
+    --namespace "$NAMESPACE" \
+    --output-dir "$OUTPUT_DIR/charts" \
     > /dev/null 2>&1 && echo -e "${GREEN}✓${NC}" || echo -e "${RED}✗${NC}"
 
 echo ""
@@ -154,9 +154,9 @@ render_template() {
     local output_file=$2
     
     # Simple sed-based replacement (works without yq)
-    sed -e "s/{{ \.Values\.global\.domain }}/$DOMAIN/g" \\
-        -e "s/{{ \.Values\.global\.namespace }}/$NAMESPACE/g" \\
-        -e "s/{{ \.Values\.global\.environment }}/$ENVIRONMENT/g" \\
+    sed -e "s/{{ \.Values\.global\.domain }}/$DOMAIN/g" \
+        -e "s/{{ \.Values\.global\.namespace }}/$NAMESPACE/g" \
+        -e "s/{{ \.Values\.global\.environment }}/$ENVIRONMENT/g" \
         "$template_file" > "$output_file"
 }
 

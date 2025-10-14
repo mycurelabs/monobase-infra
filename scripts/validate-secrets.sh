@@ -109,7 +109,7 @@ for NS in $NAMESPACES; do
         echo -e "${YELLOW}  ⚠ No ExternalSecrets found in $NS${NC}"
         WARNINGS=$((WARNINGS + 1))
     else
-        for ES in $EXTERNAL_SECRETS; then
+        for ES in $EXTERNAL_SECRETS; do
             ES_NAME=$(echo "$ES" | cut -d'/' -f2)
             STATUS=$(kubectl get externalsecret "$ES_NAME" -n "$NS" \
                 -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null || echo "Unknown")
