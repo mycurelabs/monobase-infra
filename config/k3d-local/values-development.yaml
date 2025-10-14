@@ -62,10 +62,10 @@ mycureapp:
 syncd:
   enabled: false  # Save resources
 
-# ===== CORE: MongoDB (Standalone) =====
+# ===== CORE: MongoDB (Single-node ReplicaSet) =====
 mongodb:
   enabled: true
-  architecture: standalone  # Not replicaset (saves resources)
+  architecture: replicaset  # Single-node replicaset for testing
   replicaCount: 1
 
   # Override image to use rolling tag (fixes ImagePullBackOff)
@@ -131,7 +131,7 @@ resourceQuotas:
 # Notes for k3d Testing:
 # - Minimal resources (laptop-friendly)
 # - Single replicas (no HA overhead)
-# - Standalone MongoDB (not replicaset)
+# - Single-node MongoDB replicaset (consistent with prod)
 # - No MinIO (too heavy)
 # - Monitoring disabled (save RAM)
 # - Local storage only

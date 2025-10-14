@@ -111,3 +111,58 @@ local-path
 {{- else -}}
 {{- end -}}
 {{- end }}
+
+{{/*
+MongoDB connection string - constructs DATABASE_URL from MongoDB dependency
+Supports both standalone and replicaset architectures
+*/}}
+{{- define "hapihub.mongodb.connectionString" -}}
+{{- if .Values.mongodb.enabled -}}
+{{- $release := .Release.Name -}}
+{{- $namespace := include "hapihub.namespace" . -}}
+{{- $database := .Values.mongodb.auth.database | default "hapihub" -}}
+{{- $replicaSet := .Values.mongodb.replicaSetName | default "rs0" -}}
+{{- if eq .Values.mongodb.architecture "replicaset" -}}
+{{- $hosts := list -}}
+{{- range $i := until (int .Values.mongodb.replicaCount) -}}
+{{- $hosts = append $hosts (printf "%s-mongodb-%d.%s-mongodb-headless.%s.svc.cluster.local:27017" $release $i $release $namespace) -}}
+{{- end -}}
+mongodb://root:${MONGODB_ROOT_PASSWORD}@{{ join "," $hosts }}/{{ $database }}?replicaSet={{ $replicaSet }}
+{{- else -}}
+mongodb://root:${MONGODB_ROOT_PASSWORD}@{{ $release }}-mongodb.{{ $namespace }}.svc.cluster.local:27017/{{ $database }}
+{{- end -}}
+{{- end -}}
+{{- end }}
+
+{{/*
+Typesense URL - constructs connection URL from Typesense dependency
+*/}}
+{{- define "hapihub.typesense.url" -}}
+{{- if .Values.typesense.enabled -}}
+{{- $release := .Release.Name -}}
+{{- $namespace := include "hapihub.namespace" . -}}
+http://{{ $release }}-typesense.{{ $namespace }}.svc.cluster.local:8108
+{{- end -}}
+{{- end }}
+
+{{/*
+MinIO URL - constructs connection URL from MinIO dependency
+*/}}
+{{- define "hapihub.minio.url" -}}
+{{- if .Values.minio.enabled -}}
+{{- $release := .Release.Name -}}
+{{- $namespace := include "hapihub.namespace" . -}}
+http://{{ $release }}-minio.{{ $namespace }}.svc.cluster.local:9000
+{{- end -}}
+{{- end }}
+
+{{/*
+Mailpit SMTP URL - constructs connection URL from Mailpit dependency
+*/}}
+{{- define "hapihub.mailpit.url" -}}
+{{- if .Values.mailpit.enabled -}}
+{{- $release := .Release.Name -}}
+{{- $namespace := include "hapihub.namespace" . -}}
+smtp://{{ $release }}-mailpit.{{ $namespace }}.svc.cluster.local:1025
+{{- end -}}
+{{- end }}
