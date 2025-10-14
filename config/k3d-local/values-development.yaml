@@ -54,6 +54,11 @@ mycureapp:
 
   securityContext:
     readOnlyRootFilesystem: false  # Disabled for local testing (entrypoint needs to write config.json)
+    capabilities:
+      drop:
+        - ALL
+      add:
+        - CHOWN  # Required for nginx to chown cache directories
 
   resources:
     requests:
