@@ -286,9 +286,266 @@ delete_cluster() {
   log_success "Cluster deleted"
 }
 
-cmd_up() {
+setup_forgejo() {
+  log_info "Installing Forgejo (local Git server)..."
+
+  # Create git namespace
+  kubectl create namespace git --dry-run=client -o yaml | kubectl apply -f - &> /dev/null
+
+  # Add Forgejo Helm repo (OCI)
+  log_info "Installing Forgejo via Helm..."
+
+  # Install Forgejo with minimal config
+  helm upgrade --install forgejo oci://code.forgejo.org/forgejo-helm/forgejo \
+    --namespace git \
+    --set gitea.admin.username=gitea_admin \
+    --set gitea.admin.password=gitea_admin \
+    --set gitea.admin.email=admin@local.test \
+    --set service.http.type=ClusterIP \
+    --set service.http.port=3000 \
+    --set persistence.size=1Gi \
+    --set resources.requests.cpu=100m \
+    --set resources.requests.memory=256Mi \
+    --set resources.limits.cpu=500m \
+    --set resources.limits.memory=512Mi \
+    --wait \
+    --timeout=5m &> /dev/null
+
+  log_success "Forgejo installed"
+
+  # Wait for Forgejo to be ready
+  log_info "Waiting for Forgejo to be ready..."
+  kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=forgejo -n git --timeout=120s &> /dev/null
+
+  log_success "Forgejo is ready at http://forgejo-http.git.svc.cluster.local:3000"
+}
+
+mirror_to_forgejo() {
+  log_info "Mirroring repository to Forgejo..."
+
+  # Get Forgejo pod name
+  local forgejo_pod=$(kubectl get pod -n git -l app.kubernetes.io/name=forgejo -o jsonpath='{.items[0].metadata.name}')
+
+  # Create repository via Forgejo API
+  log_info "Creating repository in Forgejo..."
+
+  # Port-forward temporarily to create repo
+  kubectl port-forward -n git svc/forgejo-http 3000:3000 &> /dev/null &
+  local pf_pid=$!
+  sleep 3
+
+  # Create repo via API
+  curl -X POST "http://localhost:3000/api/v1/user/repos" \
+    -H "Content-Type: application/json" \
+    -u "gitea_admin:gitea_admin" \
+    -d '{"name":"lfh-infra","private":false,"auto_init":false}' &> /dev/null || true
+
+  # Kill port-forward
+  kill $pf_pid 2>/dev/null || true
+
+  # Add Forgejo as git remote and push
+  log_info "Pushing current branch to Forgejo..."
+
+  # Remove existing remote if present
+  git remote remove forgejo &> /dev/null || true
+
+  # Add new remote (using kubectl port-forward)
+  git remote add forgejo http://gitea_admin:gitea_admin@localhost:3000/gitea_admin/lfh-infra.git
+
+  # Port-forward again for git push
+  kubectl port-forward -n git svc/forgejo-http 3000:3000 &> /dev/null &
+  local pf_pid=$!
+  sleep 2
+
+  # Push current branch
+  git push forgejo HEAD:main --force &> /dev/null || log_warning "Failed to push to Forgejo"
+
+  # Kill port-forward
+  kill $pf_pid 2>/dev/null || true
+
+  # Remove the remote (we'll use cluster-internal URL for ArgoCD)
+  git remote remove forgejo &> /dev/null || true
+
+  log_success "Repository mirrored to Forgejo"
+}
+
+setup_argocd_gitops() {
+  log_info "Installing ArgoCD..."
+
+  # Create argocd namespace
+  kubectl create namespace argocd --dry-run=client -o yaml | kubectl apply -f - &> /dev/null
+
+  # Install ArgoCD
+  kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml &> /dev/null
+
+  log_success "ArgoCD installed"
+
+  # Wait for ArgoCD to be ready
+  log_info "Waiting for ArgoCD to be ready..."
+  kubectl wait --for=condition=available deployment/argocd-server -n argocd --timeout=180s &> /dev/null
+
+  log_success "ArgoCD is ready"
+}
+
+deploy_apps_gitops() {
+  log_info "Deploying applications via ArgoCD..."
+
+  # Create ArgoCD Applications
+  cat <<EOF | kubectl apply -f - &> /dev/null
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: lfh-dev-mongodb
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  project: default
+  source:
+    path: charts/hapihub/charts
+    repoURL: http://forgejo-http.git.svc.cluster.local:3000/gitea_admin/lfh-infra.git
+    targetRevision: main
+    helm:
+      releaseName: hapihub-mongodb
+      valueFiles:
+        - ../../config/k3d-local/values-development.yaml
+      parameters:
+        - name: mongodb.enabled
+          value: "true"
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: $NAMESPACE
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: lfh-dev-hapihub
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+spec:
+  project: default
+  source:
+    path: charts/hapihub
+    repoURL: http://forgejo-http.git.svc.cluster.local:3000/gitea_admin/lfh-infra.git
+    targetRevision: main
+    helm:
+      releaseName: hapihub
+      valueFiles:
+        - ../../config/k3d-local/values-development.yaml
+      parameters:
+        - name: mongodb.enabled
+          value: "false"
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: $NAMESPACE
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: lfh-dev-mycureapp
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
+spec:
+  project: default
+  source:
+    path: charts/mycureapp
+    repoURL: http://forgejo-http.git.svc.cluster.local:3000/gitea_admin/lfh-infra.git
+    targetRevision: main
+    helm:
+      releaseName: mycureapp
+      valueFiles:
+        - ../../config/k3d-local/values-development.yaml
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: $NAMESPACE
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false
+EOF
+
+  log_success "ArgoCD Applications created"
+
+  log_info "Waiting for applications to sync..."
+  sleep 10
+
+  log_success "Applications deployed via GitOps"
+}
+
+show_gitops_status() {
+  echo ""
   echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-  echo -e "${BLUE}  Starting k3d Development Environment${NC}"
+  echo -e "${BLUE}  GitOps Environment Info${NC}"
+  echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+  echo ""
+
+  echo "Forgejo Git Server:"
+  echo "  Username: gitea_admin"
+  echo "  Password: gitea_admin"
+  echo "  Access: kubectl port-forward -n git svc/forgejo-http 3000:3000"
+  echo "  Then open: http://localhost:3000"
+  echo ""
+
+  echo "ArgoCD UI:"
+  echo "  Access: kubectl port-forward -n argocd svc/argocd-server 8080:443"
+  echo "  Then open: https://localhost:8080"
+  echo "  Username: admin"
+  echo "  Password: \$(kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d)"
+  echo ""
+
+  echo "ArgoCD Applications:"
+  kubectl get applications -n argocd 2>/dev/null || echo "  (checking...)"
+  echo ""
+
+  echo "Fast Iteration Workflow:"
+  echo "  1. Make changes to charts/values"
+  echo "  2. git add . && git commit -m 'update'"
+  echo "  3. Push to Forgejo:"
+  echo "     kubectl port-forward -n git svc/forgejo-http 3000:3000 &"
+  echo "     git push http://gitea_admin:gitea_admin@localhost:3000/gitea_admin/lfh-infra.git HEAD:main"
+  echo "  4. ArgoCD syncs automatically!"
+  echo ""
+}
+
+cmd_up() {
+  local GITOPS_MODE=false
+
+  # Parse flags
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --gitops)
+        GITOPS_MODE=true
+        shift
+        ;;
+      *)
+        shift
+        ;;
+    esac
+  done
+
+  echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+  if [ "$GITOPS_MODE" = true ]; then
+    echo -e "${BLUE}  Starting k3d GitOps Environment${NC}"
+  else
+    echo -e "${BLUE}  Starting k3d Development Environment${NC}"
+  fi
   echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
   echo ""
 
@@ -296,24 +553,42 @@ cmd_up() {
   create_cluster
   wait_for_cluster
   deploy_gateway_api
-  deploy_apps
+
+  if [ "$GITOPS_MODE" = true ]; then
+    setup_forgejo
+    mirror_to_forgejo
+    setup_argocd_gitops
+    deploy_apps_gitops
+  else
+    deploy_apps
+  fi
+
   configure_hosts
 
   echo ""
   echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-  echo -e "${GREEN}✓ Development environment ready!${NC}"
+  if [ "$GITOPS_MODE" = true ]; then
+    echo -e "${GREEN}✓ GitOps environment ready!${NC}"
+  else
+    echo -e "${GREEN}✓ Development environment ready!${NC}"
+  fi
   echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-  echo ""
-  echo "Access your applications:"
-  for host in "${HOSTS_ENTRIES[@]}"; do
-    echo "  http://$host:${HTTP_PORT}"
-  done
-  echo ""
-  echo "Useful commands:"
-  echo "  kubectl get pods -n $NAMESPACE --watch"
-  echo "  kubectl logs -n $NAMESPACE <pod-name> -f"
-  echo "  $0 status"
-  echo ""
+
+  if [ "$GITOPS_MODE" = true ]; then
+    show_gitops_status
+  else
+    echo ""
+    echo "Access your applications:"
+    for host in "${HOSTS_ENTRIES[@]}"; do
+      echo "  http://$host:${HTTP_PORT}"
+    done
+    echo ""
+    echo "Useful commands:"
+    echo "  kubectl get pods -n $NAMESPACE --watch"
+    echo "  kubectl logs -n $NAMESPACE <pod-name> -f"
+    echo "  $0 status"
+    echo ""
+  fi
 }
 
 cmd_down() {
@@ -346,7 +621,8 @@ cmd_status() {
 # Main
 case "${1:-}" in
   up)
-    cmd_up
+    shift  # Remove 'up' from arguments
+    cmd_up "$@"  # Pass remaining arguments (e.g., --gitops)
     ;;
   down)
     cmd_down
@@ -361,15 +637,17 @@ case "${1:-}" in
     echo "Usage: $0 {up|down|reset|status}"
     echo ""
     echo "Commands:"
-    echo "  up      - Create cluster and deploy applications"
-    echo "  down    - Delete cluster and cleanup"
-    echo "  reset   - Delete and recreate everything (fresh start)"
-    echo "  status  - Show current environment status"
+    echo "  up [--gitops]  - Create cluster and deploy applications"
+    echo "                   --gitops: Use GitOps workflow with Forgejo + ArgoCD"
+    echo "  down           - Delete cluster and cleanup"
+    echo "  reset          - Delete and recreate everything (fresh start)"
+    echo "  status         - Show current environment status"
     echo ""
     echo "Examples:"
-    echo "  $0 up       # Start local development environment"
-    echo "  $0 status   # Check what's running"
-    echo "  $0 down     # Stop and cleanup"
+    echo "  $0 up           # Start local development environment (Helm mode)"
+    echo "  $0 up --gitops  # Start with GitOps workflow (Forgejo + ArgoCD)"
+    echo "  $0 status       # Check what's running"
+    echo "  $0 down         # Stop and cleanup"
     exit 1
     ;;
 esac
