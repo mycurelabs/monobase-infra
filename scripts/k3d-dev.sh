@@ -69,6 +69,32 @@ check_prerequisites() {
     return 1
   fi
 
+  # Check for Ubuntu 24.04 AppArmor restriction
+  if [ -f /etc/os-release ]; then
+    source /etc/os-release
+    if [[ "$ID" == "ubuntu" && "$VERSION_ID" == "24.04" ]]; then
+      local userns_restriction=$(sysctl -n kernel.apparmor_restrict_unprivileged_userns 2>/dev/null || echo "unknown")
+      if [ "$userns_restriction" == "1" ]; then
+        log_warning "Ubuntu 24.04 detected with AppArmor user namespace restriction"
+        echo ""
+        echo -e "${YELLOW}k3d loadbalancer will fail without fixing this!${NC}"
+        echo ""
+        echo "Fix (run once):"
+        echo "  echo 'kernel.apparmor_restrict_unprivileged_userns = 0' | sudo tee /etc/sysctl.d/20-apparmor-donotrestrict.conf"
+        echo "  sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0"
+        echo ""
+        echo "See docs/K3D_TROUBLESHOOTING.md for details"
+        echo ""
+        read -p "Continue anyway? (y/N) " -n 1 -r
+        echo
+        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+          log_error "Aborted. Apply the fix above and try again."
+          return 1
+        fi
+      fi
+    fi
+  fi
+
   log_success "All prerequisites installed"
 }
 

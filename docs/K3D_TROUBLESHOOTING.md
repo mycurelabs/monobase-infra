@@ -1,8 +1,49 @@
 # k3d Troubleshooting Guide
 
-## Known Issues
+## Critical Fix for Ubuntu 24.04 Users 🔥
 
-### Loadbalancer Fails to Start (`/etc/confd/values.yaml` Error)
+### Ubuntu 24.04 AppArmor Restriction Breaks k3d
+
+**Symptom:**
+```
+k3d-lfh-dev-serverlb container stays in "Created" state
+Cluster creation fails with agent nodes timing out
+Logs show: ERROR stat /etc/confd/values.yaml: no such file or directory
+```
+
+**Root Cause:**
+Ubuntu 24.04 introduced `kernel.apparmor_restrict_unprivileged_userns=1` by default, which prevents Docker containers from using unprivileged user namespaces. This breaks k3d's loadbalancer and many other containerized applications.
+
+**The Fix (Recommended):**
+
+Create a persistent sysctl configuration to allow unprivileged user namespaces:
+
+```bash
+# Create persistent config
+echo 'kernel.apparmor_restrict_unprivileged_userns = 0' | sudo tee /etc/sysctl.d/20-apparmor-donotrestrict.conf
+
+# Apply immediately (no reboot needed)
+sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+
+# Verify it's applied
+sysctl kernel.apparmor_restrict_unprivileged_userns  # Should show: = 0
+```
+
+After applying this fix, `mise run dev-up` should work perfectly!
+
+**Security Note:** This makes your system equivalent to Ubuntu 22.04 (which didn't have this restriction). The security impact is minimal for development environments.
+
+**Alternative Fix (Temporary):**
+Run before each reboot:
+```bash
+sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+```
+
+---
+
+## Other Known Issues
+
+### Loadbalancer Fails to Start (Legacy Issue)
 
 **Symptom:**
 ```
@@ -15,6 +56,8 @@ This is a known k3d issue (https://github.com/k3d-io/k3d/issues/1326) related to
 - Docker security policies (AppArmor/SELinux)
 - Docker version incompatibilities
 - File system permissions in containerized environments
+
+**Note:** On Ubuntu 24.04, this is usually caused by the AppArmor restriction above. Try that fix first!
 
 **Impact:**
 - Cluster API server is accessible
