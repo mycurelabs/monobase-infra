@@ -94,6 +94,8 @@ spec:
               key: mongodb-root-password
         - name: DATABASE_URL
           value: {{ include "hapihub.mongodb.connectionString" . | quote }}
+        - name: MONGO_URI
+          value: {{ include "hapihub.mongodb.connectionString" . | quote }}
         # Service URLs from dependencies
         {{- if .Values.typesense.enabled }}
         - name: TYPESENSE_URL
