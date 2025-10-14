@@ -241,11 +241,11 @@ minio:
     burst: 200
 
     # If using external S3 instead:
-  # external:
-  #   endpoint: "s3.amazonaws.com"
-  #   bucket: "hapihub-production-files"
-  #   region: "us-east-1"
-  #   publicUrl: "https://cdn.example.com"
+    # external:
+    #   endpoint: "s3.amazonaws.com"
+    #   bucket: "hapihub-production-files"
+    #   region: "us-east-1"
+    #   publicUrl: "https://cdn.example.com"
 
 # ===== PRODUCTION: NO Mailpit =====
 mailpit:

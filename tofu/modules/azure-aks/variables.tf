@@ -54,12 +54,6 @@ variable "enable_workload_identity" {
   default     = true
 }
 
-variable "enable_azure_disk_csi" {
-  description = "Enable Azure Disk CSI driver"
-  type        = bool
-  default     = true
-}
-
 variable "tags" {
   description = "Tags for all resources"
   type        = map(string)
