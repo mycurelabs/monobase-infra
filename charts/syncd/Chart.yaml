@@ -3,7 +3,7 @@ name: syncd
 description: Syncd Real-time Sync Service - Custom Helm chart for LFH Infrastructure
 type: application
 version: 1.0.0
-appVersion: "1.2.0"
+appVersion: "5.130.7"
 keywords:
   - sync
   - real-time

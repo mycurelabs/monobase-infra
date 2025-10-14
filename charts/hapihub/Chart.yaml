@@ -3,7 +3,7 @@ name: hapihub
 description: HapiHub Healthcare API - Custom Helm chart for LFH Infrastructure
 type: application
 version: 1.0.0
-appVersion: "5.215.2"
+appVersion: "10.0.0"
 keywords:
   - healthcare
   - api
@@ -35,8 +35,11 @@ dependencies:
       - storage
 
 # Typesense - Optional full-text search
-# NOTE: Helm chart repository unavailable as of 2025-01
-# TODO: Find correct repository URL or use alternative deployment method
+# NOTE: No official Bitnami or Typesense Helm chart exists
+# RECOMMENDATION: Use Typesense Kubernetes Operator (TyKO) for production deployments
+#   - GitHub: https://github.com/akyriako/typesense-operator
+#   - Docs: https://akyriako.github.io/typesense-operator-docs/
+# Alternative: Direct StatefulSet deployment (see production examples)
 # - name: typesense
 #   version: "0.4.0"
 #   repository: https://typesense.github.io/typesense-kubernetes
