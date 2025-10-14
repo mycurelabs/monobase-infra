@@ -77,21 +77,21 @@ networkPolicy:
   ingress:
     # Allow SMTP from HapiHub
     - from:
-      - podSelector:
-          matchLabels:
-            app.kubernetes.io/name: hapihub
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: hapihub
       ports:
-      - protocol: TCP
-        port: 1025
+        - protocol: TCP
+          port: 1025
 
     # Allow HTTP from Gateway (web UI)
     - from:
-      - namespaceSelector:
-          matchLabels:
-            name: gateway-system
+        - namespaceSelector:
+            matchLabels:
+              name: gateway-system
       ports:
-      - protocol: TCP
-        port: 8025
+        - protocol: TCP
+          port: 8025
 
 # Health checks
 livenessProbe:

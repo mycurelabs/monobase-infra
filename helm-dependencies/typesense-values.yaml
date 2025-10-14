@@ -97,12 +97,12 @@ networkPolicy:
   enabled: true
   ingress:
     - from:
-      - podSelector:
-          matchLabels:
-            app.kubernetes.io/name: hapihub
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: hapihub
       ports:
-      - protocol: TCP
-        port: 8108
+        - protocol: TCP
+          port: 8108
 
 # Monitoring
 serviceMonitor:

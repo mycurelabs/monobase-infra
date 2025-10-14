@@ -1,10 +1,13 @@
 ---
 extends: default
 
-# Ignore Helm chart templates (they use Go templating)
+# Ignore Helm chart templates and files with Go templating
 ignore: |
   charts/*/templates/
   .github/workflows/
+  infrastructure/security/networkpolicies/
+  infrastructure/security/encryption/
+  infrastructure/monitoring/helm-values.yaml
 
 rules:
   line-length:

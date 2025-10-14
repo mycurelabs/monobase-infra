@@ -94,15 +94,15 @@ networkPolicy:
   # Allow traffic from HapiHub and Gateway
   ingress:
     - from:
-      - podSelector:
-          matchLabels:
-            app.kubernetes.io/name: hapihub
-      - namespaceSelector:
-          matchLabels:
-            name: gateway-system
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: hapihub
+        - namespaceSelector:
+            matchLabels:
+              name: gateway-system
       ports:
-      - protocol: TCP
-        port: 9000
+        - protocol: TCP
+          port: 9000
 
 # Pod Disruption Budget
 podDisruptionBudget:

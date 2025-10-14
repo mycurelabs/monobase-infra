@@ -43,7 +43,7 @@ securityContext:
   allowPrivilegeEscalation: false
   capabilities:
     drop:
-    - ALL
+      - ALL
   readOnlyRootFilesystem: false
 
 service:
@@ -65,7 +65,7 @@ resources:
     cpu: 500m
     memory: 1Gi
   limits:
-    cpu: 2
+    cpu: "2"
     memory: 4Gi
 
 livenessProbe:
@@ -140,34 +140,34 @@ networkPolicy:
     - Egress
   ingress:
     - from:
-      - namespaceSelector:
-          matchLabels:
-            name: gateway-system
+        - namespaceSelector:
+            matchLabels:
+              name: gateway-system
       ports:
-      - protocol: TCP
-        port: 7500
+        - protocol: TCP
+          port: 7500
   egress:
     - to:
-      - namespaceSelector: {}
+        - namespaceSelector: {}
       ports:
-      - protocol: TCP
-        port: 27017  # MongoDB
-      - protocol: TCP
-        port: 8108   # Typesense
-      - protocol: TCP
-        port: 9000   # MinIO
+        - protocol: TCP
+          port: 27017  # MongoDB
+        - protocol: TCP
+          port: 8108   # Typesense
+        - protocol: TCP
+          port: 9000   # MinIO
     - to:
-      - namespaceSelector: {}
+        - namespaceSelector: {}
       ports:
-      - protocol: TCP
-        port: 53     # DNS
-      - protocol: UDP
-        port: 53     # DNS
+        - protocol: TCP
+          port: 53     # DNS
+        - protocol: UDP
+          port: 53     # DNS
     - to:
-      - namespaceSelector: {}
+        - namespaceSelector: {}
       ports:
-      - protocol: TCP
-        port: 443    # HTTPS (external APIs)
+        - protocol: TCP
+          port: 443    # HTTPS (external APIs)
 
 # Service Monitor for Prometheus (if monitoring enabled)
 serviceMonitor:
