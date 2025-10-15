@@ -3,7 +3,7 @@
 variable "cluster_name" {
   description = "Name of the EKS cluster"
   type        = string
-  default     = "lfh-default-cluster"
+  default     = "monobase-default-cluster"
 }
 
 variable "region" {
@@ -98,6 +98,6 @@ variable "tags" {
   default = {
     Environment = "production"
     ManagedBy   = "opentofu"
-    Project     = "lfh-infrastructure"
+    Project     = "monobase-infrastructure"
   }
 }

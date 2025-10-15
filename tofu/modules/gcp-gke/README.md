@@ -1,6 +1,6 @@
 # GCP GKE Module
 
-Production-ready GKE cluster for multi-tenant LFH Infrastructure.
+Production-ready GKE cluster for multi-tenant Monobase Infrastructure.
 
 ## Features
 
@@ -18,7 +18,7 @@ Production-ready GKE cluster for multi-tenant LFH Infrastructure.
 module "gke_cluster" {
   source = "../../modules/gcp-gke"
   
-  cluster_name       = "lfh-prod"
+  cluster_name       = "monobase-prod"
   project_id         = "my-project-123456"
   region             = "us-central1"
   kubernetes_version = "1.28"
@@ -49,8 +49,8 @@ module "gke_cluster" {
 ## Get Kubeconfig
 
 ```bash
-gcloud container clusters get-credentials lfh-prod --region us-central1 --project my-project
+gcloud container clusters get-credentials monobase-prod --region us-central1 --project my-project
 kubectl get nodes
 ```
 
-Complete multi-tenant GKE cluster ready for LFH deployments.
+Complete multi-tenant GKE cluster ready for Monobase deployments.

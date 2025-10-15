@@ -243,7 +243,7 @@ velero restore create ransomware-recovery \\
 # - Implement additional controls
 
 # 7. Post-incident
-# - Breach notification (HIPAA requirement if PHI accessed)
+# - Breach notification (if required by compliance)
 # - Security assessment
 # - Update incident response plan
 ```
@@ -295,9 +295,9 @@ kubectl delete namespace myclient-restore-test
 
 ### Compliance Requirements
 
-**HIPAA:**
-- Audit logs: 7 years minimum
-- PHI: 6 years minimum
+**General:**
+- Audit logs: Retain as per compliance needs
+- Data: Retain as per compliance needs
 - Backups: 90 days minimum (Tier 3)
 
 **Implementation:**
@@ -309,7 +309,7 @@ ttl: 72h
 # Tier 2: Daily (30d retention)
 ttl: 720h
 
-# Tier 3: Weekly (90d retention - HIPAA)
+# Tier 3: Weekly (90d retention)
 ttl: 2160h
 
 # For longer retention:
@@ -379,7 +379,7 @@ velero backup delete --selector backup-schedule=daily-full \\
 - ✅ Automated schedules
 - ✅ Encrypted backups
 - ✅ Off-cluster storage (S3)
-- ✅ HIPAA-compliant retention (90 days+)
+- ✅ Configurable retention (90 days+)
 
 **Disaster Recovery:**
 - ✅ Tested procedures

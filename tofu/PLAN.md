@@ -2,9 +2,9 @@
 
 ## Executive Summary
 
-This document outlines the implementation plan for **cluster provisioning infrastructure** using OpenTofu (open-source Terraform) and Terragrunt for the LFH Infrastructure template.
+This document outlines the implementation plan for **cluster provisioning infrastructure** using OpenTofu (open-source Terraform) and Terragrunt for the Monobase Infrastructure template.
 
-**Purpose:** Provision Kubernetes clusters before deploying LFH application stack
+**Purpose:** Provision Kubernetes clusters before deploying Monobase application stack
 **Scope:** Infrastructure layer (VPC, clusters, IAM) - complements existing application layer
 **Status:** ✅ COMPLETE - All 5 modules implemented
 
@@ -37,7 +37,7 @@ Layer 2: Applications (EXISTING - ../PLAN.md)
 
 2. Deploy Applications (charts/, config/)
    ↓
-   Fork lfh-infra, create client config
+   Fork monobase-infra, create client config
    ↓
    Deploy via Helm/ArgoCD to client namespace
    ↓
@@ -131,7 +131,7 @@ tofu/
 - ✅ Create tofu/ directory structure (DONE)
 - Create tofu/README.md
 - Create tofu/terragrunt.hcl (root config)
-- Update lfh-infra/.gitignore
+- Update monobase-infra/.gitignore
 
 **Deliverables:**
 - Complete directory tree
@@ -513,11 +513,11 @@ remote_state {
     if_exists = "overwrite_terragrunt"
   }
   config = {
-    bucket         = "lfh-terraform-state"
+    bucket         = "monobase-terraform-state"
     key            = "${path_relative_to_include()}/terraform.tfstate"
     region         = "us-east-1"
     encrypt        = true
-    dynamodb_table = "lfh-terraform-locks"
+    dynamodb_table = "monobase-terraform-locks"
   }
 }
 
@@ -554,7 +554,7 @@ terraform {
 
 # Inputs (can also be in terraform.tfvars)
 inputs = {
-  cluster_name = "lfh-shared-prod"
+  cluster_name = "monobase-shared-prod"
   region       = "us-east-1"
   
   node_groups = {
@@ -612,7 +612,7 @@ module "cluster" {
   
   # Tags
   tags = merge(var.tags, {
-    ManagedBy = "lfh-infrastructure"
+    ManagedBy = "monobase-infrastructure"
     Purpose   = "multi-tenant-healthcare"
   })
 }
@@ -632,7 +632,7 @@ output "kubeconfig" {
 variable "cluster_name" {
   description = "Name of the EKS cluster"
   type        = string
-  default     = "lfh-example-cluster"
+  default     = "monobase-example-cluster"
 }
 
 variable "region" {
@@ -673,7 +673,7 @@ variable "node_groups" {
 # Reference cluster configuration for example.com
 # Copy this file and customize
 
-cluster_name       = "lfh-example-cluster"
+cluster_name       = "monobase-example-cluster"
 region             = "us-east-1"
 kubernetes_version = "1.28"
 
@@ -698,7 +698,7 @@ enable_private_endpoint = false  # Set true for maximum security
 
 tags = {
   Environment = "production"
-  Project     = "lfh-infrastructure"
+  Project     = "monobase-infrastructure"
   ManagedBy   = "opentofu"
 }
 ```
@@ -721,7 +721,7 @@ This is a REFERENCE cluster configuration (like config/example.com for applicati
    ```
 
 2. Customize terraform.tfvars:
-   - cluster_name: "lfh-myclient-prod"
+   - cluster_name: "monobase-myclient-prod"
    - region: your AWS region
    - node_groups: size for your client load
    - vpc_cidr: non-overlapping CIDR
@@ -758,7 +758,7 @@ This cluster is sized for MULTIPLE clients:
 ## Next Steps
 
 After cluster is ready:
-1. Deploy LFH application stack (see ../config/example.com/)
+1. Deploy Monobase application stack (see ../config/example.com/)
 2. For each client: ./scripts/new-client-config.sh
 3. Deploy via ArgoCD to client namespaces
 ```
@@ -792,7 +792,7 @@ cp -r tofu/clusters/default-cluster tofu/clusters/$CLUSTER_NAME
 
 # Replace placeholders
 cd tofu/clusters/$CLUSTER_NAME
-sed -i.bak "s/lfh-example-cluster/lfh-$CLUSTER_NAME/g" terraform.tfvars
+sed -i.bak "s/monobase-example-cluster/monobase-$CLUSTER_NAME/g" terraform.tfvars
 sed -i.bak "s/us-east-1/$REGION/g" terraform.tfvars
 rm *.bak
 
@@ -867,7 +867,7 @@ tofu/**/.terraform.lock.hcl
 
 ---
 
-## Integration with Existing LFH Template
+## Integration with Existing Monobase Template
 
 ### Complete Workflow
 
@@ -880,7 +880,7 @@ tofu apply
 
 **Step 2: Deploy Applications (Existing Flow)**
 ```bash
-# Use existing LFH workflow
+# Use existing Monobase workflow
 ./scripts/new-client-config.sh client-a client-a.com
 helm install hapihub charts/hapihub -f config/client-a/values-production.yaml
 ```
@@ -924,7 +924,7 @@ helm install hapihub charts/hapihub -f config/client-a/values-production.yaml
 
 ## Notes
 
-**This complements the existing LFH template:**
+**This complements the existing Monobase template:**
 - Existing: Application deployment (charts/, config/)
 - New: Cluster provisioning (tofu/)
 - Together: Complete end-to-end infrastructure solution

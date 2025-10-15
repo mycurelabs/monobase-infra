@@ -1,6 +1,6 @@
 # Infrastructure Provisioning (OpenTofu + Terragrunt)
 
-Provision Kubernetes clusters for LFH Infrastructure deployments.
+Provision Kubernetes clusters for Monobase Infrastructure deployments.
 
 ## Overview
 
@@ -29,7 +29,7 @@ tofu output -raw kubeconfig > ~/.kube/myclient-cluster
 export KUBECONFIG=~/.kube/myclient-cluster
 kubectl get nodes
 
-# 5. Deploy applications (use existing LFH workflow)
+# 5. Deploy applications (use existing Monobase workflow)
 cd ../../..
 ./scripts/new-client-config.sh client-a client-a.com
 # Deploy via Helm/ArgoCD
@@ -53,9 +53,9 @@ Choose based on deployment target:
 
 ```
 Single Cluster (provisioned via tofu/)
-├── client-a-prod namespace    ← Deploy via lfh-infra charts
-├── client-b-prod namespace    ← Deploy via lfh-infra charts
-├── client-c-staging namespace ← Deploy via lfh-infra charts
+├── client-a-prod namespace    ← Deploy via monobase-infra charts
+├── client-b-prod namespace    ← Deploy via monobase-infra charts
+├── client-c-staging namespace ← Deploy via monobase-infra charts
 └── gateway-system (shared)
 ```
 
@@ -114,7 +114,7 @@ terragrunt --version
 1. **Read:** [PLAN.md](PLAN.md) for complete architecture
 2. **Implement:** Modules as needed (start with aws-eks or k3d-local)
 3. **Test:** Use k3d-local module for local testing
-4. **Deploy:** Provision production cluster, then deploy LFH apps
+4. **Deploy:** Provision production cluster, then deploy Monobase apps
 
 ---
 

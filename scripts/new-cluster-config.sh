@@ -66,7 +66,7 @@ echo ""
 echo -e "${BLUE}[2/3] Replacing placeholders...${NC}"
 cd tofu/clusters/$CLUSTER_NAME
 
-sed -i.bak "s/lfh-default-cluster/lfh-$CLUSTER_NAME/g" terraform.tfvars
+sed -i.bak "s/monobase-default-cluster/monobase-$CLUSTER_NAME/g" terraform.tfvars
 sed -i.bak "s/us-east-1/$REGION/g" terraform.tfvars
 find . -name "*.bak" -delete
 

@@ -72,7 +72,7 @@ output "configure_kubectl" {
   value       = "aws eks update-kubeconfig --region ${var.region} --name ${aws_eks_cluster.main.name}"
 }
 
-# IRSA role ARNs for LFH components
+# IRSA role ARNs for Monobase components
 output "external_secrets_role_arn" {
   description = "IAM role ARN for External Secrets Operator"
   value       = var.enable_irsa ? aws_iam_role.external_secrets[0].arn : null

@@ -1,4 +1,4 @@
-# TFLint configuration for LFH Infrastructure
+# TFLint configuration for Monobase Infrastructure
 # Docs: https://github.com/terraform-linters/tflint
 
 config {

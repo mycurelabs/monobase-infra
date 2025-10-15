@@ -1,6 +1,6 @@
 # GitOps with ArgoCD
 
-Complete guide to GitOps workflow using ArgoCD for LFH Infrastructure.
+Complete guide to GitOps workflow using ArgoCD for Monobase Infrastructure.
 
 ## GitOps Principles
 
@@ -109,7 +109,7 @@ argocd app sync myclient-prod-hapihub
 ```bash
 # Not recommended - bypasses GitOps!
 kubectl set image deployment/hapihub \
-  hapihub=ghcr.io/mycurelabs/hapihub:5.216.0 \
+  hapihub=ghcr.io/YOUR-ORG/hapihub:5.216.0 \
   -n myclient-prod
 
 # Then update Git to match reality

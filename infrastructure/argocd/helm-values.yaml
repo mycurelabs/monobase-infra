@@ -74,7 +74,7 @@ server:
     # Git repository credentials
     repositories: |
       - type: git
-        url: https://github.com/mycurelabs/lfh-infra.git
+        url: https://github.com/YOUR-ORG/monobase-infra.git
       # Add client repositories here
 
     # Resource customizations

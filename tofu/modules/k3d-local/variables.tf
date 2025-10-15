@@ -3,7 +3,7 @@
 variable "cluster_name" {
   description = "Name of the k3d cluster"
   type        = string
-  default     = "lfh-test"
+  default     = "monobase-test"
 }
 
 variable "k3s_version" {

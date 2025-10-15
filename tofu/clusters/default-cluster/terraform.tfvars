@@ -1,7 +1,7 @@
 # Default Cluster Configuration
 # Copy to your-cluster/ and customize
 
-cluster_name       = "lfh-default-cluster"
+cluster_name       = "monobase-default-cluster"
 region             = "us-east-1"
 kubernetes_version = "1.28"
 
@@ -36,5 +36,5 @@ enable_flow_logs          = true
 tags = {
   Environment = "production"
   ManagedBy   = "opentofu"
-  Project     = "lfh-infrastructure"
+  Project     = "monobase-infrastructure"
 }

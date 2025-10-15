@@ -1,6 +1,6 @@
 #!/bin/bash
 # validate.sh
-# Comprehensive validation script for LFH Infrastructure template
+# Comprehensive validation script for Monobase Infrastructure template
 
 set -e
 
@@ -15,7 +15,7 @@ ERRORS=0
 WARNINGS=0
 
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo -e "${BLUE}  LFH Infrastructure Template Validation${NC}"
+echo -e "${BLUE}  Monobase Infrastructure Template Validation${NC}"
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
 

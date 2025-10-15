@@ -1,6 +1,6 @@
 # Storage Provider Guide
 
-Choosing and configuring storage for LFH Infrastructure.
+Choosing and configuring storage for Monobase Infrastructure.
 
 ## Quick Recommendation
 

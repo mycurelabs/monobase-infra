@@ -1,6 +1,6 @@
-# Contributing to LFH Infrastructure
+# Contributing to Monobase Infrastructure
 
-Thank you for your interest in contributing to the LFH Infrastructure project! This document provides guidelines for contributing.
+Thank you for your interest in contributing to the Monobase Infrastructure project! This document provides guidelines for contributing.
 
 ## Table of Contents
 
@@ -32,8 +32,8 @@ All other tools (terraform, kubectl, helm, tflint, yamllint, shellcheck, markdow
 
 1. **Fork and clone the repository**
    ```bash
-   git clone https://github.com/YOUR-USERNAME/lfh-infra.git
-   cd lfh-infra
+   git clone https://github.com/YOUR-USERNAME/monobase-infra.git
+   cd monobase-infra
    ```
 
 2. **Install mise** (one-time setup)
@@ -60,7 +60,7 @@ All other tools (terraform, kubectl, helm, tflint, yamllint, shellcheck, markdow
 
 4. **Create a k3d cluster for testing** (optional)
    ```bash
-   k3d cluster create lfh-dev --agents 2
+   k3d cluster create monobase-dev --agents 2
    ```
 
 5. **Start developing!**
@@ -295,4 +295,4 @@ By contributing, you agree that your contributions will be licensed under the sa
 
 ---
 
-**Thank you for contributing to LFH Infrastructure!** 🎉
+**Thank you for contributing to Monobase Infrastructure!**

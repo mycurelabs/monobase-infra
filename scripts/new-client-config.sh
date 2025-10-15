@@ -62,7 +62,7 @@ if [ ! -f "README.md" ] || [ ! -d "config/example.com" ]; then
 fi
 
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo -e "${BLUE}  LFH Infrastructure - Client Bootstrap${NC}"
+echo -e "${BLUE}  Monobase Infrastructure - Client Bootstrap${NC}"
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
 echo -e "Client Name:   ${GREEN}$CLIENT_NAME${NC}"
@@ -158,7 +158,6 @@ Domain: **$CLIENT_DOMAIN**
 ## Support
 
 - Documentation: [docs/](../../docs/)
-- Issues: [GitHub Issues](https://github.com/mycurelabs/lfh-infra/issues)
 EOF
 
 echo -e "${GREEN}✓ Created custom README${NC}"

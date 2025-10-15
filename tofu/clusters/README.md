@@ -30,7 +30,7 @@ cd tofu/clusters/myclient-cluster
 vim terraform.tfvars
 
 # Key settings:
-# - cluster_name: "lfh-myclient-prod"
+# - cluster_name: "monobase-myclient-prod"
 # - region: "us-east-1"
 # - node_instance_type: "m6i.2xlarge"
 # - node_count_min: 3

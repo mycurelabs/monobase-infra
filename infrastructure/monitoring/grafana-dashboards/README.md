@@ -1,6 +1,6 @@
 # Grafana Dashboards
 
-Pre-configured dashboards for monitoring the LFH Infrastructure stack.
+Pre-configured dashboards for monitoring the Monobase Infrastructure stack.
 
 ## Included Dashboards
 

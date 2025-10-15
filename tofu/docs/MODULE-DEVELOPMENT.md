@@ -1,6 +1,6 @@
 # Module Development Guide
 
-Comprehensive guide for creating new OpenTofu modules for LFH Infrastructure.
+Comprehensive guide for creating new OpenTofu modules for Monobase Infrastructure.
 
 ## Table of Contents
 
@@ -25,7 +25,7 @@ An OpenTofu module is a reusable package of infrastructure code that:
 - Encapsulates complexity
 - Can be versioned and tested independently
 
-### Module Goals for LFH Infrastructure
+### Module Goals for Monobase Infrastructure
 
 1. **Multi-tenant Ready** - Support 5-30 clients per cluster
 2. **Healthcare Compliant** - HIPAA/PHI-ready configurations
@@ -525,7 +525,7 @@ See [Documentation](#documentation) section below.
 
 ### Multi-Tenant Considerations
 
-For LFH Infrastructure, modules must support multiple clients per cluster:
+For Monobase Infrastructure, modules must support multiple clients per cluster:
 
 ✅ **DO:**
 - Size for 5-30 clients per cluster

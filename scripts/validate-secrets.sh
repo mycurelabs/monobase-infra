@@ -14,7 +14,7 @@ NAMESPACE=${1:-""}
 ERRORS=0
 WARNINGS=0
 
-echo "🔐 LFH Infrastructure - Secrets Validation"
+echo "🔐 Monobase Infrastructure - Secrets Validation"
 echo "=========================================="
 echo ""
 

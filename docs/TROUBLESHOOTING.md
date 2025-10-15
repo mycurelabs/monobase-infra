@@ -1,6 +1,6 @@
 # Troubleshooting Guide
 
-Common issues and solutions for LFH Infrastructure.
+Common issues and solutions for Monobase Infrastructure.
 
 ## Quick Diagnostics
 
@@ -120,4 +120,4 @@ argocd app rollback myclient-prod-hapihub
 
 - **Documentation:** docs/ directory
 - **Issues:** GitHub Issues
-- **Support:** support@mycurelabs.com
+- **Support:** support@example.com

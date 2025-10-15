@@ -19,8 +19,8 @@ cd tofu/clusters/myclient-cluster
 vim terraform.tfvars
 
 # Key settings:
-# - cluster_name: "lfh-myclient-prod"
-# - region: "us-east-1"  
+# - cluster_name: "monobase-myclient-prod"
+# - region: "us-east-1"
 # - node_groups.general.instance_types: ["m6i.2xlarge"]
 # - node_groups.general.desired_size: 5
 # - node_groups.general.max_size: 20
@@ -53,7 +53,7 @@ kubectl get nodes
 ## Deploy Applications
 
 ```bash
-# Use LFH application workflow
+# Use Monobase application workflow
 cd ../../..
 ./scripts/new-client-config.sh client-a client-a.com
 # Deploy via Helm/ArgoCD

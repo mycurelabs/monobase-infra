@@ -1,26 +1,26 @@
-# LFH Infrastructure (Low-Friction Hosting)
+# Monobase Infrastructure
 
-**Reusable Kubernetes Infrastructure Template for HapiHub, Syncd, and MyCureApp**
+**Reusable Kubernetes Infrastructure Template**
 
-This repository provides production-ready, template-based Kubernetes infrastructure that can be easily customized and deployed to any client's cluster using modern best practices.
+This repository provides production-ready, template-based Kubernetes infrastructure that can be easily customized and deployed to any cluster using modern best practices.
 
 ## 🎯 Key Features
 
 - **Fork-Based Workflow** - Clients fork this template and add their configuration
 - **100% Parameterized** - No hardcoded client-specific values in base template
 - **Security by Default** - NetworkPolicies, Pod Security Standards, encryption
-- **HIPAA Compliant** - Built-in security controls for healthcare data
+- **Compliance Ready** - Built-in security controls and compliance features
 - **Modern Stack** - Gateway API, ArgoCD GitOps, External Secrets, Velero backups
 - **Scalable** - Designed for <500 users, <1TB data per client (scales further if needed)
 
 ## 📦 Scope & Repository Structure
 
-This repository contains **complete infrastructure** for deploying healthcare applications on Kubernetes.
+This repository contains **complete infrastructure** for deploying applications on Kubernetes.
 
 ### Repository Structure
 
 ```
-lfh-infra/
+monobase-infra/
 ├── tofu/                    # ← OPTIONAL: Cluster provisioning (OpenTofu/Terraform)
 │   ├── modules/             #    - AWS EKS, Azure AKS, GCP GKE
 │   │   ├── aws-eks/         #    - K3s on-premises, k3d local
@@ -104,8 +104,8 @@ If you already have an EKS/AKS/GKE/K3s cluster:
 
 ```bash
 # 1. Fork and clone
-git clone https://github.com/YOUR-ORG/lfh-infra.git
-cd lfh-infra
+git clone https://github.com/YOUR-ORG/monobase-infra.git
+cd monobase-infra
 
 # 2. Create client configuration
 ./scripts/new-client-config.sh myclient myclient.com
@@ -136,8 +136,8 @@ If you need to create a Kubernetes cluster first:
 
 ```bash
 # 1. Fork and clone (same as above)
-git clone https://github.com/YOUR-ORG/lfh-infra.git
-cd lfh-infra
+git clone https://github.com/YOUR-ORG/monobase-infra.git
+cd monobase-infra
 
 # 2. Provision cluster using OpenTofu
 cd tofu/clusters/
@@ -221,8 +221,8 @@ kubectl port-forward -n argocd svc/argocd-server 8080:443
 | Component | Technology | Purpose |
 |-----------|-----------|---------|
 | Gateway | Envoy Gateway | Shared Gateway API routing, zero-downtime updates |
-| API Backend | HapiHub | Core healthcare API service |
-| Frontend | MyCureApp | Vue.js patient/provider application |
+| API Backend | HapiHub | Core API service |
+| Frontend | MyCureApp | Vue.js frontend application |
 | Database | MongoDB 7.x | Primary datastore with replication |
 | Storage | Longhorn | Distributed block storage for StatefulSets |
 | GitOps | ArgoCD | Declarative deployments with web UI |
@@ -253,12 +253,12 @@ Internet → Envoy Gateway (shared, HA) → HTTPRoutes (per client/env) → Appl
 - **Shared Gateway** - One Gateway in `gateway-system`, HTTPRoutes per client (zero-downtime)
 - **Namespace Isolation** - Each client/environment gets separate namespace (`{client}-{env}`)
 - **No Overengineering** - No service mesh, no self-hosted Vault (use cloud KMS)
-- **Security First** - NetworkPolicies, PSS, encryption, HIPAA compliance built-in
+- **Security First** - NetworkPolicies, PSS, encryption, compliance features built-in
 
 ## 📁 Template Structure
 
 ```
-lfh-infra/                        # Base template repository
+monobase-infra/                   # Base template repository
 ├── charts/                       # Custom Helm charts
 │   ├── hapihub/                  # HapiHub application chart
 │   ├── syncd/                    # Syncd application chart
@@ -313,7 +313,7 @@ Clients can pull template updates from the base repository:
 
 ```bash
 # In your forked repo (one-time setup)
-git remote add upstream https://github.com/mycurelabs/lfh-infra.git
+git remote add upstream https://github.com/YOUR-ORG/monobase-infra.git
 
 # Pull latest template updates
 git fetch upstream
@@ -331,7 +331,7 @@ git push origin main
 - **Encryption in Transit** - TLS everywhere via cert-manager
 - **RBAC** - Least-privilege service accounts
 - **Secrets Management** - Never commit secrets, use External Secrets + KMS
-- **HIPAA Compliance** - See [HIPAA-COMPLIANCE.md](docs/HIPAA-COMPLIANCE.md)
+- **Compliance** - See compliance documentation in [docs/](docs/)
 
 ## ⚙️ Resource Requirements
 
@@ -356,14 +356,9 @@ Improvements to the base template are welcome! If you implement a useful feature
 
 ## 📞 Support
 
-- **Issues**: [GitHub Issues](https://github.com/mycurelabs/lfh-infra/issues)
+- **Issues**: GitHub Issues
 - **Documentation**: [docs/](docs/)
-- **PLAN.md**: See [PLAN.md](PLAN.md) for full implementation details
 
 ## 📄 License
 
 [Add your license here]
-
----
-
-**Built with ❤️ by MyCureLabs for the healthcare community**

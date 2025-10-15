@@ -1,6 +1,6 @@
 # Security Hardening Guide
 
-Production security hardening for HIPAA-compliant healthcare deployments.
+Production security hardening for compliant deployments.
 
 ## Security Checklist
 
@@ -222,13 +222,13 @@ image:
 # - scratch (static binaries)
 
 # 3. Scan images for vulnerabilities
-trivy image ghcr.io/mycurelabs/hapihub:5.215.2
+trivy image ghcr.io/YOUR-ORG/hapihub:5.215.2
 
 # 4. Sign images (optional)
-cosign sign ghcr.io/mycurelabs/hapihub:5.215.2
+cosign sign ghcr.io/YOUR-ORG/hapihub:5.215.2
 
 # 5. Verify signatures
-cosign verify ghcr.io/mycurelabs/hapihub:5.215.2
+cosign verify ghcr.io/YOUR-ORG/hapihub:5.215.2
 ```
 
 ---
@@ -435,12 +435,12 @@ kubectl rollout restart deployment hapihub -n myclient-prod
 - [ ] Security training completed
 - [ ] Penetration testing scheduled
 
-### HIPAA-Specific
+### Compliance-Specific (HIPAA, SOC 2, etc.)
 
-- [ ] BAA signed with cloud provider
+- [ ] Appropriate agreements signed with cloud provider (BAA for HIPAA, DPA for GDPR, etc.)
 - [ ] Encryption documented in System Security Plan
 - [ ] Access controls documented
-- [ ] Audit logs retention configured (7 years)
+- [ ] Audit logs retention configured (as per compliance requirements)
 - [ ] Breach notification procedures documented
 - [ ] Annual risk assessment scheduled
 - [ ] Security incident log maintained
@@ -592,7 +592,7 @@ kubectl delete pod suspicious-pod-xyz -n myclient-prod
 
 # Patch vulnerabilities
 kubectl set image deployment/hapihub \\
-  hapihub=ghcr.io/mycurelabs/hapihub:5.215.3-patched \\
+  hapihub=ghcr.io/YOUR-ORG/hapihub:5.215.3-patched \\
   -n myclient-prod
 ```
 
@@ -611,7 +611,7 @@ velero restore create incident-recovery \\
 **5. Post-Incident:**
 - Document incident
 - Update security controls
-- Notify affected parties (HIPAA breach notification if PHI accessed)
+- Notify affected parties (as required by compliance, e.g., HIPAA breach notification if PHI accessed)
 - Conduct lessons learned
 
 ---
@@ -624,7 +624,7 @@ velero restore create incident-recovery \\
 
 ```bash
 # Scan container images
-trivy image ghcr.io/mycurelabs/hapihub:5.215.2
+trivy image ghcr.io/YOUR-ORG/hapihub:5.215.2
 
 # Scan Helm charts
 trivy config charts/hapihub
@@ -800,15 +800,15 @@ kubectl get networkpolicy -A
 ## Security Incident Contacts
 
 **Internal:**
-- Security Team: security@mycurelabs.com
+- Security Team: security@example.com
 - On-Call: See PagerDuty rotation
 
 **External:**
 - Cloud Provider Support
-- HIPAA Breach Notification: HHS OCR
+- Compliance-specific notifications (e.g., HIPAA Breach Notification: HHS OCR)
 - Legal Team (for breach notification)
 
 **Report Security Issues:**
-- Email: security@mycurelabs.com
+- Email: security@example.com
 - PGP Key: [link]
 - Response SLA: 24 hours

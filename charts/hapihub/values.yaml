@@ -17,7 +17,7 @@ enabled: true
 replicaCount: 2
 
 image:
-  repository: ghcr.io/mycurelabs/hapihub
+  repository: ghcr.io/YOUR-ORG/hapihub
   pullPolicy: IfNotPresent
   tag: "10.0.0"
 

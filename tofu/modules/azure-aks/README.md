@@ -1,6 +1,6 @@
 # Azure AKS Module
 
-Production-ready AKS cluster for multi-tenant LFH Infrastructure.
+Production-ready AKS cluster for multi-tenant Monobase Infrastructure.
 
 ## Features
 
@@ -18,8 +18,8 @@ Production-ready AKS cluster for multi-tenant LFH Infrastructure.
 module "aks_cluster" {
   source = "../../modules/azure-aks"
   
-  cluster_name        = "lfh-prod"
-  resource_group_name = "lfh-prod-rg"
+  cluster_name        = "monobase-prod"
+  resource_group_name = "monobase-prod-rg"
   location            = "eastus"
   kubernetes_version  = "1.28"
   
@@ -50,8 +50,8 @@ module "aks_cluster" {
 ## Get Kubeconfig
 
 ```bash
-az aks get-credentials --resource-group lfh-prod-rg --name lfh-prod
+az aks get-credentials --resource-group monobase-prod-rg --name monobase-prod
 kubectl get nodes
 ```
 
-Complete multi-tenant AKS cluster ready for LFH deployments.
+Complete multi-tenant AKS cluster ready for Monobase deployments.

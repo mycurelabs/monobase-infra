@@ -1,6 +1,6 @@
 apiVersion: v2
 name: syncd
-description: Syncd Real-time Sync Service - Custom Helm chart for LFH Infrastructure
+description: Syncd Real-time Sync Service - Custom Helm chart for Monobase Infrastructure
 type: application
 version: 1.0.0
 appVersion: "5.130.7"
@@ -9,10 +9,9 @@ keywords:
   - real-time
   - offline-first
   - syncd
-  - mycure
-home: https://github.com/mycurelabs/lfh-infra
+home: https://github.com/YOUR-ORG/monobase-infra
 sources:
-  - https://github.com/mycurelabs/syncd
+  - https://github.com/YOUR-ORG/syncd
 maintainers:
-  - name: MyCureLabs
-    email: devops@mycurelabs.com
+  - name: Your Organization
+    email: devops@example.com

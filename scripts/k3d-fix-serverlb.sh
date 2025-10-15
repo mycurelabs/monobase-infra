@@ -6,7 +6,7 @@
 set -euo pipefail
 
 # Configuration
-CLUSTER_NAME="${1:-lfh-dev}"
+CLUSTER_NAME="${1:-monobase-dev}"
 SERVERLB_CONTAINER="k3d-${CLUSTER_NAME}-serverlb"
 SERVER_NODE="k3d-${CLUSTER_NAME}-server-0"
 

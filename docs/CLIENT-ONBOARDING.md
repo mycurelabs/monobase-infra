@@ -13,7 +13,7 @@ Step-by-step guide for onboarding a new client using the fork-based workflow.
 ## Step 1: Fork the Template Repository
 
 ```bash
-# On GitHub: Click "Fork" button on mycurelabs/lfh-infra
+# On GitHub: Click "Fork" button on YOUR-ORG/monobase-infra
 
 # Clone YOUR fork
 git clone https://github.com/YOUR-ORG/YOUR-FORK.git

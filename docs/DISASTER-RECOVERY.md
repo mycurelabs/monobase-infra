@@ -1,6 +1,6 @@
 # Disaster Recovery Procedures
 
-Complete disaster recovery runbooks for LFH Infrastructure.
+Complete disaster recovery runbooks for Monobase Infrastructure.
 
 ## RTO/RPO Summary
 
@@ -201,9 +201,9 @@ kubectl logs -f deployment/hapihub -n myclient-prod
 ## Emergency Contacts
 
 **Internal:**
-- DevOps Team: devops@mycurelabs.com
+- DevOps Team: devops@example.com
 - On-Call: See PagerDuty rotation
-- Management: escalation@mycurelabs.com
+- Management: escalation@example.com
 
 **External:**
 - Cloud Provider Support

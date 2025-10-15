@@ -6,7 +6,7 @@
 
 **Symptom:**
 ```
-k3d-lfh-dev-serverlb container stays in "Created" state
+k3d-monobase-dev-serverlb container stays in "Created" state
 Cluster creation fails with agent nodes timing out
 Logs show: ERROR stat /etc/confd/values.yaml: no such file or directory
 ```
@@ -74,7 +74,7 @@ sysctl fs.inotify.max_user_watches    # Should show: = 524288
 ```
 
 **After applying this fix:**
-1. Delete existing cluster: `k3d cluster delete lfh-dev`
+1. Delete existing cluster: `k3d cluster delete monobase-dev`
 2. Recreate cluster: `mise run dev-up`
 3. Nodes should now register successfully!
 
@@ -94,7 +94,7 @@ sysctl fs.inotify.max_user_watches    # Should show: = 524288
 
 **Symptom:**
 ```
-k3d-lfh-dev-serverlb container stays in "Created" state
+k3d-monobase-dev-serverlb container stays in "Created" state
 Logs show: ERROR stat /etc/confd/values.yaml: no such file or directory
 ```
 
@@ -117,8 +117,8 @@ This is a known k3d issue (https://github.com/k3d-io/k3d/issues/1326) related to
 #### Option 1: Port Forwarding (Recommended for Development)
 ```bash
 # Forward ports directly from services
-kubectl port-forward -n lfh-dev svc/hapihub-svc 7500:7500
-kubectl port-forward -n lfh-dev svc/syncd-svc 7800:7800
+kubectl port-forward -n monobase-dev svc/hapihub-svc 7500:7500
+kubectl port-forward -n monobase-dev svc/syncd-svc 7800:7800
 
 # Access at:
 # http://localhost:7500  (HapiHub)
@@ -166,13 +166,13 @@ The `k3d-dev.sh` script is configured to:
 
 Check if loadbalancer is running:
 ```bash
-docker ps --filter "name=k3d-lfh-dev-serverlb"
+docker ps --filter "name=k3d-monobase-dev-serverlb"
 ```
 
 Expected output for working loadbalancer:
 ```
-NAME                   STATUS    PORTS
-k3d-lfh-dev-serverlb   Up        0.0.0.0:8080->80/tcp, 0.0.0.0:8443->443/tcp
+NAME                        STATUS    PORTS
+k3d-monobase-dev-serverlb   Up        0.0.0.0:8080->80/tcp, 0.0.0.0:8443->443/tcp
 ```
 
 If status shows "Created" instead of "Up", loadbalancer has failed to start.

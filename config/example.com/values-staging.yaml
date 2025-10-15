@@ -26,7 +26,7 @@ hapihub:
   enabled: true
 
   image:
-    repository: ghcr.io/mycurelabs/hapihub
+    repository: ghcr.io/YOUR-ORG/hapihub
     tag: "latest"  # TODO: Replace with specific version in production
     pullPolicy: IfNotPresent
 
@@ -71,7 +71,7 @@ mycureapp:
   enabled: true
 
   image:
-    repository: ghcr.io/mycurelabs/mycureapp
+    repository: ghcr.io/YOUR-ORG/mycureapp
     tag: "latest"  # TODO: Replace with specific version
     pullPolicy: IfNotPresent
 
@@ -93,7 +93,7 @@ syncd:
   enabled: false  # Enable if offline sync is needed
 
   image:
-    repository: ghcr.io/mycurelabs/syncd
+    repository: ghcr.io/YOUR-ORG/syncd
     tag: "latest"
 
   replicas: 1

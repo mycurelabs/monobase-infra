@@ -1,20 +1,18 @@
 apiVersion: v2
 name: hapihub
-description: HapiHub Healthcare API - Custom Helm chart for LFH Infrastructure
+description: HapiHub API - Custom Helm chart for Monobase Infrastructure
 type: application
 version: 1.0.0
 appVersion: "10.0.0"
 keywords:
-  - healthcare
   - api
   - hapihub
-  - mycure
-home: https://github.com/mycurelabs/lfh-infra
+home: https://github.com/YOUR-ORG/monobase-infra
 sources:
-  - https://github.com/mycurelabs/hapihub
+  - https://github.com/YOUR-ORG/hapihub
 maintainers:
-  - name: MyCureLabs
-    email: devops@mycurelabs.com
+  - name: Your Organization
+    email: devops@example.com
 
 # Dependencies - Using Bitnami charts for production-ready infrastructure
 dependencies:

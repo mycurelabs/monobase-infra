@@ -1,6 +1,6 @@
 # AWS EKS Module
 
-Production-ready EKS cluster for multi-tenant LFH Infrastructure deployments.
+Production-ready EKS cluster for multi-tenant Monobase Infrastructure deployments.
 
 ## Features
 
@@ -21,7 +21,7 @@ Production-ready EKS cluster for multi-tenant LFH Infrastructure deployments.
 module "eks_cluster" {
   source = "../../modules/aws-eks"
   
-  cluster_name       = "lfh-prod"
+  cluster_name       = "monobase-prod"
   region             = "us-east-1"
   kubernetes_version = "1.28"
   
@@ -40,7 +40,7 @@ module "eks_cluster" {
     }
   }
   
-  # Add-ons (required for LFH)
+  # Add-ons (required for Monobase)
   enable_ebs_csi_driver     = true  # Storage
   enable_cluster_autoscaler = true  # Auto-scaling
   enable_irsa               = true  # External Secrets, Velero
@@ -60,7 +60,7 @@ module "eks_cluster" {
 - `cluster_arn` - Cluster ARN
 - `kubeconfig` - Complete kubectl configuration
 
-### IRSA Role ARNs (for LFH components)
+### IRSA Role ARNs (for Monobase components)
 - `external_secrets_role_arn` - For External Secrets Operator
 - `velero_role_arn` - For Velero backups
 - `cert_manager_role_arn` - For cert-manager Route53 DNS-01
@@ -140,11 +140,11 @@ node_groups = {
 
 ```bash
 # Via Terraform output
-tofu output -raw kubeconfig > ~/.kube/lfh-prod
-export KUBECONFIG=~/.kube/lfh-prod
+tofu output -raw kubeconfig > ~/.kube/monobase-prod
+export KUBECONFIG=~/.kube/monobase-prod
 
 # Or via AWS CLI
-aws eks update-kubeconfig --region us-east-1 --name lfh-prod
+aws eks update-kubeconfig --region us-east-1 --name monobase-prod
 
 # Verify
 kubectl get nodes
@@ -165,10 +165,10 @@ metadata:
     eks.amazonaws.com/role-arn: <external_secrets_role_arn>
 ```
 
-### Deploy LFH Application Stack
+### Deploy Monobase Application Stack
 
 ```bash
-# Use existing LFH workflow
+# Use existing Monobase workflow
 cd ../../..
 ./scripts/new-client-config.sh client-a client-a.com
 

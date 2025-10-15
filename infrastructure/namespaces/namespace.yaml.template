@@ -30,7 +30,7 @@ metadata:
     contact: "{{ .Values.global.contact | default \"admin@example.com\" }}"
     
     # Created by
-    created-by: lfh-infrastructure-template
+    created-by: monobase-infrastructure-template
     created-at: "{{ now | date \"2006-01-02\" }}"
 
 ---

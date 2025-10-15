@@ -1,6 +1,6 @@
 # Multi-Tenant Cluster Sizing Guide
 
-Comprehensive guide for sizing Kubernetes clusters to support multiple LFH Infrastructure clients.
+Comprehensive guide for sizing Kubernetes clusters to support multiple Monobase Infrastructure clients.
 
 ## Table of Contents
 
@@ -21,7 +21,7 @@ Comprehensive guide for sizing Kubernetes clusters to support multiple LFH Infra
 
 Multi-tenancy allows **multiple clients** (tenants) to share a single Kubernetes cluster while maintaining isolation and security.
 
-**LFH Infrastructure Multi-Tenant Model:**
+**Monobase Infrastructure Multi-Tenant Model:**
 
 ```
 Single Kubernetes Cluster
@@ -155,7 +155,7 @@ spec:
 
 ### Step 1: Calculate Per-Client Resources
 
-**Typical LFH client resource usage:**
+**Typical client resource usage:**
 
 | Service | CPU Request | Memory Request | CPU Limit | Memory Limit | Replicas |
 |---------|-------------|----------------|-----------|--------------|----------|

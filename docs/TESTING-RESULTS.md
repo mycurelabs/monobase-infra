@@ -1,6 +1,6 @@
 # Testing Results
 
-Complete validation and testing results for LFH Infrastructure template.
+Complete validation and testing results for Monobase Infrastructure template.
 
 ## Test Execution Date
 

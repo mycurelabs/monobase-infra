@@ -1,6 +1,6 @@
 # Architecture Documentation
 
-Technical architecture of the LFH Infrastructure template.
+Technical architecture of the Monobase Infrastructure template.
 
 ## Table of Contents
 
@@ -19,7 +19,7 @@ Technical architecture of the LFH Infrastructure template.
 ### Design Principles
 
 1. **No Overengineering** - Simple, proven technologies for <500 users
-2. **Security by Default** - Zero-trust, encryption everywhere, HIPAA-compliant
+2. **Security by Default** - Zero-trust, encryption everywhere
 3. **Fork-Based Workflow** - Reusable template, client-specific configuration
 4. **Cloud-Native** - Kubernetes-native, CNCF projects preferred
 5. **Cost-Effective** - Shared infrastructure, optional components
@@ -89,7 +89,7 @@ graph TB
 - cert-manager (TLS automation)
 
 **Applications:**
-- HapiHub (healthcare API backend)
+- HapiHub (API backend)
 - MyCureApp (Vue.js frontend)
 - MongoDB 7.x (primary database)
 
@@ -732,18 +732,17 @@ Storage fills → Expand PVC → Longhorn expands volume
 
 ## Summary
 
-The LFH Infrastructure template provides:
+The Monobase Infrastructure template provides:
 
 ✅ **Modern Architecture** - Gateway API, GitOps, cloud-native
 ✅ **High Availability** - Multi-replica, auto-failover, zero-downtime
-✅ **Security** - Zero-trust, encryption, HIPAA-compliant
+✅ **Security** - Zero-trust, encryption everywhere
 ✅ **Disaster Recovery** - 3-tier backups, tested procedures
 ✅ **Scalability** - HPA, storage expansion, multi-tenant
 ✅ **Observability** - Metrics, logs, alerts, dashboards
 
 **Target:** <500 users, <1TB data per client
 **Architecture:** Simple, proven, production-ready
-**Compliance:** HIPAA, SOC 2 ready
 
 For detailed operational procedures, see:
 - [DEPLOYMENT.md](DEPLOYMENT.md) - Deployment steps

@@ -1,10 +1,14 @@
-# HIPAA Compliance Checklist
+# Compliance Checklist
 
-HIPAA compliance guide for LFH Infrastructure healthcare deployments.
+Compliance guide for Monobase Infrastructure deployments supporting healthcare and other regulated industries.
 
 ## Overview
 
-This infrastructure template is designed to support HIPAA-compliant deployments. However, **infrastructure alone does not guarantee compliance** - organizational policies, procedures, and BAAs are also required.
+This infrastructure template is designed to support compliant deployments for various regulatory frameworks (HIPAA, SOC 2, GDPR, etc.). However, **infrastructure alone does not guarantee compliance** - organizational policies, procedures, and appropriate agreements are also required.
+
+## HIPAA Compliance (Healthcare)
+
+If you're deploying healthcare applications handling Protected Health Information (PHI), this section provides HIPAA-specific guidance.
 
 ---
 
@@ -422,16 +426,18 @@ kubectl delete gateway shared-gateway -n gateway-system  # Stop all traffic
 
 ## Summary
 
-**HIPAA Compliance Status:**
+**Compliance Status:**
 - ✅ **Technical Safeguards:** Fully implemented
 - ✅ **Encryption:** At rest + in transit
 - ✅ **Access Controls:** RBAC + NetworkPolicies
-- ✅ **Audit Logs:** Enabled with 7-year retention
+- ✅ **Audit Logs:** Enabled with configurable retention
 - ✅ **Backup/DR:** 3-tier, tested monthly
-- ⚠️ **Administrative:** Client must document policies
-- ⚠️ **Physical:** Cloud provider responsibility (BAA)
-- ⚠️ **BAA:** Client must sign with cloud provider
+- ⚠️ **Administrative:** Organization must document policies
+- ⚠️ **Physical:** Cloud provider responsibility (via agreements)
+- ⚠️ **Agreements:** Organization must sign appropriate agreements (BAA for HIPAA, DPA for GDPR, etc.)
 
-**This infrastructure provides the technical foundation for HIPAA compliance. Clients must complete organizational requirements (policies, training, BAAs) for full compliance.**
+**This infrastructure provides the technical foundation for regulatory compliance. Organizations must complete organizational requirements (policies, training, appropriate agreements) for full compliance.**
+
+**Note:** This guide focuses on HIPAA as an example. For other frameworks (SOC 2, GDPR, PCI-DSS), consult with your compliance team to map these controls to your specific requirements.
 
 For security details, see [SECURITY-HARDENING.md](SECURITY-HARDENING.md).

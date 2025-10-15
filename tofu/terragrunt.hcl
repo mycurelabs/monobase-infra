@@ -11,17 +11,17 @@ remote_state {
   }
   
   config = {
-    bucket         = "lfh-terraform-state-${get_aws_account_id()}"
+    bucket         = "monobase-terraform-state-${get_aws_account_id()}"
     key            = "${path_relative_to_include()}/terraform.tfstate"
     region         = "us-east-1"
     encrypt        = true
-    dynamodb_table = "lfh-terraform-locks"
+    dynamodb_table = "monobase-terraform-locks"
     
     # S3 bucket tags
     s3_bucket_tags = {
       ManagedBy = "terragrunt"
       Purpose   = "terraform-state"
-      Project   = "lfh-infrastructure"
+      Project   = "monobase-infrastructure"
     }
   }
 }
@@ -49,7 +49,7 @@ provider "aws" {
   default_tags {
     tags = {
       ManagedBy   = "opentofu"
-      Project     = "lfh-infrastructure"
+      Project     = "monobase-infrastructure"
       Terragrunt  = "true"
     }
   }

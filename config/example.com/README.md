@@ -1,6 +1,6 @@
 # Reference Configuration (example.com)
 
-This directory contains **REFERENCE CONFIGURATION** showing all available parameters for the LFH Infrastructure template.
+This directory contains **REFERENCE CONFIGURATION** showing all available parameters for the Monobase Infrastructure template.
 
 ## ⚠️ This is NOT a real client configuration
 

@@ -1,6 +1,6 @@
 # Values Reference
 
-Complete parameter reference for all LFH Infrastructure configuration values.
+Complete parameter reference for all Monobase Infrastructure configuration values.
 
 ## Global Parameters
 
@@ -54,7 +54,7 @@ Used across all charts and configurations.
 
 ### hapihub.image.repository
 - **Type:** string
-- **Default:** `ghcr.io/mycurelabs/hapihub`
+- **Default:** `ghcr.io/YOUR-ORG/hapihub`
 - **Description:** Container image repository
 
 ### hapihub.image.tag
@@ -158,7 +158,7 @@ Used across all charts and configurations.
 
 ### syncd.image.repository
 - **Type:** string
-- **Default:** `ghcr.io/mycurelabs/syncd`
+- **Default:** `ghcr.io/YOUR-ORG/syncd`
 
 ### syncd.image.tag
 - **Type:** string
@@ -195,7 +195,7 @@ Used across all charts and configurations.
 
 ### mycureapp.image.repository
 - **Type:** string
-- **Default:** `ghcr.io/mycurelabs/mycureapp`
+- **Default:** `ghcr.io/YOUR-ORG/mycureapp`
 
 ### mycureapp.image.tag
 - **Type:** string
@@ -273,7 +273,7 @@ Used across all charts and configurations.
 ### mongodb.tls.enabled
 - **Type:** boolean
 - **Default:** `true`
-- **Production:** `true` (HIPAA requirement)
+- **Production:** `true` (recommended for security and compliance)
 
 ---
 
@@ -368,7 +368,7 @@ Used across all charts and configurations.
 ### networkPolicies.enabled
 - **Type:** boolean
 - **Default:** `true`
-- **Production:** `true` (required for HIPAA)
+- **Production:** `true` (recommended for security and compliance)
 - **Description:** Enable NetworkPolicies for zero-trust networking
 
 ### networkPolicies.defaultDeny
@@ -447,7 +447,7 @@ Used across all charts and configurations.
 ### backup.schedules.weekly.enabled
 - **Type:** boolean
 - **Default:** `true`
-- **Description:** Weekly archives (90d retention for HIPAA)
+- **Description:** Weekly archives (90d retention for compliance)
 
 ---
 
@@ -480,29 +480,29 @@ Used across all charts and configurations.
 
 ---
 
-## HIPAA Parameters
+## Compliance Parameters
 
-### hipaa.enabled
+### compliance.enabled
 - **Type:** boolean
 - **Default:** `true`
-- **Production:** `true` (for healthcare)
+- **Production:** `true` (for regulated industries)
 
-### hipaa.auditLogging.enabled
+### compliance.auditLogging.enabled
 - **Type:** boolean
 - **Default:** `true`
 - **Description:** Enable audit logging
 
-### hipaa.auditLogging.retention
+### compliance.auditLogging.retention
 - **Type:** string
 - **Default:** `2555d` (7 years)
-- **Description:** Audit log retention period (HIPAA requirement)
+- **Description:** Audit log retention period (configurable per compliance requirements)
 
-### hipaa.encryption.atRest
+### compliance.encryption.atRest
 - **Type:** string
 - **Default:** `required`
 - **Options:** `required`, `optional`
 
-### hipaa.encryption.inTransit
+### compliance.encryption.inTransit
 - **Type:** string
 - **Default:** `required`
 

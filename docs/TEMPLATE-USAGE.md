@@ -1,10 +1,10 @@
 # Template Usage Guide
 
-This document explains how to use and maintain the LFH Infrastructure template.
+This document explains how to use and maintain the Monobase Infrastructure template.
 
 ## Overview
 
-The LFH Infrastructure template is designed for a **fork-based workflow**:
+The Monobase Infrastructure template is designed for a **fork-based workflow**:
 
 - **Base Template** (this repo) - Generic, reusable infrastructure maintained by us
 - **Client Forks** - Clients fork the template and add their configuration
@@ -64,7 +64,7 @@ Clients can pull template updates from the base repository:
 
 ```bash
 # One-time setup
-git remote add upstream https://github.com/mycurelabs/lfh-infra.git
+git remote add upstream https://github.com/YOUR-ORG/monobase-infra.git
 
 # Pull latest updates
 git fetch upstream

@@ -16,7 +16,7 @@ Creates k3d cluster for local testing and CI/CD.
 module "k3d_test" {
   source = "../../modules/k3d-local"
   
-  cluster_name        = "lfh-test"
+  cluster_name        = "monobase-test"
   servers             = 1
   agents              = 2
   disable_traefik     = true  # Use Envoy Gateway
@@ -35,7 +35,7 @@ tofu apply
 export KUBECONFIG=$(tofu output -raw kubeconfig_file)
 kubectl get nodes
 
-# Deploy LFH
+# Deploy Monobase
 helm install hapihub ../../../charts/hapihub -f ../../../config/k3d-local/values-development.yaml
 ```
 
@@ -78,5 +78,5 @@ helm install hapihub ../../../charts/hapihub -f ../../../config/k3d-local/values
 
 ```bash
 tofu destroy
-# Or: k3d cluster delete lfh-test
+# Or: k3d cluster delete monobase-test
 ```

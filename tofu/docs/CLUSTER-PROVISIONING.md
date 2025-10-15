@@ -1,6 +1,6 @@
 # Cluster Provisioning Guide
 
-Complete guide for provisioning Kubernetes clusters using OpenTofu modules for LFH Infrastructure.
+Complete guide for provisioning Kubernetes clusters using OpenTofu modules for Monobase Infrastructure.
 
 ## Table of Contents
 
@@ -162,7 +162,7 @@ Choose the right module based on your deployment target:
 
 ```bash
 # 1. Copy reference cluster config
-cd /path/to/lfh-infra
+cd /path/to/monobase-infra
 cp -r tofu/clusters/default-cluster tofu/clusters/production-cluster
 
 # 2. Navigate to new cluster
@@ -174,7 +174,7 @@ vim terraform.tfvars
 
 Edit `terraform.tfvars`:
 ```hcl
-cluster_name       = "lfh-prod"
+cluster_name       = "monobase-prod"
 region             = "us-east-1"
 kubernetes_version = "1.28"
 
@@ -199,7 +199,7 @@ enable_private_endpoint = false  # true for max security
 
 tags = {
   Environment = "production"
-  Project     = "lfh-infrastructure"
+  Project     = "monobase-infrastructure"
   ManagedBy   = "opentofu"
   Client      = "multi-tenant"
 }
@@ -216,7 +216,7 @@ Edit `backend.tf`:
 terraform {
   backend "s3" {
     bucket         = "your-company-terraform-state"
-    key            = "lfh/production-cluster/terraform.tfstate"
+    key            = "monobase/production-cluster/terraform.tfstate"
     region         = "us-east-1"
     encrypt        = true
     dynamodb_table = "terraform-locks"
@@ -235,15 +235,15 @@ tofu plan
 tofu apply
 
 # 8. Get kubeconfig
-tofu output -raw kubeconfig > ~/.kube/lfh-prod
-chmod 600 ~/.kube/lfh-prod
-export KUBECONFIG=~/.kube/lfh-prod
+tofu output -raw kubeconfig > ~/.kube/monobase-prod
+chmod 600 ~/.kube/monobase-prod
+export KUBECONFIG=~/.kube/monobase-prod
 
 # 9. Verify cluster
 kubectl get nodes
 kubectl get pods -A
 
-# 10. Deploy LFH applications (see ../charts/, ../config/)
+# 10. Deploy Monobase applications (see ../charts/, ../config/)
 cd ../../../
 ./scripts/new-client-config.sh client-a client-a.com
 ```
@@ -291,7 +291,7 @@ terragrunt plan
 terragrunt apply
 
 # 6. Get kubeconfig
-terragrunt output -raw kubeconfig > ~/.kube/lfh-prod
+terragrunt output -raw kubeconfig > ~/.kube/monobase-prod
 ```
 
 **Benefits:**
@@ -301,7 +301,7 @@ terragrunt output -raw kubeconfig > ~/.kube/lfh-prod
 
 ### Workflow 3: Local Testing with k3d
 
-**Goal:** Test LFH applications locally before cloud deployment
+**Goal:** Test Monobase applications locally before cloud deployment
 
 ```bash
 # 1. Copy k3d config
@@ -316,8 +316,8 @@ Change module source:
 ```hcl
 module "cluster" {
   source = "../../modules/k3d-local"  # Changed from aws-eks
-  
-  cluster_name = "lfh-local"
+
+  cluster_name = "monobase-local"
   servers      = 1
   agents       = 2
 }
@@ -326,7 +326,7 @@ module "cluster" {
 ```bash
 # 3. Minimal tfvars for k3d
 cat > terraform.tfvars <<EOF
-cluster_name = "lfh-local"
+cluster_name = "monobase-local"
 EOF
 
 # 4. Provision (< 1 minute!)
@@ -334,11 +334,11 @@ tofu init
 tofu apply
 
 # 5. Get kubeconfig and test
-tofu output -raw kubeconfig > ~/.kube/lfh-local
-export KUBECONFIG=~/.kube/lfh-local
+tofu output -raw kubeconfig > ~/.kube/monobase-local
+export KUBECONFIG=~/.kube/monobase-local
 kubectl get nodes
 
-# 6. Test LFH deployment
+# 6. Test Monobase deployment
 kubectl create namespace test-client
 helm install hapihub ../../charts/hapihub -n test-client
 
@@ -426,10 +426,10 @@ default-cluster/
 ```hcl
 # terraform.tfvars
 
-cluster_name = "lfh-{environment}-{region}"
+cluster_name = "monobase-{environment}-{region}"
 # Examples:
-# - "lfh-prod-us"
-# - "lfh-staging-eu"
+# - "monobase-prod-us"
+# - "monobase-staging-eu"
 # - "clinic-prod"
 ```
 
@@ -523,7 +523,7 @@ kubernetes_version = "1.29"  # Newer version
 ```hcl
 tags = {
   Environment = "production"     # production, staging, development
-  Project     = "lfh-infrastructure"
+  Project     = "monobase-infrastructure"
   ManagedBy   = "opentofu"
   CostCenter  = "engineering"
   Client      = "multi-tenant"   # or specific client name
@@ -620,7 +620,7 @@ aws dynamodb create-table \
 terraform {
   backend "s3" {
     bucket         = "your-company-terraform-state"
-    key            = "lfh/production-cluster/terraform.tfstate"
+    key            = "monobase/production-cluster/terraform.tfstate"
     region         = "us-east-1"
     encrypt        = true
     dynamodb_table = "terraform-locks"
@@ -655,7 +655,7 @@ tofu init -migrate-state
 
 ```
 S3 Bucket: your-company-terraform-state
-├── lfh/
+├── monobase/
 │   ├── production-cluster/terraform.tfstate
 │   ├── staging-cluster/terraform.tfstate
 │   ├── eu-cluster/terraform.tfstate
@@ -1011,7 +1011,7 @@ After successfully provisioning a cluster:
   - OIDC provider ARN (for IRSA/Workload Identity)
   - Node sizes and counts
 
-### Deploy LFH Applications
+### Deploy Monobase Applications
 
 - [ ] **Install core infrastructure**
   ```bash
@@ -1032,7 +1032,7 @@ After successfully provisioning a cluster:
   ./scripts/new-client-config.sh client-a client-a.com
   ```
 
-- [ ] **Deploy HapiHub, Syncd, MyCureApp**
+- [ ] **Deploy HapiHub, Syncd, Monobase**
   ```bash
   helm install hapihub charts/hapihub -f config/client-a/values-production.yaml
   # etc.

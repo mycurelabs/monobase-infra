@@ -40,7 +40,7 @@ hapihub:
   enabled: true
 
   image:
-    repository: ghcr.io/mycurelabs/hapihub
+    repository: ghcr.io/YOUR-ORG/hapihub
     tag: "5.215.2"  # ✅ ALWAYS pin specific version in production
     pullPolicy: IfNotPresent
 
@@ -94,7 +94,7 @@ mycureapp:
   enabled: true
 
   image:
-    repository: ghcr.io/mycurelabs/mycureapp
+    repository: ghcr.io/YOUR-ORG/mycureapp
     tag: "1.0.0"  # ✅ Pin specific version
     pullPolicy: IfNotPresent
 
@@ -120,7 +120,7 @@ syncd:
   enabled: true  # Enable for offline/mobile sync
 
   image:
-    repository: ghcr.io/mycurelabs/syncd
+    repository: ghcr.io/YOUR-ORG/syncd
     tag: "1.2.0"  # ✅ Pin version
 
   replicas: 2

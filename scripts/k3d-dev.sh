@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # k3d Local Development Environment Manager
-# Creates and manages a local k3d cluster for testing LFH Infrastructure
+# Creates and manages a local k3d cluster for testing Monobase Infrastructure
 
 set -euo pipefail
 
@@ -12,8 +12,8 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Configuration
-CLUSTER_NAME="lfh-dev"
-NAMESPACE="lfh-dev"
+CLUSTER_NAME="monobase-dev"
+NAMESPACE="monobase-dev"
 AGENTS=2
 VALUES_FILE="config/k3d-local/values-development.yaml"
 HTTP_PORT=8080   # Use alternative port to avoid conflict with production k8s
@@ -338,7 +338,7 @@ mirror_to_forgejo() {
   curl -X POST "http://localhost:3000/api/v1/user/repos" \
     -H "Content-Type: application/json" \
     -u "gitea_admin:gitea_admin" \
-    -d '{"name":"lfh-infra","private":false,"auto_init":false}' &> /dev/null || true
+    -d '{"name":"monobase-infra","private":false,"auto_init":false}' &> /dev/null || true
 
   # Kill port-forward
   kill $pf_pid 2>/dev/null || true
@@ -350,7 +350,7 @@ mirror_to_forgejo() {
   git remote remove forgejo &> /dev/null || true
 
   # Add new remote (using kubectl port-forward)
-  git remote add forgejo http://gitea_admin:gitea_admin@localhost:3000/gitea_admin/lfh-infra.git
+  git remote add forgejo http://gitea_admin:gitea_admin@localhost:3000/gitea_admin/monobase-infra.git
 
   # Port-forward again for git push
   kubectl port-forward -n git svc/forgejo-http 3000:3000 &> /dev/null &
@@ -396,7 +396,7 @@ deploy_apps_gitops() {
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: lfh-dev-mongodb
+  name: monobase-dev-mongodb
   namespace: argocd
   annotations:
     argocd.argoproj.io/sync-wave: "1"
@@ -404,7 +404,7 @@ spec:
   project: default
   source:
     path: charts/hapihub/charts
-    repoURL: http://forgejo-http.git.svc.cluster.local:3000/gitea_admin/lfh-infra.git
+    repoURL: http://forgejo-http.git.svc.cluster.local:3000/gitea_admin/monobase-infra.git
     targetRevision: main
     helm:
       releaseName: hapihub-mongodb
@@ -426,7 +426,7 @@ spec:
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: lfh-dev-hapihub
+  name: monobase-dev-hapihub
   namespace: argocd
   annotations:
     argocd.argoproj.io/sync-wave: "2"
@@ -434,7 +434,7 @@ spec:
   project: default
   source:
     path: charts/hapihub
-    repoURL: http://forgejo-http.git.svc.cluster.local:3000/gitea_admin/lfh-infra.git
+    repoURL: http://forgejo-http.git.svc.cluster.local:3000/gitea_admin/monobase-infra.git
     targetRevision: main
     helm:
       releaseName: hapihub
@@ -456,7 +456,7 @@ spec:
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: lfh-dev-mycureapp
+  name: monobase-dev-mycureapp
   namespace: argocd
   annotations:
     argocd.argoproj.io/sync-wave: "3"
@@ -464,7 +464,7 @@ spec:
   project: default
   source:
     path: charts/mycureapp
-    repoURL: http://forgejo-http.git.svc.cluster.local:3000/gitea_admin/lfh-infra.git
+    repoURL: http://forgejo-http.git.svc.cluster.local:3000/gitea_admin/monobase-infra.git
     targetRevision: main
     helm:
       releaseName: mycureapp
@@ -519,7 +519,7 @@ show_gitops_status() {
   echo "  2. git add . && git commit -m 'update'"
   echo "  3. Push to Forgejo:"
   echo "     kubectl port-forward -n git svc/forgejo-http 3000:3000 &"
-  echo "     git push http://gitea_admin:gitea_admin@localhost:3000/gitea_admin/lfh-infra.git HEAD:main"
+  echo "     git push http://gitea_admin:gitea_admin@localhost:3000/gitea_admin/monobase-infra.git HEAD:main"
   echo "  4. ArgoCD syncs automatically!"
   echo ""
 }

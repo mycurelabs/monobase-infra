@@ -1,18 +1,16 @@
 apiVersion: v2
 name: mycureapp
-description: MyCureApp Patient & Provider Frontend - Custom Helm chart for LFH Infrastructure
+description: MyCureApp Frontend - Custom Helm chart for Monobase Infrastructure
 type: application
 version: 1.0.0
 appVersion: "1.0.0"
 keywords:
   - frontend
   - vue
-  - healthcare
-  - patient-portal
-  - mycure
-home: https://github.com/mycurelabs/lfh-infra
+  - mycureapp
+home: https://github.com/YOUR-ORG/monobase-infra
 sources:
-  - https://github.com/mycurelabs/mycureapp
+  - https://github.com/YOUR-ORG/mycureapp
 maintainers:
-  - name: MyCureLabs
-    email: devops@mycurelabs.com
+  - name: Your Organization
+    email: devops@example.com

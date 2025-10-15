@@ -1,11 +1,11 @@
 # On-Premises Deployment Guide
 
-Complete guide for deploying LFH Infrastructure on-premises using K3s.
+Complete guide for deploying Monobase Infrastructure on-premises using K3s.
 
 ## Overview
 
 On-premises deployment using K3s provides:
-- ✅ HIPAA compliance (data stays on-prem)
+- ✅ Compliance (data stays on-prem)
 - ✅ Air-gapped capability
 - ✅ Full control
 - ✅ Simple Kubernetes (K3s vs full kubeadm)
@@ -92,7 +92,7 @@ vim terraform.tfvars
 
 Example terraform.tfvars:
 ```hcl
-cluster_name = "lfh-clinic-prod"
+cluster_name = "monobase-clinic-prod"
 
 server_ips = [
   "192.168.1.10",  # Server 1
@@ -133,7 +133,7 @@ kubectl get nodes
 # All nodes should be Ready
 ```
 
-### 6. Deploy LFH Stack
+### 6. Deploy Monobase Stack
 
 ```bash
 cd ../../..
@@ -237,4 +237,4 @@ kubectl get pods -n longhorn-system
 kubectl logs -n longhorn-system -l app=longhorn-manager
 ```
 
-Perfect for healthcare clinics and hospitals!
+Perfect for organizations requiring on-premises deployments!

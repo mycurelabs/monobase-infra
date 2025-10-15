@@ -1,6 +1,6 @@
 # k3d Local Testing Guide
 
-Test LFH Infrastructure locally using k3d (K3s in Docker).
+Test Monobase Infrastructure locally using k3d (K3s in Docker).
 
 ## Prerequisites
 
@@ -19,7 +19,7 @@ brew install kubectl helm
 
 ```bash
 # Create 3-node cluster with port mappings
-k3d cluster create lfh-test \
+k3d cluster create monobase-test \
   --agents 2 \
   --port "80:80@loadbalancer" \
   --port "443:443@loadbalancer" \
@@ -30,17 +30,17 @@ kubectl cluster-info
 kubectl get nodes
 ```
 
-### 2. Deploy LFH Template
+### 2. Deploy Monobase Template
 
 ```bash
 # Use k3d configuration
 helm install hapihub charts/hapihub \
   -f config/k3d-local/values-development.yaml \
-  -n lfh-dev \
+  -n monobase-dev \
   --create-namespace
 
 # Watch deployment
-kubectl get pods -n lfh-dev --watch
+kubectl get pods -n monobase-dev --watch
 ```
 
 ### 3. Access Services
@@ -89,7 +89,7 @@ open http://app.local.test
 
 ```bash
 # Delete cluster
-k3d cluster delete lfh-test
+k3d cluster delete monobase-test
 
 # Remove hosts entries
 sudo sed -i.bak '/local.test/d' /etc/hosts

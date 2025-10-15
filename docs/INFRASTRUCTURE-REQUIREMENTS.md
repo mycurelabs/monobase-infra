@@ -1,6 +1,6 @@
 # Infrastructure Requirements
 
-Cluster specifications and sizing guide for LFH Infrastructure.
+Cluster specifications and sizing guide for Monobase Infrastructure.
 
 ## Minimum Requirements (Core Stack)
 
@@ -99,9 +99,9 @@ Cluster specifications and sizing guide for LFH Infrastructure.
 - **Replicas:** 3x replication (3 nodes minimum)
 
 ### Database Storage (MongoDB)
-- **Small:** 20-50Gi (<10k patients)
-- **Medium:** 50-200Gi (10k-100k patients)
-- **Large:** 200Gi-1Ti (100k+ patients)
+- **Small:** 20-50Gi (<10k records)
+- **Medium:** 50-200Gi (10k-100k records)
+- **Large:** 200Gi-1Ti (100k+ records)
 - **Growth:** Plan for 2x per year
 
 ### Object Storage (MinIO)
@@ -125,14 +125,14 @@ Cluster specifications and sizing guide for LFH Infrastructure.
 - 6443 (K8s API) - Control plane
 - Internal cluster networking
 
-## Compliance Requirements (HIPAA)
+## Compliance Requirements
 
 ### Infrastructure
 - [ ] Dedicated VPC/VNet (isolated network)
 - [ ] Encryption at rest (EBS/disk encryption)
 - [ ] Encryption in transit (TLS)
 - [ ] Audit logging enabled
-- [ ] BAA with cloud provider
+- [ ] Appropriate agreements with cloud provider (BAA for HIPAA, DPA for GDPR, etc.)
 - [ ] Access controls (IAM/RBAC)
 
 ### Cluster Configuration
@@ -142,4 +142,4 @@ Cluster specifications and sizing guide for LFH Infrastructure.
 - [ ] Pod Security Standards enforced
 - [ ] Secrets in KMS
 
-For more details, see [HIPAA-COMPLIANCE.md](HIPAA-COMPLIANCE.md).
+For more details, see [HIPAA-COMPLIANCE.md](HIPAA-COMPLIANCE.md) (covers HIPAA and general compliance).

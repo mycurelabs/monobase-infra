@@ -33,7 +33,7 @@ Provisions K3s cluster on bare metal servers for healthcare on-prem deployments.
 module "k3s_cluster" {
   source = "../../modules/on-prem-k3s"
   
-  cluster_name = "lfh-clinic-prod"
+  cluster_name = "monobase-clinic-prod"
   
   # Server IPs (control plane)
   server_ips = [
@@ -79,7 +79,7 @@ module "k3s_cluster" {
 export KUBECONFIG=$(tofu output -raw kubeconfig_path)
 kubectl get nodes
 
-# Deploy LFH stack
+# Deploy Monobase stack
 cd ../../..
 ./scripts/new-client-config.sh clinic-a clinic-a.local
 # Deploy apps

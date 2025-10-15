@@ -35,7 +35,7 @@ jobs:
       - name: Create k3d cluster
         run: |
           echo "Creating k3d cluster for testing..."
-          k3d cluster create lfh-test \
+          k3d cluster create monobase-test \
             --agents 2 \
             --port "80:80@loadbalancer" \
             --port "443:443@loadbalancer" \
@@ -123,7 +123,7 @@ jobs:
         if: always()
         run: |
           echo "Cleaning up k3d cluster..."
-          k3d cluster delete lfh-test
+          k3d cluster delete monobase-test
 
   integration-summary:
     name: Integration Test Summary

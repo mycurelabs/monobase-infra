@@ -1,6 +1,6 @@
 # Deployment Guide
 
-Complete deployment procedures for LFH Infrastructure.
+Complete deployment procedures for Monobase Infrastructure.
 
 ## Table of Contents
 
