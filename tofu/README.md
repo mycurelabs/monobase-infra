@@ -6,7 +6,7 @@ Provision Kubernetes clusters for Monobase Infrastructure deployments.
 
 This directory provides **cluster provisioning** using OpenTofu (open-source Terraform) and Terragrunt.
 
-**Scope:** Creates Kubernetes clusters (EKS, AKS, GKE, K3s, k3d)
+**Scope:** Creates Kubernetes clusters (EKS, AKS, GKE, DOKS, K3s, k3d)
 **Complements:** Application deployment in `../charts/` and `../config/`
 
 ## Quick Start
@@ -44,6 +44,7 @@ Choose based on deployment target:
 | **aws-eks** | Deploying to AWS | Managed EKS |
 | **azure-aks** | Deploying to Azure | Managed AKS |
 | **gcp-gke** | Deploying to GCP | Managed GKE |
+| **do-doks** | Deploying to DigitalOcean | Managed DOKS |
 | **on-prem-k3s** | On-premises, clinics, hospitals | K3s on bare metal |
 | **k3d-local** | Local testing, CI/CD | k3d (K3s in Docker) |
 
@@ -74,18 +75,19 @@ Contains:
 
 ## Implementation Status
 
-**✅ 100% COMPLETE - All 5 Modules Implemented**
+**✅ 100% COMPLETE - All 6 Modules Implemented**
 
 - ✅ **AWS EKS** - Production multi-tenant EKS with IRSA, autoscaling
 - ✅ **Azure AKS** - Production AKS with Workload Identity
 - ✅ **GCP GKE** - Production GKE with Workload Identity
+- ✅ **DigitalOcean DOKS** - Cost-optimized managed Kubernetes (~78% cheaper than EKS)
 - ✅ **on-prem-k3s** - Healthcare on-prem with K3s, HA, MetalLB
 - ✅ **k3d-local** - Local testing and CI/CD automation
 - ✅ **default-cluster** - Complete reference configuration
 - ✅ **Terragrunt** - DRY configuration management
 - ✅ **Bootstrap script** - new-cluster-config.sh
 
-**Complete multi-cloud support: AWS, Azure, GCP, on-prem, local testing!**
+**Complete multi-cloud support: AWS, Azure, GCP, DigitalOcean, on-prem, local testing!**
 
 ## Why OpenTofu (not Terraform)
 
