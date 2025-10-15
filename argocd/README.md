@@ -14,12 +14,12 @@ argocd/
 │   ├── external-secrets.yaml.template
 │   └── cert-manager.yaml.template
 └── applications/
-    ├── postgresql.yaml.template
-    ├── minio.yaml.template
-    ├── valkey.yaml.template
-    ├── api.yaml.template
-    ├── api-worker.yaml.template
-    └── account.yaml.template
+    ├── postgresql.yaml.template  # Database (Wave 2)
+    ├── valkey.yaml.template      # Cache (Wave 2)
+    ├── minio.yaml.template       # Object storage (Wave 2, optional)
+    ├── mailpit.yaml.template     # Email testing (Wave 2, dev only)
+    ├── api.yaml.template         # Backend API (Wave 3)
+    └── account.yaml.template     # Frontend (Wave 3)
 ```
 
 ## App-of-Apps Pattern
@@ -33,13 +33,14 @@ root-app (bootstrap)
 │   ├── envoy-gateway
 │   ├── external-secrets
 │   └── cert-manager
-└── Applications (Sync Wave 2)
-    ├── postgresql
-    ├── minio (optional)
-    ├── valkey (optional)
-    ├── api
-    ├── api-worker (optional)
-    └── account
+├── Data & Services (Sync Wave 2)
+│   ├── postgresql (database)
+│   ├── valkey (cache)
+│   ├── minio (object storage, optional)
+│   └── mailpit (email testing, dev/staging only)
+└── Applications (Sync Wave 3)
+    ├── api (backend)
+    └── account (frontend)
 ```
 
 ## Sync Waves
@@ -47,9 +48,15 @@ root-app (bootstrap)
 Sync waves ensure ordered deployment:
 
 1. **Wave 0:** Namespace creation
-2. **Wave 1:** Infrastructure (Longhorn, Gateway, Secrets)
-3. **Wave 2:** Data stores (PostgreSQL, MinIO, Valkey)
-4. **Wave 3:** Applications (Monobase API, API Worker, Monobase Account)
+2. **Wave 1:** Infrastructure (Longhorn, Gateway, Secrets, Cert-Manager)
+3. **Wave 2:** Data & Services (PostgreSQL, Valkey, MinIO, Mailpit)
+4. **Wave 3:** Applications (Monobase API, Monobase Account)
+
+All dependencies are deployed as **separate ArgoCD Applications**, not as Helm chart sub-charts. This provides:
+- Independent lifecycle management
+- Better observability in ArgoCD UI
+- Granular sync policies (e.g., `prune: false` for databases)
+- Ability to deploy databases before applications
 
 ## Template Variables
 

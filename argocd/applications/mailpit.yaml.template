@@ -1,0 +1,41 @@
+# ArgoCD Application: Mailpit (Email testing)
+# Sync Wave 2 - Deploy email testing (dev/staging only)
+
+{{- if .Values.mailpit.enabled }}
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ .Values.global.namespace }}-mailpit
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+
+  source:
+    chart: mailpit
+    repoURL: https://jouve.github.io/charts/
+    targetRevision: 0.22.4
+    helm:
+      releaseName: mailpit
+      values: |
+        {{- toYaml .Values.mailpit | nindent 8 }}
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: {{ .Values.global.namespace }}
+
+  syncPolicy:
+    automated:
+      prune: true  # Safe to auto-delete (ephemeral test emails)
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false
+    retry:
+      limit: 5
+      backoff:
+        duration: 10s
+        maxDuration: 5m
+{{- end }}
