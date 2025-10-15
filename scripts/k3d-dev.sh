@@ -175,8 +175,8 @@ deploy_gateway_api() {
   log_success "Gateway API CRDs installed"
 }
 
-deploy_apps() {
-  log_info "Deploying applications via bootstrap script..."
+deploy_via_bootstrap() {
+  log_info "Deploying via ArgoCD (bootstrap script)..."
 
   if [ ! -f "$VALUES_FILE" ]; then
     log_error "Values file not found: $VALUES_FILE"
@@ -186,7 +186,8 @@ deploy_apps() {
   # Get script directory
   local script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-  # Use bootstrap script to deploy everything
+  # Use bootstrap script to deploy everything via GitOps
+  # This installs ArgoCD and deploys root-app (App-of-Apps pattern)
   "$script_dir/bootstrap.sh" \
     --client monobase \
     --env dev \
@@ -194,7 +195,7 @@ deploy_apps() {
     --k3d \
     &> /dev/null
 
-  log_success "Applications deployed via bootstrap"
+  log_success "Deployed via ArgoCD"
 }
 
 configure_hosts() {
@@ -369,38 +370,12 @@ mirror_to_forgejo() {
   log_success "Repository mirrored to Forgejo"
 }
 
-setup_gitops_deployment() {
-  log_info "Deploying via GitOps (ArgoCD + root-app)..."
+# Removed duplicate deployment functions - now using single deploy_via_bootstrap()
 
-  if [ ! -f "$VALUES_FILE" ]; then
-    log_error "Values file not found: $VALUES_FILE"
-    return 1
-  fi
-
-  # Get script directory
-  local script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-
-  # Use bootstrap script to deploy everything via GitOps
-  # This will:
-  # 1. Install ArgoCD (if not present)
-  # 2. Render templates
-  # 3. Deploy root-app (App-of-Apps pattern)
-  "$script_dir/bootstrap.sh" \
-    --client monobase \
-    --env dev \
-    --values "$VALUES_FILE" \
-    --k3d \
-    &> /dev/null
-
-  log_success "GitOps deployment complete"
-}
-
-# deploy_apps_gitops function removed - now handled by setup_gitops_deployment via bootstrap.sh
-
-show_gitops_status() {
+show_local_git_info() {
   echo ""
   echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-  echo -e "${BLUE}  GitOps Environment Info${NC}"
+  echo -e "${BLUE}  Local Git Server & ArgoCD Info${NC}"
   echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
   echo ""
 
@@ -433,13 +408,13 @@ show_gitops_status() {
 }
 
 cmd_up() {
-  local GITOPS_MODE=false
+  local USE_LOCAL_GIT=false
 
   # Parse flags
   while [[ $# -gt 0 ]]; do
     case "$1" in
-      --gitops)
-        GITOPS_MODE=true
+      --local-git-server)
+        USE_LOCAL_GIT=true
         shift
         ;;
       *)
@@ -449,8 +424,8 @@ cmd_up() {
   done
 
   echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-  if [ "$GITOPS_MODE" = true ]; then
-    echo -e "${BLUE}  Starting k3d GitOps Environment${NC}"
+  if [ "$USE_LOCAL_GIT" = true ]; then
+    echo -e "${BLUE}  Starting k3d with Local Git Server (Forgejo)${NC}"
   else
     echo -e "${BLUE}  Starting k3d Development Environment${NC}"
   fi
@@ -462,29 +437,26 @@ cmd_up() {
   wait_for_cluster
   deploy_gateway_api
 
-  if [ "$GITOPS_MODE" = true ]; then
+  # Optional: Setup local Git server for testing pull-based GitOps
+  if [ "$USE_LOCAL_GIT" = true ]; then
     setup_forgejo
     mirror_to_forgejo
-    setup_gitops_deployment
-  else
-    deploy_apps
   fi
+
+  # Deploy via ArgoCD (same for both modes)
+  deploy_via_bootstrap
 
   configure_hosts
 
   echo ""
   echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-  if [ "$GITOPS_MODE" = true ]; then
-    echo -e "${GREEN}✓ GitOps environment ready!${NC}"
-  else
-    echo -e "${GREEN}✓ Development environment ready!${NC}"
-  fi
+  echo -e "${GREEN}✓ Development environment ready!${NC}"
   echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+  echo ""
 
-  if [ "$GITOPS_MODE" = true ]; then
-    show_gitops_status
+  if [ "$USE_LOCAL_GIT" = true ]; then
+    show_local_git_info
   else
-    echo ""
     echo "Access your applications:"
     for host in "${HOSTS_ENTRIES[@]}"; do
       echo "  http://$host:${HTTP_PORT}"
@@ -544,17 +516,23 @@ case "${1:-}" in
     echo "Usage: $0 {up|down|reset|status}"
     echo ""
     echo "Commands:"
-    echo "  up [--gitops]  - Create cluster and deploy applications"
-    echo "                   --gitops: Use GitOps workflow with Forgejo + ArgoCD"
-    echo "  down           - Delete cluster and cleanup"
-    echo "  reset          - Delete and recreate everything (fresh start)"
-    echo "  status         - Show current environment status"
+    echo "  up [--local-git-server]  - Create cluster and deploy via ArgoCD"
+    echo "  down                     - Delete cluster and cleanup"
+    echo "  reset                    - Delete and recreate everything (fresh start)"
+    echo "  status                   - Show current environment status"
+    echo ""
+    echo "Options:"
+    echo "  --local-git-server  Add Forgejo (local Git server) for testing pull-based GitOps"
+    echo "                      Without this flag, ArgoCD deploys from local rendered files"
     echo ""
     echo "Examples:"
-    echo "  $0 up           # Start local development environment (Helm mode)"
-    echo "  $0 up --gitops  # Start with GitOps workflow (Forgejo + ArgoCD)"
-    echo "  $0 status       # Check what's running"
-    echo "  $0 down         # Stop and cleanup"
+    echo "  $0 up                      # Deploy via ArgoCD (local files)"
+    echo "  $0 up --local-git-server   # Deploy with Forgejo Git server"
+    echo "  $0 status                  # Check what's running"
+    echo "  $0 down                    # Stop and cleanup"
+    echo ""
+    echo "Note: Both modes use GitOps (ArgoCD). The flag controls whether ArgoCD"
+    echo "      pulls from a local Git server (Forgejo) or from local files."
     exit 1
     ;;
 esac
