@@ -1,0 +1,123 @@
+# Kyverno Policy: Restrict Image Registries
+# Only allow images from approved registries to prevent supply chain attacks
+
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: restrict-registries
+  annotations:
+    policies.kyverno.io/title: Restrict Image Registries
+    policies.kyverno.io/category: Supply Chain Security
+    policies.kyverno.io/severity: high
+    policies.kyverno.io/subject: Pod
+    policies.kyverno.io/description: >-
+      Only allow container images from approved registries.
+      This prevents supply chain attacks and ensures all images are vetted.
+spec:
+  validationFailureAction: audit  # Start with audit mode (warning only)
+  background: true
+
+  rules:
+  - name: restrict-image-registries
+    match:
+      any:
+      - resources:
+          kinds:
+          - Pod
+    validate:
+      message: >-
+        Container images must be from approved registries:
+        - ghcr.io/YOUR-ORG/* (your organization)
+        - bitnami/* (trusted third-party charts)
+        - registry.k8s.io/* (Kubernetes official)
+        - quay.io/jetstack/* (cert-manager)
+        - docker.io/grafana/* (monitoring)
+        - docker.io/prom/* (monitoring)
+
+        Current image: {{ request.object.spec.containers[0].image }}
+
+        If you need to add a registry, update this policy.
+      foreach:
+      - list: "request.object.spec.containers"
+        deny:
+          conditions:
+            all:
+            # Deny if image doesn't match any approved registry
+            - key: "{{ element.image }}"
+              operator: NotIn
+              value:
+              # Your organization registry
+              - "ghcr.io/YOUR-ORG/*"
+
+              # Trusted third-party registries
+              - "bitnami/*"
+              - "registry.k8s.io/*"
+              - "k8s.gcr.io/*"  # Legacy Kubernetes registry
+
+              # Monitoring tools
+              - "docker.io/grafana/*"
+              - "docker.io/prom/*"
+              - "quay.io/prometheus/*"
+              - "quay.io/prometheus-operator/*"
+
+              # Cert-manager
+              - "quay.io/jetstack/*"
+
+              # Security tools
+              - "docker.io/falcosecurity/*"
+              - "ghcr.io/kyverno/*"
+
+              # External Secrets
+              - "ghcr.io/external-secrets/*"
+
+              # Longhorn
+              - "longhornio/*"
+
+              # Envoy Gateway
+              - "envoyproxy/*"
+              - "docker.io/envoyproxy/*"
+
+              # PostgreSQL (Bitnami)
+              - "docker.io/bitnami/postgresql*"
+
+              # Valkey (Redis)
+              - "docker.io/valkey/*"
+              - "docker.io/bitnami/valkey*"
+
+              # MinIO
+              - "quay.io/minio/*"
+              - "docker.io/minio/*"
+
+              # Velero
+              - "velero/*"
+              - "gcr.io/velero-gcp/*"
+
+              # ArgoCD
+              - "quay.io/argoproj/*"
+
+---
+# Registry Approval Process
+#
+# To add a new registry:
+#
+# 1. Verify the registry is trusted:
+#    - Official project registry (e.g., quay.io/prometheus)
+#    - Verified publisher (e.g., bitnami)
+#    - Your organization's private registry
+#
+# 2. Add to the approved list above:
+#    - "registry.example.com/org/*"
+#
+# 3. Document why it's approved (in git commit)
+#
+# 4. Review approved registries quarterly
+#
+# Examples of DENIED registries:
+# ❌ docker.io/<random-user>/*
+# ❌ index.docker.io/*
+# ❌ Unknown registries
+# ❌ Public Docker Hub images without organization
+#
+# To enforce this policy (after testing in audit mode):
+# kubectl patch clusterpolicy restrict-registries \
+#   -p '{"spec":{"validationFailureAction":"enforce"}}'

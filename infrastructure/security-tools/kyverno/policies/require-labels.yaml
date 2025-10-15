@@ -1,0 +1,135 @@
+# Kyverno Policy: Require Standard Labels
+# Enforces standard labels on all workload resources for tracking and governance
+
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: require-labels
+  annotations:
+    policies.kyverno.io/title: Require Standard Labels
+    policies.kyverno.io/category: Best Practices
+    policies.kyverno.io/severity: medium
+    policies.kyverno.io/subject: Deployment, StatefulSet, DaemonSet, Pod
+    policies.kyverno.io/description: >-
+      All workload resources must have standard labels for tracking ownership,
+      environment, and cost allocation.
+spec:
+  validationFailureAction: enforce  # Change to "audit" for testing
+  background: true
+
+  rules:
+  # Require labels on Deployments
+  - name: require-labels-deployment
+    match:
+      any:
+      - resources:
+          kinds:
+          - Deployment
+    validate:
+      message: >-
+        Deployments must have labels: app, environment, client.
+        These labels are required for tracking, cost allocation, and governance.
+      pattern:
+        metadata:
+          labels:
+            app: "?*"
+            environment: "production | staging | development"
+            client: "?*"
+
+  # Require labels on StatefulSets
+  - name: require-labels-statefulset
+    match:
+      any:
+      - resources:
+          kinds:
+          - StatefulSet
+    validate:
+      message: >-
+        StatefulSets must have labels: app, environment, client.
+      pattern:
+        metadata:
+          labels:
+            app: "?*"
+            environment: "production | staging | development"
+            client: "?*"
+
+  # Require labels on DaemonSets
+  - name: require-labels-daemonset
+    match:
+      any:
+      - resources:
+          kinds:
+          - DaemonSet
+    validate:
+      message: >-
+        DaemonSets must have labels: app, environment, client.
+      pattern:
+        metadata:
+          labels:
+            app: "?*"
+            environment: "production | staging | development"
+            client: "?*"
+
+  # Require labels on Pod templates (via Deployments/StatefulSets)
+  - name: require-labels-pod-template
+    match:
+      any:
+      - resources:
+          kinds:
+          - Deployment
+          - StatefulSet
+          - DaemonSet
+    validate:
+      message: >-
+        Pod templates must have labels: app, environment, client.
+        These labels help with NetworkPolicies, monitoring, and debugging.
+      pattern:
+        spec:
+          template:
+            metadata:
+              labels:
+                app: "?*"
+                environment: "production | staging | development"
+                client: "?*"
+
+---
+# Label Description Documentation
+#
+# Required Labels:
+#
+# 1. app: <string>
+#    - Application or service name
+#    - Examples: "monobase-api", "postgresql", "nginx"
+#    - Used for: Service discovery, monitoring dashboards, debugging
+#
+# 2. environment: "production" | "staging" | "development"
+#    - Deployment environment
+#    - Must be one of: production, staging, development
+#    - Used for: Cost allocation, access controls, alerting severity
+#
+# 3. client: <string>
+#    - Client identifier (typically namespace prefix)
+#    - Examples: "myclient", "example-com", "acme"
+#    - Used for: Multi-tenancy, cost tracking per client, billing
+#
+# Example Deployment:
+#
+# apiVersion: apps/v1
+# kind: Deployment
+# metadata:
+#   name: api
+#   labels:
+#     app: monobase-api
+#     environment: production
+#     client: myclient
+# spec:
+#   template:
+#     metadata:
+#       labels:
+#         app: monobase-api
+#         environment: production
+#         client: myclient
+#     spec:
+#       containers:
+#       - name: api
+#         image: ghcr.io/YOUR-ORG/monobase-api:5.215.2

@@ -1,0 +1,235 @@
+# Falco Helm Chart Values
+# Chart: falcosecurity/falco
+# Version: 4.x+
+
+# DaemonSet configuration (runs on every node)
+daemonset:
+  updateStrategy:
+    type: RollingUpdate
+
+# Resource limits (per node)
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+# Pod security context
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  fsGroup: 1000
+  seccompProfile:
+    type: RuntimeDefault
+
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+    - ALL
+    add:
+    - SYS_PTRACE  # Required for eBPF
+  readOnlyRootFilesystem: true
+  privileged: false
+
+# Falco configuration
+falco:
+  # Rule sets
+  rulesFile:
+  - /etc/falco/falco_rules.yaml  # Default rules
+  - /etc/falco/falco_rules.local.yaml  # Custom rules
+  - /etc/falco/rules.d  # Additional rules directory
+
+  # Priority level (only alert on these levels and above)
+  priority: notice  # debug, info, notice, warning, error, critical, alert, emergency
+
+  # JSON output (for integration with SIEM, Slack, etc.)
+  jsonOutput: true
+  jsonIncludeOutputProperty: true
+  jsonIncludeTagsProperty: true
+
+  # Log output
+  logStderr: true
+  logSyslog: false
+  logLevel: info
+
+  # Metrics
+  webserver:
+    enabled: true
+    port: 8765
+    prometheus_metrics_enabled: true
+
+  # Syscall event drops
+  syscall_event_drops:
+    actions:
+    - log
+    - alert
+    rate: 0.03333  # Max 3.33% drop rate
+    max_burst: 1000
+
+  # Output channels
+  # File output (for SIEM ingestion)
+  fileOutput:
+    enabled: true
+    keepAlive: false
+    filename: /var/log/falco/events.log
+
+  # Syslog output (for centralized logging)
+  syslogOutput:
+    enabled: false  # Enable if using syslog
+    host: "syslog-server.example.com"
+    port: 514
+    format: json
+
+  # HTTP output (for Slack/webhooks)
+  httpOutput:
+    enabled: false  # Enable for Slack integration
+    url: ""  # https://hooks.slack.com/services/YOUR/WEBHOOK/URL
+    userAgent: "falco/0.1"
+
+  # Program output (for custom integrations)
+  programOutput:
+    enabled: false
+    keepAlive: false
+    program: |
+      jq '{
+        text: .output,
+        priority: .priority,
+        rule: .rule,
+        time: .time
+      }' | curl -X POST -H 'Content-Type: application/json' -d @- YOUR_WEBHOOK_URL
+
+  # gRPC output (for Falco Sidekick)
+  grpc:
+    enabled: false  # Enable for Falco Sidekick integration
+    bindAddress: "unix:///run/falco/falco.sock"
+    threadiness: 0
+
+# Driver configuration (eBPF vs kernel module)
+driver:
+  enabled: true
+  kind: ebpf  # Use eBPF (modern, safer) instead of kernel module
+
+  ebpf:
+    hostNetwork: true  # Required for eBPF
+    path: /usr/src/ebpf
+
+# Tolerations (run on all nodes, including masters)
+tolerations:
+- effect: NoSchedule
+  key: node-role.kubernetes.io/master
+  operator: Exists
+- effect: NoSchedule
+  key: node-role.kubernetes.io/control-plane
+  operator: Exists
+
+# Node selector (optional - only monitor specific nodes)
+nodeSelector: {}
+
+# Service account
+serviceAccount:
+  create: true
+  annotations: {}
+
+# RBAC
+rbac:
+  create: true
+
+# Pod security policy (deprecated, using Pod Security Standards instead)
+podSecurityPolicy:
+  create: false
+
+# Custom rules (mounted as ConfigMap)
+customRules:
+  api-rules.yaml: |-
+    # See rules/api-rules.yaml for full custom rules
+
+  database-rules.yaml: |-
+    # See rules/database-rules.yaml for full custom rules
+
+# Extra volumes (for custom rules)
+extraVolumes:
+- name: custom-rules
+  configMap:
+    name: falco-custom-rules
+
+extraVolumeMounts:
+- name: custom-rules
+  mountPath: /etc/falco/rules.d
+  readOnly: true
+
+# Metrics service
+services:
+  - name: metrics
+    type: ClusterIP
+    ports:
+    - port: 8765
+      targetPort: 8765
+      protocol: TCP
+      name: metrics
+
+# Service monitor for Prometheus Operator
+serviceMonitor:
+  enabled: false  # Enable if using Prometheus Operator
+  interval: 30s
+  scrapeTimeout: 10s
+
+# Example Slack integration:
+#
+# 1. Create Slack webhook: https://api.slack.com/messaging/webhooks
+# 2. Update httpOutput.url with webhook URL
+# 3. Set httpOutput.enabled: true
+# 4. Redeploy: helm upgrade falco falcosecurity/falco -f helm-values.yaml
+#
+# Example alert in Slack:
+# {
+#   "text": "⚠️ Falco Alert: Shell spawned in container",
+#   "fields": [
+#     {"title": "Priority", "value": "Notice"},
+#     {"title": "Container", "value": "api-pod"},
+#     {"title": "User", "value": "root"},
+#     {"title": "Command", "value": "/bin/bash"}
+#   ]
+# }
+
+# Example PagerDuty integration:
+#
+# Use programOutput to send to PagerDuty Events API v2:
+#
+# programOutput:
+#   enabled: true
+#   program: |
+#     jq '{
+#       routing_key: "YOUR_PAGERDUTY_INTEGRATION_KEY",
+#       event_action: "trigger",
+#       payload: {
+#         summary: .output,
+#         severity: .priority,
+#         source: .hostname,
+#         custom_details: {
+#           rule: .rule,
+#           container: .output_fields.container_name,
+#           command: .output_fields.proc_cmdline
+#         }
+#       }
+#     }' | curl -X POST \
+#       -H 'Content-Type: application/json' \
+#       -d @- \
+#       https://events.pagerduty.com/v2/enqueue
+
+# Installation instructions:
+# helm repo add falcosecurity https://falcosecurity.github.io/charts
+# helm install falco falcosecurity/falco \
+#   --namespace falco \
+#   --create-namespace \
+#   --values helm-values.yaml
+#
+# Verify installation:
+# kubectl get pods -n falco
+# kubectl logs -n falco -l app.kubernetes.io/name=falco --tail=20
+#
+# Test detection:
+# kubectl exec -it <any-pod> -- /bin/bash
+# kubectl logs -n falco -l app.kubernetes.io/name=falco | grep "Shell spawned"

@@ -1,0 +1,174 @@
+# Kyverno Helm Chart Values
+# Chart: kyverno/kyverno
+# Version: 3.x+
+
+# Kyverno admission controller configuration
+replicaCount: 3  # HA for production
+
+# Resource limits
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+# High availability
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+# Admission controller configuration
+admissionController:
+  replicas: 3  # HA
+
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+# Background controller (for existing resources)
+backgroundController:
+  enabled: true
+  replicas: 2  # HA
+
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+
+# Cleanup controller
+cleanupController:
+  enabled: true
+
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 128Mi
+
+# Reports controller (for policy reports)
+reportsController:
+  enabled: true
+
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+
+# Webhook configuration
+webhooksCleanup:
+  enabled: true
+
+# Pod security context
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  fsGroup: 1000
+  seccompProfile:
+    type: RuntimeDefault
+
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+    - ALL
+  readOnlyRootFilesystem: true
+
+# Metrics
+metricsService:
+  create: true
+  type: ClusterIP
+  port: 8000
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "8000"
+
+# Service monitor for Prometheus Operator
+serviceMonitor:
+  enabled: false  # Enable if using Prometheus Operator
+  namespace: kyverno
+  interval: 30s
+
+# Features
+features:
+  # Generate policies (auto-create resources)
+  generateValidatingAdmissionPolicy:
+    enabled: false  # Use ClusterPolicy instead
+
+  # Logging
+  logging:
+    format: json
+    verbosity: 2
+
+# Namespace exclusions
+config:
+  excludeKyvernoNamespace: true  # Don't apply policies to kyverno namespace
+
+  # Exclude system namespaces
+  resourceFilters:
+  - '[Event,*,*]'
+  - '[*,kube-system,*]'
+  - '[*,kube-public,*]'
+  - '[*,kube-node-lease,*]'
+  - '[*,kyverno,*]'
+  - '[*,velero,*]'
+  - '[*,argocd,*]'
+  - '[*,cert-manager,*]'
+  - '[*,external-secrets-system,*]'
+  - '[*,longhorn-system,*]'
+  - '[*,monitoring,*]'
+  - '[*,falco,*]'
+  - '[Node,*,*]'
+  - '[APIService,*,*]'
+  - '[TokenReview,*,*]'
+  - '[SubjectAccessReview,*,*]'
+  - '[SelfSubjectAccessReview,*,*]'
+  - '[Binding,*,*]'
+  - '[ReplicaSet,*,*]'
+  - '[AdmissionReport,*,*]'
+  - '[ClusterAdmissionReport,*,*]'
+  - '[BackgroundScanReport,*,*]'
+  - '[ClusterBackgroundScanReport,*,*]'
+
+# Admission controller tuning
+admissionReports:
+  enabled: true  # Generate admission reports
+
+backgroundReports:
+  enabled: true  # Scan existing resources
+
+# Webhooks timeout
+webhookTimeout: 10  # Seconds (avoid blocking deployments too long)
+
+# Upgrade settings
+upgradeController:
+  enabled: true
+
+# Cleanup CRDs on uninstall
+crds:
+  install: true
+  annotations: {}
+
+# Installation instructions:
+# helm repo add kyverno https://kyverno.github.io/kyverno/
+# helm install kyverno kyverno/kyverno \
+#   --namespace kyverno \
+#   --create-namespace \
+#   --values helm-values.yaml
+#
+# Verify installation:
+# kubectl get pods -n kyverno
+# kubectl get clusterpolicies
