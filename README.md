@@ -107,15 +107,18 @@ If you already have an EKS/AKS/GKE/K3s cluster:
 git clone https://github.com/YOUR-ORG/monobase-infra.git
 cd monobase-infra
 
-# 2. Create client configuration
-./scripts/new-client-config.sh myclient myclient.com
+# 2. Create client configuration from base profile
+cp config/profiles/production-base.yaml config/myclient/values-production.yaml
 
-# 3. Choose a deployment profile (or customize)
-cp config/profiles/production-small.yaml config/myclient/values-production.yaml
-
-# 4. Edit domain and namespace
+# 3. Edit configuration (minimal overrides only)
 vim config/myclient/values-production.yaml
-# Change: global.domain and global.namespace
+# Required changes:
+#   - global.domain: myclient.com
+#   - global.namespace: myclient-prod
+#   - api.image.tag: "5.215.2" (pin version)
+#   - account.image.tag: "1.0.0" (pin version)
+# Optional: Adjust resources, storage sizes, enable components
+# Keep it minimal! (~60 lines vs 430 lines)
 
 # 5. Deploy infrastructure
 kubectl apply -f infrastructure/
@@ -214,6 +217,43 @@ kubectl port-forward -n argocd svc/argocd-server 8080:443
 # Open https://localhost:8080
 ```
 
+## ⚙️ Configuration Approach
+
+### Profile-Based Configuration (Recommended)
+
+This template uses a **profile-based configuration** system to minimize boilerplate and maximize maintainability:
+
+**Base Profiles:**
+- `config/profiles/production-base.yaml` - Production defaults (HA, backups, security)
+- `config/profiles/staging-base.yaml` - Staging defaults (single replicas, Mailpit enabled)
+- `config/profiles/production-{small|medium|large}.yaml` - Sized profiles
+
+**Your Client Config:**
+1. Copy a base profile to `config/yourclient/values-{env}.yaml`
+2. Change only required values (domain, namespace, image tags)
+3. Override only what's different from the base
+4. Keep your config minimal (~60 lines instead of 430 lines)
+
+**Example:**
+```yaml
+# config/myclient/values-production.yaml (60 lines)
+global:
+  domain: myclient.com
+  namespace: myclient-prod
+
+api:
+  image:
+    tag: "5.215.2"  # Pin version
+
+postgresql:
+  persistence:
+    size: 200Gi  # Override default of 50Gi
+
+# Everything else inherits from production-base.yaml
+```
+
+See `config/profiles/README.md` for detailed workflow and examples.
+
 ## 📋 What's Included
 
 ### Required Core Components
@@ -303,10 +343,14 @@ monobase-infra/                   # Base template repository
 │   └── applications/             # Application apps
 │
 ├── config/                       # Configuration directory
-│   ├── example.com/              # Reference configuration (copy this!)
-│   │   ├── values-staging.yaml
-│   │   ├── values-production.yaml
-│   │   └── secrets-mapping.yaml
+│   ├── profiles/                 # Base configuration profiles
+│   │   ├── production-base.yaml  # Production defaults (copy this!)
+│   │   ├── staging-base.yaml     # Staging defaults
+│   │   └── README.md             # Configuration guide
+│   ├── example.com/              # Example configurations
+│   │   ├── values-production.yaml           # Full reference (430 lines)
+│   │   ├── values-production-minimal.yaml   # Minimal example (60 lines) ⭐
+│   │   └── values-staging-minimal.yaml      # Staging minimal (40 lines) ⭐
 │   └── [your-client]/            # Your client config goes here
 │
 ├── docs/                         # Documentation

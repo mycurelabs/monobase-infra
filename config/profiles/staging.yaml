@@ -1,0 +1,51 @@
+# Staging Profile
+# For: Testing and development
+# Minimal resources, optional components disabled
+
+global:
+  domain: example.com
+  namespace: example-staging
+  environment: staging
+
+api:
+  enabled: true
+  replicas: 1
+  resources:
+    requests: {cpu: 250m, memory: 512Mi}
+    limits: {cpu: 1, memory: 2Gi}
+
+account:
+  enabled: true
+  replicas: 1
+  resources:
+    requests: {cpu: 100m, memory: 256Mi}
+    limits: {cpu: 500m, memory: 512Mi}
+
+# api-worker (removed):
+  enabled: false
+
+postgresql:
+  enabled: true
+  replicaCount: 1
+  persistence: {size: 20Gi}
+  resources:
+    requests: {cpu: 500m, memory: 2Gi}
+    limits: {cpu: 2, memory: 4Gi}
+
+# typesense (removed):
+  enabled: false
+
+minio:
+  enabled: false
+
+mailpit:
+  enabled: true  # Email testing
+
+monitoring:
+  enabled: false
+
+backup:
+  enabled: false
+
+autoscaling:
+  enabled: false

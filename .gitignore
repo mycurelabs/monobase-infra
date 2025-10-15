@@ -17,6 +17,7 @@ credentials.json
 config/*/
 !config/example.com/
 !config/k3d-local/
+!config/profiles/
 
 # OpenTofu/Terraform
 tofu/clusters/*/

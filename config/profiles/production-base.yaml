@@ -1,0 +1,201 @@
+# Production Base Profile
+# Comprehensive production defaults that all production deployments inherit
+# Override specific values in your client config
+
+# Instructions:
+# 1. Copy this file to config/yourclient/values-production.yaml
+# 2. Change global.domain and global.namespace
+# 3. Override only the values you need to change
+# 4. Delete sections you don't need to override (keep it minimal)
+
+global:
+  domain: CHANGEME.com  # ⚠️ REQUIRED: Change to client domain
+  namespace: CHANGEME-prod  # ⚠️ REQUIRED: Change to client namespace
+  environment: production
+
+  gateway:
+    name: shared-gateway
+    namespace: gateway-system
+
+  storage:
+    provider: cloud-default  # Use cloud provider's default StorageClass
+    className: ""  # Auto-detect from provider
+
+# ===== CORE: Monobase API =====
+api:
+  enabled: true
+
+  image:
+    repository: ghcr.io/YOUR-ORG/monobase-api
+    tag: "latest"  # ⚠️ CHANGE: Pin specific version in production
+    pullPolicy: IfNotPresent
+
+  replicas: 2  # Minimum for HA
+
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      cpu: 2
+      memory: 2Gi
+
+  gateway:
+    hostname: ""  # Empty = uses api.{global.domain}
+
+  livenessProbe:
+    enabled: true
+    path: /health
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3
+
+  readinessProbe:
+    enabled: true
+    path: /ready
+    initialDelaySeconds: 10
+    periodSeconds: 5
+    timeoutSeconds: 3
+    failureThreshold: 2
+
+  podDisruptionBudget:
+    enabled: true
+    minAvailable: 1
+
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 5
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: 80
+
+# ===== CORE: Monobase Account Frontend =====
+account:
+  enabled: true
+
+  image:
+    repository: ghcr.io/YOUR-ORG/monobase-account
+    tag: "latest"  # ⚠️ CHANGE: Pin specific version
+    pullPolicy: IfNotPresent
+
+  replicas: 2
+
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+  gateway:
+    hostname: ""  # Empty = uses app.{global.domain}
+
+  podDisruptionBudget:
+    enabled: true
+    minAvailable: 1
+
+# ===== CORE: PostgreSQL Database =====
+postgresql:
+  enabled: true
+
+  # Production uses replication for HA
+  architecture: replication
+  replicaCount: 2  # 1 primary + 1 replica
+
+  auth:
+    enabled: true
+    # Credentials managed by External Secrets
+
+  persistence:
+    enabled: true
+    storageClass: ""  # Auto-detect from global.storage.provider
+    size: 50Gi  # Adjust based on data volume
+
+  resources:
+    requests:
+      cpu: 500m
+      memory: 2Gi
+    limits:
+      cpu: 2
+      memory: 4Gi
+
+  podDisruptionBudget:
+    enabled: true
+    minAvailable: 1
+
+# ===== OPTIONAL: Valkey (Redis Cache) =====
+valkey:
+  enabled: true
+
+  architecture: replication
+
+  master:
+    persistence:
+      enabled: true
+      storageClass: ""  # Auto-detect
+      size: 8Gi
+
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: 1
+      memory: 1Gi
+
+# ===== OPTIONAL: MinIO (Object Storage) =====
+minio:
+  enabled: false  # Disabled by default - use cloud S3 instead
+
+  # If enabled, use distributed mode for production
+  mode: distributed
+  replicas: 6
+
+  persistence:
+    enabled: true
+    storageClass: ""
+    size: 250Gi
+
+# ===== PRODUCTION: NO Mailpit =====
+mailpit:
+  enabled: false  # ❌ NEVER enable in production (use real SMTP)
+
+# ===== External Secrets =====
+externalSecrets:
+  enabled: true
+  provider: aws  # Options: aws, azure, gcp, sops
+
+# ===== Monitoring =====
+monitoring:
+  enabled: false  # Enable when needed
+
+# ===== Backup (Velero) =====
+backup:
+  enabled: true
+
+  schedules:
+    # Daily full backup
+    daily:
+      enabled: true
+      schedule: "0 2 * * *"
+      retention: 720h  # 30 days
+
+    # Hourly critical data (optional)
+    hourly:
+      enabled: false
+      retention: 72h
+
+# ===== Security =====
+networkPolicies:
+  enabled: true
+  defaultDeny: true
+
+podSecurityStandards:
+  enabled: true
+  level: restricted
+
+# ===== Resource Quotas =====
+resourceQuotas:
+  enabled: false  # Enable for multi-tenant clusters

@@ -1,0 +1,73 @@
+# Base Configuration - Shared Defaults
+# All profiles inherit from this base configuration
+
+global:
+  # Gateway configuration (shared across all deployments)
+  gateway:
+    name: shared-gateway
+    namespace: gateway-system
+
+  # Storage defaults
+  storage:
+    provider: cloud-default  # Use cluster's default StorageClass
+    className: ""  # Empty = auto-detect
+
+# Resource tier definitions (referenced by profiles)
+resourceTiers:
+  minimal:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+  small:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: 1
+      memory: 2Gi
+
+  medium:
+    requests:
+      cpu: 1
+      memory: 2Gi
+    limits:
+      cpu: 2
+      memory: 4Gi
+
+  large:
+    requests:
+      cpu: 2
+      memory: 4Gi
+    limits:
+      cpu: 4
+      memory: 8Gi
+
+# Common component defaults
+defaults:
+  # Health check configuration
+  livenessProbe:
+    enabled: true
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3
+
+  readinessProbe:
+    enabled: true
+    initialDelaySeconds: 10
+    periodSeconds: 5
+    timeoutSeconds: 3
+    failureThreshold: 2
+
+  # Security
+  podSecurityStandards:
+    enabled: true
+    level: restricted
+
+  networkPolicies:
+    enabled: true
+    defaultDeny: true

@@ -1,0 +1,58 @@
+# Staging Configuration for example.com (MINIMAL EXAMPLE)
+#
+# This file shows the MINIMAL config needed when using staging-base.yaml as a starting point
+#
+# To create your own:
+# 1. cp config/profiles/staging-base.yaml config/yourclient/values-staging.yaml
+# 2. Edit only the values below
+# 3. Delete everything else (keep the config small and maintainable)
+
+# ===== REQUIRED: Client-specific values =====
+global:
+  domain: staging.example.com  # Or use subdomain: staging.example.com
+  namespace: example-staging
+  environment: staging
+
+# ===== OPTIONAL: Override defaults from staging-base.yaml =====
+
+# Example 1: Test specific versions
+api:
+  image:
+    tag: "feature-new-dashboard"  # Test branch build
+
+account:
+  image:
+    tag: "v1.1.0-rc1"  # Test release candidate
+
+# Example 2: Slightly larger database for realistic testing
+postgresql:
+  persistence:
+    size: 50Gi  # Override default of 20Gi
+
+# Example 3: Enable MinIO for S3 testing (optional)
+minio:
+  enabled: true
+  mode: standalone  # Single instance for staging
+  persistence:
+    size: 100Gi
+
+# Example 4: Custom mailpit hostname
+mailpit:
+  gateway:
+    hostname: mail.staging.example.com
+
+# ===== NOTES =====
+#
+# Everything else inherits from profiles/staging-base.yaml:
+# - Single replicas (no HA needed)
+# - Lower resource limits
+# - Mailpit enabled by default
+# - Valkey with no persistence
+# - Backup disabled
+# - Monitoring disabled
+#
+# Total config: ~40 lines instead of 270 lines!
+#
+# To see all available options, check:
+# - config/profiles/staging-base.yaml
+# - config/profiles/production-base.yaml (for comparison)

@@ -1,0 +1,95 @@
+# Production Small Profile
+# For: 1-5 clients, <50k patients, <500GB data
+# Cluster: 3 × m6i.xlarge (4 vCPU, 16GB RAM)
+# Monthly cost: ~$500-700
+
+global:
+  domain: CHANGEME.com  # Override per client
+  namespace: CHANGEME-prod
+  environment: production
+
+# Core: Monobase API
+api:
+  enabled: true
+  image:
+    repository: ghcr.io/YOUR-ORG/monobase-api
+    tag: "5.215.2"  # Pin version
+  replicas: 2
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      cpu: 2
+      memory: 2Gi
+
+# Core: Monobase Account Frontend
+account:
+  enabled: true
+  replicas: 2
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+# Optional: API Worker
+# api-worker (removed):
+  enabled: false  # Enable if needed
+
+# Core: MongoDB
+postgresql:
+  enabled: true
+  architecture: replicaset
+  replicaCount: 3
+  auth:
+    enabled: true
+  persistence:
+    enabled: true
+    size: 50Gi
+  resources:
+    requests:
+      cpu: 500m
+      memory: 2Gi
+    limits:
+      cpu: 2
+      memory: 4Gi
+
+# Optional: Typesense
+# typesense (removed):
+  enabled: false
+
+# Optional: MinIO (use external S3 instead)
+minio:
+  enabled: false
+
+# Optional: Monitoring
+monitoring:
+  enabled: false
+
+# Backup
+backup:
+  enabled: true
+  schedules:
+    daily:
+      enabled: true
+      retention: 720h  # 30 days
+
+# Security
+networkPolicies:
+  enabled: true
+podSecurityStandards:
+  enabled: true
+  level: restricted
+
+# Autoscaling
+autoscaling:
+  enabled: true
+  api:
+    minReplicas: 2
+    maxReplicas: 5
+  account:
+    minReplicas: 2
+    maxReplicas: 3

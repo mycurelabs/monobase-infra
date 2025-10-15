@@ -1,0 +1,75 @@
+# Production Configuration for example.com (MINIMAL EXAMPLE)
+#
+# This file shows the MINIMAL config needed when using production-base.yaml as a starting point
+#
+# To create your own:
+# 1. cp config/profiles/production-base.yaml config/yourclient/values-production.yaml
+# 2. Edit only the values below
+# 3. Delete everything else (keep the config small and maintainable)
+
+# ===== REQUIRED: Client-specific values =====
+global:
+  domain: example.com
+  namespace: example-prod
+  environment: production
+
+# ===== OPTIONAL: Override defaults from production-base.yaml =====
+
+# Example 1: Use different image tags
+api:
+  image:
+    tag: "5.215.2"  # Pin specific version (not "latest")
+
+account:
+  image:
+    tag: "1.0.0"
+
+# Example 2: Scale up for higher traffic
+api:
+  replicas: 3  # Override default of 2
+  autoscaling:
+    maxReplicas: 10  # Override default of 5
+
+# Example 3: Larger database
+postgresql:
+  persistence:
+    size: 200Gi  # Override default of 50Gi
+
+  resources:
+    requests:
+      cpu: 1
+      memory: 4Gi
+    limits:
+      cpu: 2
+      memory: 8Gi
+
+# Example 4: Enable optional components
+minio:
+  enabled: true
+  mode: distributed
+  replicas: 6
+  persistence:
+    size: 500Gi  # Larger than default
+
+# Example 5: Custom external secrets provider
+externalSecrets:
+  provider: azure  # Override default of "aws"
+  azure:
+    tenantId: "YOUR-TENANT-ID"
+    vaultUrl: "https://example-kv.vault.azure.net"
+
+# ===== NOTES =====
+#
+# Everything else inherits from profiles/production-base.yaml:
+# - Security settings (NetworkPolicies, PSS)
+# - Resource requests/limits for account, valkey
+# - Backup schedules
+# - Gateway configuration
+# - Storage provider auto-detection
+#
+# Total config: ~60 lines instead of 430 lines!
+#
+# To see all available options, check:
+# - config/profiles/production-base.yaml
+# - helm-dependencies/*.yaml
+# - charts/*/values.yaml

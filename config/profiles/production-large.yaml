@@ -1,0 +1,72 @@
+# Production Large Profile
+# For: 15+ clients, 200k+ patients, 2TB+ data
+# Cluster: 5-10 × m6i.2xlarge (8 vCPU, 32GB RAM)
+# Monthly cost: ~$1500-2500
+
+global:
+  domain: CHANGEME.com
+  namespace: CHANGEME-prod
+  environment: production
+
+api:
+  enabled: true
+  replicas: 5
+  resources:
+    requests: {cpu: 2, memory: 4Gi}
+    limits: {cpu: 4, memory: 8Gi}
+
+account:
+  enabled: true
+  replicas: 3
+  resources:
+    requests: {cpu: 500m, memory: 1Gi}
+    limits: {cpu: 2, memory: 2Gi}
+
+# api-worker (removed):
+  enabled: true
+  replicas: 3
+  resources:
+    requests: {cpu: 1, memory: 2Gi}
+    limits: {cpu: 3, memory: 4Gi}
+
+postgresql:
+  enabled: true
+  replicaCount: 3
+  persistence: {size: 500Gi}
+  resources:
+    requests: {cpu: 3, memory: 12Gi}
+    limits: {cpu: 6, memory: 16Gi}
+
+# typesense (removed):
+  enabled: true
+  replicas: 3
+  persistence: {size: 200Gi}
+  resources:
+    requests: {cpu: 2, memory: 4Gi}
+    limits: {cpu: 4, memory: 8Gi}
+
+minio:
+  enabled: true
+  mode: distributed
+  replicas: 6
+  persistence: {size: 500Gi}
+  resources:
+    requests: {cpu: 2, memory: 4Gi}
+    limits: {cpu: 4, memory: 8Gi}
+
+monitoring:
+  enabled: true
+  prometheus: {retention: 30d, storage: 100Gi}
+
+backup:
+  enabled: true
+  schedules:
+    hourly: {enabled: true, retention: 168h}
+    daily: {enabled: true, retention: 2160h}
+    weekly: {enabled: true, retention: 4320h}
+
+autoscaling:
+  enabled: true
+  api: {minReplicas: 5, maxReplicas: 20}
+  account: {minReplicas: 3, maxReplicas: 10}
+  # api-worker (removed): {minReplicas: 3, maxReplicas: 10}
