@@ -93,7 +93,7 @@ tofu/
 │   │   └── cloud-init/              # Cloud-init for automated setup
 │   │       └── k3s-server.yaml
 │   │
-│   └── k3d-local/                   # k3d for local/CI testing
+│   └── local-k3d/                   # k3d for local/CI testing
 │       ├── README.md
 │       ├── main.tf                  # k3d cluster resource
 │       ├── variables.tf

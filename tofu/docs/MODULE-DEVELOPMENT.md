@@ -800,7 +800,7 @@ resource "aws_eks_node_group" "main" {
 ### Example 2: k3d Local Module
 
 ```hcl
-# modules/k3d-local/main.tf
+# modules/local-k3d/main.tf
 
 terraform {
   required_providers {
@@ -1040,7 +1040,7 @@ resource "aws_vpc" "main" {
 Study these well-implemented modules:
 
 1. **tofu/modules/aws-eks/** - Complete production EKS
-2. **tofu/modules/k3d-local/** - Simple, focused k3d
+2. **tofu/modules/local-k3d/** - Simple, focused k3d
 3. **tofu/modules/azure-aks/** - Azure Workload Identity pattern
 4. **tofu/modules/gcp-gke/** - GCP Autopilot option
 

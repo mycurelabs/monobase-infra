@@ -14,7 +14,7 @@ Creates k3d cluster for local testing and CI/CD.
 
 ```hcl
 module "k3d_test" {
-  source = "../../modules/k3d-local"
+  source = "../../modules/local-k3d"
   
   cluster_name        = "monobase-test"
   servers             = 1
@@ -27,7 +27,7 @@ module "k3d_test" {
 ## Quick Start
 
 ```bash
-cd tofu/modules/k3d-local
+cd tofu/modules/local-k3d
 tofu init
 tofu apply
 
@@ -44,7 +44,7 @@ helm install hapihub ../../../charts/hapihub -f ../../../config/k3d-local/values
 ```yaml
 - name: Create k3d cluster
   run: |
-    cd tofu/modules/k3d-local
+    cd tofu/modules/local-k3d
     tofu init
     tofu apply -auto-approve
 
@@ -57,7 +57,7 @@ helm install hapihub ../../../charts/hapihub -f ../../../config/k3d-local/values
 - name: Cleanup
   if: always()
   run: |
-    cd tofu/modules/k3d-local
+    cd tofu/modules/local-k3d
     tofu destroy -auto-approve
 ```
 

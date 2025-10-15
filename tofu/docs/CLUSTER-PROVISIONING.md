@@ -116,7 +116,7 @@ gcloud config set project your-project-id
 gcloud config list
 ```
 
-#### On-Prem / Local (for on-prem-k3s / k3d-local)
+#### On-Prem / Local (for on-prem-k3s / local-k3d)
 
 No cloud credentials needed!
 
@@ -135,12 +135,12 @@ Choose the right module based on your deployment target:
 | **Production Azure** | `azure-aks` | Multi-tenant SaaS in Azure |
 | **Production GCP** | `gcp-gke` | Multi-tenant SaaS in GCP |
 | **Healthcare Clinic/Hospital** | `on-prem-k3s` | On-premises, air-gapped |
-| **Local Testing** | `k3d-local` | Developer laptop, CI/CD |
-| **Staging/Testing** | `k3d-local` or cloud | Pre-production validation |
+| **Local Testing** | `local-k3d` | Developer laptop, CI/CD |
+| **Staging/Testing** | `local-k3d` or cloud | Pre-production validation |
 
 ### Module Comparison
 
-| Feature | aws-eks | azure-aks | gcp-gke | on-prem-k3s | k3d-local |
+| Feature | aws-eks | azure-aks | gcp-gke | on-prem-k3s | local-k3d |
 |---------|---------|-----------|---------|-------------|-----------|
 | **Setup Time** | 15-20 min | 15-20 min | 15-20 min | 30-60 min | <1 min |
 | **Monthly Cost** | ~$300+ | ~$300+ | ~$300+ | Hardware only | $0 |
@@ -315,7 +315,7 @@ vim main.tf
 Change module source:
 ```hcl
 module "cluster" {
-  source = "../../modules/k3d-local"  # Changed from aws-eks
+  source = "../../modules/local-k3d"  # Changed from aws-eks
 
   cluster_name = "monobase-local"
   servers      = 1
