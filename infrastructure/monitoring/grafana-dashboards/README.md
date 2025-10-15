@@ -8,7 +8,7 @@ The kube-prometheus-stack Helm chart automatically provisions these dashboards f
 
 1. **Kubernetes Cluster** (ID: 7249) - Overall cluster health
 2. **Kubernetes Pods** (ID: 6417) - Pod-level metrics
-3. **MongoDB** (ID: 2583) - Database performance
+3. **PostgreSQL** (ID: 2583) - Database performance
 4. **Node Exporter** (ID: 1860) - Node-level system metrics
 5. **MinIO** (ID: 13502) - Object storage metrics
 
@@ -20,14 +20,14 @@ grafana:
     default:
       kubernetes-cluster:
         gnetId: 7249
-      mongodb:
+      postgresql:
         gnetId: 2583
       # etc...
 ```
 
 ## Custom Dashboards
 
-To add custom dashboards for HapiHub or other applications:
+To add custom dashboards for Monobase API or other applications:
 
 ### Option 1: Import JSON (Recommended for custom dashboards)
 
@@ -38,17 +38,17 @@ To add custom dashboards for HapiHub or other applications:
 grafana:
   dashboards:
     default:
-      hapihub-dashboard:
+      api-dashboard:
         json: |
-          {{ .Files.Get "grafana-dashboards/hapihub-dashboard.json" | indent 10 }}
+          {{ .Files.Get "grafana-dashboards/api-dashboard.json" | indent 10 }}
 ```
 
 ### Option 2: ConfigMap (For existing dashboards)
 
 ```bash
 # Create ConfigMap with dashboard JSON
-kubectl create configmap hapihub-dashboard \\
-  --from-file=hapihub-dashboard.json \\
+kubectl create configmap api-dashboard \\
+  --from-file=api-dashboard.json \\
   -n monitoring \\
   --dry-run=client -o yaml | kubectl label -f - grafana_dashboard=1 --local -o yaml | kubectl apply -f -
 
@@ -69,25 +69,25 @@ grafana:
         datasource: Prometheus
 ```
 
-## Creating Custom HapiHub Dashboard
+## Creating Custom Monobase API Dashboard
 
 Example metrics to visualize:
 
 ```promql
 # Request rate
-rate(http_requests_total{job="hapihub"}[5m])
+rate(http_requests_total{job="api"}[5m])
 
 # Error rate
-rate(http_requests_total{job="hapihub",status=~"5.."}[5m])
+rate(http_requests_total{job="api",status=~"5.."}[5m])
 
 # Latency (p50, p95, p99)
-histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{job="hapihub"}[5m]))
+histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{job="api"}[5m]))
 
 # Active connections
-hapihub_active_connections
+api_active_connections
 
 # Database query duration
-rate(hapihub_db_query_duration_seconds_sum[5m]) / rate(hapihub_db_query_duration_seconds_count[5m])
+rate(api_db_query_duration_seconds_sum[5m]) / rate(api_db_query_duration_seconds_count[5m])
 ```
 
 ## Dashboard Development Workflow
@@ -122,7 +122,7 @@ rate(hapihub_db_query_duration_seconds_sum[5m]) / rate(hapihub_db_query_duration
 
 - Kubernetes Cluster: 7249
 - Kubernetes Pods: 6417
-- MongoDB: 2583
+- PostgreSQL: 2583
 - Node Exporter: 1860
 - MinIO: 13502
 - Envoy: 11022

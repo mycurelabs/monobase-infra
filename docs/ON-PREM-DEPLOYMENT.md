@@ -146,7 +146,7 @@ vim config/clinic-a/values-production.yaml
 # Set: global.storage.provider: longhorn
 
 # Deploy
-helm install hapihub charts/hapihub -f config/clinic-a/values-production.yaml -n clinic-a-prod --create-namespace
+helm install api charts/api -f config/clinic-a/values-production.yaml -n clinic-a-prod --create-namespace
 ```
 
 ## High Availability Setup

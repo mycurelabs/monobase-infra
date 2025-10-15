@@ -32,7 +32,7 @@ Production security hardening for compliant deployments.
 ### Encryption
 - [ ] Encryption at rest (Longhorn volumes)
 - [ ] Encryption in transit (TLS everywhere)
-- [ ] MongoDB encryption enabled
+- [ ] PostgreSQL encryption enabled
 - [ ] Backup encryption enabled (S3 + KMS)
 - [ ] Secrets in KMS (never in Git)
 - [ ] TLS certificates from trusted CA
@@ -82,11 +82,11 @@ kubectl get networkpolicy -n myclient-prod
 ```bash
 # Should FAIL (blocked by default-deny):
 kubectl run test --image=busybox -n myclient-prod -it --rm -- \\
-  wget -O- http://hapihub.other-namespace:7500
+  wget -O- http://api.other-namespace:7500
 
 # Should SUCCEED (allowed by allow rules):
 kubectl run test --image=busybox -n gateway-system -it --rm -- \\
-  wget -O- http://hapihub.myclient-prod:7500
+  wget -O- http://api.myclient-prod:7500
 ```
 
 ### 2. Gateway Security
@@ -222,13 +222,13 @@ image:
 # - scratch (static binaries)
 
 # 3. Scan images for vulnerabilities
-trivy image ghcr.io/YOUR-ORG/hapihub:5.215.2
+trivy image ghcr.io/YOUR-ORG/api:5.215.2
 
 # 4. Sign images (optional)
-cosign sign ghcr.io/YOUR-ORG/hapihub:5.215.2
+cosign sign ghcr.io/YOUR-ORG/api:5.215.2
 
 # 5. Verify signatures
-cosign verify ghcr.io/YOUR-ORG/hapihub:5.215.2
+cosign verify ghcr.io/YOUR-ORG/api:5.215.2
 ```
 
 ---
@@ -245,12 +245,12 @@ cosign verify ghcr.io/YOUR-ORG/hapihub:5.215.2
 
 # Verify permissions
 kubectl auth can-i get secrets \\
-  --as=system:serviceaccount:myclient-prod:hapihub \\
+  --as=system:serviceaccount:myclient-prod:api \\
   -n myclient-prod
 # yes (needs secrets)
 
 kubectl auth can-i delete pods \\
-  --as=system:serviceaccount:myclient-prod:hapihub \\
+  --as=system:serviceaccount:myclient-prod:api \\
   -n myclient-prod
 # no (doesn't need to delete pods)
 ```
@@ -262,7 +262,7 @@ kubectl auth can-i delete pods \\
 kubectl get rolebindings -n myclient-prod
 
 # Review permissions
-kubectl describe role hapihub -n myclient-prod
+kubectl describe role api -n myclient-prod
 ```
 
 ### 2. Admin Access
@@ -320,13 +320,13 @@ kubectl create secret generic longhorn-crypto \\
 # Or use External Secrets (recommended)
 ```
 
-**MongoDB Encryption:**
+**PostgreSQL Encryption:**
 
 ```yaml
-# Enable in helm-dependencies/mongodb-values.yaml
+# Enable in helm-dependencies/postgresql-values.yaml
 encryption:
   enabled: true
-  existingSecret: mongodb-encryption-key
+  existingSecret: postgresql-encryption-key
 
 tls:
   enabled: true
@@ -340,26 +340,26 @@ tls:
 ```
 ✅ Client → Gateway: TLS 1.3
 ✅ Gateway → Apps: HTTP (internal, within cluster)
-✅ Apps → MongoDB: TLS
+✅ Apps → PostgreSQL: TLS
 ✅ Apps → External APIs: HTTPS
 ✅ Backup → S3: HTTPS + encryption
 ```
 
-**MongoDB TLS:**
+**PostgreSQL TLS:**
 
 ```bash
 # Generate certificates (or use cert-manager)
 openssl req -x509 -newkey rsa:4096 \\
-  -keyout mongodb.key \\
-  -out mongodb.crt \\
+  -keyout postgresql.key \\
+  -out postgresql.crt \\
   -days 365 \\
   -nodes \\
-  -subj "/CN=mongodb.myclient-prod.svc.cluster.local"
+  -subj "/CN=postgresql.myclient-prod.svc.cluster.local"
 
 # Create secret
-kubectl create secret generic mongodb-tls \\
-  --from-file=tls.crt=mongodb.crt \\
-  --from-file=tls.key=mongodb.key \\
+kubectl create secret generic postgresql-tls \\
+  --from-file=tls.crt=postgresql.crt \\
+  --from-file=tls.key=postgresql.key \\
   -n myclient-prod
 ```
 
@@ -406,7 +406,7 @@ aws secretsmanager update-secret \\
 
 # 2. External Secrets auto-syncs (within 1h)
 # 3. Restart pods to use new secret
-kubectl rollout restart deployment hapihub -n myclient-prod
+kubectl rollout restart deployment api -n myclient-prod
 ```
 
 ---
@@ -464,14 +464,14 @@ logging:
       enabled: true
 ```
 
-**MongoDB Audit Logs:**
+**PostgreSQL Audit Logs:**
 
 ```yaml
-# In mongodb configuration:
+# In postgresql configuration:
 auditLog:
   destination: file
   format: JSON
-  path: /var/log/mongodb/audit.json
+  path: /var/log/postgresql/audit.json
 ```
 
 ### 2. Security Alerts
@@ -591,8 +591,8 @@ kubectl delete pod suspicious-pod-xyz -n myclient-prod
 # See: Secret Rotation procedure above
 
 # Patch vulnerabilities
-kubectl set image deployment/hapihub \\
-  hapihub=ghcr.io/YOUR-ORG/hapihub:5.215.3-patched \\
+kubectl set image deployment/api \\
+  api=ghcr.io/YOUR-ORG/api:5.215.3-patched \\
   -n myclient-prod
 ```
 
@@ -624,10 +624,10 @@ velero restore create incident-recovery \\
 
 ```bash
 # Scan container images
-trivy image ghcr.io/YOUR-ORG/hapihub:5.215.2
+trivy image ghcr.io/YOUR-ORG/api:5.215.2
 
 # Scan Helm charts
-trivy config charts/hapihub
+trivy config charts/api
 
 # Scan Kubernetes manifests
 trivy kubernetes --namespace myclient-prod
@@ -644,7 +644,7 @@ npm audit
 npm audit fix
 
 # Scan Helm dependencies
-helm dependency list charts/hapihub
+helm dependency list charts/api
 # Check for outdated charts
 ```
 
@@ -718,7 +718,7 @@ kubectl get networkpolicy -A
 ### 2. SQL Injection
 
 **Mitigation:**
-- Parameterized queries in HapiHub (already done)
+- Parameterized queries in Monobase API (already done)
 - Input validation
 - WAF rules (if using external WAF)
 - Regular code reviews

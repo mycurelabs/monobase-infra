@@ -46,10 +46,10 @@ kubectl apply -f - <<EOF
 apiVersion: longhorn.io/v1beta2
 kind: Snapshot
 metadata:
-  name: mongodb-manual-snapshot
+  name: postgresql-manual-snapshot
   namespace: longhorn-system
 spec:
-  volume: pvc-mongodb-data
+  volume: pvc-postgresql-data
   labels:
     snapshot-type: manual
 EOF
@@ -69,10 +69,10 @@ kubectl apply -f - <<EOF
 apiVersion: longhorn.io/v1beta2
 kind: Backup
 metadata:
-  name: mongodb-manual-backup
+  name: postgresql-manual-backup
   namespace: longhorn-system
 spec:
-  snapshotName: mongodb-manual-snapshot
+  snapshotName: postgresql-manual-snapshot
   labels:
     backup-type: manual
 EOF
@@ -90,7 +90,7 @@ kubectl apply -f - <<EOF
 apiVersion: longhorn.io/v1beta2
 kind: Volume
 metadata:
-  name: mongodb-restored
+  name: postgresql-restored
   namespace: longhorn-system
 spec:
   fromBackup: s3://bucket/backups/backup-<id>
@@ -103,7 +103,7 @@ kubectl apply -f - <<EOF
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: mongodb-data-restored
+  name: postgresql-data-restored
   namespace: myclient-prod
 spec:
   storageClassName: longhorn
@@ -112,7 +112,7 @@ spec:
   resources:
     requests:
       storage: 100Gi
-  volumeName: mongodb-restored
+  volumeName: postgresql-restored
 EOF
 ```
 
@@ -153,7 +153,7 @@ mc ls myminio
 mc mb myminio/new-bucket
 
 # Set bucket policy (public read)
-mc policy set download myminio/hapihub-files
+mc policy set download myminio/api-files
 
 # Monitor usage
 mc admin info myminio
@@ -176,21 +176,21 @@ mc ilm add --expiry-days 90 myminio/versioned-bucket
 mc encrypt set sse-s3 myminio/encrypted-bucket
 
 # Monitor bucket usage
-mc du myminio/hapihub-files
+mc du myminio/api-files
 ```
 
 ---
 
 ## Volume Expansion
 
-### Expand StatefulSet PVC (MongoDB, MinIO)
+### Expand StatefulSet PVC (PostgreSQL, MinIO)
 
 **Automated Script:**
 
 ```bash
 # See: scripts/resize-statefulset-storage.sh (Phase 6)
 ./scripts/resize-statefulset-storage.sh \\
-  mongodb \\
+  postgresql \\
   myclient-prod \\
   200Gi
 ```
@@ -202,20 +202,20 @@ mc du myminio/hapihub-files
 kubectl get pvc -n myclient-prod
 
 # 2. Edit each PVC (for StatefulSet, edit ALL PVCs)
-kubectl edit pvc mongodb-data-mongodb-0 -n myclient-prod
+kubectl edit pvc postgresql-data-postgresql-0 -n myclient-prod
 # Change: storage: 100Gi → 200Gi
 
-kubectl edit pvc mongodb-data-mongodb-1 -n myclient-prod
-kubectl edit pvc mongodb-data-mongodb-2 -n myclient-prod
+kubectl edit pvc postgresql-data-postgresql-1 -n myclient-prod
+kubectl edit pvc postgresql-data-postgresql-2 -n myclient-prod
 
 # 3. Delete StatefulSet (keeps pods running!)
-kubectl delete statefulset mongodb -n myclient-prod --cascade=orphan
+kubectl delete statefulset postgresql -n myclient-prod --cascade=orphan
 
 # 4. Re-create StatefulSet with new size
 # Edit helm values or redeploy via ArgoCD
 
 # 5. Rolling restart to use new size
-kubectl rollout restart statefulset mongodb -n myclient-prod
+kubectl rollout restart statefulset postgresql -n myclient-prod
 
 # 6. Verify expansion
 kubectl get pvc -n myclient-prod
@@ -274,7 +274,7 @@ kubectl get pvc my-pvc -n myclient-prod
 
 ```bash
 # Check PVC usage
-kubectl exec -it mongodb-0 -n myclient-prod -- df -h
+kubectl exec -it postgresql-0 -n myclient-prod -- df -h
 
 # Check Longhorn node storage
 kubectl get nodes.longhorn.io -n longhorn-system \\
@@ -401,7 +401,7 @@ kubectl exec -it minio-0 -n myclient-prod -- \\
 # Estimate growth rate
 # Plan expansion when >70% full
 
-# MongoDB: Plan for 2x growth per year
+# PostgreSQL: Plan for 2x growth per year
 # MinIO: Plan based on file upload rate
 ```
 

@@ -1,19 +1,19 @@
 # Allow Traffic from Gateway to Applications
-# Permits Envoy Gateway to route traffic to HapiHub, Syncd, MyCureApp
+# Permits Envoy Gateway to route traffic to Monobase API, API Worker, Monobase Account
 
 ---
-# Allow Gateway → HapiHub
+# Allow Gateway → Monobase API
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: allow-gateway-to-hapihub
+  name: allow-gateway-to-api
   namespace: {{ .Values.global.namespace }}
   labels:
     security-policy: allow-ingress
 spec:
   podSelector:
     matchLabels:
-      app.kubernetes.io/name: hapihub
+      app.kubernetes.io/name: api
 
   policyTypes:
     - Ingress
@@ -29,18 +29,18 @@ spec:
           port: 7500
 
 ---
-# Allow Gateway → Syncd
+# Allow Gateway → API Worker
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: allow-gateway-to-syncd
+  name: allow-gateway-to-api-worker
   namespace: {{ .Values.global.namespace }}
   labels:
     security-policy: allow-ingress
 spec:
   podSelector:
     matchLabels:
-      app.kubernetes.io/name: syncd
+      app.kubernetes.io/name: api-worker
 
   policyTypes:
     - Ingress
@@ -55,18 +55,18 @@ spec:
           port: 8080
 
 ---
-# Allow Gateway → MyCureApp
+# Allow Gateway → Monobase Account
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: allow-gateway-to-mycureapp
+  name: allow-gateway-to-account
   namespace: {{ .Values.global.namespace }}
   labels:
     security-policy: allow-ingress
 spec:
   podSelector:
     matchLabels:
-      app.kubernetes.io/name: mycureapp
+      app.kubernetes.io/name: account
 
   policyTypes:
     - Ingress

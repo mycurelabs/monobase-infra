@@ -1,14 +1,14 @@
 {{/*
 Expand the name of the chart.
 */}}
-{{- define "mycureapp.name" -}}
+{{- define "account.name" -}}
 {{- default .Chart.Name .Values.nameOverride | trunc 63 | trimSuffix "-" }}
 {{- end }}
 
 {{/*
 Create a default fully qualified app name.
 */}}
-{{- define "mycureapp.fullname" -}}
+{{- define "account.fullname" -}}
 {{- if .Values.fullnameOverride }}
 {{- .Values.fullnameOverride | trunc 63 | trimSuffix "-" }}
 {{- else }}
@@ -24,16 +24,16 @@ Create a default fully qualified app name.
 {{/*
 Create chart name and version as used by the chart label.
 */}}
-{{- define "mycureapp.chart" -}}
+{{- define "account.chart" -}}
 {{- printf "%s-%s" .Chart.Name .Chart.Version | replace "+" "_" | trunc 63 | trimSuffix "-" }}
 {{- end }}
 
 {{/*
 Common labels
 */}}
-{{- define "mycureapp.labels" -}}
-helm.sh/chart: {{ include "mycureapp.chart" . }}
-{{ include "mycureapp.selectorLabels" . }}
+{{- define "account.labels" -}}
+helm.sh/chart: {{ include "account.chart" . }}
+{{ include "account.selectorLabels" . }}
 {{- if .Chart.AppVersion }}
 app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
 {{- end }}
@@ -44,17 +44,17 @@ app.kubernetes.io/part-of: mycureapp
 {{/*
 Selector labels
 */}}
-{{- define "mycureapp.selectorLabels" -}}
-app.kubernetes.io/name: {{ include "mycureapp.name" . }}
+{{- define "account.selectorLabels" -}}
+app.kubernetes.io/name: {{ include "account.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
 
 {{/*
 Create the name of the service account to use
 */}}
-{{- define "mycureapp.serviceAccountName" -}}
+{{- define "account.serviceAccountName" -}}
 {{- if .Values.serviceAccount.create }}
-{{- default (include "mycureapp.fullname" .) .Values.serviceAccount.name }}
+{{- default (include "account.fullname" .) .Values.serviceAccount.name }}
 {{- else }}
 {{- default "default" .Values.serviceAccount.name }}
 {{- end }}
@@ -63,7 +63,7 @@ Create the name of the service account to use
 {{/*
 Gateway hostname - defaults to app.{global.domain}
 */}}
-{{- define "mycureapp.gateway.hostname" -}}
+{{- define "account.gateway.hostname" -}}
 {{- if .Values.gateway.hostname }}
 {{- .Values.gateway.hostname }}
 {{- else }}
@@ -74,20 +74,20 @@ Gateway hostname - defaults to app.{global.domain}
 {{/*
 Namespace - uses global.namespace or Release.Namespace
 */}}
-{{- define "mycureapp.namespace" -}}
+{{- define "account.namespace" -}}
 {{- default .Release.Namespace .Values.global.namespace }}
 {{- end }}
 
 {{/*
 Gateway parent reference name
 */}}
-{{- define "mycureapp.gateway.name" -}}
+{{- define "account.gateway.name" -}}
 {{- default "shared-gateway" .Values.global.gateway.name }}
 {{- end }}
 
 {{/*
 Gateway parent reference namespace
 */}}
-{{- define "mycureapp.gateway.namespace" -}}
+{{- define "account.gateway.namespace" -}}
 {{- default "gateway-system" .Values.global.gateway.namespace }}
 {{- end }}

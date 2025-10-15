@@ -1,86 +1,59 @@
 # Allow Applications to Access Database
-# Permits HapiHub and Syncd to connect to MongoDB
+# Permits API to connect to PostgreSQL
 
 ---
-# Allow HapiHub → MongoDB
+# Allow API → PostgreSQL
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: allow-hapihub-to-mongodb
+  name: allow-api-to-postgresql
   namespace: {{ .Values.global.namespace }}
   labels:
     security-policy: allow-egress
 spec:
   podSelector:
     matchLabels:
-      app.kubernetes.io/name: mongodb
+      app.kubernetes.io/name: postgresql
 
   policyTypes:
     - Ingress
 
   ingress:
-    # Allow from HapiHub
+    # Allow from API
     - from:
         - podSelector:
             matchLabels:
-              app.kubernetes.io/name: hapihub
+              app.kubernetes.io/name: api
       ports:
         - protocol: TCP
-          port: 27017
+          port: 5432
 
 ---
-# Allow Syncd → MongoDB
+# Egress from API to PostgreSQL
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: allow-syncd-to-mongodb
+  name: allow-api-egress-to-postgresql
   namespace: {{ .Values.global.namespace }}
   labels:
     security-policy: allow-egress
 spec:
   podSelector:
     matchLabels:
-      app.kubernetes.io/name: mongodb
-
-  policyTypes:
-    - Ingress
-
-  ingress:
-    - from:
-        - podSelector:
-            matchLabels:
-              app.kubernetes.io/name: syncd
-      ports:
-        - protocol: TCP
-          port: 27017
-
----
-# Egress from Apps to MongoDB
-# Allow HapiHub egress to MongoDB
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata:
-  name: allow-hapihub-egress-to-mongodb
-  namespace: {{ .Values.global.namespace }}
-  labels:
-    security-policy: allow-egress
-spec:
-  podSelector:
-    matchLabels:
-      app.kubernetes.io/name: hapihub
+      app.kubernetes.io/name: api
 
   policyTypes:
     - Egress
 
   egress:
-    # To MongoDB
+    # To PostgreSQL
     - to:
         - podSelector:
             matchLabels:
-              app.kubernetes.io/name: mongodb
+              app.kubernetes.io/name: postgresql
       ports:
         - protocol: TCP
-          port: 27017
+          port: 5432
 
     # To DNS (required for service discovery)
     - to:
@@ -104,46 +77,8 @@ spec:
           port: 443
 
 ---
-# Allow Syncd egress to MongoDB
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata:
-  name: allow-syncd-egress-to-mongodb
-  namespace: {{ .Values.global.namespace }}
-  labels:
-    security-policy: allow-egress
-spec:
-  podSelector:
-    matchLabels:
-      app.kubernetes.io/name: syncd
-
-  policyTypes:
-    - Egress
-
-  egress:
-    - to:
-        - podSelector:
-            matchLabels:
-              app.kubernetes.io/name: mongodb
-      ports:
-        - protocol: TCP
-          port: 27017
-
-    # DNS
-    - to:
-        - namespaceSelector:
-            matchLabels:
-              kubernetes.io/metadata.name: kube-system
-        - podSelector:
-            matchLabels:
-              k8s-app: kube-dns
-      ports:
-        - protocol: UDP
-          port: 53
-
----
 # Notes:
-# 1. Only HapiHub and Syncd can access MongoDB
-# 2. MyCureApp (frontend) has NO database access (security!)
+# 1. Only API backend can access PostgreSQL
+# 2. Account (frontend) has NO database access (security!)
 # 3. DNS access required for service name resolution
 # 4. Kubernetes API access needed for service discovery

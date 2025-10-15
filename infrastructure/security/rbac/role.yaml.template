@@ -6,7 +6,7 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  name: hapihub
+  name: api
   namespace: {{ .Values.global.namespace }}
 rules:
   # Read ConfigMaps
@@ -22,7 +22,7 @@ rules:
   # Read own service
   - apiGroups: [""]
     resources: ["services"]
-    resourceNames: ["hapihub"]
+    resourceNames: ["api"]
     verbs: ["get"]
 
 ---
@@ -30,7 +30,7 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  name: syncd
+  name: api-worker
   namespace: {{ .Values.global.namespace }}
 rules:
   - apiGroups: [""]
@@ -42,7 +42,7 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  name: mycureapp
+  name: account
   namespace: {{ .Values.global.namespace }}
 rules:
   - apiGroups: [""]

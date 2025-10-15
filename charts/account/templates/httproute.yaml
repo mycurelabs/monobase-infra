@@ -2,23 +2,23 @@
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
-  name: {{ include "mycureapp.fullname" . }}
-  namespace: {{ include "mycureapp.namespace" . }}
+  name: {{ include "account.fullname" . }}
+  namespace: {{ include "account.namespace" . }}
   labels:
-    {{- include "mycureapp.labels" . | nindent 4 }}
+    {{- include "account.labels" . | nindent 4 }}
 spec:
   parentRefs:
-    - name: {{ include "mycureapp.gateway.name" . }}
-      namespace: {{ include "mycureapp.gateway.namespace" . }}
+    - name: {{ include "account.gateway.name" . }}
+      namespace: {{ include "account.gateway.namespace" . }}
   hostnames:
-    - {{ include "mycureapp.gateway.hostname" . }}
+    - {{ include "account.gateway.hostname" . }}
   rules:
     - matches:
         - path:
             type: PathPrefix
             value: /
       backendRefs:
-        - name: {{ include "mycureapp.fullname" . }}
+        - name: {{ include "account.fullname" . }}
           port: {{ .Values.service.port }}
           weight: 1
 {{- end }}

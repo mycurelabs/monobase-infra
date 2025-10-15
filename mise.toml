@@ -52,9 +52,8 @@ markdownlint-cli2 --fix '**/*.md' --ignore node_modules --ignore .git 2>&1 || tr
 description = "Lint Helm charts"
 run = """
 echo "Linting Helm charts..."
-helm lint charts/hapihub
-helm lint charts/syncd
-helm lint charts/mycureapp
+helm lint charts/api
+helm lint charts/account
 """
 
 [tasks.lint]
@@ -80,9 +79,8 @@ echo "Validating Terraform modules..."
 description = "Validate Helm charts"
 run = """
 echo "Validating Helm charts..."
-helm template test charts/hapihub --values config/profiles/staging.yaml --dry-run > /dev/null
-helm template test charts/syncd --values config/profiles/staging.yaml --dry-run > /dev/null
-helm template test charts/mycureapp --values config/profiles/staging.yaml --dry-run > /dev/null
+helm template test charts/api --values config/profiles/staging.yaml --dry-run > /dev/null
+helm template test charts/account --values config/profiles/staging.yaml --dry-run > /dev/null
 """
 
 [tasks.validate]
@@ -111,9 +109,8 @@ description = "Run Helm unit tests"
 run = """
 echo "Running Helm unit tests..."
 if command -v helm unittest >/dev/null 2>&1; then
-    helm unittest charts/hapihub
-    helm unittest charts/syncd
-    helm unittest charts/mycureapp
+    helm unittest charts/api
+    helm unittest charts/account
 else
     echo "⚠ helm unittest not installed. Install: helm plugin install https://github.com/helm-unittest/helm-unittest"
 fi

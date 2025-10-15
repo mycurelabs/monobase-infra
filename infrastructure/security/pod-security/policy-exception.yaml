@@ -46,7 +46,7 @@ metadata:
 # ❌ Application Workloads:
 # - Never relax PSS for applications
 # - Fix the application to comply with restricted profile
-# - All HapiHub, Syncd, MyCureApp pods MUST be compliant
+# - All Monobase API, API Worker, Monobase Account pods MUST be compliant
 
 ---
 # Exception Documentation

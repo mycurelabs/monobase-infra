@@ -26,14 +26,14 @@ Multi-tenancy allows **multiple clients** (tenants) to share a single Kubernetes
 ```
 Single Kubernetes Cluster
 ├── client-a-prod namespace
-│   ├── HapiHub (1-2 pods)
-│   ├── Syncd (1 pod)
-│   └── MyCureApp (1-2 pods)
+│   ├── Monobase API (1-2 pods)
+│   ├── API Worker (1 pod)
+│   └── Monobase Account (1-2 pods)
 │
 ├── client-b-prod namespace
-│   ├── HapiHub (1-2 pods)
-│   ├── Syncd (1 pod)
-│   └── MyCureApp (1-2 pods)
+│   ├── Monobase API (1-2 pods)
+│   ├── API Worker (1 pod)
+│   └── Monobase Account (1-2 pods)
 │
 ├── client-c-prod namespace
 │   └── ... (same pattern)
@@ -140,9 +140,9 @@ spec:
 
 | Resource | Deployment Model | Reason |
 |----------|------------------|--------|
-| **HapiHub** | Per-client | Client-specific data |
-| **Syncd** | Per-client | Client-specific sync logic |
-| **MyCureApp** | Per-client | Client-specific branding |
+| **Monobase API** | Per-client | Client-specific data |
+| **API Worker** | Per-client | Client-specific sync logic |
+| **Monobase Account** | Per-client | Client-specific branding |
 | **Envoy Gateway** | Shared | Routing for all clients |
 | **External Secrets** | Shared | Secret management |
 | **Velero** | Shared | Backup all namespaces |
@@ -159,9 +159,9 @@ spec:
 
 | Service | CPU Request | Memory Request | CPU Limit | Memory Limit | Replicas |
 |---------|-------------|----------------|-----------|--------------|----------|
-| HapiHub | 500m | 2Gi | 2000m | 4Gi | 2 |
-| Syncd | 250m | 1Gi | 1000m | 2Gi | 1 |
-| MyCureApp | 500m | 2Gi | 2000m | 4Gi | 2 |
+| Monobase API | 500m | 2Gi | 2000m | 4Gi | 2 |
+| API Worker | 250m | 1Gi | 1000m | 2Gi | 1 |
+| Monobase Account | 500m | 2Gi | 2000m | 4Gi | 2 |
 | PostgreSQL | 500m | 2Gi | 2000m | 4Gi | 1 |
 | Redis | 250m | 512Mi | 1000m | 1Gi | 1 |
 | **Total per client** | **2000m (2 vCPU)** | **7.5Gi** | **8000m (8 vCPU)** | **15Gi** | **7 pods** |
@@ -417,13 +417,13 @@ Scale pods based on CPU/memory:
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
-  name: hapihub-hpa
+  name: api-hpa
   namespace: client-a-prod
 spec:
   scaleTargetRef:
     apiVersion: apps/v1
     kind: Deployment
-    name: hapihub
+    name: api
   minReplicas: 2
   maxReplicas: 5
   metrics:
@@ -472,13 +472,13 @@ Automatically adjust pod resource requests:
 apiVersion: autoscaling.k8s.io/v1
 kind: VerticalPodAutoscaler
 metadata:
-  name: hapihub-vpa
+  name: api-vpa
   namespace: client-a-prod
 spec:
   targetRef:
     apiVersion: apps/v1
     kind: Deployment
-    name: hapihub
+    name: api
   updatePolicy:
     updateMode: "Auto"  # Or "Recreate", "Initial"
 ```

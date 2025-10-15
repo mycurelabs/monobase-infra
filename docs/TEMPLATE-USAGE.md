@@ -30,7 +30,7 @@ The Monobase Infrastructure template is designed for a **fork-based workflow**:
 
 ```bash
 # 1. Make changes to base template
-vim charts/hapihub/Chart.yaml
+vim charts/api/Chart.yaml
 
 # 2. Update reference config if needed
 vim config/example.com/values-production.yaml
@@ -39,12 +39,12 @@ vim config/example.com/values-production.yaml
 vim docs/VALUES-REFERENCE.md
 
 # 4. Test with example.com config
-helm template test charts/hapihub \\
+helm template test charts/api \\
   -f config/example.com/values-production.yaml
 
 # 5. Commit and tag
 git add .
-git commit -m "feat(hapihub): Add new feature X"
+git commit -m "feat(api): Add new feature X"
 git tag -a v1.1.0 -m "Version 1.1.0"
 git push --tags
 

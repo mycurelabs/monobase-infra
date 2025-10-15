@@ -64,10 +64,10 @@ jobs:
             --all-namespaces \
             --timeout=5m || true
 
-      - name: Deploy HapiHub (core)
+      - name: Deploy Monobase API (core)
         run: |
-          echo "Deploying HapiHub with staging config..."
-          helm install hapihub charts/hapihub \
+          echo "Deploying Monobase API with staging config..."
+          helm install api charts/api \
             --values config/example.com/values-staging.yaml \
             --namespace example-staging \
             --create-namespace \
@@ -81,9 +81,9 @@ jobs:
           # Check if pods are running
           kubectl get pods -n example-staging
 
-          # Check if HapiHub pods are ready
+          # Check if Monobase API pods are ready
           kubectl wait --for=condition=Ready \
-            pod -l app=hapihub \
+            pod -l app=api \
             -n example-staging \
             --timeout=5m
 
@@ -100,7 +100,7 @@ jobs:
 
           # Get MongoDB pod
           MONGO_POD=$(kubectl get pod -n example-staging \
-            -l app.kubernetes.io/name=mongodb \
+            -l app.kubernetes.io/name=postgresql \
             -o jsonpath='{.items[0].metadata.name}')
 
           if [ -n "$MONGO_POD" ]; then
@@ -117,7 +117,7 @@ jobs:
           echo "Collecting logs..."
           kubectl get all --all-namespaces
           kubectl describe pods --all-namespaces
-          kubectl logs -n example-staging -l app=hapihub --tail=100 || true
+          kubectl logs -n example-staging -l app=api --tail=100 || true
 
       - name: Cleanup
         if: always()

@@ -1,6 +1,6 @@
 # Longhorn Distributed Block Storage
 
-Longhorn provides distributed block storage for StatefulSets (MongoDB, MinIO, Typesense).
+Longhorn provides distributed block storage for StatefulSets (PostgreSQL, MinIO, Valkey).
 
 ## Features
 

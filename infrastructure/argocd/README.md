@@ -42,10 +42,10 @@ root-app (bootstrap)
 │   ├── external-secrets
 │   └── cert-manager
 └── application apps
-    ├── mongodb
-    ├── hapihub
-    ├── syncd
-    └── mycureapp
+    ├── postgresql
+    ├── api
+    ├── api-worker
+    └── account
 ```
 
 ## Access ArgoCD UI

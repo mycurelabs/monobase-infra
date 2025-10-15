@@ -35,15 +35,15 @@ helm install monitoring prometheus-community/kube-prometheus-stack \\
 ## Files
 
 - `helm-values.yaml` - kube-prometheus-stack configuration
-- `prometheus-rules.yaml` - Alert rules (HapiHub, MongoDB, MinIO)
+- `prometheus-rules.yaml` - Alert rules (Monobase API, PostgreSQL, MinIO)
 - `grafana-dashboards/` - Pre-configured dashboards
 - `httproute.yaml.template` - Grafana UI access via Gateway
 
 ## Pre-Configured Dashboards
 
 1. **Kubernetes Cluster** - Overall cluster health
-2. **HapiHub** - Application metrics
-3. **MongoDB** - Database performance
+2. **Monobase API** - Application metrics
+3. **PostgreSQL** - Database performance
 4. **MinIO** - Storage metrics
 5. **Longhorn** - Storage health
 
@@ -80,7 +80,7 @@ kubectl -n monitoring get secret monitoring-grafana \\
 
 Full implementation includes:
 - Complete Helm values with HA
-- Custom alert rules for HapiHub
+- Custom alert rules for Monobase API
 - Pre-configured Grafana dashboards
 - Integration with Slack/PagerDuty
 - Backup monitoring alerts (Velero)

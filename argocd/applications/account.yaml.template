@@ -1,27 +1,26 @@
-# ArgoCD Application: Typesense
-# Sync Wave 2 - Deploy search engine (optional)
+# ArgoCD Application: Monobase Account
+# Sync Wave 3 - Deploy frontend
 
-{{- if .Values.typesense.enabled }}
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: {{ .Values.global.namespace }}-typesense
+  name: {{ .Values.global.namespace }}-account
   namespace: argocd
   annotations:
-    argocd.argoproj.io/sync-wave: "2"
+    argocd.argoproj.io/sync-wave: "3"
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:
   project: default
   
   source:
-    chart: typesense
-    repoURL: https://typesense.github.io/typesense-kubernetes
-    targetRevision: 0.4.0
+    path: charts/account
+    repoURL: {{ .Values.argocd.repoURL }}
+    targetRevision: {{ .Values.argocd.targetRevision | default "main" }}
     helm:
-      releaseName: typesense
-      values: |
-        {{- toYaml .Values.typesense | nindent 8 }}
+      releaseName: account
+      valueFiles:
+        - ../../config/{{ .Values.global.namespace }}/values-{{ .Values.global.environment }}.yaml
   
   destination:
     server: https://kubernetes.default.svc
@@ -29,7 +28,7 @@ spec:
   
   syncPolicy:
     automated:
-      prune: false
+      prune: true
       selfHeal: true
     syncOptions:
       - CreateNamespace=false
@@ -38,4 +37,3 @@ spec:
       backoff:
         duration: 10s
         maxDuration: 5m
-{{- end }}

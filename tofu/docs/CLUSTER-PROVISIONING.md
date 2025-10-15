@@ -340,7 +340,7 @@ kubectl get nodes
 
 # 6. Test Monobase deployment
 kubectl create namespace test-client
-helm install hapihub ../../charts/hapihub -n test-client
+helm install api ../../charts/api -n test-client
 
 # 7. Cleanup when done
 tofu destroy
@@ -1032,9 +1032,9 @@ After successfully provisioning a cluster:
   ./scripts/new-client-config.sh client-a client-a.com
   ```
 
-- [ ] **Deploy HapiHub, Syncd, Monobase**
+- [ ] **Deploy Monobase API, API Worker, Monobase**
   ```bash
-  helm install hapihub charts/hapihub -f config/client-a/values-production.yaml
+  helm install api charts/api -f config/client-a/values-production.yaml
   # etc.
   ```
 

@@ -186,8 +186,8 @@ deploy_apps() {
   # Create namespace
   kubectl create namespace "$NAMESPACE" --dry-run=client -o yaml | kubectl apply -f - &> /dev/null
 
-  # Install HapiHub (which includes dependencies)
-  helm upgrade --install hapihub charts/hapihub \
+  # Install Monobase API (which includes dependencies)
+  helm upgrade --install api charts/api \
     -f "$VALUES_FILE" \
     -n "$NAMESPACE" \
     --wait \
@@ -396,22 +396,22 @@ deploy_apps_gitops() {
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: monobase-dev-mongodb
+  name: monobase-dev-postgresql
   namespace: argocd
   annotations:
     argocd.argoproj.io/sync-wave: "1"
 spec:
   project: default
   source:
-    path: charts/hapihub/charts
+    path: charts/api/charts
     repoURL: http://forgejo-http.git.svc.cluster.local:3000/gitea_admin/monobase-infra.git
     targetRevision: main
     helm:
-      releaseName: hapihub-mongodb
+      releaseName: api-postgresql
       valueFiles:
         - ../../config/k3d-local/values-development.yaml
       parameters:
-        - name: mongodb.enabled
+        - name: postgresql.enabled
           value: "true"
   destination:
     server: https://kubernetes.default.svc
@@ -426,22 +426,22 @@ spec:
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: monobase-dev-hapihub
+  name: monobase-dev-api
   namespace: argocd
   annotations:
     argocd.argoproj.io/sync-wave: "2"
 spec:
   project: default
   source:
-    path: charts/hapihub
+    path: charts/api
     repoURL: http://forgejo-http.git.svc.cluster.local:3000/gitea_admin/monobase-infra.git
     targetRevision: main
     helm:
-      releaseName: hapihub
+      releaseName: api
       valueFiles:
         - ../../config/k3d-local/values-development.yaml
       parameters:
-        - name: mongodb.enabled
+        - name: postgresql.enabled
           value: "false"
   destination:
     server: https://kubernetes.default.svc
@@ -456,18 +456,18 @@ spec:
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: monobase-dev-mycureapp
+  name: monobase-dev-account
   namespace: argocd
   annotations:
     argocd.argoproj.io/sync-wave: "3"
 spec:
   project: default
   source:
-    path: charts/mycureapp
+    path: charts/account
     repoURL: http://forgejo-http.git.svc.cluster.local:3000/gitea_admin/monobase-infra.git
     targetRevision: main
     helm:
-      releaseName: mycureapp
+      releaseName: account
       valueFiles:
         - ../../config/k3d-local/values-development.yaml
   destination:

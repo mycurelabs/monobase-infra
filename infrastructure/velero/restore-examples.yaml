@@ -49,17 +49,17 @@ spec:
   restorePVs: true
 
 ---
-# Example 4: Restore Single Application (HapiHub only)
+# Example 4: Restore Single Application (Monobase API only)
 apiVersion: velero.io/v1
 kind: Restore
 metadata:
-  name: hapihub-restore
+  name: api-restore
   namespace: velero
 spec:
   backupName: daily-full-20250115020000
   labelSelector:
     matchLabels:
-      app.kubernetes.io/name: hapihub
+      app.kubernetes.io/name: api
 
 ---
 # Example 5: Restore with Hooks (Post-Restore Actions)
@@ -126,7 +126,7 @@ spec:
 # kubectl get pods -n myclient-restore-test
 
 # 4. Test application
-# kubectl port-forward -n myclient-restore-test svc/hapihub 7500:7500
+# kubectl port-forward -n myclient-restore-test svc/api 7500:7500
 # curl http://localhost:7500/health
 
 # 5. Verify data integrity
@@ -146,10 +146,10 @@ spec:
 # velero restore create data-recovery --from-backup daily-full-latest
 
 # Scenario 2: Database Corruption (RTO: 2h, RPO: 24h)
-# 1. Scale down apps: kubectl scale deployment hapihub --replicas=0
+# 1. Scale down apps: kubectl scale deployment api --replicas=0
 # 2. Delete corrupted DB: kubectl delete sts mongodb --cascade=false
 # 3. Restore: velero restore create --from-backup daily-full-20250114 --include-resources statefulsets,pvc --selector app=mongodb
-# 4. Scale up apps: kubectl scale deployment hapihub --replicas=3
+# 4. Scale up apps: kubectl scale deployment api --replicas=3
 
 # Scenario 3: Complete Cluster Failure (RTO: 4h, RPO: 1w)
 # 1. Deploy new cluster

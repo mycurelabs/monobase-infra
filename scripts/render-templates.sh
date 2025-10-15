@@ -121,25 +121,25 @@ mkdir -p "$OUTPUT_DIR/argocd"
 
 echo -e "${BLUE}[1/3] Rendering Helm charts...${NC}"
 
-# Render HapiHub chart
-echo -n "  - HapiHub... "
-helm template hapihub charts/hapihub \
+# Render Monobase API chart
+echo -n "  - Monobase API... "
+helm template api charts/api \
     -f "$VALUES_FILE" \
     --namespace "$NAMESPACE" \
     --output-dir "$OUTPUT_DIR/charts" \
     > /dev/null 2>&1 && echo -e "${GREEN}✓${NC}" || echo -e "${RED}✗${NC}"
 
-# Render Syncd chart
-echo -n "  - Syncd... "
-helm template syncd charts/syncd \
+# Render API Worker chart
+echo -n "  - API Worker... "
+helm template api charts/api \
     -f "$VALUES_FILE" \
     --namespace "$NAMESPACE" \
     --output-dir "$OUTPUT_DIR/charts" \
     > /dev/null 2>&1 && echo -e "${GREEN}✓${NC}" || echo -e "${RED}✗${NC}"
 
-# Render MyCureApp chart
-echo -n "  - MyCureApp... "
-helm template mycureapp charts/mycureapp \
+# Render Monobase Account chart
+echo -n "  - Monobase Account... "
+helm template account charts/account \
     -f "$VALUES_FILE" \
     --namespace "$NAMESPACE" \
     --output-dir "$OUTPUT_DIR/charts" \

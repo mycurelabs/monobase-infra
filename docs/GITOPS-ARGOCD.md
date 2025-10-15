@@ -42,11 +42,11 @@ root-app.yaml (bootstrap)
 │   ├── external-secrets
 │   └── cert-manager
 └── Application Apps (Wave 2-3)
-    ├── mongodb (Wave 2)
+    ├── postgresql (Wave 2)
     ├── minio (Wave 2)
-    ├── hapihub (Wave 3)
-    ├── syncd (Wave 3)
-    └── mycureapp (Wave 3)
+    ├── api (Wave 3)
+    ├── api-worker (Wave 3)
+    └── account (Wave 3)
 ```
 
 **Sync Waves ensure ordered deployment:**
@@ -94,22 +94,22 @@ vim config/myclient/values-production.yaml
 
 # 2. Commit and push
 git add config/myclient/values-production.yaml
-git commit -m "Update HapiHub to 5.216.0"
+git commit -m "Update Monobase API to 5.216.0"
 git push origin main
 
 # 3. ArgoCD detects change and syncs automatically
 # (if auto-sync enabled)
 
 # 4. Or manually sync
-argocd app sync myclient-prod-hapihub
+argocd app sync myclient-prod-api
 ```
 
 **Manual way (for emergencies):**
 
 ```bash
 # Not recommended - bypasses GitOps!
-kubectl set image deployment/hapihub \
-  hapihub=ghcr.io/YOUR-ORG/hapihub:5.216.0 \
+kubectl set image deployment/api \
+  api=ghcr.io/YOUR-ORG/api:5.216.0 \
   -n myclient-prod
 
 # Then update Git to match reality
@@ -139,19 +139,19 @@ argocd login argocd.myclient.com
 argocd app list
 
 # Get application details
-argocd app get myclient-prod-hapihub
+argocd app get myclient-prod-api
 
 # Sync application
-argocd app sync myclient-prod-hapihub
+argocd app sync myclient-prod-api
 
 # Rollback to previous version
-argocd app rollback myclient-prod-hapihub
+argocd app rollback myclient-prod-api
 
 # Watch sync status
-argocd app wait myclient-prod-hapihub
+argocd app wait myclient-prod-api
 
 # View application logs
-argocd app logs myclient-prod-hapihub
+argocd app logs myclient-prod-api
 ```
 
 ## Sync Policies
@@ -195,7 +195,7 @@ ArgoCD monitors application health:
 
 ```bash
 # Check health status
-argocd app get myclient-prod-hapihub
+argocd app get myclient-prod-api
 
 # Status values:
 # - Healthy: All resources healthy
@@ -210,23 +210,23 @@ argocd app get myclient-prod-hapihub
 
 ```bash
 # Compare Git vs cluster
-argocd app diff myclient-prod-hapihub
+argocd app diff myclient-prod-api
 
 # Force sync
-argocd app sync myclient-prod-hapihub --force
+argocd app sync myclient-prod-api --force
 
 # Hard refresh
-argocd app get myclient-prod-hapihub --hard-refresh
+argocd app get myclient-prod-api --hard-refresh
 ```
 
 ### Sync Failing
 
 ```bash
 # Check sync status
-argocd app get myclient-prod-hapihub
+argocd app get myclient-prod-api
 
 # View sync errors
-kubectl describe application myclient-prod-hapihub -n argocd
+kubectl describe application myclient-prod-api -n argocd
 
 # Common issues:
 # - Invalid Helm values

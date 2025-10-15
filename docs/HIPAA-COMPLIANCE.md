@@ -29,11 +29,11 @@ If you're deploying healthcare applications handling Protected Health Informatio
 
 - [ ] **Automatic Logoff (Addressable)**
   - ✅ Session timeouts in ArgoCD, Grafana
-  - ✅ JWT token expiry in HapiHub
+  - ✅ JWT token expiry in Monobase API
   - Configure: Application-level session management
 
 - [ ] **Encryption and Decryption (Addressable)**
-  - ✅ Encryption at rest (Longhorn, MongoDB)
+  - ✅ Encryption at rest (Longhorn, PostgreSQL)
   - ✅ Encryption in transit (TLS everywhere)
   - ✅ KMS for key management
   - Location: `infrastructure/security/encryption/`
@@ -42,7 +42,7 @@ If you're deploying healthcare applications handling Protected Health Informatio
 
 - [ ] **Audit Logging (Required)**
   - ✅ Kubernetes audit logs enabled
-  - ✅ MongoDB audit logs configured
+  - ✅ PostgreSQL audit logs configured
   - ✅ Application access logs
   - ✅ 7-year retention (via S3 lifecycle)
   
@@ -51,12 +51,12 @@ If you're deploying healthcare applications handling Protected Health Informatio
   # Kubernetes audit (EKS example)
   # Enable in cluster logging configuration
   
-  # MongoDB audit
-  # Configured in mongodb-values.yaml
+  # PostgreSQL audit
+  # Configured in postgresql-values.yaml
   auditLog:
     destination: file
     format: JSON
-    path: /var/log/mongodb/audit.json
+    path: /var/log/postgresql/audit.json
   ```
 
 ### Integrity (§164.312(c))
@@ -64,7 +64,7 @@ If you're deploying healthcare applications handling Protected Health Informatio
 - [ ] **Mechanism to Authenticate ePHI (Addressable)**
   - ✅ Checksums for backups
   - ✅ Digital signatures (optional)
-  - ✅ MongoDB integrity validation
+  - ✅ PostgreSQL integrity validation
   
   **Verify:**
   ```bash
@@ -242,7 +242,7 @@ If you're deploying healthcare applications handling Protected Health Informatio
 
 ### Infrastructure (Template Provides)
 
-- [x] Encryption at rest (Longhorn, MongoDB)
+- [x] Encryption at rest (Longhorn, PostgreSQL)
 - [x] Encryption in transit (TLS everywhere)
 - [x] Access controls (RBAC, NetworkPolicies)
 - [x] Audit logging (enabled and configured)

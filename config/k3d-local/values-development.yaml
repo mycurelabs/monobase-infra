@@ -15,8 +15,8 @@ global:
     provider: local-path
     className: local-path
 
-# ===== CORE: HapiHub (Minimal) =====
-hapihub:
+# ===== CORE: API (Minimal) =====
+api:
   enabled: true
   replicas: 1  # Single replica for testing
 
@@ -37,28 +37,26 @@ hapihub:
   gateway:
     hostname: api.local.test
 
-# ===== CORE: MyCureApp =====
-mycureapp:
+# ===== CORE: Account =====
+account:
   enabled: true
   replicas: 1
 
   image:
-    repository: ghcr.io/YOUR-ORG/mycureapp
+    repository: ghcr.io/YOUR-ORG/monobase-account
     pullPolicy: IfNotPresent
-    tag: "10.0.19"
+    tag: "latest"
 
   podSecurityContext:
-    runAsUser: 0  # Run as root for local testing
-    runAsNonRoot: false
+    runAsUser: 101  # nginx user
+    runAsNonRoot: true
     fsGroup: 101  # nginx group owns the volumes
 
   securityContext:
-    readOnlyRootFilesystem: false  # Disabled for local testing (entrypoint needs to write config.json)
+    readOnlyRootFilesystem: true
     capabilities:
       drop:
         - ALL
-      add:
-        - CHOWN  # Required for nginx to chown cache directories
 
   resources:
     requests:
@@ -68,19 +66,14 @@ mycureapp:
       cpu: 200m
       memory: 256Mi
 
-# ===== OPTIONAL: Syncd (Disabled) =====
-syncd:
-  enabled: false  # Save resources
-
-# ===== CORE: MongoDB (Single-node ReplicaSet) =====
-mongodb:
+# ===== CORE: PostgreSQL (Single-node for testing) =====
+postgresql:
   enabled: true
-  architecture: replicaset  # Single-node replicaset for testing
-  replicaCount: 1
+  architecture: standalone  # Standalone mode for testing (no replication)
 
-  # Override image to use rolling tag (fixes ImagePullBackOff)
+  # Override image to use rolling tag
   image:
-    tag: "7.0"  # Rolling tag - always latest MongoDB 7.0.x
+    tag: "16"  # Rolling tag - always latest PostgreSQL 16.x
 
   persistence:
     enabled: true
@@ -95,9 +88,22 @@ mongodb:
       cpu: 1
       memory: 1Gi
 
-# ===== OPTIONAL: Typesense (Disabled) =====
-typesense:
-  enabled: false
+# ===== OPTIONAL: Valkey (Redis cache) =====
+valkey:
+  enabled: true
+  architecture: standalone  # No replication for local testing
+
+  master:
+    persistence:
+      enabled: false  # Disabled for local testing
+
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 250m
+      memory: 256Mi
 
 # ===== OPTIONAL: MinIO (Disabled - Too Heavy) =====
 minio:
@@ -141,7 +147,7 @@ resourceQuotas:
 # Notes for k3d Testing:
 # - Minimal resources (laptop-friendly)
 # - Single replicas (no HA overhead)
-# - Single-node MongoDB replicaset (consistent with prod)
+# - Standalone PostgreSQL (no replication overhead)
 # - No MinIO (too heavy)
 # - Monitoring disabled (save RAM)
 # - Local storage only

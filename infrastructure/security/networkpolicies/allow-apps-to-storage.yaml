@@ -1,18 +1,18 @@
 # Allow Applications to Access Storage (MinIO, Typesense)
 
 ---
-# Allow HapiHub → MinIO (if enabled)
+# Allow Monobase API → MinIO (if enabled)
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: allow-hapihub-to-minio
+  name: allow-api-to-minio
   namespace: {{ .Values.global.namespace }}
   labels:
     security-policy: allow-egress
 spec:
   podSelector:
     matchLabels:
-      app.kubernetes.io/name: hapihub
+      app.kubernetes.io/name: api
 
   policyTypes:
     - Egress
@@ -27,18 +27,18 @@ spec:
           port: 9000  # S3 API
 
 ---
-# Allow HapiHub → Typesense (if enabled)
+# Allow Monobase API → Typesense (if enabled)
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: allow-hapihub-to-typesense
+  name: allow-api-to-typesense
   namespace: {{ .Values.global.namespace }}
   labels:
     security-policy: allow-egress
 spec:
   podSelector:
     matchLabels:
-      app.kubernetes.io/name: hapihub
+      app.kubernetes.io/name: api
 
   policyTypes:
     - Egress
@@ -53,11 +53,11 @@ spec:
           port: 8108
 
 ---
-# Allow ingress to MinIO from HapiHub
+# Allow ingress to MinIO from Monobase API
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: allow-minio-from-hapihub
+  name: allow-minio-from-api
   namespace: {{ .Values.global.namespace }}
   labels:
     security-policy: allow-ingress
@@ -73,17 +73,17 @@ spec:
     - from:
         - podSelector:
             matchLabels:
-              app.kubernetes.io/name: hapihub
+              app.kubernetes.io/name: api
       ports:
         - protocol: TCP
           port: 9000
 
 ---
-# Allow ingress to Typesense from HapiHub
+# Allow ingress to Typesense from Monobase API
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: allow-typesense-from-hapihub
+  name: allow-typesense-from-api
   namespace: {{ .Values.global.namespace }}
   labels:
     security-policy: allow-ingress
@@ -99,7 +99,7 @@ spec:
     - from:
         - podSelector:
             matchLabels:
-              app.kubernetes.io/name: hapihub
+              app.kubernetes.io/name: api
       ports:
         - protocol: TCP
           port: 8108
@@ -116,7 +116,7 @@ metadata:
 spec:
   podSelector:
     matchLabels:
-      app.kubernetes.io/name: hapihub
+      app.kubernetes.io/name: api
 
   policyTypes:
     - Egress
@@ -141,8 +141,8 @@ spec:
 ---
 # Notes:
 # 1. MinIO and Typesense are optional (check .Values before applying)
-# 2. Only HapiHub accesses these services
-# 3. MyCureApp and Syncd do NOT need storage access
+# 2. Only Monobase API accesses these services
+# 3. Monobase Account and API Worker do NOT need storage access
 # 4. External HTTPS needed for:
 #    - Payment APIs (Stripe, PayPal)
 #    - SMS APIs (Twilio)

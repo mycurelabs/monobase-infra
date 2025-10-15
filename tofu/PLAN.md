@@ -23,7 +23,7 @@ Layer 1: Infrastructure (THIS PLAN)
 Layer 2: Applications (EXISTING - ../PLAN.md)
 ├── Helm charts deploy applications
 ├── ArgoCD manages GitOps
-└── Deploys: HapiHub, Syncd, MyCureApp to cluster namespaces
+└── Deploys: Monobase API, API Worker, Monobase Account to cluster namespaces
 ```
 
 ### Deployment Flow
@@ -882,7 +882,7 @@ tofu apply
 ```bash
 # Use existing Monobase workflow
 ./scripts/new-client-config.sh client-a client-a.com
-helm install hapihub charts/hapihub -f config/client-a/values-production.yaml
+helm install api charts/api -f config/client-a/values-production.yaml
 ```
 
 **Both layers work together!**

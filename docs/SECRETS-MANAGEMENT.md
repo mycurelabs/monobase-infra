@@ -40,14 +40,14 @@ eksctl create iamserviceaccount \
 ### 2. Create Secrets in AWS
 
 ```bash
-# Create MongoDB password
+# Create PostgreSQL password
 aws secretsmanager create-secret \
-  --name myclient/prod/mongodb/root-password \
+  --name myclient/prod/postgresql/root-password \
   --secret-string "$(openssl rand -base64 32)"
 
 # Create JWT secret
 aws secretsmanager create-secret \
-  --name myclient/prod/hapihub/jwt-secret \
+  --name myclient/prod/api/jwt-secret \
   --secret-string "$(openssl rand -base64 64)"
 
 # Create all secrets from secrets-mapping.yaml
@@ -69,7 +69,7 @@ cat infrastructure/external-secrets-operator/secretstore/aws-secretsmanager.yaml
 kubectl get externalsecrets -n myclient-prod
 
 # Check sync status
-kubectl describe externalsecret hapihub-secrets -n myclient-prod
+kubectl describe externalsecret api-secrets -n myclient-prod
 
 # Verify Kubernetes secrets created
 kubectl get secrets -n myclient-prod
@@ -100,7 +100,7 @@ az keyvault create \
 # Create secrets
 az keyvault secret set \
   --vault-name myclient-prod-kv \
-  --name mongodb-root-password \
+  --name postgresql-root-password \
   --value "$(openssl rand -base64 32)"
 ```
 
@@ -131,7 +131,7 @@ gcloud services enable secretmanager.googleapis.com
 
 ```bash
 # Create secret
-echo -n "SecurePassword123" | gcloud secrets create mongodb-root-password \
+echo -n "SecurePassword123" | gcloud secrets create postgresql-root-password \
   --data-file=- \
   --project=my-project
 ```
@@ -187,9 +187,9 @@ creation_rules:
 ```bash
 # Create secrets file
 cat > config/myclient/secrets.yaml <<EOF
-mongodb:
+postgresql:
   root-password: SecurePassword123
-hapihub:
+api:
   jwt-secret: JwtSecret456
 EOF
 
@@ -211,17 +211,17 @@ NEW_SECRET=$(openssl rand -base64 64)
 
 # 2. Update in KMS
 aws secretsmanager update-secret \
-  --secret-id myclient/prod/hapihub/jwt-secret \
+  --secret-id myclient/prod/api/jwt-secret \
   --secret-string "$NEW_SECRET"
 
 # 3. External Secrets syncs automatically (within 1h)
 # Or force refresh:
-kubectl annotate externalsecret hapihub-secrets \
+kubectl annotate externalsecret api-secrets \
   force-sync=$(date +%s) \
   -n myclient-prod
 
 # 4. Restart pods to use new secret
-kubectl rollout restart deployment hapihub -n myclient-prod
+kubectl rollout restart deployment api -n myclient-prod
 ```
 
 ## Security Best Practices

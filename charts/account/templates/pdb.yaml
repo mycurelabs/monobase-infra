@@ -2,13 +2,13 @@
 apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:
-  name: {{ include "mycureapp.fullname" . }}
-  namespace: {{ include "mycureapp.namespace" . }}
+  name: {{ include "account.fullname" . }}
+  namespace: {{ include "account.namespace" . }}
   labels:
-    {{- include "mycureapp.labels" . | nindent 4 }}
+    {{- include "account.labels" . | nindent 4 }}
 spec:
   minAvailable: {{ .Values.podDisruptionBudget.minAvailable }}
   selector:
     matchLabels:
-      {{- include "mycureapp.selectorLabels" . | nindent 6 }}
+      {{- include "account.selectorLabels" . | nindent 6 }}
 {{- end }}

@@ -21,12 +21,12 @@ global:
     provider: cloud-default  # Use cluster default (simple for staging)
     className: ""
 
-# ===== REQUIRED CORE: HapiHub API =====
-hapihub:
+# ===== REQUIRED CORE: Monobase API =====
+api:
   enabled: true
 
   image:
-    repository: ghcr.io/YOUR-ORG/hapihub
+    repository: ghcr.io/YOUR-ORG/monobase-api
     tag: "latest"  # TODO: Replace with specific version in production
     pullPolicy: IfNotPresent
 
@@ -66,12 +66,12 @@ hapihub:
     initialDelaySeconds: 10
     periodSeconds: 5
 
-# ===== REQUIRED CORE: MyCureApp Frontend =====
-mycureapp:
+# ===== REQUIRED CORE: Monobase Account Frontend =====
+account:
   enabled: true
 
   image:
-    repository: ghcr.io/YOUR-ORG/mycureapp
+    repository: ghcr.io/YOUR-ORG/monobase-account
     tag: "latest"  # TODO: Replace with specific version
     pullPolicy: IfNotPresent
 
@@ -88,12 +88,12 @@ mycureapp:
   gateway:
     hostname: ""  # Empty = uses app.{global.domain} → app.example.com
 
-# ===== OPTIONAL: Syncd Sync Service =====
-syncd:
+# ===== OPTIONAL: API Worker Sync Service =====
+# api-worker (removed):
   enabled: false  # Enable if offline sync is needed
 
   image:
-    repository: ghcr.io/YOUR-ORG/syncd
+    repository: ghcr.io/YOUR-ORG/api-worker
     tag: "latest"
 
   replicas: 1
@@ -110,7 +110,7 @@ syncd:
     hostname: ""  # Empty = uses sync.{global.domain}
 
 # ===== REQUIRED CORE: MongoDB Database =====
-mongodb:
+postgresql:
   enabled: true
 
   # Bitnami MongoDB chart configuration
@@ -139,7 +139,7 @@ mongodb:
     enabled: false  # Disabled for staging
 
 # ===== OPTIONAL: Typesense Search =====
-typesense:
+# typesense (removed):
   enabled: false  # Enable if search features needed
 
   replicas: 1
@@ -260,12 +260,12 @@ podSecurityStandards:
 autoscaling:
   enabled: false  # Usually disabled in staging
 
-  hapihub:
+  api:
     minReplicas: 1
     maxReplicas: 2
     targetCPUUtilization: 70
 
-  mycureapp:
+  account:
     minReplicas: 1
     maxReplicas: 2
     targetCPUUtilization: 70

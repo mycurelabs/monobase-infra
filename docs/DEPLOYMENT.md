@@ -336,26 +336,26 @@ kubectl get role -n myclient-prod
 ### Option A: Via Helm (Direct)
 
 ```bash
-# Deploy MongoDB
-helm install mongodb charts/hapihub \\
+# Deploy PostgreSQL
+helm install postgresql charts/api \\
   --namespace myclient-prod \\
   --values config/myclient/values-production.yaml \\
-  --set mongodb.enabled=true \\
-  --set hapihub.enabled=false
+  --set postgresql.enabled=true \\
+  --set api.enabled=false
 
-# Deploy HapiHub
-helm install hapihub charts/hapihub \\
+# Deploy Monobase API
+helm install api charts/api \\
   --namespace myclient-prod \\
   --values config/myclient/values-production.yaml \\
-  --set mongodb.enabled=false
+  --set postgresql.enabled=false
 
-# Deploy Syncd (if enabled)
-helm install syncd charts/syncd \\
+# Deploy API Worker (if enabled)
+helm install api-worker charts/api-worker \\
   --namespace myclient-prod \\
   --values config/myclient/values-production.yaml
 
-# Deploy MyCureApp
-helm install mycureapp charts/mycureapp \\
+# Deploy Monobase Account
+helm install account charts/account \\
   --namespace myclient-prod \\
   --values config/myclient/values-production.yaml
 ```
@@ -395,12 +395,12 @@ argocd app sync myclient-prod-root --async
 kubectl get pods -n myclient-prod
 
 # Expected pods:
-# - hapihub-xxx (2-3 replicas)
-# - syncd-xxx (2 replicas, if enabled)
-# - mycureapp-xxx (2 replicas)
-# - mongodb-xxx (3 replicas)
+# - api-xxx (2-3 replicas)
+# - api-worker-xxx (2 replicas, if enabled)
+# - account-xxx (2 replicas)
+# - postgresql-xxx (3 replicas)
 # - minio-xxx (6 replicas, if enabled)
-# - typesense-xxx (3 replicas, if enabled)
+# - valkey-xxx (3 replicas, if enabled)
 
 # Check pod status
 kubectl get pods -n myclient-prod -o wide
@@ -415,12 +415,12 @@ kubectl get pods -n myclient-prod -o wide
 kubectl get svc -n myclient-prod
 
 # Expected services:
-# - hapihub (ClusterIP)
-# - syncd (ClusterIP)
-# - mycureapp (ClusterIP)
-# - mongodb (ClusterIP)
+# - api (ClusterIP)
+# - api-worker (ClusterIP)
+# - account (ClusterIP)
+# - postgresql (ClusterIP)
 # - minio (ClusterIP, if enabled)
-# - typesense (ClusterIP, if enabled)
+# - valkey (ClusterIP, if enabled)
 ```
 
 ### 3. Verify HTTPRoutes
@@ -430,13 +430,13 @@ kubectl get svc -n myclient-prod
 kubectl get httproute -n myclient-prod
 
 # Expected routes:
-# - hapihub → api.myclient.com
-# - syncd → sync.myclient.com (if enabled)
-# - mycureapp → app.myclient.com
+# - api → api.myclient.com
+# - api-worker → sync.myclient.com (if enabled)
+# - account → app.myclient.com
 # - minio → storage.myclient.com (if enabled)
 
 # Check route status
-kubectl describe httproute hapihub -n myclient-prod
+kubectl describe httproute api -n myclient-prod
 ```
 
 ### 4. Verify External Secrets
@@ -446,7 +446,7 @@ kubectl describe httproute hapihub -n myclient-prod
 kubectl get externalsecrets -n myclient-prod
 
 # Check sync status
-kubectl describe externalsecret hapihub-secrets -n myclient-prod
+kubectl describe externalsecret api-secrets -n myclient-prod
 
 # Verify secrets created
 kubectl get secrets -n myclient-prod | grep secrets
@@ -455,15 +455,15 @@ kubectl get secrets -n myclient-prod | grep secrets
 ### 5. Test Endpoints
 
 ```bash
-# Test HapiHub health
+# Test Monobase API health
 curl https://api.myclient.com/health
 # Expected: {"status": "ok"}
 
-# Test MyCureApp
+# Test Monobase Account
 curl -I https://app.myclient.com
 # Expected: HTTP/2 200
 
-# Test Syncd (if enabled)
+# Test API Worker (if enabled)
 curl https://sync.myclient.com/health
 ```
 
@@ -617,12 +617,12 @@ echo "Password: $GRAFANA_PASSWORD"
 - [ ] Security policies applied
 
 ### Applications
-- [ ] MongoDB replica set healthy (3 nodes)
-- [ ] HapiHub pods running
-- [ ] Syncd pods running (if enabled)
-- [ ] MyCureApp pods running
+- [ ] PostgreSQL replica set healthy (3 nodes)
+- [ ] Monobase API pods running
+- [ ] API Worker pods running (if enabled)
+- [ ] Monobase Account pods running
 - [ ] MinIO cluster healthy (if enabled)
-- [ ] Typesense running (if enabled)
+- [ ] Valkey running (if enabled)
 
 ### Networking
 - [ ] HTTPRoutes created
@@ -650,13 +650,13 @@ echo "Password: $GRAFANA_PASSWORD"
 
 ```bash
 # Via Helm
-helm rollback hapihub -n myclient-prod
+helm rollback api -n myclient-prod
 
 # Via ArgoCD
-argocd app rollback myclient-prod-hapihub
+argocd app rollback myclient-prod-api
 
 # To specific revision
-helm rollback hapihub 3 -n myclient-prod
+helm rollback api 3 -n myclient-prod
 ```
 
 ### Rollback Infrastructure

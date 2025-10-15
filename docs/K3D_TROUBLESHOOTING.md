@@ -117,19 +117,19 @@ This is a known k3d issue (https://github.com/k3d-io/k3d/issues/1326) related to
 #### Option 1: Port Forwarding (Recommended for Development)
 ```bash
 # Forward ports directly from services
-kubectl port-forward -n monobase-dev svc/hapihub-svc 7500:7500
-kubectl port-forward -n monobase-dev svc/syncd-svc 7800:7800
+kubectl port-forward -n monobase-dev svc/api-svc 7500:7500
+kubectl port-forward -n monobase-dev svc/api-worker-svc 7800:7800
 
 # Access at:
-# http://localhost:7500  (HapiHub)
-# http://localhost:7800  (Syncd)
+# http://localhost:7500  (Monobase API)
+# http://localhost:7800  (API Worker)
 ```
 
 #### Option 2: Use NodePort Services
 Modify Helm values to use NodePort instead of ClusterIP:
 ```yaml
 # config/k3d-local/values-development.yaml
-hapihub:
+api:
   service:
     type: NodePort
     nodePort: 30750

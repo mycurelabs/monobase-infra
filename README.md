@@ -30,9 +30,9 @@ monobase-infra/
 │   │   └── k3d-local/
 │   └── clusters/            #    Example cluster configurations
 ├── charts/                  # ← CORE: Helm charts for applications
-│   ├── hapihub/
-│   ├── syncd/
-│   └── mycureapp/
+│   ├── api/
+│   ├── api-worker/
+│   └── account/
 ├── config/                  # ← CORE: Client configurations
 │   ├── profiles/            #    Pre-configured size profiles
 │   └── example.com/         #    Example client config
@@ -48,7 +48,7 @@ monobase-infra/
 
 ### What's Included ✅
 - **Cluster Provisioning (Optional)**: OpenTofu modules for AWS/Azure/GCP/on-prem/local
-- **Application Deployments**: HapiHub, Syncd, MyCureApp Helm charts
+- **Application Deployments**: Monobase API, API Worker, Monobase Account Helm charts
 - **Storage Infrastructure**: Longhorn distributed block storage
 - **Networking & Routing**: Envoy Gateway with Gateway API
 - **Security Layer**: NetworkPolicies, Pod Security Standards, RBAC, encryption
@@ -121,7 +121,7 @@ vim config/myclient/values-production.yaml
 kubectl apply -f infrastructure/
 
 # 6. Deploy applications  
-helm install myclient-prod charts/hapihub \
+helm install myclient-prod charts/api \
   --values config/myclient/values-production.yaml \
   --namespace myclient-prod --create-namespace
 ```
@@ -164,7 +164,7 @@ cd ../../../
 # - global.storage.provider: cloud-default (EKS/AKS/GKE) or longhorn (on-prem)
 # - Image tags (replace "latest" with specific versions)
 # - Resource limits (CPU, memory)
-# - Storage sizes (MongoDB, MinIO, etc.)
+# - Storage sizes (PostgreSQL, MinIO, etc.)
 # - Hostnames for each service
 ```
 
@@ -221,9 +221,9 @@ kubectl port-forward -n argocd svc/argocd-server 8080:443
 | Component | Technology | Purpose |
 |-----------|-----------|---------|
 | Gateway | Envoy Gateway | Shared Gateway API routing, zero-downtime updates |
-| API Backend | HapiHub | Core API service |
-| Frontend | MyCureApp | Vue.js frontend application |
-| Database | MongoDB 7.x | Primary datastore with replication |
+| API Backend | Monobase API | Core API service |
+| Frontend | Monobase Account | Vue.js frontend application |
+| Database | PostgreSQL 7.x | Primary datastore with replication |
 | Storage | Longhorn | Distributed block storage for StatefulSets |
 | GitOps | ArgoCD | Declarative deployments with web UI |
 | Secrets | External Secrets Operator | KMS integration (AWS/Azure/GCP/SOPS) |
@@ -232,8 +232,8 @@ kubectl port-forward -n argocd svc/argocd-server 8080:443
 
 | Component | Enable When | Purpose |
 |-----------|-------------|---------|
-| Syncd | Offline/mobile sync needed | Real-time data synchronization |
-| Typesense | Search features needed | Full-text search engine |
+| API Worker | Offline/mobile sync needed | Real-time data synchronization |
+| Valkey | Search features needed | Full-text search engine |
 | MinIO | Self-hosted S3 needed | Object storage (files, images) |
 | Monitoring | Production visibility needed | Prometheus + Grafana metrics |
 | Velero | Backup/DR required | Kubernetes-native backups |
@@ -244,9 +244,9 @@ kubectl port-forward -n argocd svc/argocd-server 8080:443
 ```
 Internet → Envoy Gateway (shared, HA) → HTTPRoutes (per client/env) → Applications
                                                                       ↓
-                                                            MongoDB + Longhorn Storage
+                                                            PostgreSQL + Longhorn Storage
                                                             MinIO (optional)
-                                                            Typesense (optional)
+                                                            Valkey (optional)
 ```
 
 **Key Design Decisions:**
@@ -260,14 +260,14 @@ Internet → Envoy Gateway (shared, HA) → HTTPRoutes (per client/env) → Appl
 ```
 monobase-infra/                   # Base template repository
 ├── charts/                       # Custom Helm charts
-│   ├── hapihub/                  # HapiHub application chart
-│   ├── syncd/                    # Syncd application chart
-│   └── mycureapp/                # MyCureApp frontend chart
+│   ├── api/                  # Monobase API application chart
+│   ├── api-worker/                    # API Worker application chart
+│   └── account/                # Monobase Account frontend chart
 │
 ├── helm-dependencies/            # Bitnami/community chart configurations
-│   ├── mongodb-values.yaml       # MongoDB configuration
+│   ├── postgresql-values.yaml       # PostgreSQL configuration
 │   ├── minio-values.yaml         # MinIO configuration
-│   └── typesense-values.yaml    # Typesense configuration
+│   └── valkey-values.yaml    # Valkey configuration
 │
 ├── infrastructure/               # Infrastructure templates
 │   ├── longhorn/                 # Block storage
@@ -327,7 +327,7 @@ git push origin main
 
 - **NetworkPolicies** - Default-deny, allow-specific traffic patterns
 - **Pod Security Standards** - Restricted security profile enforced
-- **Encryption at Rest** - MongoDB encryption, Longhorn volume encryption
+- **Encryption at Rest** - PostgreSQL encryption, Longhorn volume encryption
 - **Encryption in Transit** - TLS everywhere via cert-manager
 - **RBAC** - Least-privilege service accounts
 - **Secrets Management** - Never commit secrets, use External Secrets + KMS
@@ -338,12 +338,12 @@ git push origin main
 ### Minimum (Core Only)
 - **3 nodes** × 4 CPU × 16GB RAM
 - **~7 CPU, ~23Gi memory**
-- **~100Gi storage** (MongoDB)
+- **~100Gi storage** (PostgreSQL)
 
 ### Full Stack (All Optional Components)
 - **3-5 nodes** × 8 CPU × 32GB RAM
 - **~22 CPU, ~53Gi memory**
-- **~1.15TB storage** (MongoDB + MinIO)
+- **~1.15TB storage** (PostgreSQL + MinIO)
 
 ## 🤝 Contributing
 

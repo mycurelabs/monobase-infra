@@ -38,8 +38,8 @@ Complete validation and testing results for Monobase Infrastructure template.
 
 **Validation Method:** File existence and content verification
 
-**HapiHub Chart:**
-- ✅ Chart.yaml with proper dependencies (MongoDB, MinIO, Typesense)
+**Monobase API Chart:**
+- ✅ Chart.yaml with proper dependencies (PostgreSQL, MinIO, Valkey)
 - ✅ values.yaml with sensible defaults
 - ✅ values.schema.json for validation
 - ✅ 17 template files (deployment, service, httproute, hpa, pdb, etc.)
@@ -47,10 +47,10 @@ Complete validation and testing results for Monobase Infrastructure template.
 - ✅ NOTES.txt with post-install instructions
 - ✅ .helmignore
 
-**Syncd Chart:**
+**API Worker Chart:**
 - ✅ Complete structure (11 templates)
 
-**MyCureApp Chart:**
+**Monobase Account Chart:**
 - ✅ Complete structure (11 templates)
 
 **Verdict:** ✅ PASS
@@ -68,9 +68,9 @@ Complete validation and testing results for Monobase Infrastructure template.
 
 **Recommendation:** Run helm lint in environment with Helm installed:
 ```bash
-helm lint charts/hapihub
-helm lint charts/syncd
-helm lint charts/mycureapp
+helm lint charts/api
+helm lint charts/api-worker
+helm lint charts/account
 ```
 
 **Expected Result:** Should pass (charts are well-structured)
@@ -88,7 +88,7 @@ helm lint charts/mycureapp
 
 **Recommendation:** Run template rendering test:
 ```bash
-helm template test charts/hapihub -f config/example.com/values-production.yaml
+helm template test charts/api -f config/example.com/values-production.yaml
 ```
 
 **Expected Result:** Should render without errors
@@ -216,7 +216,7 @@ helm template test charts/hapihub -f config/example.com/values-production.yaml
 
 **ArgoCD Applications:**
 - ✅ 4 infrastructure apps (longhorn, gateway, external-secrets, cert-manager, monitoring)
-- ✅ 6 application apps (mongodb, minio, typesense, hapihub, syncd, mycureapp)
+- ✅ 6 application apps (postgresql, minio, valkey, api, api-worker, account)
 - ✅ 1 bootstrap (root-app)
 - **Total: 12 ArgoCD applications** (including monitoring)
 

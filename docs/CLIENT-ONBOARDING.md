@@ -53,7 +53,7 @@ vim config/myclient/values-production.yaml
 
 2. **Image tags** (IMPORTANT - don't use "latest"):
    ```yaml
-   hapihub:
+   api:
      image:
        tag: "5.215.2"  # Specific version
    ```
@@ -71,20 +71,20 @@ vim config/myclient/values-production.yaml
 
 4. **Storage sizes:**
    ```yaml
-   mongodb:
+   postgresql:
      persistence:
        size: 100Gi  # Adjust based on data volume
    ```
 
 5. **Replica counts:**
    ```yaml
-   hapihub:
+   api:
      replicas: 3  # HA for production
    ```
 
 6. **Optional components:**
    ```yaml
-   syncd:
+   api-worker:
      enabled: true  # Enable if needed
    minio:
      enabled: true  # Or false for external S3
@@ -104,13 +104,13 @@ Update with your KMS paths:
 provider: aws  # or azure, gcp, sops
 
 # AWS example
-mongodb:
-  - secretKey: mongodb-root-password
-    remoteKey: myclient/prod/mongodb/root-password
+postgresql:
+  - secretKey: postgresql-root-password
+    remoteKey: myclient/prod/postgresql/root-password
 
-hapihub:
+api:
   - secretKey: JWT_SECRET
-    remoteKey: myclient/prod/hapihub/jwt-secret
+    remoteKey: myclient/prod/api/jwt-secret
 ```
 
 ## Step 5: Create Secrets in KMS
@@ -120,11 +120,11 @@ Before deploying, create all secrets in your KMS:
 ```bash
 # AWS Secrets Manager example
 aws secretsmanager create-secret \\
-  --name myclient/prod/mongodb/root-password \\
+  --name myclient/prod/postgresql/root-password \\
   --secret-string "$(openssl rand -base64 32)"
 
 aws secretsmanager create-secret \\
-  --name myclient/prod/hapihub/jwt-secret \\
+  --name myclient/prod/api/jwt-secret \\
   --secret-string "$(openssl rand -base64 64)"
 
 # Repeat for all secrets in secrets-mapping.yaml
@@ -182,10 +182,10 @@ kubectl get pods -n myclient-prod
 # Check Gateway HTTPRoutes
 kubectl get httproutes -n myclient-prod
 
-# Test HapiHub API
+# Test Monobase API API
 curl https://api.myclient.com/health
 
-# Test MyCureApp
+# Test Monobase Account
 curl https://app.myclient.com
 ```
 

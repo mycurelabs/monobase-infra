@@ -70,12 +70,12 @@ spec:
 # 1. Deploy in two namespaces (client-a-prod, client-b-prod)
 # 2. Try to access from client-a to client-b:
 #    kubectl run test -n client-a-prod --image=busybox -it --rm -- \
-#      wget -O- http://hapihub.client-b-prod:7500
+#      wget -O- http://api.client-b-prod:7500
 #    # Should FAIL!
 #
 # 3. Try to access within same namespace:
 #    kubectl run test -n client-a-prod --image=busybox -it --rm -- \
-#      wget -O- http://hapihub.client-a-prod:7500
+#      wget -O- http://api.client-a-prod:7500
 #    # Should work (if other policies allow)
 
 ---

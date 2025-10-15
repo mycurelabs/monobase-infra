@@ -158,7 +158,7 @@ cd ../../..
 ./scripts/new-client-config.sh client-a client-a.com
 
 # Deploy via ArgoCD or Helm
-helm install hapihub charts/hapihub -f config/client-a/values-production.yaml
+helm install api charts/api -f config/client-a/values-production.yaml
 ```
 
 ### Install Storage (Optional)
@@ -254,13 +254,13 @@ This module creates the Kubernetes cluster. After provisioning:
 
 1. **Configure kubectl** using the `kubeconfig` output
 2. **Deploy infrastructure** using Monobase charts:
-   - MongoDB
+   - PostgreSQL
    - Longhorn (or use DO Block Storage)
    - External Secrets (with DO API token)
    - Gateway API (Envoy Gateway)
 3. **Deploy applications** using Monobase charts:
-   - HapiHub
-   - MyCureApp
-   - Syncd
+   - Monobase API
+   - Monobase Account
+   - API Worker
 
 See main repository README for deployment instructions.

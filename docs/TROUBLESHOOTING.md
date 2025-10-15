@@ -12,7 +12,7 @@ kubectl get pods -A | grep -v Running
 kubectl get events -n myclient-prod --sort-by='.lastTimestamp' | tail -20
 
 # Check logs
-kubectl logs -n myclient-prod deployment/hapihub --tail=100
+kubectl logs -n myclient-prod deployment/api --tail=100
 ```
 
 ##Common Issues
@@ -37,7 +37,7 @@ kubectl logs <pod-name> -n myclient-prod
 ```bash
 # Check ExternalSecret
 kubectl get externalsecrets -n myclient-prod
-kubectl describe externalsecret hapihub-secrets -n myclient-prod
+kubectl describe externalsecret api-secrets -n myclient-prod
 
 # Common fixes:
 # 1. Check SecretStore exists
@@ -64,7 +64,7 @@ curl -v https://api.myclient.com
 
 ```bash
 # PVC stuck Pending
-kubectl describe pvc mongodb-data -n myclient-prod
+kubectl describe pvc postgresql-data -n myclient-prod
 # Check: StorageClass exists, Longhorn healthy
 
 # Volume degraded
@@ -110,10 +110,10 @@ kubectl get pods -n longhorn-system
 
 ```bash
 # Via Helm
-helm rollback hapihub -n myclient-prod
+helm rollback api -n myclient-prod
 
 # Via ArgoCD
-argocd app rollback myclient-prod-hapihub
+argocd app rollback myclient-prod-api
 ```
 
 ## Getting Help

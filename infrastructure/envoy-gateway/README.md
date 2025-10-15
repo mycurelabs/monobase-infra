@@ -48,7 +48,7 @@ Each application creates its own HTTPRoute:
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
-  name: hapihub
+  name: api
   namespace: client-prod
 spec:
   parentRefs:
@@ -58,7 +58,7 @@ spec:
     - api.client.com
   rules:
     - backendRefs:
-      - name: hapihub
+      - name: api
         port: 7500
 ```
 

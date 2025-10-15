@@ -2,10 +2,10 @@
 apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:
-  name: {{ include "hapihub.fullname" . }}
-  namespace: {{ include "hapihub.namespace" . }}
+  name: {{ include "api.fullname" . }}
+  namespace: {{ include "api.namespace" . }}
   labels:
-    {{- include "hapihub.labels" . | nindent 4 }}
+    {{- include "api.labels" . | nindent 4 }}
 spec:
   {{- if .Values.podDisruptionBudget.minAvailable }}
   minAvailable: {{ .Values.podDisruptionBudget.minAvailable }}
@@ -14,5 +14,5 @@ spec:
   {{- end }}
   selector:
     matchLabels:
-      {{- include "hapihub.selectorLabels" . | nindent 6 }}
+      {{- include "api.selectorLabels" . | nindent 6 }}
 {{- end }}

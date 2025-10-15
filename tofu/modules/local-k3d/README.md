@@ -36,7 +36,7 @@ export KUBECONFIG=$(tofu output -raw kubeconfig_file)
 kubectl get nodes
 
 # Deploy Monobase
-helm install hapihub ../../../charts/hapihub -f ../../../config/k3d-local/values-development.yaml
+helm install api ../../../charts/api -f ../../../config/k3d-local/values-development.yaml
 ```
 
 ## CI/CD Example (GitHub Actions)
@@ -51,8 +51,8 @@ helm install hapihub ../../../charts/hapihub -f ../../../config/k3d-local/values
 - name: Deploy and test
   run: |
     export KUBECONFIG=$(tofu output -raw kubeconfig_file)
-    helm install hapihub charts/hapihub -f config/k3d-local/values-development.yaml
-    kubectl wait --for=condition=ready pod -l app=hapihub --timeout=300s
+    helm install api charts/api -f config/k3d-local/values-development.yaml
+    kubectl wait --for=condition=ready pod -l app=api --timeout=300s
 
 - name: Cleanup
   if: always()

@@ -18,7 +18,7 @@ Production-grade security controls for HIPAA compliance and best practices.
 - **Drop ALL Capabilities** - Minimal Linux capabilities
 
 ### 3. Encryption
-- **At Rest** - Longhorn volume encryption, MongoDB encryption
+- **At Rest** - Longhorn volume encryption, PostgreSQL encryption
 - **In Transit** - TLS everywhere via cert-manager
 - **Backup Encryption** - Velero backups encrypted in S3
 
@@ -44,13 +44,13 @@ security/
 │   ├── role.yaml.template
 │   └── rolebinding.yaml.template
 └── encryption/
-    ├── mongodb-encryption.yaml
+    ├── postgresql-encryption.yaml
     └── backup-encryption.yaml
 ```
 
 ## HIPAA Compliance Checklist
 
-- [x] Encryption at rest (Longhorn, MongoDB)
+- [x] Encryption at rest (Longhorn, PostgreSQL)
 - [x] Encryption in transit (TLS via cert-manager)
 - [x] Network segmentation (NetworkPolicies)
 - [x] Access controls (RBAC, Pod Security)

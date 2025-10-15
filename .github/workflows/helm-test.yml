@@ -30,32 +30,32 @@ jobs:
         run: |
           helm plugin install https://github.com/helm-unittest/helm-unittest
 
-      - name: Run HapiHub unit tests
+      - name: Run Monobase API unit tests
         run: |
-          echo "Running HapiHub chart unit tests..."
-          if [ -d "charts/hapihub/tests" ]; then
-            helm unittest charts/hapihub
+          echo "Running Monobase API chart unit tests..."
+          if [ -d "charts/api/tests" ]; then
+            helm unittest charts/api
           else
-            echo "⚠️ No tests found for HapiHub (charts/hapihub/tests/ not found)"
+            echo "⚠️ No tests found for Monobase API (charts/api/tests/ not found)"
             echo "📝 Consider adding unit tests for better coverage"
           fi
 
-      - name: Run Syncd unit tests
+      - name: Run API Worker unit tests
         run: |
-          echo "Running Syncd chart unit tests..."
-          if [ -d "charts/syncd/tests" ]; then
-            helm unittest charts/syncd
+          echo "Running API Worker chart unit tests..."
+          if [ -d "charts/api/tests" ]; then
+            helm unittest charts/api
           else
-            echo "⚠️ No tests found for Syncd"
+            echo "⚠️ No tests found for API Worker"
           fi
 
-      - name: Run MyCureApp unit tests
+      - name: Run Monobase Account unit tests
         run: |
-          echo "Running MyCureApp chart unit tests..."
-          if [ -d "charts/mycureapp/tests" ]; then
-            helm unittest charts/mycureapp
+          echo "Running Monobase Account chart unit tests..."
+          if [ -d "charts/account/tests" ]; then
+            helm unittest charts/account
           else
-            echo "⚠️ No tests found for MyCureApp"
+            echo "⚠️ No tests found for Monobase Account"
           fi
 
   template-validation:
@@ -63,7 +63,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        chart: [hapihub, syncd, mycureapp]
+        chart: [api, api, account]
         config: [production, staging]
     steps:
       - name: Checkout code
@@ -110,37 +110,37 @@ jobs:
         with:
           version: '3.14.0'
 
-      - name: Check HapiHub dependencies
+      - name: Check Monobase API dependencies
         run: |
-          cd charts/hapihub
+          cd charts/api
           if [ -f "Chart.yaml" ] && grep -q "dependencies:" Chart.yaml; then
-            echo "Checking dependencies for HapiHub..."
+            echo "Checking dependencies for Monobase API..."
             helm dependency list
             helm dependency build
           else
-            echo "No dependencies defined for HapiHub"
+            echo "No dependencies defined for Monobase API"
           fi
 
-      - name: Check Syncd dependencies
+      - name: Check API Worker dependencies
         run: |
-          cd charts/syncd
+          cd charts/api
           if [ -f "Chart.yaml" ] && grep -q "dependencies:" Chart.yaml; then
-            echo "Checking dependencies for Syncd..."
+            echo "Checking dependencies for API Worker..."
             helm dependency list
             helm dependency build
           else
-            echo "No dependencies defined for Syncd"
+            echo "No dependencies defined for API Worker"
           fi
 
-      - name: Check MyCureApp dependencies
+      - name: Check Monobase Account dependencies
         run: |
-          cd charts/mycureapp
+          cd charts/account
           if [ -f "Chart.yaml" ] && grep -q "dependencies:" Chart.yaml; then
-            echo "Checking dependencies for MyCureApp..."
+            echo "Checking dependencies for Monobase Account..."
             helm dependency list
             helm dependency build
           else
-            echo "No dependencies defined for MyCureApp"
+            echo "No dependencies defined for Monobase Account"
           fi
 
   test-summary:

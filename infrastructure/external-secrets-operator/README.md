@@ -43,17 +43,17 @@ helm install external-secrets external-secrets/external-secrets \\
 apiVersion: external-secrets.io/v1beta1
 kind: ExternalSecret
 metadata:
-  name: mongodb-credentials
+  name: postgresql-credentials
 spec:
   secretStoreRef:
     name: aws-secretstore
     kind: SecretStore
   target:
-    name: mongodb-credentials
+    name: postgresql-credentials
   data:
     - secretKey: root-password
       remoteRef:
-        key: client/prod/mongodb/root-password
+        key: client/prod/postgresql/root-password
 ```
 
 ## Phase 3 Implementation

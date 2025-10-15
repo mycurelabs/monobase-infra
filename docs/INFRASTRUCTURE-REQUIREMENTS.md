@@ -12,15 +12,15 @@ Cluster specifications and sizing guide for Monobase Infrastructure.
 **Storage:** 100GB per node (for system + Longhorn)
 
 **Workload:**
-- HapiHub (2 replicas)
-- MyCureApp (2 replicas)
-- MongoDB (3 replicas)
+- Monobase API (2 replicas)
+- Monobase Account (2 replicas)
+- PostgreSQL (3 replicas)
 - Longhorn, Gateway, ArgoCD, External Secrets
 
 **Total Resource Usage:**
 - ~7 CPU cores
 - ~23Gi memory
-- ~100Gi storage (MongoDB PVC)
+- ~100Gi storage (PostgreSQL PVC)
 
 ## Recommended (Full Stack)
 
@@ -33,9 +33,9 @@ Cluster specifications and sizing guide for Monobase Infrastructure.
 
 **Workload:**
 - All core components
-- Syncd (2 replicas)
+- API Worker (2 replicas)
 - MinIO (6 replicas)
-- Typesense (3 replicas)
+- Valkey (3 replicas)
 - Monitoring stack
 
 **Total Resource Usage:**
@@ -98,7 +98,7 @@ Cluster specifications and sizing guide for Monobase Infrastructure.
 - **Type:** SSD preferred
 - **Replicas:** 3x replication (3 nodes minimum)
 
-### Database Storage (MongoDB)
+### Database Storage (PostgreSQL)
 - **Small:** 20-50Gi (<10k records)
 - **Medium:** 50-200Gi (10k-100k records)
 - **Large:** 200Gi-1Ti (100k+ records)

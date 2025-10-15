@@ -1,58 +1,58 @@
 # Custom Prometheus Alert Rules
-# Application-specific alerts for HapiHub, MongoDB, MinIO, Velero
+# Application-specific alerts for Monobase API, MongoDB, MinIO, Velero
 
 apiVersion: monitoring.coreos.com/v1
 kind: PrometheusRule
 metadata:
-  name: hapihub-alerts
+  name: api-alerts
   namespace: monitoring
   labels:
     prometheus: kube-prometheus
 spec:
   groups:
-    # HapiHub Application Alerts
-    - name: hapihub
+    # Monobase API Application Alerts
+    - name: api
       interval: 30s
       rules:
-        - alert: HapiHubDown
-          expr: up{job="hapihub"} == 0
+        - alert: Monobase APIDown
+          expr: up{job="api"} == 0
           for: 5m
           labels:
             severity: critical
-            component: hapihub
+            component: api
           annotations:
-            summary: "HapiHub is down"
-            description: "HapiHub has been down for more than 5 minutes"
+            summary: "Monobase API is down"
+            description: "Monobase API has been down for more than 5 minutes"
 
-        - alert: HapiHubHighErrorRate
-          expr: rate(http_requests_total{job="hapihub",status=~"5.."}[5m]) > 0.05
+        - alert: Monobase APIHighErrorRate
+          expr: rate(http_requests_total{job="api",status=~"5.."}[5m]) > 0.05
           for: 5m
           labels:
             severity: warning
-            component: hapihub
+            component: api
           annotations:
-            summary: "HapiHub high error rate"
-            description: "HapiHub error rate is {{ $value | humanizePercentage }}"
+            summary: "Monobase API high error rate"
+            description: "Monobase API error rate is {{ $value | humanizePercentage }}"
 
-        - alert: HapiHubHighLatency
-          expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{job="hapihub"}[5m])) > 2
+        - alert: Monobase APIHighLatency
+          expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{job="api"}[5m])) > 2
           for: 10m
           labels:
             severity: warning
-            component: hapihub
+            component: api
           annotations:
-            summary: "HapiHub high latency"
-            description: "HapiHub p95 latency is {{ $value }}s"
+            summary: "Monobase API high latency"
+            description: "Monobase API p95 latency is {{ $value }}s"
 
-        - alert: HapiHubHighMemoryUsage
-          expr: container_memory_usage_bytes{pod=~"hapihub-.*"} / container_spec_memory_limit_bytes{pod=~"hapihub-.*"} > 0.9
+        - alert: Monobase APIHighMemoryUsage
+          expr: container_memory_usage_bytes{pod=~"api-.*"} / container_spec_memory_limit_bytes{pod=~"api-.*"} > 0.9
           for: 10m
           labels:
             severity: warning
-            component: hapihub
+            component: api
           annotations:
-            summary: "HapiHub high memory usage"
-            description: "HapiHub memory usage is {{ $value | humanizePercentage }}"
+            summary: "Monobase API high memory usage"
+            description: "Monobase API memory usage is {{ $value | humanizePercentage }}"
 
     # MongoDB Alerts
     - name: mongodb

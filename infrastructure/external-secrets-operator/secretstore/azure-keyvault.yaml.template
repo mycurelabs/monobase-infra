@@ -91,5 +91,5 @@ metadata:
 # Use hyphens instead of slashes (Key Vault requirement)
 # Examples:
 # - mongodb-root-password
-# - hapihub-jwt-secret
+# - api-jwt-secret
 # - minio-access-key

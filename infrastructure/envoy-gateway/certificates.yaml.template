@@ -36,10 +36,10 @@ spec:
 apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
-  name: hapihub-tls
+  name: api-tls
   namespace: gateway-system
 spec:
-  secretName: hapihub-tls
+  secretName: api-tls
   issuerRef:
     name: letsencrypt-prod
     kind: ClusterIssuer

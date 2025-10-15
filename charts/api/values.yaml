@@ -1,4 +1,4 @@
-# Default values for HapiHub chart
+# Default values for Monobase API chart
 # This is a YAML-formatted file with sensible defaults
 # Override these values in config/{client}/values-{env}.yaml
 
@@ -11,15 +11,15 @@ global:
     name: shared-gateway
     namespace: gateway-system
 
-# HapiHub application configuration
+# Monobase API application configuration
 enabled: true
 
 replicaCount: 2
 
 image:
-  repository: ghcr.io/YOUR-ORG/hapihub
+  repository: ghcr.io/YOUR-ORG/monobase-api
   pullPolicy: IfNotPresent
-  tag: "10.0.0"
+  tag: "0.1.0"
 
 imagePullSecrets: []
 nameOverride: ""
@@ -48,8 +48,8 @@ securityContext:
 
 service:
   type: ClusterIP
-  port: 7500
-  targetPort: 7500
+  port: 7213
+  targetPort: 7213
   annotations: {}
 
 # Gateway API HTTPRoute configuration
@@ -72,7 +72,7 @@ livenessProbe:
   enabled: true
   httpGet:
     path: /health
-    port: 7500
+    port: 7213
   initialDelaySeconds: 30
   periodSeconds: 10
   timeoutSeconds: 5
@@ -82,7 +82,7 @@ readinessProbe:
   enabled: true
   httpGet:
     path: /health
-    port: 7500
+    port: 7213
   initialDelaySeconds: 10
   periodSeconds: 5
   timeoutSeconds: 3
@@ -113,14 +113,14 @@ affinity:
               - key: app.kubernetes.io/name
                 operator: In
                 values:
-                  - hapihub
+                  - api
           topologyKey: kubernetes.io/hostname
 
 # Application configuration (ConfigMap)
 config:
   NODE_ENV: production
   LOG_LEVEL: info
-  PORT: "7500"
+  PORT: "7213"
   # Database URL from secrets
   # S3 configuration from secrets/ConfigMap
   # SMTP configuration from secrets/ConfigMap
@@ -145,17 +145,19 @@ networkPolicy:
               name: gateway-system
       ports:
         - protocol: TCP
-          port: 7500
+          port: 7213
   egress:
     - to:
         - namespaceSelector: {}
       ports:
         - protocol: TCP
-          port: 27017  # MongoDB
+          port: 5432   # PostgreSQL
         - protocol: TCP
-          port: 8108   # Typesense
+          port: 6379   # Valkey (Redis)
         - protocol: TCP
           port: 9000   # MinIO
+        - protocol: TCP
+          port: 1025   # Mailpit SMTP
     - to:
         - namespaceSelector: {}
       ports:
@@ -175,20 +177,30 @@ serviceMonitor:
   interval: 30s
   path: /metrics
 
-# MongoDB dependency configuration
-mongodb:
+# PostgreSQL dependency configuration
+postgresql:
   enabled: true
-  architecture: replicaset
-  replicaCount: 3
+  architecture: replication
+  replicaCount: 2
   auth:
     enabled: true
     existingSecret: ""
   persistence:
     enabled: true
     storageClass: longhorn
-    size: 50Gi
+    size: 100Gi
 
-# MinIO dependency configuration (optional)
+# Valkey (Redis-compatible cache) dependency configuration
+valkey:
+  enabled: true
+  architecture: replication
+  master:
+    persistence:
+      enabled: true
+      storageClass: longhorn
+      size: 8Gi
+
+# MinIO dependency configuration (optional S3 storage)
 minio:
   enabled: false
   mode: distributed
@@ -198,11 +210,6 @@ minio:
     storageClass: longhorn
     size: 250Gi
 
-# Typesense dependency configuration (optional)
-typesense:
+# Mailpit dependency configuration (email testing for dev/staging)
+mailpit:
   enabled: false
-  replicas: 3
-  persistence:
-    enabled: true
-    storageClass: longhorn
-    size: 50Gi

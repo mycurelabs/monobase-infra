@@ -38,15 +38,15 @@ graph TB
         end
         
         subgraph "client-a-prod namespace"
-            HapiHub1[⚕️ HapiHub API<br/>3 replicas]
-            MyCureApp1[📱 MyCureApp<br/>2 replicas]
-            Syncd1[🔄 Syncd<br/>2 replicas]
-            MongoDB1[(🗄️ MongoDB<br/>3-node replica)]
+            Monobase API1[⚕️ Monobase API API<br/>3 replicas]
+            Monobase Account1[📱 Monobase Account<br/>2 replicas]
+            API Worker1[🔄 API Worker<br/>2 replicas]
+            PostgreSQL1[(🗄️ PostgreSQL<br/>3-node replica)]
             MinIO1[(📦 MinIO<br/>6-node distributed)]
         end
         
         subgraph "client-b-prod namespace"
-            HapiHub2[⚕️ HapiHub API]
+            Monobase API2[⚕️ Monobase API API]
             Apps2[📱 Apps...]
         end
         
@@ -64,18 +64,18 @@ graph TB
     end
     
     Users -->|HTTPS| Gateway
-    Gateway -->|HTTPRoute| HapiHub1
-    Gateway -->|HTTPRoute| MyCureApp1
-    Gateway -->|HTTPRoute| HapiHub2
-    HapiHub1 --> MongoDB1
-    HapiHub1 --> MinIO1
-    Syncd1 --> MongoDB1
-    ArgoCD -.->|manages| HapiHub1
-    ArgoCD -.->|manages| MyCureApp1
+    Gateway -->|HTTPRoute| Monobase API1
+    Gateway -->|HTTPRoute| Monobase Account1
+    Gateway -->|HTTPRoute| Monobase API2
+    Monobase API1 --> PostgreSQL1
+    Monobase API1 --> MinIO1
+    API Worker1 --> PostgreSQL1
+    ArgoCD -.->|manages| Monobase API1
+    ArgoCD -.->|manages| Monobase Account1
     ExtSecrets -->|fetches| KMS
-    ExtSecrets -.->|injects| HapiHub1
-    Velero -.->|backups| MongoDB1
-    Longhorn -.->|provides storage| MongoDB1
+    ExtSecrets -.->|injects| Monobase API1
+    Velero -.->|backups| PostgreSQL1
+    Longhorn -.->|provides storage| PostgreSQL1
 ```
 
 ### Technology Stack
@@ -89,14 +89,14 @@ graph TB
 - cert-manager (TLS automation)
 
 **Applications:**
-- HapiHub (API backend)
-- MyCureApp (Vue.js frontend)
-- MongoDB 7.x (primary database)
+- Monobase API (API backend)
+- Monobase Account (Vue.js frontend)
+- PostgreSQL 7.x (primary database)
 
 **Optional:**
-- Syncd (real-time sync)
+- API Worker (real-time sync)
 - MinIO (self-hosted S3)
-- Typesense (search engine)
+- Valkey (search engine)
 - Velero (Kubernetes backups)
 - Prometheus + Grafana (monitoring)
 
@@ -117,8 +117,8 @@ sequenceDiagram
     participant DNS as 🌐 DNS
     participant LB as ⚖️ LoadBalancer
     participant GW as 🚪 Envoy Gateway
-    participant API as ⚕️ HapiHub API
-    participant DB as 🗄️ MongoDB
+    participant API as ⚕️ Monobase API API
+    participant DB as 🗄️ PostgreSQL
     participant S3 as 📦 MinIO/S3
     
     U->>DNS: api.client-a.com
@@ -127,7 +127,7 @@ sequenceDiagram
     LB->>GW: Forward to Gateway
     Note over GW: Rate Limiting<br/>Security Headers<br/>TLS Termination
     GW->>GW: Match HTTPRoute<br/>(api.client-a.com)
-    GW->>API: Route to HapiHub<br/>(client-a-prod ns)
+    GW->>API: Route to Monobase API<br/>(client-a-prod ns)
     API->>DB: Query Data
     DB-->>API: Response
     API->>S3: Fetch File
@@ -148,20 +148,20 @@ graph TB
         
         subgraph "client-a-prod namespace"
             R1[HTTPRoute<br/>api.client-a.com]
-            H1[HapiHub-A]
-            DB1[(MongoDB-A)]
+            H1[Monobase API-A]
+            DB1[(PostgreSQL-A)]
         end
         
         subgraph "client-b-prod namespace"
             R2[HTTPRoute<br/>api.client-b.com]
-            H2[HapiHub-B]
-            DB2[(MongoDB-B)]
+            H2[Monobase API-B]
+            DB2[(PostgreSQL-B)]
         end
         
         subgraph "client-c-staging namespace"
             R3[HTTPRoute<br/>api.client-c-staging.com]
-            H3[HapiHub-C]
-            DB3[(MongoDB-C)]
+            H3[Monobase API-C]
+            DB3[(PostgreSQL-C)]
         end
         
         subgraph "Infrastructure (Shared)"
@@ -218,7 +218,7 @@ graph TB
         │  ┌─────┴──────┬────────┬────────┐│
         │  │            │        │        ││
         │ ┌▼──────┐ ┌──▼────┐ ┌▼──────┐ ││
-        │ │HapiHub│ │ Syncd │ │MyCure │ ││
+        │ │Monobase API│ │ API Worker │ │MyCure │ ││
         │ │ App   │ │       │ │ App   │ ││
         │ │2-3 rep│ │2 rep  │ │2 rep  │ ││
         │ └───┬───┘ └───┬───┘ └───────┘ ││
@@ -226,7 +226,7 @@ graph TB
         │  ┌──┴─────────┴──┐             ││
         │  │               │             ││
         │ ┌▼────────────┐ ┌▼─────────┐  ││
-        │ │  MongoDB    │ │  MinIO   │  ││
+        │ │  PostgreSQL    │ │  MinIO   │  ││
         │ │  Replica Set│ │ Distrib. │  ││
         │ │  3 nodes    │ │ 6 nodes  │  ││
         │ └──────┬──────┘ └────┬─────┘  ││
@@ -242,29 +242,29 @@ graph TB
 
 ### Data Flow
 
-**1. User Request → HapiHub API:**
+**1. User Request → Monobase API API:**
 ```
 Browser → DNS → LoadBalancer → Gateway (443) 
-  → HTTPRoute (api.myclient.com) → HapiHub Service (7500) 
-  → HapiHub Pod → MongoDB (27017)
+  → HTTPRoute (api.myclient.com) → Monobase API Service (7500) 
+  → Monobase API Pod → PostgreSQL (5432)
 ```
 
 **2. User Request → Frontend:**
 ```
 Browser → DNS → LoadBalancer → Gateway (443)
-  → HTTPRoute (app.myclient.com) → MyCureApp Service (80)
-  → MyCureApp Pod (nginx serving static files)
+  → HTTPRoute (app.myclient.com) → Monobase Account Service (80)
+  → Monobase Account Pod (nginx serving static files)
 ```
 
 **3. File Upload Flow:**
 ```
-Client → HapiHub API → MinIO S3 API (9000)
+Client → Monobase API API → MinIO S3 API (9000)
   → Longhorn PVC → Distributed storage across nodes
 ```
 
 **4. File Download Flow:**
 ```
-Client → HapiHub (generates presigned URL)
+Client → Monobase API (generates presigned URL)
   → Client downloads directly from MinIO via Gateway
   → HTTPRoute (storage.myclient.com) → MinIO (9000)
 ```
@@ -316,7 +316,7 @@ spec:
     - api.client.com       # Client-specific domain
   rules:
     - backendRefs:
-        - name: hapihub
+        - name: api
           port: 7500
 ```
 
@@ -347,9 +347,9 @@ spec:
          │
 ┌────────┴─────────┐
 │  StatefulSets    │
-│  - MongoDB       │
+│  - PostgreSQL       │
 │  - MinIO         │
-│  - Typesense     │
+│  - Valkey     │
 └──────────────────┘
 ```
 
@@ -412,7 +412,7 @@ Explicit ALLOW rules:
     ↓
 ┌─────────────────────────────────┐
 │ ✅ Gateway → Apps               │
-│ ✅ Apps → MongoDB               │
+│ ✅ Apps → PostgreSQL               │
 │ ✅ Apps → Storage               │
 │ ✅ Apps → Internet (HTTPS)      │
 │ ❌ Cross-namespace (blocked)    │
@@ -442,7 +442,7 @@ Explicit ALLOW rules:
 - Namespace-scoped permissions
 
 **Layer 4: Data (Encryption)**
-- At rest: Longhorn + MongoDB encryption
+- At rest: Longhorn + PostgreSQL encryption
 - In transit: TLS everywhere (cert-manager)
 - Backups: S3 + KMS encryption
 
@@ -488,7 +488,7 @@ Explicit ALLOW rules:
 
 1. **Longhorn Snapshots** - Volume-level, COW snapshots
 2. **Velero Backups** - Kubernetes-native, application-aware
-3. **MongoDB dumps** - Application-level (optional)
+3. **PostgreSQL dumps** - Application-level (optional)
 
 **Recovery Time Objectives (RTO):**
 - Tier 1: 5 minutes
@@ -509,7 +509,7 @@ Explicit ALLOW rules:
 ```
 ┌─────────────────────────────────────────┐
 │           Applications                  │
-│  HapiHub, Syncd, MyCureApp             │
+│  Monobase API, API Worker, Monobase Account             │
 │  /metrics endpoints                     │
 └──────────────┬──────────────────────────┘
                │ scrape
@@ -545,10 +545,10 @@ Explicit ALLOW rules:
 
 | Component | Replicas | Strategy | Downtime on Failure |
 |-----------|----------|----------|---------------------|
-| HapiHub | 2-3 | Rolling update + PDB | 0s (other pods serve) |
-| MyCureApp | 2 | Rolling update + PDB | 0s |
-| Syncd | 2 | Rolling update + PDB | 0s |
-| MongoDB | 3 | Replica set | <30s (auto-failover) |
+| Monobase API | 2-3 | Rolling update + PDB | 0s (other pods serve) |
+| Monobase Account | 2 | Rolling update + PDB | 0s |
+| API Worker | 2 | Rolling update + PDB | 0s |
+| PostgreSQL | 3 | Replica set | <30s (auto-failover) |
 | MinIO | 6 | Erasure coding | 0s (2 node tolerance) |
 | Envoy Gateway | 2 | Anti-affinity | <1s (pod swap) |
 | Longhorn | 3 | Volume replication | 0s (auto-rebuild) |
@@ -598,18 +598,18 @@ Cluster
 │   └── Prometheus + Grafana
 │
 ├── client-a-prod
-│   ├── hapihub, syncd, mycureapp
-│   ├── mongodb, minio, typesense
+│   ├── api, api-worker, account
+│   ├── postgresql, minio, valkey
 │   └── HTTPRoutes → shared-gateway
 │
 ├── client-a-staging
-│   ├── hapihub, mycureapp
-│   ├── mongodb
+│   ├── api, account
+│   ├── postgresql
 │   └── HTTPRoutes → shared-gateway
 │
 └── client-b-prod
-    ├── hapihub, syncd, mycureapp
-    ├── mongodb, minio
+    ├── api, api-worker, account
+    ├── postgresql, minio
     └── HTTPRoutes → shared-gateway
 ```
 
@@ -637,14 +637,14 @@ Cluster
                │ HTTPS only
 ┌──────────────▼──────────────────────────┐
 │  Application Zone                       │
-│  - HapiHub, Syncd, MyCureApp           │
+│  - Monobase API, API Worker, Monobase Account           │
 │  - NetworkPolicy: allow from Gateway    │
 │  - Pod Security: restricted             │
 └──────────────┬──────────────────────────┘
                │ Authenticated connections
 ┌──────────────▼──────────────────────────┐
 │  Data Zone                              │
-│  - MongoDB (TLS + auth)                 │
+│  - PostgreSQL (TLS + auth)                 │
 │  - MinIO (IAM auth)                     │
 │  - NetworkPolicy: allow from apps only  │
 │  - Encryption at rest                   │
@@ -681,7 +681,7 @@ Cluster
 - **RTO:** 1-5 minutes
 - **Longhorn:** Rebuilds volume replicas automatically
 
-**3. MongoDB Replica Failure:**
+**3. PostgreSQL Replica Failure:**
 - **Detection:** Replica set monitoring
 - **Action:** Automatic failover to secondary
 - **Impact:** <30s connection interruption
@@ -716,14 +716,14 @@ Storage fills → Expand PVC → Longhorn expands volume
 
 | Component | Max Replicas | Bottleneck |
 |-----------|--------------|------------|
-| HapiHub | 10 | MongoDB connections |
-| MyCureApp | 20 | None (stateless) |
-| Syncd | 5 | WebSocket connections |
-| MongoDB | 5 | Replication overhead |
+| Monobase API | 10 | PostgreSQL connections |
+| Monobase Account | 20 | None (stateless) |
+| API Worker | 5 | WebSocket connections |
+| PostgreSQL | 5 | Replication overhead |
 | MinIO | 16 | Erasure coding limit |
 
 **For >500 users:**
-- Add MongoDB sharding
+- Add PostgreSQL sharding
 - Add read replicas
 - Consider external S3
 - Add caching layer (Redis)

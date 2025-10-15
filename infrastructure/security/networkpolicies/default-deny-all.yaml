@@ -48,7 +48,7 @@ spec:
 #    kubectl apply -f default-deny-all.yaml
 #
 # 2. Verify pods can't communicate:
-#    kubectl run test --image=busybox -it --rm -- wget -O- http://hapihub:7500
+#    kubectl run test --image=busybox -it --rm -- wget -O- http://api:7500
 #    # Should fail!
 #
 # 3. Apply allow rules:
@@ -56,7 +56,7 @@ spec:
 #    kubectl apply -f allow-apps-to-db.yaml
 #
 # 4. Verify communication works:
-#    kubectl run test --image=busybox -it --rm -- wget -O- http://hapihub:7500
+#    kubectl run test --image=busybox -it --rm -- wget -O- http://api:7500
 #    # Should succeed (if you're in gateway namespace)
 
 ---

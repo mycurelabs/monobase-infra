@@ -25,12 +25,12 @@ velero backup create manual-$(date +%Y%m%d-%H%M%S) \\
   --wait
 
 # Selective backup (specific resources)
-velero backup create mongodb-only \\
+velero backup create postgresql-only \\
   --include-namespaces myclient-prod \\
   --include-resources statefulsets,persistentvolumeclaims \\
-  --selector app.kubernetes.io/name=mongodb
+  --selector app.kubernetes.io/name=postgresql
 
-# Backup with hooks (MongoDB consistency)
+# Backup with hooks (PostgreSQL consistency)
 velero backup create consistent-backup \\
   --include-namespaces myclient-prod \\
   --snapshot-volumes \\
@@ -90,9 +90,9 @@ velero restore create restore-deployments \\
   --include-resources deployments,services,configmaps
 
 # Restore single application
-velero restore create restore-hapihub \\
+velero restore create restore-api \\
   --from-backup daily-full-20250115020000 \\
-  --selector app.kubernetes.io/name=hapihub
+  --selector app.kubernetes.io/name=api
 ```
 
 ### Restore to Different Namespace
@@ -129,7 +129,7 @@ velero restore create deleted-data-recovery \\
   --include-resources persistentvolumeclaims,statefulsets
 
 # 3. Verify data restored
-kubectl exec -it mongodb-0 -n myclient-prod -- mongosh
+kubectl exec -it postgresql-0 -n myclient-prod -- mongosh
 # Check collections
 
 # 4. Resume operations
@@ -141,28 +141,28 @@ kubectl exec -it mongodb-0 -n myclient-prod -- mongosh
 
 ```bash
 # 1. Stop write operations
-kubectl scale deployment hapihub --replicas=0 -n myclient-prod
+kubectl scale deployment api --replicas=0 -n myclient-prod
 
 # 2. Backup current state (corrupted)
 velero backup create corrupted-state-$(date +%Y%m%d) \\
   --include-namespaces myclient-prod
 
 # 3. Delete corrupted database
-kubectl delete statefulset mongodb -n myclient-prod
-kubectl delete pvc -l app.kubernetes.io/name=mongodb -n myclient-prod
+kubectl delete statefulset postgresql -n myclient-prod
+kubectl delete pvc -l app.kubernetes.io/name=postgresql -n myclient-prod
 
 # 4. Restore from backup
 velero restore create corruption-recovery \\
   --from-backup daily-full-20250114020000 \\
   --include-resources statefulsets,persistentvolumeclaims \\
-  --selector app.kubernetes.io/name=mongodb
+  --selector app.kubernetes.io/name=postgresql
 
-# 5. Wait for MongoDB ready
-kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=mongodb \\
+# 5. Wait for PostgreSQL ready
+kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=postgresql \\
   -n myclient-prod --timeout=600s
 
-# 6. Restart HapiHub
-kubectl scale deployment hapihub --replicas=3 -n myclient-prod
+# 6. Restart Monobase API
+kubectl scale deployment api --replicas=3 -n myclient-prod
 
 # 7. Verify
 curl https://api.myclient.com/health
@@ -267,10 +267,10 @@ velero restore create monthly-test-$(date +%Y%m) \\
   --wait
 
 # 3. Verify data integrity
-kubectl exec -it mongodb-0 -n myclient-restore-test -- mongosh
+kubectl exec -it postgresql-0 -n myclient-restore-test -- mongosh
 
 # 4. Test application functionality
-kubectl port-forward -n myclient-restore-test svc/hapihub 7500:7500
+kubectl port-forward -n myclient-restore-test svc/api 7500:7500
 curl http://localhost:7500/health
 
 # 5. Document results
@@ -365,8 +365,8 @@ velero backup delete --selector backup-schedule=daily-full \\
 | Component | Backup Method | RTO | Recovery Steps |
 |-----------|--------------|-----|----------------|
 | Application Pods | None | 0s | Auto-restart, HA replicas |
-| MongoDB | Longhorn snapshot | 5 min | Restore from snapshot |
-| MongoDB | Velero daily | 1h | Restore from daily backup |
+| PostgreSQL | Longhorn snapshot | 5 min | Restore from snapshot |
+| PostgreSQL | Velero daily | 1h | Restore from daily backup |
 | Full Namespace | Velero daily | 1-2h | Full namespace restore |
 | Complete Cluster | Velero weekly | 4-8h | New cluster + restore |
 

@@ -11,7 +11,7 @@ Horizontal pod autoscaling, storage expansion, and capacity planning.
 autoscaling:
   enabled: true
   
-  hapihub:
+  api:
     minReplicas: 3
     maxReplicas: 10
     targetCPUUtilizationPercentage: 70
@@ -24,20 +24,20 @@ autoscaling:
 kubectl get hpa -n myclient-prod
 
 # HPA details
-kubectl describe hpa hapihub -n myclient-prod
+kubectl describe hpa api -n myclient-prod
 
 # Watch scaling events
-kubectl get events -n myclient-prod --field-selector involvedObject.name=hapihub --watch
+kubectl get events -n myclient-prod --field-selector involvedObject.name=api --watch
 ```
 
 ### Manual Scaling
 
 ```bash
 # Scale deployment manually
-kubectl scale deployment hapihub --replicas=5 -n myclient-prod
+kubectl scale deployment api --replicas=5 -n myclient-prod
 
 # Disable HPA temporarily
-kubectl patch hpa hapihub -n myclient-prod \\
+kubectl patch hpa api -n myclient-prod \\
   --patch '{"spec":{"maxReplicas":3,"minReplicas":3}}'
 ```
 
@@ -47,24 +47,24 @@ kubectl patch hpa hapihub -n myclient-prod \\
 
 ```bash
 # Automated (Phase 6 script)
-./scripts/resize-statefulset-storage.sh mongodb myclient-prod 200Gi
+./scripts/resize-statefulset-storage.sh postgresql myclient-prod 200Gi
 
 # Manual steps:
 # 1. Edit all PVCs
 for i in 0 1 2; do
-  kubectl patch pvc mongodb-data-mongodb-$i -n myclient-prod \\
+  kubectl patch pvc postgresql-data-postgresql-$i -n myclient-prod \\
     --patch '{"spec":{"resources":{"requests":{"storage":"200Gi"}}}}'
 done
 
 # 2. Delete StatefulSet (keeps pods)
-kubectl delete sts mongodb -n myclient-prod --cascade=orphan
+kubectl delete sts postgresql -n myclient-prod --cascade=orphan
 
 # 3. Update values and redeploy
 # Or manually recreate StatefulSet with new volumeClaimTemplates
 
 # 4. Rolling restart
-kubectl delete pod mongodb-0 -n myclient-prod
-# Wait for ready, then repeat for mongodb-1, mongodb-2
+kubectl delete pod postgresql-0 -n myclient-prod
+# Wait for ready, then repeat for postgresql-1, postgresql-2
 ```
 
 ## Capacity Planning
@@ -77,10 +77,10 @@ kubectl top pods -n myclient-prod
 kubectl top nodes
 
 # Storage usage
-kubectl exec -it mongodb-0 -n myclient-prod -- df -h
+kubectl exec -it postgresql-0 -n myclient-prod -- df -h
 
 # MinIO storage
-mc du myminio/hapihub-files
+mc du myminio/api-files
 ```
 
 ### When to Scale
@@ -99,8 +99,8 @@ mc du myminio/hapihub-files
 
 | Component | Current Max | Bottleneck | Solution if Exceeded |
 |-----------|-------------|------------|----------------------|
-| HapiHub | 10 pods | MongoDB connections | Add MongoDB read replicas |
-| MongoDB | 5 nodes | Replication lag | Implement sharding |
+| Monobase API | 10 pods | PostgreSQL connections | Add PostgreSQL read replicas |
+| PostgreSQL | 5 nodes | Replication lag | Implement sharding |
 | MinIO | 16 nodes | Erasure coding | Use external S3 |
 | Storage | 5TB/node | Longhorn limit | Add nodes or use cloud storage |
 
@@ -110,6 +110,6 @@ mc du myminio/hapihub-files
 - ✅ HPA for pod autoscaling
 - ✅ PVC expansion for storage
 - ✅ Node addition for capacity
-- ✅ MongoDB sharding (advanced)
+- ✅ PostgreSQL sharding (advanced)
 
 For storage operations, see [STORAGE.md](STORAGE.md).

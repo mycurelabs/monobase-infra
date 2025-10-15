@@ -78,17 +78,17 @@ Password: (from External Secrets or initial secret)
 **Automatically provisioned:**
 1. Kubernetes Cluster (ID: 7249)
 2. Kubernetes Pods (ID: 6417)
-3. MongoDB (ID: 2583)
+3. PostgreSQL (ID: 2583)
 4. Node Exporter (ID: 1860)
 5. MinIO (ID: 13502)
 
 ## Custom Alerts
 
 **Configured in prometheus-rules.yaml:**
-- HapiHub down
+- Monobase API down
 - High error rate
 - High latency
-- MongoDB replication lag
+- PostgreSQL replication lag
 - MinIO disk offline
 - Velero backup failures
 - Storage filling up

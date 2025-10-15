@@ -38,7 +38,7 @@ spec:
                   type: Distinct
 
 ---
-# API Rate Limit (HapiHub)
+# API Rate Limit (Monobase API)
 apiVersion: gateway.envoyproxy.io/v1alpha1
 kind: BackendTrafficPolicy
 metadata:

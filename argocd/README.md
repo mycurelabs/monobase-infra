@@ -14,12 +14,12 @@ argocd/
 │   ├── external-secrets.yaml.template
 │   └── cert-manager.yaml.template
 └── applications/
-    ├── mongodb.yaml.template
+    ├── postgresql.yaml.template
     ├── minio.yaml.template
-    ├── typesense.yaml.template
-    ├── hapihub.yaml.template
-    ├── syncd.yaml.template
-    └── mycureapp.yaml.template
+    ├── valkey.yaml.template
+    ├── api.yaml.template
+    ├── api-worker.yaml.template
+    └── account.yaml.template
 ```
 
 ## App-of-Apps Pattern
@@ -34,12 +34,12 @@ root-app (bootstrap)
 │   ├── external-secrets
 │   └── cert-manager
 └── Applications (Sync Wave 2)
-    ├── mongodb
+    ├── postgresql
     ├── minio (optional)
-    ├── typesense (optional)
-    ├── hapihub
-    ├── syncd (optional)
-    └── mycureapp
+    ├── valkey (optional)
+    ├── api
+    ├── api-worker (optional)
+    └── account
 ```
 
 ## Sync Waves
@@ -48,8 +48,8 @@ Sync waves ensure ordered deployment:
 
 1. **Wave 0:** Namespace creation
 2. **Wave 1:** Infrastructure (Longhorn, Gateway, Secrets)
-3. **Wave 2:** Data stores (MongoDB, MinIO, Typesense)
-4. **Wave 3:** Applications (HapiHub, Syncd, MyCureApp)
+3. **Wave 2:** Data stores (PostgreSQL, MinIO, Valkey)
+4. **Wave 3:** Applications (Monobase API, API Worker, Monobase Account)
 
 ## Template Variables
 

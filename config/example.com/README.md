@@ -95,16 +95,16 @@ Each service hostname is fully configurable:
 global:
   domain: example.com  # Default base domain
 
-hapihub:
+api:
   gateway:
     hostname: ""  # Empty = uses api.example.com (default)
     # OR set explicitly: api.custom-domain.com
 
-syncd:
+api-worker:
   gateway:
     hostname: sync.example.com  # Explicit
 
-mycureapp:
+account:
   gateway:
     hostname: ""  # Uses app.example.com (default)
 ```
@@ -115,11 +115,11 @@ Enable only what you need:
 
 ```yaml
 # Sync service - enable for offline/mobile sync
-syncd:
+api-worker:
   enabled: true  # Set false if not needed
 
 # Search engine - enable for full-text search
-typesense:
+valkey:
   enabled: true  # Set false if not needed
 
 # Self-hosted S3 - enable if cost-sensitive, disable for AWS S3
@@ -172,7 +172,7 @@ Monitor actual usage and tune accordingly.
 Base storage sizes on data growth projections:
 
 ```yaml
-mongodb:
+postgresql:
   persistence:
     size: 50Gi    # Start small, expand as needed
 
@@ -186,15 +186,15 @@ Note: Longhorn supports volume expansion without downtime.
 ### High Availability
 
 Production should always use:
-- MongoDB: 3 replicas (replica set)
-- HapiHub: 2-3 replicas (load balanced)
+- PostgreSQL: 3 replicas (replica set)
+- Monobase API: 2-3 replicas (load balanced)
 - MinIO: 6+ nodes (distributed, erasure coded)
 
 ```yaml
-mongodb:
+postgresql:
   replicas: 3  # Required for HA
 
-hapihub:
+api:
   replicas: 3  # Minimum 2 for HA
 
 minio:

@@ -1,16 +1,17 @@
 apiVersion: v2
-name: mycureapp
-description: MyCureApp Frontend - Custom Helm chart for Monobase Infrastructure
+name: account
+description: Monobase Account App - React/Vite frontend
 type: application
 version: 1.0.0
 appVersion: "1.0.0"
 keywords:
   - frontend
-  - vue
-  - mycureapp
+  - react
+  - vite
+  - account
 home: https://github.com/YOUR-ORG/monobase-infra
 sources:
-  - https://github.com/YOUR-ORG/mycureapp
+  - https://github.com/YOUR-ORG/monobase
 maintainers:
   - name: Your Organization
     email: devops@example.com

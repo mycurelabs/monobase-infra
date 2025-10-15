@@ -99,15 +99,15 @@ curl https://app.myclient.com
 # 10. Notify stakeholders of recovery
 ```
 
-### Scenario 3: Data Corruption in MongoDB
+### Scenario 3: Data Corruption in PostgreSQL
 
 **Detection:** Invalid data, query errors
 **RTO:** 2-3 hours | **RPO:** 24 hours
 
 ```bash
 # 1. Stop write operations immediately
-kubectl scale deployment hapihub --replicas=0 -n myclient-prod
-kubectl scale deployment syncd --replicas=0 -n myclient-prod
+kubectl scale deployment api --replicas=0 -n myclient-prod
+kubectl scale deployment api-worker --replicas=0 -n myclient-prod
 
 # 2. Backup CURRENT state (corrupted)
 velero backup create corruption-snapshot-$(date +%Y%m%d-%H%M) \
@@ -119,31 +119,31 @@ velero backup get | grep Completed
 # Review backup times, choose backup BEFORE corruption
 
 # 4. Delete corrupted database
-kubectl delete statefulset mongodb -n myclient-prod --cascade=false
-kubectl delete pvc -l app.kubernetes.io/name=mongodb -n myclient-prod
+kubectl delete statefulset postgresql -n myclient-prod --cascade=false
+kubectl delete pvc -l app.kubernetes.io/name=postgresql -n myclient-prod
 
 # 5. Restore database from clean backup
 velero restore create db-corruption-fix \
   --from-backup daily-full-20250114020000 \
   --include-resources statefulsets,persistentvolumeclaims \
-  --selector app.kubernetes.io/name=mongodb \
+  --selector app.kubernetes.io/name=postgresql \
   --wait
 
-# 6. Wait for MongoDB ready
+# 6. Wait for PostgreSQL ready
 kubectl wait --for=condition=ready pod \
-  -l app.kubernetes.io/name=mongodb \
+  -l app.kubernetes.io/name=postgresql \
   -n myclient-prod \
   --timeout=600s
 
 # 7. Verify database integrity
-kubectl exec -it mongodb-0 -n myclient-prod -- mongosh --eval "db.stats()"
+kubectl exec -it postgresql-0 -n myclient-prod -- mongosh --eval "db.stats()"
 
 # 8. Restart applications
-kubectl scale deployment hapihub --replicas=3 -n myclient-prod
-kubectl scale deployment syncd --replicas=2 -n myclient-prod
+kubectl scale deployment api --replicas=3 -n myclient-prod
+kubectl scale deployment api-worker --replicas=2 -n myclient-prod
 
 # 9. Monitor for issues
-kubectl logs -f deployment/hapihub -n myclient-prod
+kubectl logs -f deployment/api -n myclient-prod
 
 # 10. Assess data loss
 # Compare current data with backup timestamp

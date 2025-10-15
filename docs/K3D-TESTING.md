@@ -34,7 +34,7 @@ kubectl get nodes
 
 ```bash
 # Use k3d configuration
-helm install hapihub charts/hapihub \
+helm install api charts/api \
   -f config/k3d-local/values-development.yaml \
   -n monobase-dev \
   --create-namespace
@@ -49,10 +49,10 @@ kubectl get pods -n monobase-dev --watch
 # Add to /etc/hosts
 echo "127.0.0.1 api.local.test app.local.test" | sudo tee -a /etc/hosts
 
-# Test HapiHub
+# Test Monobase API
 curl http://api.local.test/health
 
-# Test MyCureApp
+# Test Monobase Account
 open http://app.local.test
 ```
 
@@ -99,7 +99,7 @@ sudo sed -i.bak '/local.test/d' /etc/hosts
 
 1. **Use local-path storage** - It's fast and simple
 2. **Disable monitoring** - Saves RAM
-3. **Use standalone MongoDB** - Not replicaset
+3. **Use standalone PostgreSQL** - Not replicaset
 4. **Skip MinIO** - Too resource intensive
 5. **Test one client at a time** - Multiple namespaces drain resources
 

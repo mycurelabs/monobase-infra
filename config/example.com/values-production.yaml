@@ -35,12 +35,12 @@ global:
     # - ebs-csi: "gp3"
     # - local-path: "local-path"
 
-# ===== REQUIRED CORE: HapiHub API =====
-hapihub:
+# ===== REQUIRED CORE: Monobase API =====
+api:
   enabled: true
 
   image:
-    repository: ghcr.io/YOUR-ORG/hapihub
+    repository: ghcr.io/YOUR-ORG/monobase-api
     tag: "5.215.2"  # ✅ ALWAYS pin specific version in production
     pullPolicy: IfNotPresent
 
@@ -89,12 +89,12 @@ hapihub:
     enabled: true
     minAvailable: 1
 
-# ===== REQUIRED CORE: MyCureApp Frontend =====
-mycureapp:
+# ===== REQUIRED CORE: Monobase Account Frontend =====
+account:
   enabled: true
 
   image:
-    repository: ghcr.io/YOUR-ORG/mycureapp
+    repository: ghcr.io/YOUR-ORG/monobase-account
     tag: "1.0.0"  # ✅ Pin specific version
     pullPolicy: IfNotPresent
 
@@ -115,12 +115,12 @@ mycureapp:
     enabled: true
     minAvailable: 1
 
-# ===== OPTIONAL: Syncd Sync Service =====
-syncd:
+# ===== OPTIONAL: API Worker Sync Service =====
+# api-worker (removed):
   enabled: true  # Enable for offline/mobile sync
 
   image:
-    repository: ghcr.io/YOUR-ORG/syncd
+    repository: ghcr.io/YOUR-ORG/api-worker
     tag: "1.2.0"  # ✅ Pin version
 
   replicas: 2
@@ -141,7 +141,7 @@ syncd:
     minAvailable: 1
 
 # ===== REQUIRED CORE: MongoDB Database =====
-mongodb:
+postgresql:
   enabled: true
 
   # Bitnami MongoDB chart configuration
@@ -186,7 +186,7 @@ mongodb:
     minAvailable: 2  # At least 2 replicas always available
 
 # ===== OPTIONAL: Typesense Search =====
-typesense:
+# typesense (removed):
   enabled: true  # Enable for full-text search
 
   replicas: 3  # HA for production
@@ -243,7 +243,7 @@ minio:
     # If using external S3 instead:
     # external:
     #   endpoint: "s3.amazonaws.com"
-    #   bucket: "hapihub-production-files"
+    #   bucket: "api-production-files"
     #   region: "us-east-1"
     #   publicUrl: "https://cdn.example.com"
 
@@ -303,7 +303,7 @@ monitoring:
     dashboards:
       - kubernetes-cluster
       - mongodb
-      - hapihub
+      - api
       - minio
 
   alertmanager:
@@ -380,18 +380,18 @@ podSecurityStandards:
 autoscaling:
   enabled: true  # ✅ Enable HPA for production
 
-  hapihub:
+  api:
     minReplicas: 3
     maxReplicas: 10
     targetCPUUtilization: 70
     targetMemoryUtilization: 80
 
-  mycureapp:
+  account:
     minReplicas: 2
     maxReplicas: 5
     targetCPUUtilization: 70
 
-  syncd:
+  # api-worker (removed):
     minReplicas: 2
     maxReplicas: 5
     targetCPUUtilization: 70

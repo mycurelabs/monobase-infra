@@ -81,7 +81,7 @@ spec:
 # mongodb:
 #   root-password: SecurePassword123!
 #   replica-set-key: ReplicaSetKey456!
-# hapihub:
+# api:
 #   jwt-secret: JwtSecretToken789!
 #
 # # After encryption with SOPS:
@@ -89,7 +89,7 @@ spec:
 # mongodb:
 #   root-password: ENC[AES256_GCM,data:...,iv:...,tag:...,type:str]
 #   replica-set-key: ENC[AES256_GCM,data:...,iv:...,tag:...,type:str]
-# hapihub:
+# api:
 #   jwt-secret: ENC[AES256_GCM,data:...,iv:...,tag:...,type:str]
 # sops:
 #   kms:

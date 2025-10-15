@@ -50,9 +50,9 @@ echo ""
 echo -e "${BLUE}[3/7] Validating directory structure...${NC}"
 
 REQUIRED_DIRS=(
-    "charts/hapihub/templates"
-    "charts/syncd/templates"
-    "charts/mycureapp/templates"
+    "charts/api/templates"
+    "charts/api/templates"
+    "charts/account/templates"
     "infrastructure/longhorn"
     "infrastructure/envoy-gateway"
     "infrastructure/security/networkpolicies"
@@ -76,7 +76,7 @@ echo ""
 # Test 4: Check Helm charts have required files
 echo -e "${BLUE}[4/7] Validating Helm chart structure...${NC}"
 
-for CHART in hapihub syncd mycureapp; do
+for CHART in api api account; do
     echo -n "  - $CHART: "
     CHART_COMPLETE=true
     

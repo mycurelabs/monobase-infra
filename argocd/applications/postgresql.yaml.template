@@ -1,10 +1,10 @@
-# ArgoCD Application: MongoDB
+# ArgoCD Application: PostgreSQL
 # Sync Wave 2 - Deploy database before applications
 
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: {{ .Values.global.namespace }}-mongodb
+  name: {{ .Values.global.namespace }}-postgresql
   namespace: argocd
   annotations:
     argocd.argoproj.io/sync-wave: "2"
@@ -14,13 +14,13 @@ spec:
   project: default
   
   source:
-    chart: mongodb
+    chart: postgresql
     repoURL: https://charts.bitnami.com/bitnami
     targetRevision: 15.6.13
     helm:
-      releaseName: mongodb
+      releaseName: postgresql
       values: |
-        {{- toYaml .Values.mongodb | nindent 8 }}
+        {{- toYaml .Values.postgresql | nindent 8 }}
   
   destination:
     server: https://kubernetes.default.svc

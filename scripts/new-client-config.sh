@@ -131,7 +131,7 @@ Domain: **$CLIENT_DOMAIN**
    - Resource limits (CPU, memory)
    - Storage sizes (MongoDB, MinIO)
    - Replica counts
-   - Optional components (syncd, minio, typesense)
+   - Optional components (api, minio, valkey)
 
 3. **Configure secrets management:**
    \`\`\`bash
@@ -141,7 +141,7 @@ Domain: **$CLIENT_DOMAIN**
 
 4. **Create secrets in your KMS:**
    - MongoDB credentials
-   - HapiHub secrets (JWT, database URL, S3, SMTP)
+   - Monobase API secrets (JWT, database URL, S3, SMTP)
    - MinIO credentials (if self-hosted)
    - TLS certificates (if not using cert-manager)
 

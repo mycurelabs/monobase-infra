@@ -6,17 +6,17 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
-  name: hapihub
+  name: api
   namespace: {{ .Values.global.namespace }}
   labels:
-    app.kubernetes.io/name: hapihub
+    app.kubernetes.io/name: api
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
-  name: hapihub
+  name: api
 subjects:
   - kind: ServiceAccount
-    name: hapihub
+    name: api
     namespace: {{ .Values.global.namespace }}
 
 ---
@@ -24,17 +24,17 @@ subjects:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
-  name: syncd
+  name: api-worker
   namespace: {{ .Values.global.namespace }}
   labels:
-    app.kubernetes.io/name: syncd
+    app.kubernetes.io/name: api-worker
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
-  name: syncd
+  name: api-worker
 subjects:
   - kind: ServiceAccount
-    name: syncd
+    name: api-worker
     namespace: {{ .Values.global.namespace }}
 
 ---
@@ -42,17 +42,17 @@ subjects:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
-  name: mycureapp
+  name: account
   namespace: {{ .Values.global.namespace }}
   labels:
-    app.kubernetes.io/name: mycureapp
+    app.kubernetes.io/name: account
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
-  name: mycureapp
+  name: account
 subjects:
   - kind: ServiceAccount
-    name: mycureapp
+    name: account
     namespace: {{ .Values.global.namespace }}
 
 ---
@@ -75,8 +75,8 @@ subjects:
 
 ---
 # Verify RBAC:
-# kubectl auth can-i get secrets --as=system:serviceaccount:myclient-prod:hapihub -n myclient-prod
+# kubectl auth can-i get secrets --as=system:serviceaccount:myclient-prod:api -n myclient-prod
 # # Should return: yes
 #
-# kubectl auth can-i delete pods --as=system:serviceaccount:myclient-prod:hapihub -n myclient-prod
+# kubectl auth can-i delete pods --as=system:serviceaccount:myclient-prod:api -n myclient-prod
 # # Should return: no

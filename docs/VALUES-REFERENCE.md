@@ -38,239 +38,239 @@ Used across all charts and configurations.
 
 ---
 
-## HapiHub Parameters
+## Monobase API Parameters
 
-### hapihub.enabled
+### api.enabled
 - **Type:** boolean
 - **Default:** `true`
-- **Description:** Enable or disable HapiHub deployment
+- **Description:** Enable or disable Monobase API deployment
 
-### hapihub.replicaCount
+### api.replicaCount
 - **Type:** integer
 - **Default:** `2`
 - **Minimum:** `1`
 - **Production:** `3` (for HA)
-- **Description:** Number of HapiHub pod replicas
+- **Description:** Number of Monobase API pod replicas
 
-### hapihub.image.repository
+### api.image.repository
 - **Type:** string
-- **Default:** `ghcr.io/YOUR-ORG/hapihub`
+- **Default:** `ghcr.io/YOUR-ORG/api`
 - **Description:** Container image repository
 
-### hapihub.image.tag
+### api.image.tag
 - **Type:** string
 - **Default:** `5.215.2`
 - **Production:** Pin specific version (e.g., `5.215.2`)
 - **Staging:** Can use `latest` for testing
 - **Description:** Container image tag
 
-### hapihub.image.pullPolicy
+### api.image.pullPolicy
 - **Type:** string
 - **Default:** `IfNotPresent`
 - **Options:** `Always`, `IfNotPresent`, `Never`
 
-### hapihub.resources.requests.cpu
+### api.resources.requests.cpu
 - **Type:** string
 - **Default:** `500m`
 - **Staging:** `250m`
 - **Production:** `1` (1 CPU)
 - **Description:** Guaranteed CPU allocation
 
-### hapihub.resources.requests.memory
+### api.resources.requests.memory
 - **Type:** string
 - **Default:** `1Gi`
 - **Staging:** `512Mi`
 - **Production:** `2Gi`
 - **Description:** Guaranteed memory allocation
 
-### hapihub.resources.limits.cpu
+### api.resources.limits.cpu
 - **Type:** string
 - **Default:** `2`
 - **Production:** `2-4`
 - **Description:** Maximum CPU allowed
 
-### hapihub.resources.limits.memory
+### api.resources.limits.memory
 - **Type:** string
 - **Default:** `4Gi`
 - **Production:** `4-8Gi`
 - **Description:** Maximum memory allowed
 
-### hapihub.gateway.hostname
+### api.gateway.hostname
 - **Type:** string
 - **Default:** Empty (uses `api.{global.domain}`)
 - **Example:** `api.myclient.com` or `api.custom-domain.com`
-- **Description:** Custom hostname for HapiHub API. If empty, defaults to api.{global.domain}
+- **Description:** Custom hostname for Monobase API API. If empty, defaults to api.{global.domain}
 
-### hapihub.autoscaling.enabled
+### api.autoscaling.enabled
 - **Type:** boolean
 - **Default:** `false`
 - **Production:** `true`
 - **Description:** Enable Horizontal Pod Autoscaler
 
-### hapihub.autoscaling.minReplicas
+### api.autoscaling.minReplicas
 - **Type:** integer
 - **Default:** `2`
 - **Production:** `3`
 
-### hapihub.autoscaling.maxReplicas
+### api.autoscaling.maxReplicas
 - **Type:** integer
 - **Default:** `10`
 - **Production:** `5-10`
 
-### hapihub.autoscaling.targetCPUUtilizationPercentage
+### api.autoscaling.targetCPUUtilizationPercentage
 - **Type:** integer
 - **Default:** `70`
 - **Range:** 1-100
 
-### hapihub.podDisruptionBudget.enabled
+### api.podDisruptionBudget.enabled
 - **Type:** boolean
 - **Default:** `true`
 - **Production:** `true` (required for HA)
 
-### hapihub.podDisruptionBudget.minAvailable
+### api.podDisruptionBudget.minAvailable
 - **Type:** integer
 - **Default:** `1`
 - **Description:** Minimum pods that must remain available during disruptions
 
-### hapihub.networkPolicy.enabled
+### api.networkPolicy.enabled
 - **Type:** boolean
 - **Default:** `true`
 - **Production:** `true` (required for security)
 
-### hapihub.externalSecrets.enabled
+### api.externalSecrets.enabled
 - **Type:** boolean
 - **Default:** `true`
 - **Description:** Sync secrets from KMS via External Secrets Operator
 
 ---
 
-## Syncd Parameters
+## API Worker Parameters
 
-### syncd.enabled
+### api-worker.enabled
 - **Type:** boolean
 - **Default:** `false`
-- **Description:** Enable Syncd (optional component for offline sync)
+- **Description:** Enable API Worker (optional component for offline sync)
 
-### syncd.replicaCount
+### api-worker.replicaCount
 - **Type:** integer
 - **Default:** `2`
 - **Production:** `2-3`
 
-### syncd.image.repository
+### api-worker.image.repository
 - **Type:** string
-- **Default:** `ghcr.io/YOUR-ORG/syncd`
+- **Default:** `ghcr.io/YOUR-ORG/api-worker`
 
-### syncd.image.tag
+### api-worker.image.tag
 - **Type:** string
 - **Default:** `1.2.0`
 - **Production:** Pin specific version
 
-### syncd.gateway.hostname
+### api-worker.gateway.hostname
 - **Type:** string
 - **Default:** Empty (uses `sync.{global.domain}`)
 - **Example:** `sync.myclient.com`
 
-### syncd.resources.requests.cpu
+### api-worker.resources.requests.cpu
 - **Type:** string
 - **Default:** `500m`
 - **Production:** `500m-1`
 
-### syncd.resources.requests.memory
+### api-worker.resources.requests.memory
 - **Type:** string
 - **Default:** `1Gi`
 - **Production:** `1-2Gi`
 
 ---
 
-## MyCureApp Parameters
+## Monobase Account Parameters
 
-### mycureapp.enabled
+### account.enabled
 - **Type:** boolean
 - **Default:** `true`
 
-### mycureapp.replicaCount
+### account.replicaCount
 - **Type:** integer
 - **Default:** `2`
 - **Production:** `2-3`
 
-### mycureapp.image.repository
+### account.image.repository
 - **Type:** string
-- **Default:** `ghcr.io/YOUR-ORG/mycureapp`
+- **Default:** `ghcr.io/YOUR-ORG/account`
 
-### mycureapp.image.tag
+### account.image.tag
 - **Type:** string
 - **Default:** `1.0.0`
 
-### mycureapp.gateway.hostname
+### account.gateway.hostname
 - **Type:** string
 - **Default:** Empty (uses `app.{global.domain}`)
 
-### mycureapp.resources.requests.cpu
+### account.resources.requests.cpu
 - **Type:** string
 - **Default:** `200m`
 - **Production:** `200m-500m`
 
-### mycureapp.resources.requests.memory
+### account.resources.requests.memory
 - **Type:** string
 - **Default:** `512Mi`
 - **Production:** `512Mi-1Gi`
 
 ---
 
-## MongoDB Parameters
+## PostgreSQL Parameters
 
-### mongodb.enabled
+### postgresql.enabled
 - **Type:** boolean
 - **Default:** `true`
-- **Description:** Deploy MongoDB (required for HapiHub)
+- **Description:** Deploy PostgreSQL (required for Monobase API)
 
-### mongodb.architecture
+### postgresql.architecture
 - **Type:** string
 - **Default:** `replicaset`
 - **Options:** `standalone`, `replicaset`
 - **Production:** `replicaset` (required for HA)
 
-### mongodb.replicaCount
+### postgresql.replicaCount
 - **Type:** integer
 - **Default:** `3`
 - **Staging:** `1`
 - **Production:** `3` (minimum for HA)
 
-### mongodb.auth.enabled
+### postgresql.auth.enabled
 - **Type:** boolean
 - **Default:** `true`
 - **Production:** `true` (required)
 
-### mongodb.auth.existingSecret
+### postgresql.auth.existingSecret
 - **Type:** string
-- **Default:** `mongodb-credentials`
-- **Description:** Secret name containing MongoDB passwords (managed by External Secrets)
+- **Default:** `postgresql-credentials`
+- **Description:** Secret name containing PostgreSQL passwords (managed by External Secrets)
 
-### mongodb.persistence.enabled
+### postgresql.persistence.enabled
 - **Type:** boolean
 - **Default:** `true`
 
-### mongodb.persistence.storageClass
+### postgresql.persistence.storageClass
 - **Type:** string
 - **Default:** `longhorn`
 
-### mongodb.persistence.size
+### postgresql.persistence.size
 - **Type:** string
 - **Default:** `100Gi`
 - **Staging:** `20Gi`
 - **Production:** `50Gi-500Gi` (based on data volume)
 
-### mongodb.resources.requests.cpu
+### postgresql.resources.requests.cpu
 - **Type:** string
 - **Default:** `1.5`
 - **Production:** `1.5-3`
 
-### mongodb.resources.requests.memory
+### postgresql.resources.requests.memory
 - **Type:** string
 - **Default:** `6Gi`
 - **Production:** `6-8Gi`
 
-### mongodb.tls.enabled
+### postgresql.tls.enabled
 - **Type:** boolean
 - **Default:** `true`
 - **Production:** `true` (recommended for security and compliance)
@@ -309,19 +309,19 @@ Used across all charts and configurations.
 
 ---
 
-## Typesense Parameters (Optional)
+## Valkey Parameters (Optional)
 
-### typesense.enabled
+### valkey.enabled
 - **Type:** boolean
 - **Default:** `false`
-- **Description:** Deploy Typesense search engine
+- **Description:** Deploy Valkey search engine
 
-### typesense.replicas
+### valkey.replicas
 - **Type:** integer
 - **Default:** `3`
 - **Production:** `3` (for HA)
 
-### typesense.persistence.size
+### valkey.persistence.size
 - **Type:** string
 - **Default:** `50Gi`
 - **Description:** Search index storage
@@ -518,17 +518,17 @@ global:
   namespace: myclient-staging
   environment: staging
 
-hapihub:
+api:
   enabled: true
   replicas: 1
   image:
     tag: "latest"
 
-mycureapp:
+account:
   enabled: true
   replicas: 1
 
-mongodb:
+postgresql:
   enabled: true
   replicaCount: 1
   persistence:
@@ -543,7 +543,7 @@ global:
   namespace: myclient-prod
   environment: production
 
-hapihub:
+api:
   enabled: true
   replicas: 3
   image:
@@ -560,7 +560,7 @@ hapihub:
       cpu: 2
       memory: 4Gi
 
-mongodb:
+postgresql:
   enabled: true
   architecture: replicaset
   replicaCount: 3
@@ -592,6 +592,6 @@ For complete examples, see:
 - `config/example.com/secrets-mapping.yaml` - Secret mappings
 
 For chart-specific schemas, see:
-- `charts/hapihub/values.schema.json`
-- `charts/syncd/values.schema.json`
-- `charts/mycureapp/values.schema.json`
+- `charts/api/values.schema.json`
+- `charts/api-worker/values.schema.json`
+- `charts/account/values.schema.json`

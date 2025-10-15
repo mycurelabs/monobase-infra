@@ -2,17 +2,17 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "hapihub.fullname" . }}
-  namespace: {{ include "hapihub.namespace" . }}
+  name: {{ include "api.fullname" . }}
+  namespace: {{ include "api.namespace" . }}
   labels:
-    {{- include "hapihub.labels" . | nindent 4 }}
+    {{- include "api.labels" . | nindent 4 }}
 spec:
   {{- if not .Values.autoscaling.enabled }}
   replicas: {{ .Values.replicaCount }}
   {{- end }}
   selector:
     matchLabels:
-      {{- include "hapihub.selectorLabels" . | nindent 6 }}
+      {{- include "api.selectorLabels" . | nindent 6 }}
   template:
     metadata:
       annotations:
@@ -21,13 +21,13 @@ spec:
         {{- toYaml . | nindent 8 }}
         {{- end }}
       labels:
-        {{- include "hapihub.selectorLabels" . | nindent 8 }}
+        {{- include "api.selectorLabels" . | nindent 8 }}
     spec:
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      serviceAccountName: {{ include "hapihub.serviceAccountName" . }}
+      serviceAccountName: {{ include "api.serviceAccountName" . }}
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
       containers:
@@ -74,57 +74,53 @@ spec:
         - name: NODE_ENV
           valueFrom:
             configMapKeyRef:
-              name: {{ include "hapihub.fullname" . }}
+              name: {{ include "api.fullname" . }}
               key: NODE_ENV
         - name: LOG_LEVEL
           valueFrom:
             configMapKeyRef:
-              name: {{ include "hapihub.fullname" . }}
+              name: {{ include "api.fullname" . }}
               key: LOG_LEVEL
-        # Override HAPIHUB_PORT to prevent yargs from reading Kubernetes service discovery value
-        # The CLI uses .env('HAPIHUB') which reads HAPIHUB_* env vars
-        - name: HAPIHUB_PORT
-          value: "7500"
-        # MongoDB connection - load password from MongoDB chart's secret
-        # Note: MongoDB may be deployed separately in GitOps, connection always configured
-        - name: MONGODB_ROOT_PASSWORD
+        - name: PORT
+          value: "7213"
+        # PostgreSQL connection - load password from PostgreSQL chart's secret
+        # Note: PostgreSQL may be deployed separately in GitOps, connection always configured
+        - name: POSTGRESQL_PASSWORD
           valueFrom:
             secretKeyRef:
-              name: {{ .Release.Name }}-mongodb
-              key: mongodb-root-password
+              name: {{ .Release.Name }}-postgresql
+              key: password
         - name: DATABASE_URL
-          value: {{ include "hapihub.mongodb.connectionString" . | quote }}
-        - name: MONGO_URI
-          value: {{ include "hapihub.mongodb.connectionString" . | quote }}
+          value: {{ include "api.postgresql.connectionString" . | quote }}
         # Service URLs from dependencies
-        {{- if .Values.typesense.enabled }}
-        - name: TYPESENSE_URL
-          value: {{ include "hapihub.typesense.url" . | quote }}
+        {{- if .Values.valkey.enabled }}
+        - name: REDIS_URL
+          value: {{ include "api.valkey.url" . | quote }}
         {{- end }}
         {{- if .Values.minio.enabled }}
         - name: S3_ENDPOINT
-          value: {{ include "hapihub.minio.url" . | quote }}
+          value: {{ include "api.minio.url" . | quote }}
         {{- end }}
         {{- if .Values.mailpit.enabled }}
         - name: SMTP_URL
-          value: {{ include "hapihub.mailpit.url" . | quote }}
+          value: {{ include "api.mailpit.url" . | quote }}
         {{- end }}
         # Load non-DB secrets from External Secrets Operator
         {{- if .Values.externalSecrets.enabled }}
         - name: JWT_SECRET
           valueFrom:
             secretKeyRef:
-              name: {{ include "hapihub.fullname" . }}-secrets
+              name: {{ include "api.fullname" . }}-secrets
               key: JWT_SECRET
         - name: S3_ACCESS_KEY_ID
           valueFrom:
             secretKeyRef:
-              name: {{ include "hapihub.fullname" . }}-secrets
+              name: {{ include "api.fullname" . }}-secrets
               key: S3_ACCESS_KEY_ID
         - name: S3_SECRET_ACCESS_KEY
           valueFrom:
             secretKeyRef:
-              name: {{ include "hapihub.fullname" . }}-secrets
+              name: {{ include "api.fullname" . }}-secrets
               key: S3_SECRET_ACCESS_KEY
         {{- end }}
         # Additional environment variables from config

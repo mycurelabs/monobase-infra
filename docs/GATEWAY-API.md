@@ -60,7 +60,7 @@ kubectl get gateway shared-gateway -n gateway-system \\
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
-  name: hapihub
+  name: api
   namespace: myclient-prod
 spec:
   parentRefs:
@@ -74,7 +74,7 @@ spec:
             type: PathPrefix
             value: /
       backendRefs:
-        - name: hapihub
+        - name: api
           port: 7500
 ```
 
@@ -88,19 +88,19 @@ kubectl get httproute -A
 kubectl get httproute -n myclient-prod
 
 # Route details
-kubectl describe httproute hapihub -n myclient-prod
+kubectl describe httproute api -n myclient-prod
 ```
 
 ### Route Status
 
 ```bash
 # Check if route is accepted
-kubectl get httproute hapihub -n myclient-prod \\
+kubectl get httproute api -n myclient-prod \\
   -o jsonpath='{.status.parents[0].conditions[?(@.type=="Accepted")].status}'
 # Should return: True
 
 # Check route programmed
-kubectl get httproute hapihub -n myclient-prod \\
+kubectl get httproute api -n myclient-prod \\
   -o jsonpath='{.status.parents[0].conditions[?(@.type=="Programmed")].status}'
 # Should return: True
 ```
@@ -115,7 +115,7 @@ kubectl apply -f - <<EOF
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
-  name: hapihub
+  name: api
   namespace: client-c-prod  # New client
 spec:
   parentRefs:
@@ -125,7 +125,7 @@ spec:
     - api.client-c.com
   rules:
     - backendRefs:
-        - name: hapihub
+        - name: api
           port: 7500
 EOF
 
@@ -152,7 +152,7 @@ rules:
           type: PathPrefix
           value: /api/v1
     backendRefs:
-      - name: hapihub-v1
+      - name: api-v1
         port: 7500
   
   - matches:
@@ -160,7 +160,7 @@ rules:
           type: PathPrefix
           value: /api/v2
     backendRefs:
-      - name: hapihub-v2
+      - name: api-v2
         port: 7500
 ```
 
@@ -173,7 +173,7 @@ rules:
           - name: X-API-Version
             value: "2.0"
     backendRefs:
-      - name: hapihub-v2
+      - name: api-v2
         port: 7500
 ```
 
@@ -182,10 +182,10 @@ rules:
 ```yaml
 rules:
   - backendRefs:
-      - name: hapihub-stable
+      - name: api-stable
         port: 7500
         weight: 90  # 90% traffic
-      - name: hapihub-canary
+      - name: api-canary
         port: 7500
         weight: 10  # 10% traffic
 ```
@@ -218,7 +218,7 @@ spec:
       port: 443
   rules:
     - backendRefs:
-        - name: hapihub
+        - name: api
           port: 7500
       filters:
         - type: RequestHeaderModifier
@@ -234,14 +234,14 @@ spec:
 
 ```bash
 # Check route status
-kubectl describe httproute hapihub -n myclient-prod
+kubectl describe httproute api -n myclient-prod
 
 # Common issues:
 # 1. Gateway not ready
 kubectl get gateway shared-gateway -n gateway-system
 
 # 2. Backend service not found
-kubectl get svc hapihub -n myclient-prod
+kubectl get svc api -n myclient-prod
 
 # 3. Wrong namespace (ReferenceGrant needed for cross-namespace)
 

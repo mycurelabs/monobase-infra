@@ -60,9 +60,9 @@ ingress:
 # Note: Bitnami MinIO chart doesn't support defaultBuckets parameter
 # Create buckets post-deployment using:
 # - MinIO Console UI
-# - mc command: mc mb myminio/hapihub-files
+# - mc command: mc mb myminio/api-files
 # - Kubernetes Job with mc commands
-# Required buckets: hapihub-files, hapihub-backups, mycureapp-assets
+# Required buckets: api-files, api-backups, account-assets
 
 # Monitoring
 metrics:
@@ -91,12 +91,12 @@ containerSecurityContext:
 networkPolicy:
   enabled: true
   allowExternal: false
-  # Allow traffic from HapiHub and Gateway
+  # Allow traffic from Monobase API and Gateway
   ingress:
     - from:
         - podSelector:
             matchLabels:
-              app.kubernetes.io/name: hapihub
+              app.kubernetes.io/name: api
         - namespaceSelector:
             matchLabels:
               name: gateway-system
@@ -149,7 +149,7 @@ extraEnvVars:
     value: "https://app.example.com"  # Update per client
 
 # For external S3 (AWS, GCS, Azure Blob) instead of self-hosted:
-# Set minio.enabled: false in values and configure HapiHub with:
+# Set minio.enabled: false in values and configure Monobase API with:
 # - S3_ENDPOINT: s3.amazonaws.com
 # - S3_BUCKET: your-bucket-name
 # - S3_REGION: us-east-1

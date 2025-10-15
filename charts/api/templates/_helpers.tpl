@@ -1,14 +1,14 @@
 {{/*
 Expand the name of the chart.
 */}}
-{{- define "hapihub.name" -}}
+{{- define "api.name" -}}
 {{- default .Chart.Name .Values.nameOverride | trunc 63 | trimSuffix "-" }}
 {{- end }}
 
 {{/*
 Create a default fully qualified app name.
 */}}
-{{- define "hapihub.fullname" -}}
+{{- define "api.fullname" -}}
 {{- if .Values.fullnameOverride }}
 {{- .Values.fullnameOverride | trunc 63 | trimSuffix "-" }}
 {{- else }}
@@ -24,37 +24,37 @@ Create a default fully qualified app name.
 {{/*
 Create chart name and version as used by the chart label.
 */}}
-{{- define "hapihub.chart" -}}
+{{- define "api.chart" -}}
 {{- printf "%s-%s" .Chart.Name .Chart.Version | replace "+" "_" | trunc 63 | trimSuffix "-" }}
 {{- end }}
 
 {{/*
 Common labels
 */}}
-{{- define "hapihub.labels" -}}
-helm.sh/chart: {{ include "hapihub.chart" . }}
-{{ include "hapihub.selectorLabels" . }}
+{{- define "api.labels" -}}
+helm.sh/chart: {{ include "api.chart" . }}
+{{ include "api.selectorLabels" . }}
 {{- if .Chart.AppVersion }}
 app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
 {{- end }}
 app.kubernetes.io/managed-by: {{ .Release.Service }}
-app.kubernetes.io/part-of: hapihub
+app.kubernetes.io/part-of: monobase
 {{- end }}
 
 {{/*
 Selector labels
 */}}
-{{- define "hapihub.selectorLabels" -}}
-app.kubernetes.io/name: {{ include "hapihub.name" . }}
+{{- define "api.selectorLabels" -}}
+app.kubernetes.io/name: {{ include "api.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
 
 {{/*
 Create the name of the service account to use
 */}}
-{{- define "hapihub.serviceAccountName" -}}
+{{- define "api.serviceAccountName" -}}
 {{- if .Values.serviceAccount.create }}
-{{- default (include "hapihub.fullname" .) .Values.serviceAccount.name }}
+{{- default (include "api.fullname" .) .Values.serviceAccount.name }}
 {{- else }}
 {{- default "default" .Values.serviceAccount.name }}
 {{- end }}
@@ -63,7 +63,7 @@ Create the name of the service account to use
 {{/*
 Gateway hostname - defaults to api.{global.domain}
 */}}
-{{- define "hapihub.gateway.hostname" -}}
+{{- define "api.gateway.hostname" -}}
 {{- if .Values.gateway.hostname }}
 {{- .Values.gateway.hostname }}
 {{- else }}
@@ -74,28 +74,28 @@ Gateway hostname - defaults to api.{global.domain}
 {{/*
 Namespace - uses global.namespace or Release.Namespace
 */}}
-{{- define "hapihub.namespace" -}}
+{{- define "api.namespace" -}}
 {{- default .Release.Namespace .Values.global.namespace }}
 {{- end }}
 
 {{/*
 Gateway parent reference name
 */}}
-{{- define "hapihub.gateway.name" -}}
+{{- define "api.gateway.name" -}}
 {{- default "shared-gateway" .Values.global.gateway.name }}
 {{- end }}
 
 {{/*
 Gateway parent reference namespace
 */}}
-{{- define "hapihub.gateway.namespace" -}}
+{{- define "api.gateway.namespace" -}}
 {{- default "gateway-system" .Values.global.gateway.namespace }}
 {{- end }}
 
 {{/*
 StorageClass name - auto-detects based on provider
 */}}
-{{- define "hapihub.storageClass" -}}
+{{- define "api.storageClass" -}}
 {{- if .Values.global.storage.className -}}
 {{- .Values.global.storage.className }}
 {{- else if eq .Values.global.storage.provider "longhorn" -}}
@@ -113,46 +113,43 @@ local-path
 {{- end }}
 
 {{/*
-MongoDB connection string - constructs DATABASE_URL from MongoDB dependency
-Supports both standalone and replicaset architectures
-Note: Always generates connection string; MongoDB may be deployed separately in GitOps
+PostgreSQL connection string - constructs DATABASE_URL from PostgreSQL dependency
+Supports both standalone and replication architectures
+Note: Always generates connection string; PostgreSQL may be deployed separately in GitOps
 */}}
-{{- define "hapihub.mongodb.connectionString" -}}
+{{- define "api.postgresql.connectionString" -}}
 {{- $release := .Release.Name -}}
-{{- $namespace := include "hapihub.namespace" . -}}
-{{- $database := .Values.mongodb.auth.database | default "hapihub" -}}
-{{- $replicaSet := .Values.mongodb.replicaSetName | default "rs0" -}}
-{{- $architecture := .Values.mongodb.architecture | default "replicaset" -}}
-{{- $replicaCount := .Values.mongodb.replicaCount | default 1 -}}
-{{- if eq $architecture "replicaset" -}}
-{{- $hosts := list -}}
-{{- range $i := until (int $replicaCount) -}}
-{{- $hosts = append $hosts (printf "%s-mongodb-%d.%s-mongodb-headless.%s.svc.cluster.local:27017" $release $i $release $namespace) -}}
-{{- end -}}
-mongodb://root:${MONGODB_ROOT_PASSWORD}@{{ join "," $hosts }}/{{ $database }}?replicaSet={{ $replicaSet }}
+{{- $namespace := include "api.namespace" . -}}
+{{- $database := .Values.postgresql.auth.database | default "monobase" -}}
+{{- $username := .Values.postgresql.auth.username | default "monobase" -}}
+{{- $architecture := .Values.postgresql.architecture | default "replication" -}}
+{{- if eq $architecture "replication" -}}
+{{- /* Use primary for writes */ -}}
+postgresql://{{ $username }}:${POSTGRESQL_PASSWORD}@{{ $release }}-postgresql-primary.{{ $namespace }}.svc.cluster.local:5432/{{ $database }}
 {{- else -}}
-mongodb://root:${MONGODB_ROOT_PASSWORD}@{{ $release }}-mongodb.{{ $namespace }}.svc.cluster.local:27017/{{ $database }}
+{{- /* Standalone mode */ -}}
+postgresql://{{ $username }}:${POSTGRESQL_PASSWORD}@{{ $release }}-postgresql.{{ $namespace }}.svc.cluster.local:5432/{{ $database }}
 {{- end -}}
 {{- end }}
 
 {{/*
-Typesense URL - constructs connection URL from Typesense dependency
+Valkey (Redis) URL - constructs connection URL from Valkey dependency
 */}}
-{{- define "hapihub.typesense.url" -}}
-{{- if .Values.typesense.enabled -}}
+{{- define "api.valkey.url" -}}
+{{- if .Values.valkey.enabled -}}
 {{- $release := .Release.Name -}}
-{{- $namespace := include "hapihub.namespace" . -}}
-http://{{ $release }}-typesense.{{ $namespace }}.svc.cluster.local:8108
+{{- $namespace := include "api.namespace" . -}}
+redis://{{ $release }}-valkey-master.{{ $namespace }}.svc.cluster.local:6379
 {{- end -}}
 {{- end }}
 
 {{/*
 MinIO URL - constructs connection URL from MinIO dependency
 */}}
-{{- define "hapihub.minio.url" -}}
+{{- define "api.minio.url" -}}
 {{- if .Values.minio.enabled -}}
 {{- $release := .Release.Name -}}
-{{- $namespace := include "hapihub.namespace" . -}}
+{{- $namespace := include "api.namespace" . -}}
 http://{{ $release }}-minio.{{ $namespace }}.svc.cluster.local:9000
 {{- end -}}
 {{- end }}
@@ -160,10 +157,10 @@ http://{{ $release }}-minio.{{ $namespace }}.svc.cluster.local:9000
 {{/*
 Mailpit SMTP URL - constructs connection URL from Mailpit dependency
 */}}
-{{- define "hapihub.mailpit.url" -}}
+{{- define "api.mailpit.url" -}}
 {{- if .Values.mailpit.enabled -}}
 {{- $release := .Release.Name -}}
-{{- $namespace := include "hapihub.namespace" . -}}
+{{- $namespace := include "api.namespace" . -}}
 smtp://{{ $release }}-mailpit.{{ $namespace }}.svc.cluster.local:1025
 {{- end -}}
 {{- end }}

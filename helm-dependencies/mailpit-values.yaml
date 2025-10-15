@@ -75,11 +75,11 @@ gateway:
 networkPolicy:
   enabled: true
   ingress:
-    # Allow SMTP from HapiHub
+    # Allow SMTP from Monobase API
     - from:
         - podSelector:
             matchLabels:
-              app.kubernetes.io/name: hapihub
+              app.kubernetes.io/name: api
       ports:
         - protocol: TCP
           port: 1025
@@ -108,7 +108,7 @@ readinessProbe:
   initialDelaySeconds: 5
   periodSeconds: 5
 
-# HapiHub SMTP Configuration (when Mailpit is enabled):
+# Monobase API SMTP Configuration (when Mailpit is enabled):
 # SMTP_HOST: mailpit-svc.{namespace}.svc.cluster.local
 # SMTP_PORT: 1025
 # SMTP_SECURE: false

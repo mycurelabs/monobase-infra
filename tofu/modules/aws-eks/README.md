@@ -173,7 +173,7 @@ cd ../../..
 ./scripts/new-client-config.sh client-a client-a.com
 
 # Deploy via ArgoCD or Helm
-helm install hapihub charts/hapihub -f config/client-a/values-production.yaml
+helm install api charts/api -f config/client-a/values-production.yaml
 ```
 
 ## Requirements
