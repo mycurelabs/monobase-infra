@@ -64,7 +64,7 @@ monobase-infra/
 - ✅ Existing Kubernetes cluster (EKS, AKS, GKE, or self-hosted)
 - ✅ kubectl configured and authenticated
 - ✅ Helm 3.x installed
-- ✅ Cluster meets [minimum requirements](docs/INFRASTRUCTURE-REQUIREMENTS.md)
+- ✅ Cluster meets [minimum requirements](docs/getting-started/INFRASTRUCTURE-REQUIREMENTS.md)
 
 **Minimum Cluster Specs:**
 - 3 worker nodes
@@ -359,15 +359,33 @@ monobase-infra/                   # Base template repository
 
 ## 📚 Documentation
 
-- **[TEMPLATE-USAGE.md](docs/TEMPLATE-USAGE.md)** - Fork workflow and template maintenance
-- **[CLIENT-ONBOARDING.md](docs/CLIENT-ONBOARDING.md)** - Step-by-step client setup guide
-- **[VALUES-REFERENCE.md](docs/VALUES-REFERENCE.md)** - All configuration parameters
-- **[DEPLOYMENT.md](docs/DEPLOYMENT.md)** - Deployment procedures
-- **[ARCHITECTURE.md](docs/ARCHITECTURE.md)** - Architecture deep-dive
-- **[GATEWAY-API.md](docs/GATEWAY-API.md)** - Envoy Gateway and HTTPRoutes
-- **[SECURITY-HARDENING.md](docs/SECURITY-HARDENING.md)** - Security best practices
-- **[BACKUP-RECOVERY.md](docs/BACKUP-RECOVERY.md)** - Backup strategies and DR
-- **[SCALING-GUIDE.md](docs/SCALING-GUIDE.md)** - HPA and storage expansion
+**See [docs/INDEX.md](docs/INDEX.md) for complete documentation index.**
+
+### Quick Links
+
+**🚀 Getting Started:**
+- [Client Onboarding](docs/getting-started/CLIENT-ONBOARDING.md) - Fork, configure, deploy
+- [Deployment Guide](docs/getting-started/DEPLOYMENT.md) - Step-by-step deployment
+- [Configuration Profiles](config/profiles/README.md) - Profile-based config workflow
+
+**🏗️ Architecture:**
+- [System Architecture](docs/architecture/ARCHITECTURE.md) - Design decisions, components
+- [GitOps with ArgoCD](docs/architecture/GITOPS-ARGOCD.md) - App-of-Apps pattern
+- [Gateway API](docs/architecture/GATEWAY-API.md) - Envoy Gateway, HTTPRoutes
+- [Storage](docs/architecture/STORAGE.md) - Longhorn, cloud CSI drivers
+
+**⚙️ Operations:**
+- [Backup & DR](docs/operations/BACKUP_DR.md) - 3-tier backup, disaster recovery
+- [Scaling Guide](docs/operations/SCALING-GUIDE.md) - HPA, storage expansion
+- [Troubleshooting](docs/operations/TROUBLESHOOTING.md) - Common issues
+
+**🔐 Security:**
+- [Security Hardening](docs/security/SECURITY-HARDENING.md) - Best practices
+- [Compliance](docs/security/SECURITY_COMPLIANCE.md) - HIPAA, SOC2, GDPR
+
+**📖 Reference:**
+- [Values Reference](docs/reference/VALUES-REFERENCE.md) - All configuration parameters
+- [Optimization Summary](docs/reference/OPTIMIZATION-SUMMARY.md) - Simplification history
 
 ## 🔄 Syncing Upstream Changes
 
