@@ -174,18 +174,35 @@ monitoring:
 # ===== Backup (Velero) =====
 backup:
   enabled: true
+  provider: aws  # Options: aws, azure, gcp
+  bucket: ""  # ⚠️ REQUIRED: Set to your backup bucket (e.g., myclient-prod-backups)
+  region: ""  # ⚠️ REQUIRED: Set to your region (e.g., us-east-1)
+  credentialSecret: velero-credentials  # Created by External Secrets
+
+  encryption:
+    enabled: true
+    type: AES256
+    kmsKeyId: ""  # Optional: AWS KMS key for SSE-KMS
 
   schedules:
-    # Daily full backup
+    # Daily full backup (recommended for production)
     daily:
       enabled: true
       schedule: "0 2 * * *"
       retention: 720h  # 30 days
 
-    # Hourly critical data (optional)
+    # Hourly critical data (optional - enable for RPO <1 day)
     hourly:
       enabled: false
+      schedule: "0 * * * *"
       retention: 72h
+
+    # Weekly archive (optional - for compliance)
+    weekly:
+      enabled: false
+      schedule: "0 3 * * 0"  # Sunday 3 AM
+      retention: 2160h  # 90 days
+      storageLocation: default
 
 # ===== Security =====
 networkPolicies:

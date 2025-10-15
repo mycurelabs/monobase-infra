@@ -1,59 +1,15 @@
 # Velero Kubernetes Backup - Helm Values
 # Chart: https://vmware-tanzu.github.io/helm-charts/
 # Version: 6.x+
+#
+# This is a cluster-wide Velero installation.
+# Backup storage locations and schedules are configured per-client in their Helm values.
 
 # Velero configuration
 configuration:
-  # Backup storage locations
-  backupStorageLocation:
-    - name: default
-      provider: aws
-      bucket: ""  # Set in client config: myclient-prod-backups
-      prefix: velero  # Prefix in bucket
-      default: true
-
-      config:
-        region: ""  # Set in client config: us-east-1
-        s3ForcePathStyle: "false"
-        s3Url: ""  # Leave empty for AWS S3
-        publicUrl: ""
-        serverSideEncryption: AES256  # Encrypted backups
-        # For SSE-KMS:
-        # kmsKeyId: "arn:aws:kms:us-east-1:123456789012:key/key-id"
-
-      # Access mode
-      accessMode: ReadWrite
-
-      # Validation frequency
-      validationFrequency: 24h
-
-    # Archive location (cold storage for weekly backups)
-    - name: archive
-      provider: aws
-      bucket: ""  # Set in client config: myclient-prod-archive
-      prefix: velero-archive
-      default: false
-
-      config:
-        region: ""
-        s3ForcePathStyle: "false"
-        serverSideEncryption: AES256
-
-      accessMode: ReadWrite
-
-  # Volume snapshot locations
-  volumeSnapshotLocation:
-    - name: default
-      provider: aws
-      config:
-        region: ""  # Set in client config
 
   # Default backup TTL
   defaultBackupTTL: 720h  # 30 days
-
-  # Backup storage validation
-  defaultBackupStorageLocation: default
-  defaultVolumeSnapshotLocations: aws:default
 
   # Resource filters
   defaultVolumesToFsBackup: true  # Use restic/kopia for PVC backups
@@ -189,8 +145,6 @@ features: |-
 #   -n velero --create-namespace \
 #   -f helm-values.yaml
 
-# Post-installation:
-# 1. Create velero-credentials secret (via External Secrets)
-# 2. Deploy backup schedules (see backup-schedules/)
-# 3. Test backup: velero backup create test-backup --include-namespaces myclient-prod
-# 4. Verify: velero backup describe test-backup
+# Note: Backup schedules and storage locations are configured per-client
+# in their Helm charts (charts/api/templates/velero-schedules.yaml).
+# Each client configures their backup settings in config/{client}/values-{env}.yaml
