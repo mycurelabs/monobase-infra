@@ -96,11 +96,15 @@ If you need to create Kubernetes clusters, use these tools **before** deploying 
 
 ## 🚀 Quick Start
 
-### Choose Your Path
+**One Command Deployment:** Empty cluster → Running applications
 
-#### **Track 1: I Already Have a Kubernetes Cluster** ✅ (Most Common)
+### Prerequisites
 
-If you already have an EKS/AKS/GKE/K3s cluster:
+- Existing Kubernetes cluster (EKS, AKS, GKE, K3s, or any distribution)
+- `kubectl` configured and authenticated
+- `helm` 3.x installed
+
+### Deploy Everything
 
 ```bash
 # 1. Fork and clone
@@ -117,19 +121,31 @@ vim config/myclient/values-production.yaml
 #   - global.namespace: myclient-prod
 #   - api.image.tag: "5.215.2" (pin version)
 #   - account.image.tag: "1.0.0" (pin version)
-# Optional: Adjust resources, storage sizes, enable components
 # Keep it minimal! (~60 lines vs 430 lines)
 
-# 5. Deploy infrastructure
-kubectl apply -f infrastructure/
-
-# 6. Deploy applications  
-helm install myclient-prod charts/api \
-  --values config/myclient/values-production.yaml \
-  --namespace myclient-prod --create-namespace
+# 4. Bootstrap entire stack (ArgoCD + all infrastructure + applications)
+./scripts/bootstrap.sh --client myclient --env production
 ```
 
-**You can skip the `tofu/` directory entirely!**
+**That's it!** The bootstrap script:
+- ✅ Installs ArgoCD (if not present)
+- ✅ Deploys all infrastructure via GitOps
+- ✅ Deploys applications with sync waves
+- ✅ Outputs ArgoCD UI access info
+
+### Monitor Deployment
+
+```bash
+# Access ArgoCD UI
+kubectl port-forward -n argocd svc/argocd-server 8080:443
+# Open: https://localhost:8080
+
+# Check application status
+kubectl get applications -n argocd
+
+# View pods
+kubectl get pods -n myclient-prod
+```
 
 ---
 
