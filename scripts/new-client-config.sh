@@ -1,6 +1,6 @@
 #!/bin/bash
 # new-client-config.sh
-# Bootstrap script to create new client configuration from example.com reference
+# Bootstrap script to create new client configuration from profile templates
 
 set -e
 
@@ -13,28 +13,60 @@ NC='\033[0m' # No Color
 
 # Usage function
 usage() {
-    echo "Usage: $0 <client-name> <client-domain>"
+    echo "Usage: $0 <client-name> <client-domain> [--profile production|staging]"
     echo ""
-    echo "Creates a new client configuration from the example.com reference."
+    echo "Creates a new client configuration from base profile templates."
     echo ""
     echo "Arguments:"
     echo "  client-name    Client identifier (lowercase, no spaces)"
     echo "  client-domain  Client's domain (e.g., myclient.com)"
     echo ""
+    echo "Options:"
+    echo "  --profile      Base profile to use (default: production)"
+    echo "                 - production: Full HA setup with backups"
+    echo "                 - staging: Single replicas, Mailpit enabled"
+    echo ""
     echo "Example:"
     echo "  $0 myclient myclient.com"
+    echo "  $0 myclient myclient.com --profile staging"
     echo ""
     exit 1
 }
 
-# Check arguments
-if [ $# -ne 2 ]; then
+# Parse arguments
+CLIENT_NAME=""
+CLIENT_DOMAIN=""
+PROFILE="production"
+
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --profile)
+            PROFILE="$2"
+            shift 2
+            ;;
+        -h|--help)
+            usage
+            ;;
+        *)
+            if [ -z "$CLIENT_NAME" ]; then
+                CLIENT_NAME="$1"
+                shift
+            elif [ -z "$CLIENT_DOMAIN" ]; then
+                CLIENT_DOMAIN="$1"
+                shift
+            else
+                echo -e "${RED}Error: Unknown argument: $1${NC}"
+                usage
+            fi
+            ;;
+    esac
+done
+
+# Check required arguments
+if [ -z "$CLIENT_NAME" ] || [ -z "$CLIENT_DOMAIN" ]; then
     echo -e "${RED}Error: Missing required arguments${NC}"
     usage
 fi
-
-CLIENT_NAME=$1
-CLIENT_DOMAIN=$2
 
 # Validate client name (lowercase, alphanumeric, hyphens only)
 if ! [[ "$CLIENT_NAME" =~ ^[a-z0-9-]+$ ]]; then
@@ -55,9 +87,22 @@ if [ -d "config/$CLIENT_NAME" ]; then
     exit 1
 fi
 
+# Validate profile
+if [[ "$PROFILE" != "production" && "$PROFILE" != "staging" ]]; then
+    echo -e "${RED}Error: Invalid profile. Must be 'production' or 'staging'${NC}"
+    exit 1
+fi
+
 # Check if we're in the repository root
-if [ ! -f "README.md" ] || [ ! -d "config/example.com" ]; then
+if [ ! -f "README.md" ] || [ ! -d "config/profiles" ]; then
     echo -e "${RED}Error: Must run from repository root${NC}"
+    exit 1
+fi
+
+# Check if profile exists
+PROFILE_FILE="config/profiles/${PROFILE}-base.yaml"
+if [ ! -f "$PROFILE_FILE" ]; then
+    echo -e "${RED}Error: Profile not found: $PROFILE_FILE${NC}"
     exit 1
 fi
 
@@ -67,6 +112,7 @@ echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━�
 echo ""
 echo -e "Client Name:   ${GREEN}$CLIENT_NAME${NC}"
 echo -e "Client Domain: ${GREEN}$CLIENT_DOMAIN${NC}"
+echo -e "Base Profile:  ${GREEN}$PROFILE${NC}"
 echo ""
 
 # Confirm before proceeding
@@ -78,118 +124,177 @@ if [[ ! $REPLY =~ ^[Yy]$ ]]; then
 fi
 
 echo ""
-echo -e "${BLUE}[1/4] Copying reference configuration...${NC}"
+echo -e "${BLUE}[1/3] Creating client configuration directory...${NC}"
 
-# Copy example.com to client directory
-cp -r config/example.com config/$CLIENT_NAME
+# Create client directory
+mkdir -p config/$CLIENT_NAME
 
-echo -e "${GREEN}✓ Copied config/example.com → config/$CLIENT_NAME${NC}"
-
-echo ""
-echo -e "${BLUE}[2/4] Replacing placeholders...${NC}"
-
-# Replace placeholders in all files
-# Using sed -i.bak for cross-platform compatibility (macOS and Linux)
-find config/$CLIENT_NAME -type f -exec sed -i.bak \
-    -e "s/example\.com/$CLIENT_DOMAIN/g" \
-    -e "s/example-prod/$CLIENT_NAME-prod/g" \
-    -e "s/example-staging/$CLIENT_NAME-staging/g" \
-    -e "s/example/$CLIENT_NAME/g" \
-    {} \;
-
-# Clean up backup files
-find config/$CLIENT_NAME -type f -name "*.bak" -delete
-
-echo -e "${GREEN}✓ Replaced example.com → $CLIENT_DOMAIN${NC}"
-echo -e "${GREEN}✓ Replaced example → $CLIENT_NAME${NC}"
+echo -e "${GREEN}✓ Created config/$CLIENT_NAME/${NC}"
 
 echo ""
-echo -e "${BLUE}[3/4] Updating README...${NC}"
+echo -e "${BLUE}[2/3] Creating minimal configuration from profile...${NC}"
+
+# Create production values file with minimal overrides
+cat > config/$CLIENT_NAME/values-production.yaml << EOF
+# $CLIENT_NAME Production Configuration
+# Based on: $PROFILE-base.yaml profile
+#
+# This file contains ONLY client-specific overrides.
+# All other settings are inherited from config/profiles/$PROFILE-base.yaml
+#
+# Keep this file minimal (~60 lines) by only overriding what's different.
+
+global:
+  domain: $CLIENT_DOMAIN
+  namespace: $CLIENT_NAME-prod
+  environment: production
+
+# REQUIRED: Pin specific image versions (never use "latest" in production)
+api:
+  image:
+    tag: "5.215.2"  # TODO: Update to your API version
+
+account:
+  image:
+    tag: "1.0.0"  # TODO: Update to your Account version
+
+# Optional: Override resource limits if needed
+# api:
+#   resources:
+#     limits:
+#       cpu: "2000m"
+#       memory: "4Gi"
+
+# Optional: Override storage sizes if needed
+# postgresql:
+#   persistence:
+#     size: 200Gi  # Default: 50Gi
+
+# Optional: Enable/disable components
+# minio:
+#   enabled: false  # Use cloud S3 instead
+#
+# mailpit:
+#   enabled: false  # Production uses real SMTP
+EOF
+
+# Create staging values file if using staging profile
+if [ "$PROFILE" == "staging" ]; then
+    cat > config/$CLIENT_NAME/values-staging.yaml << EOF
+# $CLIENT_NAME Staging Configuration
+# Based on: staging-base.yaml profile
+
+global:
+  domain: staging.$CLIENT_DOMAIN
+  namespace: $CLIENT_NAME-staging
+  environment: staging
+
+# Pin image versions
+api:
+  image:
+    tag: "latest"  # OK for staging
+
+account:
+  image:
+    tag: "latest"  # OK for staging
+EOF
+    echo -e "${GREEN}✓ Created values-staging.yaml${NC}"
+fi
+
+echo -e "${GREEN}✓ Created values-production.yaml (minimal overrides only)${NC}"
+
+echo ""
+echo -e "${BLUE}[3/3] Creating README...${NC}"
 
 # Update the README in client config
 cat > config/$CLIENT_NAME/README.md << EOF
 # Configuration for $CLIENT_NAME
 
-Client: **$CLIENT_NAME**  
+Client: **$CLIENT_NAME**
 Domain: **$CLIENT_DOMAIN**
+Base Profile: **$PROFILE**
 
 ## Files
 
-- \`values-staging.yaml\` - Staging environment configuration
-- \`values-production.yaml\` - Production environment configuration
-- \`secrets-mapping.yaml\` - KMS secret path mappings
+- \`values-production.yaml\` - Production configuration (minimal overrides only)
+- \`values-staging.yaml\` - Staging configuration (if applicable)
+
+## Profile-Based Configuration
+
+This configuration inherits from \`config/profiles/$PROFILE-base.yaml\`.
+
+**Keep your configuration minimal!** Only override values that are different from the base profile:
+- Domain and namespace (required)
+- Image tags (required - pin specific versions)
+- Resource limits (only if different from profile)
+- Storage sizes (only if different from profile)
+
+**Target:** ~60 lines instead of 430 lines
 
 ## Next Steps
 
-1. **Review and customize configuration:**
+1. **Review and customize minimal overrides:**
    \`\`\`bash
    vim config/$CLIENT_NAME/values-production.yaml
    \`\`\`
 
-2. **Key items to configure:**
-   - Image tags (replace "latest" with specific versions)
-   - Resource limits (CPU, memory)
-   - Storage sizes (MongoDB, MinIO)
-   - Replica counts
-   - Optional components (api, minio, valkey)
+2. **Update image tags to specific versions:**
+   - Replace TODO comments with actual version numbers
+   - Never use "latest" in production
 
-3. **Configure secrets management:**
-   \`\`\`bash
-   vim config/$CLIENT_NAME/secrets-mapping.yaml
-   \`\`\`
-   Update with your KMS paths (AWS, Azure, GCP, or SOPS)
+3. **Add overrides only if needed:**
+   - Resource limits (if different from profile defaults)
+   - Storage sizes (if different from profile defaults)
+   - Component toggles (minio, mailpit, etc.)
 
-4. **Create secrets in your KMS:**
-   - MongoDB credentials
-   - Monobase API secrets (JWT, database URL, S3, SMTP)
-   - MinIO credentials (if self-hosted)
-   - TLS certificates (if not using cert-manager)
-
-5. **Commit configuration:**
+4. **Commit configuration:**
    \`\`\`bash
    git add config/$CLIENT_NAME/
    git commit -m "Add $CLIENT_NAME configuration"
    git push origin main
    \`\`\`
 
-6. **Deploy infrastructure:**
-   See [CLIENT-ONBOARDING.md](../../docs/CLIENT-ONBOARDING.md) for deployment steps.
+5. **Bootstrap deployment (one command!):**
+   \`\`\`bash
+   ./scripts/bootstrap.sh --client $CLIENT_NAME --env production
+   \`\`\`
 
 ## Support
 
 - Documentation: [docs/](../../docs/)
+- Profile Documentation: [config/profiles/README.md](../profiles/README.md)
 EOF
 
 echo -e "${GREEN}✓ Created custom README${NC}"
-
-echo ""
-echo -e "${BLUE}[4/4] Creating directory structure...${NC}"
-
-# Create rendered output directory (for template rendering)
-mkdir -p rendered/$CLIENT_NAME
-
-echo -e "${GREEN}✓ Created rendered/$CLIENT_NAME/${NC}"
 
 echo ""
 echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo -e "${GREEN}✓ Client configuration created successfully!${NC}"
 echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
+echo -e "${YELLOW}Configuration Summary:${NC}"
+echo -e "  Base Profile:  ${GREEN}$PROFILE-base.yaml${NC}"
+echo -e "  Config File:   ${GREEN}config/$CLIENT_NAME/values-production.yaml${NC}"
+echo -e "  Approach:      ${GREEN}Minimal overrides only (~60 lines)${NC}"
+echo ""
 echo -e "${YELLOW}Next steps:${NC}"
 echo ""
-echo -e "1. Customize your configuration:"
+echo -e "1. Review and update image tags (REQUIRED):"
 echo -e "   ${BLUE}vim config/$CLIENT_NAME/values-production.yaml${NC}"
+echo -e "   ${YELLOW}→ Replace TODO comments with actual version numbers${NC}"
 echo ""
-echo -e "2. Update secrets mapping:"
-echo -e "   ${BLUE}vim config/$CLIENT_NAME/secrets-mapping.yaml${NC}"
+echo -e "2. Add overrides only if needed (optional):"
+echo -e "   - Resource limits (if different from profile)"
+echo -e "   - Storage sizes (if different from profile)"
+echo -e "   - Component toggles (minio, mailpit, etc.)"
 echo ""
-echo -e "3. Create secrets in your KMS"
-echo ""
-echo -e "4. Commit your configuration:"
+echo -e "3. Commit your configuration:"
 echo -e "   ${BLUE}git add config/$CLIENT_NAME/${NC}"
 echo -e "   ${BLUE}git commit -m \"Add $CLIENT_NAME configuration\"${NC}"
 echo -e "   ${BLUE}git push origin main${NC}"
 echo ""
-echo -e "5. Deploy infrastructure:"
-echo -e "   See ${BLUE}docs/CLIENT-ONBOARDING.md${NC} for deployment steps"
+echo -e "4. Bootstrap entire stack (one command!):"
+echo -e "   ${BLUE}./scripts/bootstrap.sh --client $CLIENT_NAME --env production${NC}"
+echo ""
+echo -e "📖 See ${BLUE}config/profiles/README.md${NC} for profile-based configuration guide"
 echo ""

@@ -117,6 +117,7 @@ echo ""
 # Create output directories
 mkdir -p "$OUTPUT_DIR/charts"
 mkdir -p "$OUTPUT_DIR/infrastructure"
+mkdir -p "$OUTPUT_DIR/bootstrap"
 mkdir -p "$OUTPUT_DIR/argocd"
 
 echo -e "${BLUE}[1/3] Rendering Helm charts...${NC}"
@@ -169,9 +170,9 @@ echo -e "${GREEN}✓${NC}"
 
 # Render ArgoCD HTTPRoute
 echo -n "  - ArgoCD HTTPRoute... "
-render_template \\
-    "infrastructure/argocd/httproute.yaml.template" \\
-    "$OUTPUT_DIR/infrastructure/argocd-httproute.yaml"
+render_template \
+    "bootstrap/argocd/httproute.yaml.template" \
+    "$OUTPUT_DIR/bootstrap/argocd-httproute.yaml"
 echo -e "${GREEN}✓${NC}"
 
 # Render Monitoring HTTPRoute

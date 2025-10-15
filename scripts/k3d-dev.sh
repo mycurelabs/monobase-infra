@@ -176,25 +176,25 @@ deploy_gateway_api() {
 }
 
 deploy_apps() {
-  log_info "Deploying applications..."
+  log_info "Deploying applications via bootstrap script..."
 
   if [ ! -f "$VALUES_FILE" ]; then
     log_error "Values file not found: $VALUES_FILE"
     return 1
   fi
 
-  # Create namespace
-  kubectl create namespace "$NAMESPACE" --dry-run=client -o yaml | kubectl apply -f - &> /dev/null
+  # Get script directory
+  local script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-  # Install Monobase API (which includes dependencies)
-  helm upgrade --install api charts/api \
-    -f "$VALUES_FILE" \
-    -n "$NAMESPACE" \
-    --wait \
-    --timeout 5m \
+  # Use bootstrap script to deploy everything
+  "$script_dir/bootstrap.sh" \
+    --client monobase \
+    --env dev \
+    --values "$VALUES_FILE" \
+    --k3d \
     &> /dev/null
 
-  log_success "Applications deployed"
+  log_success "Applications deployed via bootstrap"
 }
 
 configure_hosts() {
@@ -369,125 +369,33 @@ mirror_to_forgejo() {
   log_success "Repository mirrored to Forgejo"
 }
 
-setup_argocd_gitops() {
-  log_info "Installing ArgoCD..."
+setup_gitops_deployment() {
+  log_info "Deploying via GitOps (ArgoCD + root-app)..."
 
-  # Create argocd namespace
-  kubectl create namespace argocd --dry-run=client -o yaml | kubectl apply -f - &> /dev/null
+  if [ ! -f "$VALUES_FILE" ]; then
+    log_error "Values file not found: $VALUES_FILE"
+    return 1
+  fi
 
-  # Install ArgoCD
-  kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml &> /dev/null
+  # Get script directory
+  local script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-  log_success "ArgoCD installed"
+  # Use bootstrap script to deploy everything via GitOps
+  # This will:
+  # 1. Install ArgoCD (if not present)
+  # 2. Render templates
+  # 3. Deploy root-app (App-of-Apps pattern)
+  "$script_dir/bootstrap.sh" \
+    --client monobase \
+    --env dev \
+    --values "$VALUES_FILE" \
+    --k3d \
+    &> /dev/null
 
-  # Wait for ArgoCD to be ready
-  log_info "Waiting for ArgoCD to be ready..."
-  kubectl wait --for=condition=available deployment/argocd-server -n argocd --timeout=180s &> /dev/null
-
-  log_success "ArgoCD is ready"
+  log_success "GitOps deployment complete"
 }
 
-deploy_apps_gitops() {
-  log_info "Deploying applications via ArgoCD..."
-
-  # Create ArgoCD Applications
-  cat <<EOF | kubectl apply -f - &> /dev/null
----
-apiVersion: argoproj.io/v1alpha1
-kind: Application
-metadata:
-  name: monobase-dev-postgresql
-  namespace: argocd
-  annotations:
-    argocd.argoproj.io/sync-wave: "1"
-spec:
-  project: default
-  source:
-    path: charts/api/charts
-    repoURL: http://forgejo-http.git.svc.cluster.local:3000/gitea_admin/monobase-infra.git
-    targetRevision: main
-    helm:
-      releaseName: api-postgresql
-      valueFiles:
-        - ../../config/k3d-local/values-development.yaml
-      parameters:
-        - name: postgresql.enabled
-          value: "true"
-  destination:
-    server: https://kubernetes.default.svc
-    namespace: $NAMESPACE
-  syncPolicy:
-    automated:
-      prune: true
-      selfHeal: true
-    syncOptions:
-      - CreateNamespace=true
----
-apiVersion: argoproj.io/v1alpha1
-kind: Application
-metadata:
-  name: monobase-dev-api
-  namespace: argocd
-  annotations:
-    argocd.argoproj.io/sync-wave: "2"
-spec:
-  project: default
-  source:
-    path: charts/api
-    repoURL: http://forgejo-http.git.svc.cluster.local:3000/gitea_admin/monobase-infra.git
-    targetRevision: main
-    helm:
-      releaseName: api
-      valueFiles:
-        - ../../config/k3d-local/values-development.yaml
-      parameters:
-        - name: postgresql.enabled
-          value: "false"
-  destination:
-    server: https://kubernetes.default.svc
-    namespace: $NAMESPACE
-  syncPolicy:
-    automated:
-      prune: true
-      selfHeal: true
-    syncOptions:
-      - CreateNamespace=false
----
-apiVersion: argoproj.io/v1alpha1
-kind: Application
-metadata:
-  name: monobase-dev-account
-  namespace: argocd
-  annotations:
-    argocd.argoproj.io/sync-wave: "3"
-spec:
-  project: default
-  source:
-    path: charts/account
-    repoURL: http://forgejo-http.git.svc.cluster.local:3000/gitea_admin/monobase-infra.git
-    targetRevision: main
-    helm:
-      releaseName: account
-      valueFiles:
-        - ../../config/k3d-local/values-development.yaml
-  destination:
-    server: https://kubernetes.default.svc
-    namespace: $NAMESPACE
-  syncPolicy:
-    automated:
-      prune: true
-      selfHeal: true
-    syncOptions:
-      - CreateNamespace=false
-EOF
-
-  log_success "ArgoCD Applications created"
-
-  log_info "Waiting for applications to sync..."
-  sleep 10
-
-  log_success "Applications deployed via GitOps"
-}
+# deploy_apps_gitops function removed - now handled by setup_gitops_deployment via bootstrap.sh
 
 show_gitops_status() {
   echo ""
@@ -557,8 +465,7 @@ cmd_up() {
   if [ "$GITOPS_MODE" = true ]; then
     setup_forgejo
     mirror_to_forgejo
-    setup_argocd_gitops
-    deploy_apps_gitops
+    setup_gitops_deployment
   else
     deploy_apps
   fi
