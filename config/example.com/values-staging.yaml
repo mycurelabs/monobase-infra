@@ -123,7 +123,7 @@ postgresql:
 
   persistence:
     enabled: true
-    storageClass: longhorn
+    storageClass: ""  # Auto-detect from global.storage.provider
     size: 20Gi  # Small for staging
 
   resources:
@@ -146,7 +146,7 @@ postgresql:
 
   persistence:
     enabled: true
-    storageClass: longhorn
+    storageClass: ""  # Auto-detect from global.storage.provider
     size: 10Gi
 
   resources:
@@ -166,7 +166,7 @@ minio:
 
   persistence:
     enabled: true
-    storageClass: longhorn
+    storageClass: ""  # Auto-detect from global.storage.provider
     size: 50Gi  # Small for staging
 
   resources:

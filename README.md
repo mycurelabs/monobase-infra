@@ -222,11 +222,29 @@ kubectl port-forward -n argocd svc/argocd-server 8080:443
 |-----------|-----------|---------|
 | Gateway | Envoy Gateway | Shared Gateway API routing, zero-downtime updates |
 | API Backend | Monobase API | Core API service |
-| Frontend | Monobase Account | Vue.js frontend application |
-| Database | PostgreSQL 7.x | Primary datastore with replication |
-| Storage | Longhorn | Distributed block storage for StatefulSets |
+| Frontend | Monobase Account | React/Vite frontend application |
+| Database | PostgreSQL 16.x | Primary datastore with replication |
+| Storage | Cloud-native or Longhorn | Persistent storage for databases |
 | GitOps | ArgoCD | Declarative deployments with web UI |
 | Secrets | External Secrets Operator | KMS integration (AWS/Azure/GCP/SOPS) |
+
+### Storage Provider Options
+
+The infrastructure **automatically selects** the appropriate storage provider based on `global.storage.provider`:
+
+| Provider | Use When | StorageClass | Auto-Deploy Longhorn? |
+|----------|----------|--------------|----------------------|
+| `ebs-csi` | **AWS EKS** | `gp3` | ❌ No (uses native EBS) |
+| `azure-disk` | **Azure AKS** | `managed-premium` | ❌ No (uses Azure Disk) |
+| `gcp-pd` | **GCP GKE** | `pd-ssd` | ❌ No (uses GCP PD) |
+| `longhorn` | **On-prem/Bare-metal** | `longhorn` | ✅ Yes (self-hosted storage) |
+| `local-path` | **k3d/k3s dev** | `local-path` | ❌ No (local development) |
+| `cloud-default` | **Any cloud** | (cluster default) | ❌ No (uses provider default) |
+
+**Recommendation:**
+- **Cloud deployments** (EKS/AKS/GKE): Use native CSI drivers (`ebs-csi`, `azure-disk`, `gcp-pd`)
+- **On-premises/bare-metal**: Use `longhorn` for distributed block storage
+- **Development**: Use `local-path` for simplicity
 
 ### Optional Add-On Components
 
