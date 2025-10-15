@@ -1,0 +1,41 @@
+# ArgoCD Application: Falco Custom Rules
+# Sync Wave 2 - Deploy custom rules after Falco DaemonSet
+# Only deployed if security.falco.enabled=true
+
+{{- if .Values.security.falco.enabled }}
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: falco-rules
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+
+  source:
+    repoURL: {{ .Values.argocd.repoURL }}
+    targetRevision: {{ .Values.argocd.targetRevision | default "main" }}
+    path: infrastructure/security-tools/falco/rules
+    directory:
+      recurse: false
+      include: '{api-rules.yaml,database-rules.yaml}'
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: falco
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false
+    retry:
+      limit: 5
+      backoff:
+        duration: 10s
+        maxDuration: 3m
+{{- end }}

@@ -242,52 +242,106 @@ curl http://mining-pool.com:3333
 
 ## Installation
 
-### Prerequisites
+### GitOps Deployment (Recommended)
 
-```bash
-# Add Helm repositories
-helm repo add kyverno https://kyverno.github.io/kyverno/
-helm repo add falcosecurity https://falcosecurity.github.io/charts
-helm repo update
+Security tools are deployed via ArgoCD along with all other infrastructure. **No manual installation required.**
+
+#### Enable Security Tools
+
+Edit your client config (`config/yourclient/values-{env}.yaml`):
+
+```yaml
+# Enable Kyverno (policy enforcement)
+security:
+  kyverno:
+    enabled: true  # Set to true to enable
+
+  falco:
+    enabled: true  # Set to true to enable
 ```
 
-### Install Kyverno
+#### Deployment Flow
 
-```bash
-# Install Kyverno controller (cluster-wide)
-helm install kyverno kyverno/kyverno \
-  --namespace kyverno \
-  --create-namespace \
-  --values infrastructure/security-tools/kyverno/helm-values.yaml
+When you enable security tools in your config:
 
-# Wait for Kyverno to be ready
-kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=kyverno -n kyverno --timeout=120s
+1. **Render templates:**
+   ```bash
+   helm template myclient charts/monobase \
+     -f config/yourclient/values-production.yaml \
+     --output-dir rendered/myclient-prod
+   ```
 
-# Apply policies
-kubectl apply -f infrastructure/security-tools/kyverno/policies/
+2. **Deploy via ArgoCD:**
+   ```bash
+   kubectl apply -f rendered/myclient-prod/monobase/templates/root-app.yaml
+   ```
 
-# Verify policies are installed
-kubectl get clusterpolicies
+3. **Verify deployment:**
+   ```bash
+   # Check Kyverno
+   kubectl get pods -n kyverno
+   kubectl get clusterpolicies
+
+   # Check Falco
+   kubectl get pods -n falco -o wide
+   kubectl logs -n falco -l app.kubernetes.io/name=falco --tail=20
+   ```
+
+#### Sync Waves
+
+Security tools deploy in the correct order automatically:
+
+- **Wave 0:** Kyverno controller
+- **Wave 1:** Kyverno policies, Falco DaemonSet
+- **Wave 2:** Falco custom rules
+
+ArgoCD ensures all dependencies are ready before proceeding to the next wave.
+
+### Configuration
+
+All configuration is managed through Helm values in your client config.
+
+**Production config example** (`config/profiles/production-base.yaml`):
+```yaml
+security:
+  kyverno:
+    enabled: false  # Set true for policy enforcement
+    replicaCount: 3  # HA for production
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+    # ... see config/profiles/production-base.yaml for full config
+
+  falco:
+    enabled: false  # Set true for runtime monitoring
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+    # ... see config/profiles/production-base.yaml for full config
 ```
 
-### Install Falco
+**Staging config example** (`config/profiles/staging-base.yaml`):
+```yaml
+security:
+  kyverno:
+    enabled: false  # Usually disabled in staging
+    replicaCount: 1  # Lower resources for staging
 
-```bash
-# Install Falco DaemonSet (per-node)
-helm install falco falcosecurity/falco \
-  --namespace falco \
-  --create-namespace \
-  --values infrastructure/security-tools/falco/helm-values.yaml
-
-# Verify Falco is running on all nodes
-kubectl get pods -n falco -o wide
-
-# Apply custom rules
-kubectl apply -f infrastructure/security-tools/falco/rules/
-
-# Check Falco logs
-kubectl logs -n falco -l app.kubernetes.io/name=falco --tail=20
+  falco:
+    enabled: false  # Usually disabled in staging
+    # Lower resources configured in staging profile
 ```
+
+### Customization
+
+To customize policies or rules:
+
+1. **Edit policies:** Modify files in `infrastructure/security-tools/kyverno/policies/`
+2. **Edit rules:** Modify files in `infrastructure/security-tools/falco/rules/`
+3. **Commit changes:** Changes are automatically synced by ArgoCD
+4. **ArgoCD selfHeal:** Policies/rules update within 3 minutes
 
 ## Testing
 

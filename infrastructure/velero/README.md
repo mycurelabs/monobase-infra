@@ -31,20 +31,43 @@ Velero provides Kubernetes-native backup and restore for disaster recovery.
 
 ## Installation
 
-### One-Time Cluster Setup
+### GitOps Deployment (Recommended)
 
-```bash
-# Install Velero CLI
-brew install velero  # macOS
-# Or download from https://velero.io/docs/main/basic-install/
+Velero is deployed via ArgoCD along with all other infrastructure. **No manual installation required.**
 
-# Install Velero server (once per cluster)
-helm repo add vmware-tanzu https://vmware-tanzu.github.io/helm-charts
-helm install velero vmware-tanzu/velero \
-  --namespace velero \
-  --create-namespace \
-  --values helm-values.yaml
-```
+Velero is **always enabled** for all environments because backups are critical for disaster recovery.
+
+#### Deployment Flow
+
+1. **Render templates:**
+   ```bash
+   helm template myclient charts/monobase \
+     -f config/yourclient/values-production.yaml \
+     --output-dir rendered/myclient-prod
+   ```
+
+2. **Deploy via ArgoCD:**
+   ```bash
+   kubectl apply -f rendered/myclient-prod/monobase/templates/root-app.yaml
+   ```
+
+3. **Verify deployment:**
+   ```bash
+   # Check Velero controller
+   kubectl get pods -n velero
+
+   # Check backup schedules
+   velero schedule get
+   ```
+
+#### Sync Waves
+
+Velero deploys automatically:
+
+- **Wave 1:** Velero controller (cluster-wide, once per cluster)
+- **Wave 2:** Per-client backup schedules (from API chart)
+
+ArgoCD ensures the controller is ready before creating schedules.
 
 ### Per-Client Configuration
 
@@ -53,10 +76,11 @@ Configure backup settings in your client values file:
 ```yaml
 # config/myclient/values-production.yaml
 backup:
-  enabled: true
-  provider: aws
-  bucket: myclient-prod-backups
+  enabled: true  # Usually true for production
+  provider: aws  # Options: aws, azure, gcp
+  bucket: myclient-prod-backups  # Unique per client
   region: us-east-1
+  credentialSecret: velero-credentials  # From External Secrets
 
   encryption:
     enabled: true
@@ -64,21 +88,40 @@ backup:
     kmsKeyId: arn:aws:kms:us-east-1:123456789012:key/abc123
 
   schedules:
-    hourly:
+    daily:
       enabled: true
+      schedule: "0 2 * * *"  # 2 AM daily
+      retention: 720h  # 30 days
+
+    hourly:
+      enabled: false  # Optional for RPO <1 day
       schedule: "0 * * * *"
       retention: 72h
 
-    daily:
-      enabled: true
-      schedule: "0 2 * * *"
-      retention: 720h
-
     weekly:
-      enabled: false
+      enabled: false  # Optional for compliance
+      schedule: "0 3 * * 0"  # Sunday 3 AM
+      retention: 2160h  # 90 days
 ```
 
-When you deploy the API chart, Velero schedules are automatically created.
+When ArgoCD syncs the API chart, Velero schedules are automatically created in the `velero` namespace.
+
+### Velero CLI Installation
+
+Install the CLI for manual operations:
+
+```bash
+# macOS
+brew install velero
+
+# Linux
+wget https://github.com/vmware-tanzu/velero/releases/download/v1.13.0/velero-v1.13.0-linux-amd64.tar.gz
+tar -xvf velero-v1.13.0-linux-amd64.tar.gz
+sudo mv velero-v1.13.0-linux-amd64/velero /usr/local/bin/
+
+# Verify
+velero version
+```
 
 ## Files
 

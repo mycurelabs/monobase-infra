@@ -1,0 +1,41 @@
+# ArgoCD Application: Kyverno Policies
+# Sync Wave 1 - Deploy policies after Kyverno controller
+# Only deployed if security.kyverno.enabled=true
+
+{{- if .Values.security.kyverno.enabled }}
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kyverno-policies
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+
+  source:
+    repoURL: {{ .Values.argocd.repoURL }}
+    targetRevision: {{ .Values.argocd.targetRevision | default "main" }}
+    path: infrastructure/security-tools/kyverno/policies
+    directory:
+      recurse: false
+      include: '*.yaml'
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: kyverno
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false
+    retry:
+      limit: 5
+      backoff:
+        duration: 10s
+        maxDuration: 3m
+{{- end }}

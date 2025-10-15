@@ -168,6 +168,281 @@ podSecurityStandards:
   enabled: true
   level: restricted
 
+# Security tools (optional - usually disabled in staging to save resources)
+security:
+  kyverno:
+    enabled: false  # Usually disabled in staging (GitOps already provides guardrails)
+
+    # Kyverno configuration (applies if enabled) - lower resources for staging
+    replicaCount: 1  # Single replica for staging
+
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+      limits:
+        cpu: 200m
+        memory: 256Mi
+
+    podDisruptionBudget:
+      enabled: false
+
+    admissionController:
+      replicas: 1
+      resources:
+        requests:
+          cpu: 50m
+          memory: 64Mi
+        limits:
+          cpu: 200m
+          memory: 256Mi
+
+    backgroundController:
+      enabled: true
+      replicas: 1
+      resources:
+        requests:
+          cpu: 25m
+          memory: 32Mi
+        limits:
+          cpu: 100m
+          memory: 128Mi
+
+    cleanupController:
+      enabled: true
+      resources:
+        requests:
+          cpu: 25m
+          memory: 32Mi
+        limits:
+          cpu: 100m
+          memory: 64Mi
+
+    reportsController:
+      enabled: true
+      resources:
+        requests:
+          cpu: 25m
+          memory: 32Mi
+        limits:
+          cpu: 100m
+          memory: 128Mi
+
+    webhooksCleanup:
+      enabled: true
+
+    podSecurityContext:
+      runAsNonRoot: true
+      runAsUser: 1000
+      fsGroup: 1000
+      seccompProfile:
+        type: RuntimeDefault
+
+    containerSecurityContext:
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop:
+        - ALL
+      readOnlyRootFilesystem: true
+
+    metricsService:
+      create: true
+      type: ClusterIP
+      port: 8000
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8000"
+
+    serviceMonitor:
+      enabled: false
+      namespace: kyverno
+      interval: 30s
+
+    features:
+      generateValidatingAdmissionPolicy:
+        enabled: false
+      logging:
+        format: json
+        verbosity: 2
+
+    config:
+      excludeKyvernoNamespace: true
+      resourceFilters:
+      - '[Event,*,*]'
+      - '[*,kube-system,*]'
+      - '[*,kube-public,*]'
+      - '[*,kube-node-lease,*]'
+      - '[*,kyverno,*]'
+      - '[*,velero,*]'
+      - '[*,argocd,*]'
+      - '[*,cert-manager,*]'
+      - '[*,external-secrets-system,*]'
+      - '[*,longhorn-system,*]'
+      - '[*,monitoring,*]'
+      - '[*,falco,*]'
+      - '[Node,*,*]'
+      - '[APIService,*,*]'
+      - '[TokenReview,*,*]'
+      - '[SubjectAccessReview,*,*]'
+      - '[SelfSubjectAccessReview,*,*]'
+      - '[Binding,*,*]'
+      - '[ReplicaSet,*,*]'
+      - '[AdmissionReport,*,*]'
+      - '[ClusterAdmissionReport,*,*]'
+      - '[BackgroundScanReport,*,*]'
+      - '[ClusterBackgroundScanReport,*,*]'
+
+    admissionReports:
+      enabled: true
+
+    backgroundReports:
+      enabled: true
+
+    webhookTimeout: 10
+
+    upgradeController:
+      enabled: true
+
+    crds:
+      install: true
+      annotations: {}
+
+  falco:
+    enabled: false  # Usually disabled in staging (save resources, not production data)
+
+    # Falco configuration (applies if enabled) - lower resources for staging
+    daemonset:
+      updateStrategy:
+        type: RollingUpdate
+
+    resources:
+      requests:
+        cpu: 50m
+        memory: 128Mi
+      limits:
+        cpu: 200m
+        memory: 256Mi
+
+    podSecurityContext:
+      runAsNonRoot: true
+      runAsUser: 1000
+      fsGroup: 1000
+      seccompProfile:
+        type: RuntimeDefault
+
+    containerSecurityContext:
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop:
+        - ALL
+        add:
+        - SYS_PTRACE
+      readOnlyRootFilesystem: true
+      privileged: false
+
+    falco:
+      rulesFile:
+      - /etc/falco/falco_rules.yaml
+      - /etc/falco/falco_rules.local.yaml
+      - /etc/falco/rules.d
+
+      priority: warning  # Higher threshold for staging (reduce noise)
+
+      jsonOutput: true
+      jsonIncludeOutputProperty: true
+      jsonIncludeTagsProperty: true
+
+      logStderr: true
+      logSyslog: false
+      logLevel: info
+
+      webserver:
+        enabled: true
+        port: 8765
+        prometheus_metrics_enabled: true
+
+      syscall_event_drops:
+        actions:
+        - log
+        rate: 0.05
+        max_burst: 500
+
+      fileOutput:
+        enabled: true
+        keepAlive: false
+        filename: /var/log/falco/events.log
+
+      syslogOutput:
+        enabled: false
+
+      httpOutput:
+        enabled: false
+        url: ""
+        userAgent: "falco/0.1"
+
+      programOutput:
+        enabled: false
+        keepAlive: false
+        program: ""
+
+      grpc:
+        enabled: false
+        bindAddress: "unix:///run/falco/falco.sock"
+        threadiness: 0
+
+    driver:
+      enabled: true
+      kind: ebpf
+      ebpf:
+        hostNetwork: true
+        path: /usr/src/ebpf
+
+    tolerations:
+    - effect: NoSchedule
+      key: node-role.kubernetes.io/master
+      operator: Exists
+    - effect: NoSchedule
+      key: node-role.kubernetes.io/control-plane
+      operator: Exists
+
+    nodeSelector: {}
+
+    serviceAccount:
+      create: true
+      annotations: {}
+
+    rbac:
+      create: true
+
+    podSecurityPolicy:
+      create: false
+
+    customRules: {}
+
+    extraVolumes:
+    - name: custom-rules
+      configMap:
+        name: falco-custom-rules
+
+    extraVolumeMounts:
+    - name: custom-rules
+      mountPath: /etc/falco/rules.d
+      readOnly: true
+
+    services:
+    - name: metrics
+      type: ClusterIP
+      ports:
+      - port: 8765
+        targetPort: 8765
+        protocol: TCP
+        name: metrics
+
+    serviceMonitor:
+      enabled: false
+      interval: 30s
+      scrapeTimeout: 10s
+
 # ===== Resource Quotas =====
 resourceQuotas:
   enabled: false

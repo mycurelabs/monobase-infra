@@ -208,67 +208,124 @@ pip install cryptominer
 
 ## Installation
 
-### Step 1: Install Falco DaemonSet
+### GitOps Deployment (Recommended)
 
-```bash
-# Add Helm repository
-helm repo add falcosecurity https://falcosecurity.github.io/charts
-helm repo update
+Falco is deployed via ArgoCD along with all other infrastructure. **No manual installation required.**
 
-# Install Falco (runs on all nodes)
-helm install falco falcosecurity/falco \
-  --namespace falco \
-  --create-namespace \
-  --values helm-values.yaml
+#### Enable Falco
 
-# Verify Falco is running on all nodes
-kubectl get pods -n falco -o wide
+Edit your client config (`config/yourclient/values-{env}.yaml`):
 
-# Check Falco logs
-kubectl logs -n falco -l app.kubernetes.io/name=falco --tail=20
-```
-
-### Step 2: Configure Alert Destinations
-
-Edit `helm-values.yaml` to configure alerts:
-
-**Slack:**
 ```yaml
-falco:
-  jsonOutput: true
-  httpOutput:
-    enabled: true
-    url: "https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK"
+security:
+  falco:
+    enabled: true  # Set to true to enable runtime monitoring
 ```
 
-**Syslog:**
+#### Deployment Flow
+
+1. **Render templates:**
+   ```bash
+   helm template myclient charts/monobase \
+     -f config/yourclient/values-production.yaml \
+     --output-dir rendered/myclient-prod
+   ```
+
+2. **Deploy via ArgoCD:**
+   ```bash
+   kubectl apply -f rendered/myclient-prod/monobase/templates/root-app.yaml
+   ```
+
+3. **Verify deployment:**
+   ```bash
+   # Check Falco is running on all nodes
+   kubectl get pods -n falco -o wide
+
+   # Check Falco logs
+   kubectl logs -n falco -l app.kubernetes.io/name=falco --tail=20
+   ```
+
+#### Sync Waves
+
+Falco deploys in the correct order automatically:
+
+- **Wave 1:** Falco DaemonSet (deployed to all nodes)
+- **Wave 2:** Custom rules (API-specific, database-specific)
+
+ArgoCD ensures the DaemonSet is ready before applying custom rules.
+
+### Configuration
+
+All Falco configuration is managed through Helm values.
+
+**Production example** (`config/profiles/production-base.yaml`):
 ```yaml
-falco:
-  syslogOutput:
-    enabled: true
-    host: "syslog-server.example.com"
-    port: 514
+security:
+  falco:
+    enabled: false  # Set true for runtime monitoring
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+    falco:
+      priority: notice  # Alert on notice and above
+      httpOutput:
+        enabled: false
+        url: ""  # Set to Slack webhook URL
+    # ... see config/profiles/production-base.yaml for full config
 ```
 
-**File (for SIEM):**
+**Staging example** (`config/profiles/staging-base.yaml`):
 ```yaml
-falco:
-  fileOutput:
+security:
+  falco:
+    enabled: false  # Usually disabled in staging
+    resources:
+      requests:
+        cpu: 50m  # Lower resources for staging
+        memory: 128Mi
+    falco:
+      priority: warning  # Higher threshold to reduce noise
+```
+
+### Alert Destinations
+
+Configure alerts in your client config:
+
+**Slack alerts:**
+```yaml
+security:
+  falco:
     enabled: true
-    filename: "/var/log/falco/events.log"
+    falco:
+      httpOutput:
+        enabled: true
+        url: "https://hooks.slack.com/services/YOUR/WEBHOOK/URL"
 ```
 
-### Step 3: Apply Custom Rules
-
-```bash
-# Apply custom rules
-kubectl apply -f rules/
-
-# Reload Falco to pick up new rules
-kubectl rollout restart daemonset/falco -n falco
+**Syslog (SIEM):**
+```yaml
+security:
+  falco:
+    enabled: true
+    falco:
+      syslogOutput:
+        enabled: true
+        host: "siem.example.com"
+        port: 514
+        format: json
 ```
 
-### Step 4: Test Detection
+### Customization
+
+To customize rules:
+
+1. **Edit rules:** Modify files in `infrastructure/security-tools/falco/rules/`
+2. **Commit changes:** Push to Git
+3. **ArgoCD sync:** Rules update automatically within 3 minutes
+4. **Falco reload:** DaemonSet automatically reloads rules
+
+### Testing After Deployment
 
 ```bash
 # Test 1: Spawn shell (should trigger alert)

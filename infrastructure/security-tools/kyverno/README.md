@@ -195,40 +195,89 @@ kubectl apply -f privileged-pod.yaml
 
 ## Installation
 
-### Step 1: Install Kyverno Controller
+### GitOps Deployment (Recommended)
 
-```bash
-# Add Helm repository
-helm repo add kyverno https://kyverno.github.io/kyverno/
-helm repo update
+Kyverno is deployed via ArgoCD along with all other infrastructure. **No manual installation required.**
 
-# Install Kyverno
-helm install kyverno kyverno/kyverno \
-  --namespace kyverno \
-  --create-namespace \
-  --values helm-values.yaml
+#### Enable Kyverno
 
-# Wait for Kyverno to be ready
-kubectl wait --for=condition=ready pod \
-  -l app.kubernetes.io/name=kyverno \
-  -n kyverno \
-  --timeout=120s
+Edit your client config (`config/yourclient/values-{env}.yaml`):
+
+```yaml
+security:
+  kyverno:
+    enabled: true  # Set to true to enable policy enforcement
 ```
 
-### Step 2: Apply Policies
+#### Deployment Flow
 
-```bash
-# Apply all policies
-kubectl apply -f policies/
+1. **Render templates:**
+   ```bash
+   helm template myclient charts/monobase \
+     -f config/yourclient/values-production.yaml \
+     --output-dir rendered/myclient-prod
+   ```
 
-# Verify policies are active
-kubectl get clusterpolicies
+2. **Deploy via ArgoCD:**
+   ```bash
+   kubectl apply -f rendered/myclient-prod/monobase/templates/root-app.yaml
+   ```
 
-# Check policy status
-kubectl describe clusterpolicy pod-security
+3. **Verify deployment:**
+   ```bash
+   # Check Kyverno controller
+   kubectl get pods -n kyverno
+
+   # Check policies are active
+   kubectl get clusterpolicies
+
+   # Check policy status
+   kubectl describe clusterpolicy pod-security
+   ```
+
+#### Sync Waves
+
+Kyverno deploys in the correct order automatically:
+
+- **Wave 0:** Kyverno controller (admission webhook)
+- **Wave 1:** ClusterPolicies (pod-security, require-labels, restrict-registries)
+
+ArgoCD ensures the controller is ready before applying policies.
+
+### Configuration
+
+All Kyverno configuration is managed through Helm values.
+
+**Production example** (`config/profiles/production-base.yaml`):
+```yaml
+security:
+  kyverno:
+    enabled: false  # Set true for policy enforcement
+    replicaCount: 3  # HA for production
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+    # ... see config/profiles/production-base.yaml for full config
 ```
 
-### Step 3: Test Policies
+**Staging example** (`config/profiles/staging-base.yaml`):
+```yaml
+security:
+  kyverno:
+    enabled: false  # Usually disabled in staging
+    replicaCount: 1  # Lower resources for staging
+```
+
+### Customization
+
+To customize policies:
+
+1. **Edit policies:** Modify files in `infrastructure/security-tools/kyverno/policies/`
+2. **Commit changes:** Push to Git
+3. **ArgoCD sync:** Policies update automatically within 3 minutes
+
+### Testing After Deployment
 
 ```bash
 # Test blocking non-compliant pod
@@ -239,6 +288,9 @@ kubectl run test-root --image=nginx --restart=Never
 kubectl run test-nonroot --image=nginx --restart=Never \
   --overrides='{"spec":{"securityContext":{"runAsNonRoot":true,"runAsUser":1000}}}'
 # Should SUCCEED
+
+# Clean up
+kubectl delete pod test-nonroot
 ```
 
 ## Included Policies

@@ -61,19 +61,63 @@ security/
 
 ## Implementation
 
-```bash
-# Apply NetworkPolicies
-kubectl apply -f networkpolicies/
+### GitOps Deployment (Recommended)
 
-# Enable Pod Security Standards
-kubectl label namespace client-prod \\
-  pod-security.kubernetes.io/enforce=restricted \\
-  pod-security.kubernetes.io/audit=restricted \\
-  pod-security.kubernetes.io/warn=restricted
+Security baseline is deployed via ArgoCD along with all other infrastructure. **No manual installation required.**
 
-# Apply RBAC
-kubectl apply -f rbac/
-```
+Security baseline is **always enabled** for all environments.
+
+#### Deployment Flow
+
+1. **Render templates:**
+   ```bash
+   helm template myclient charts/monobase \
+     -f config/yourclient/values-production.yaml \
+     --output-dir rendered/myclient-prod
+   ```
+
+2. **Deploy via ArgoCD:**
+   ```bash
+   kubectl apply -f rendered/myclient-prod/monobase/templates/root-app.yaml
+   ```
+
+3. **Verify deployment:**
+   ```bash
+   # Check NetworkPolicies
+   kubectl get networkpolicies -n myclient-prod
+
+   # Check Pod Security Standards labels
+   kubectl get namespace myclient-prod --show-labels
+
+   # Check RBAC
+   kubectl get serviceaccounts,roles,rolebindings -n myclient-prod
+   ```
+
+#### Sync Waves
+
+Security baseline deploys early in the sequence:
+
+- **Wave -1:** Namespace creation with Pod Security Standards labels
+- **Wave 0:** NetworkPolicies and RBAC
+
+ArgoCD ensures security is configured before applications deploy.
+
+### What Gets Deployed
+
+**NetworkPolicies** (from `infrastructure/security/networkpolicies/`):
+- `default-deny-all.yaml` - Block all traffic by default
+- `allow-gateway-to-apps.yaml` - Allow traffic from Gateway API
+- `allow-apps-to-db.yaml` - Allow API to database connections
+- `deny-cross-namespace.yaml` - Block cross-namespace traffic
+
+**Pod Security Standards** (from namespace labels):
+- Enforces `restricted` profile on all pods
+- Configured in `argocd/infrastructure/namespace.yaml.template`
+
+**RBAC** (from `infrastructure/security/rbac/`):
+- Service accounts with least-privilege permissions
+- Roles limited to namespace scope
+- No cluster-wide permissions
 
 ## Phase 3 Implementation
 
