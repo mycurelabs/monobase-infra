@@ -28,6 +28,8 @@ KUBECONFIG="${KUBECONFIG:-$HOME/.kube/config}"
 WAIT_FOR_SYNC=false
 SKIP_ARGOCD=false
 DRY_RUN=false
+AUTO_APPROVE=false
+TARGET_CONTEXT=""
 
 # Function to print colored messages
 print_info() {
@@ -51,6 +53,125 @@ print_step() {
     echo -e "${BLUE}==>${NC} $1"
 }
 
+# Security functions for context selection and confirmation
+select_kubectl_context() {
+    print_step "Interactive Context Selection"
+    
+    # Get current context
+    CURRENT_CONTEXT=$(kubectl config current-context 2>/dev/null || echo "")
+    
+    if [[ -z "$CURRENT_CONTEXT" ]]; then
+        print_error "No kubectl context is currently set"
+        exit 1
+    fi
+    
+    # Get all contexts
+    echo ""
+    print_info "Available kubectl contexts:"
+    kubectl config get-contexts
+    
+    echo ""
+    print_info "Current context: ${GREEN}${CURRENT_CONTEXT}${NC}"
+    
+    # Show cluster details
+    CLUSTER_SERVER=$(kubectl config view -o jsonpath="{.clusters[?(@.name=='$(kubectl config view -o jsonpath="{.contexts[?(@.name=='${CURRENT_CONTEXT}')].context.cluster}")')].cluster.server}" 2>/dev/null || echo "unknown")
+    echo "Cluster server: $CLUSTER_SERVER"
+    
+    echo ""
+    print_warning "Select a context:"
+    echo "  1. Use current context: ${CURRENT_CONTEXT}"
+    echo "  2. Switch to different context"
+    echo "  3. Cancel bootstrap"
+    
+    read -p "Choice (1-3): " CHOICE
+    
+    case $CHOICE in
+        1)
+            TARGET_CONTEXT="$CURRENT_CONTEXT"
+            ;;
+        2)
+            echo ""
+            print_info "Enter context name to switch to:"
+            read -p "> " NEW_CONTEXT
+            
+            if kubectl config use-context "$NEW_CONTEXT" &>/dev/null; then
+                TARGET_CONTEXT="$NEW_CONTEXT"
+                print_success "Switched to context: $TARGET_CONTEXT"
+            else
+                print_error "Invalid context: $NEW_CONTEXT"
+                exit 1
+            fi
+            ;;
+        3)
+            print_info "Bootstrap cancelled"
+            exit 0
+            ;;
+        *)
+            print_error "Invalid choice"
+            exit 1
+            ;;
+    esac
+}
+
+confirm_cluster_target() {
+    print_step "Confirm Cluster Target"
+    
+    # Get cluster details
+    CLUSTER_SERVER=$(kubectl config view -o jsonpath="{.clusters[?(@.name=='$(kubectl config view -o jsonpath="{.contexts[?(@.name=='${TARGET_CONTEXT}')].context.cluster}")')].cluster.server}" 2>/dev/null || echo "unknown")
+    NAMESPACE=$(kubectl config view -o jsonpath="{.contexts[?(@.name=='${TARGET_CONTEXT}')].context.namespace}" 2>/dev/null || echo "default")
+    
+    echo ""
+    print_warning "⚠️  You are about to bootstrap this cluster:"
+    echo "  Context: ${TARGET_CONTEXT}"
+    echo "  Cluster: ${CLUSTER_SERVER}"
+    echo "  Namespace: ${NAMESPACE}"
+    
+    # Try to get cluster info
+    if K8S_VERSION=$(kubectl version --short 2>/dev/null | grep "Server Version" | cut -d: -f2 | tr -d ' '); then
+        echo "  Kubernetes: ${K8S_VERSION}"
+    fi
+    
+    if NODE_COUNT=$(kubectl get nodes --no-headers 2>/dev/null | wc -l); then
+        echo "  Nodes: ${NODE_COUNT}"
+    fi
+    
+    echo ""
+    print_error "⚠️  WARNING: This will install ArgoCD and enable GitOps on this cluster!"
+    echo ""
+    print_warning "Type the exact context name '${TARGET_CONTEXT}' to confirm:"
+    read -p "> " CONFIRMATION
+    
+    if [[ "$CONFIRMATION" != "$TARGET_CONTEXT" ]]; then
+        print_error "Confirmation failed - context name did not match"
+        echo "Aborted."
+        exit 1
+    fi
+}
+
+confirm_bootstrap_action() {
+    print_step "Confirm Bootstrap Action"
+    
+    echo ""
+    print_warning "You are about to perform the following actions:"
+    echo "  • Install ArgoCD in namespace 'argocd'"
+    echo "  • Deploy infrastructure root Application"
+    echo "  • Deploy ApplicationSet for auto-discovery"
+    echo "  • Enable GitOps management for this cluster"
+    echo ""
+    print_error "⚠️  This will begin managing the cluster via Git!"
+    echo ""
+    print_warning "Type 'BOOTSTRAP' to proceed:"
+    read -p "> " CONFIRMATION
+    
+    if [[ "$CONFIRMATION" != "BOOTSTRAP" ]]; then
+        print_error "Confirmation failed"
+        echo "Aborted."
+        exit 1
+    fi
+    
+    print_success "Confirmation received - proceeding with bootstrap"
+}
+
 # Function to show usage
 usage() {
     cat <<EOF
@@ -66,8 +187,10 @@ USAGE:
 
 OPTIONS:
     --kubeconfig FILE       Path to kubeconfig (default: \$KUBECONFIG or ~/.kube/config)
+    --context NAME          Target kubectl context (still requires confirmation)
     --wait                  Wait for ApplicationSet to be synced (default: false)
     --skip-argocd           Skip ArgoCD installation (assume already installed)
+    --yes                   Skip interactive confirmations (use with caution!)
     --dry-run               Print commands without executing
     --help                  Show this help message
 
@@ -120,12 +243,20 @@ while [[ $# -gt 0 ]]; do
             KUBECONFIG="$2"
             shift 2
             ;;
+        --context)
+            TARGET_CONTEXT="$2"
+            shift 2
+            ;;
         --wait)
             WAIT_FOR_SYNC=true
             shift
             ;;
         --skip-argocd)
             SKIP_ARGOCD=true
+            shift
+            ;;
+        --yes)
+            AUTO_APPROVE=true
             shift
             ;;
         --dry-run)
@@ -148,6 +279,16 @@ print_info "Kubeconfig: $KUBECONFIG"
 print_info "Wait for sync: $WAIT_FOR_SYNC"
 print_info "Skip ArgoCD: $SKIP_ARGOCD"
 print_info "Dry run: $DRY_RUN"
+
+# Warning for auto-approve mode
+if [[ "$AUTO_APPROVE" == "true" ]]; then
+    echo ""
+    print_error "⚠️  Auto-approve mode enabled (--yes)"
+    print_error "⚠️  Skipping interactive confirmations"
+    print_error "⚠️  Use with caution in production environments"
+    echo ""
+    sleep 2
+fi
 
 # Function to execute command with dry-run support
 execute() {
@@ -184,6 +325,43 @@ if [[ "$DRY_RUN" == "false" ]]; then
     fi
     CLUSTER_VERSION=$(kubectl --kubeconfig="$KUBECONFIG" version --short 2>/dev/null | grep "Server Version" || echo "Unknown")
     print_success "Connected to cluster: $CLUSTER_VERSION"
+fi
+
+# Interactive security guards (unless auto-approved or dry-run)
+if [[ "$AUTO_APPROVE" == "false" ]] && [[ "$DRY_RUN" == "false" ]]; then
+    # If no context specified via CLI, prompt for selection
+    if [[ -z "$TARGET_CONTEXT" ]]; then
+        select_kubectl_context
+    else
+        # Context specified via --context flag, but still needs confirmation
+        print_info "Target context specified: $TARGET_CONTEXT"
+        # Switch to specified context if not already active
+        CURRENT_CTX=$(kubectl config current-context 2>/dev/null || echo "")
+        if [[ "$CURRENT_CTX" != "$TARGET_CONTEXT" ]]; then
+            if kubectl config use-context "$TARGET_CONTEXT" &>/dev/null; then
+                print_success "Switched to context: $TARGET_CONTEXT"
+            else
+                print_error "Invalid context: $TARGET_CONTEXT"
+                exit 1
+            fi
+        fi
+    fi
+    
+    # Confirm cluster target
+    confirm_cluster_target
+    
+    # Confirm bootstrap action
+    confirm_bootstrap_action
+else
+    # Auto-approve or dry-run mode - use current context
+    TARGET_CONTEXT=$(kubectl config current-context 2>/dev/null || echo "")
+    if [[ -z "$TARGET_CONTEXT" ]]; then
+        print_error "No kubectl context is currently set"
+        exit 1
+    fi
+    if [[ "$DRY_RUN" == "false" ]]; then
+        print_warning "Using current context: $TARGET_CONTEXT (auto-approve mode)"
+    fi
 fi
 
 # Install ArgoCD if needed
