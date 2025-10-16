@@ -214,3 +214,11 @@ run = 'bash scripts/validate-secrets.sh "$@"'
 [tasks.resize-storage]
 description = "Resize StatefulSet PVCs without downtime"
 run = 'bash scripts/resize-statefulset-storage.sh "$@"'
+
+[tasks.teardown]
+description = "Destroy cluster infrastructure - REQUIRES CONFIRMATION"
+run = 'bash scripts/teardown.sh "$@"'
+
+[tasks.unbootstrap]
+description = "Remove GitOps/ArgoCD - REQUIRES CONFIRMATION"
+run = 'bash scripts/unbootstrap.sh "$@"'
