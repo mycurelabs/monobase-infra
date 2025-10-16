@@ -57,6 +57,9 @@ api:
   backup:
     enabled: false  # No Velero backups for staging
 
+  externalSecrets:
+    enabled: false  # No External Secrets for staging
+
 # ===== CORE: Monobase Account Frontend =====
 account:
   enabled: true
