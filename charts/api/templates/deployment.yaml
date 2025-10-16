@@ -121,12 +121,12 @@ spec:
           valueFrom:
             secretKeyRef:
               name: {{ .Values.minio.auth.existingSecret | default "minio" }}
-              key: root-user
+              key: rootUser
         - name: STORAGE_SECRET_ACCESS_KEY
           valueFrom:
             secretKeyRef:
               name: {{ .Values.minio.auth.existingSecret | default "minio" }}
-              key: root-password
+              key: rootPassword
         - name: STORAGE_UPLOAD_URL_EXPIRY
           value: "300"
         - name: STORAGE_DOWNLOAD_URL_EXPIRY

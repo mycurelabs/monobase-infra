@@ -167,9 +167,8 @@ MinIO URL - constructs connection URL from MinIO dependency
 */}}
 {{- define "api.minio.url" -}}
 {{- if .Values.minio.enabled -}}
-{{- $release := .Release.Name -}}
 {{- $namespace := include "api.namespace" . -}}
-http://{{ $release }}-minio.{{ $namespace }}.svc.cluster.local:9000
+http://minio.{{ $namespace }}.svc.cluster.local:9000
 {{- end -}}
 {{- end }}
 

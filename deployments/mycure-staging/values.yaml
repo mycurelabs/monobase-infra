@@ -147,14 +147,7 @@ valkey:
 # ===== OPTIONAL: MinIO (Object Storage) =====
 minio:
   enabled: true
-  architecture: standalone
-  global:
-    security:
-      allowInsecureImages: true
-  image:
-    registry: quay.io
-    repository: minio/minio
-    tag: latest
+  mode: standalone
   persistence:
     enabled: true
     storageClass: ""  # Auto-detect
@@ -163,9 +156,13 @@ minio:
     requests:
       cpu: 50m
       memory: 128Mi
-    limits:
-      cpu: 200m
-      memory: 256Mi
+  replicas: 1
+  rootUser: minioadmin
+  rootPassword: minioadmin
+  buckets:
+    - name: monobase-files
+      policy: none
+      purge: false
 
 # ===== STAGING: Mailpit (Email Testing) =====
 mailpit:
