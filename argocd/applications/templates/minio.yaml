@@ -1,0 +1,47 @@
+{{- if .Values.minio.enabled }}
+# ArgoCD Application: MinIO (Object Storage)
+# Sync Wave 2 - Deploy storage before applications
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ .Values.global.namespace }}-minio
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+
+  source:
+    chart: minio
+    repoURL: https://charts.bitnami.com/bitnami
+    targetRevision: 14.x.x
+    helm:
+      releaseName: minio
+      valueFiles:
+        - ../../deployments/{{ .Values.global.namespace }}/values.yaml
+      valuesObject:
+        mode: {{ .Values.minio.mode | default "standalone" }}
+        persistence:
+          enabled: {{ .Values.minio.persistence.enabled | default true }}
+          storageClass: {{ .Values.minio.persistence.storageClass | default "" }}
+          size: {{ .Values.minio.persistence.size | default "100Gi" }}
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: {{ .Values.global.namespace }}
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false
+    retry:
+      limit: 5
+      backoff:
+        duration: 10s
+        maxDuration: 5m
+{{- end }}

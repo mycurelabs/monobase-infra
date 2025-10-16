@@ -1,0 +1,52 @@
+{{- if .Values.postgresql.enabled }}
+# ArgoCD Application: PostgreSQL Database
+# Sync Wave 2 - Deploy database before applications
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ .Values.global.namespace }}-postgresql
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+
+  source:
+    chart: postgresql
+    repoURL: https://charts.bitnami.com/bitnami
+    targetRevision: 16.x.x
+    helm:
+      releaseName: postgresql
+      valueFiles:
+        - ../../deployments/{{ .Values.global.namespace }}/values.yaml
+      valuesObject:
+        global:
+          postgresql:
+            auth:
+              username: {{ .Values.postgresql.auth.username | default "postgres" }}
+              database: {{ .Values.postgresql.auth.database | default "monobase" }}
+        architecture: {{ .Values.postgresql.architecture | default "standalone" }}
+        persistence:
+          enabled: {{ .Values.postgresql.persistence.enabled | default true }}
+          storageClass: {{ .Values.postgresql.persistence.storageClass | default "" }}
+          size: {{ .Values.postgresql.persistence.size | default "20Gi" }}
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: {{ .Values.global.namespace }}
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false
+    retry:
+      limit: 5
+      backoff:
+        duration: 10s
+        maxDuration: 5m
+{{- end }}

@@ -1,0 +1,11 @@
+# Default values for monobase-applications Helm chart
+# These are overridden by deployments/*/values.yaml files
+
+global:
+  domain: example.com
+  namespace: example
+  environment: production
+
+argocd:
+  repoURL: https://github.com/YOUR-ORG/monobase-infra.git
+  targetRevision: main
