@@ -87,7 +87,8 @@ postgresql:
   architecture: standalone
 
   image:
-    tag: 16.4.0-debian-12-r13  # Use stable version
+    repository: bitnamilegacy/postgresql
+    tag: 16.4.0-debian-12-r13  # Use stable version from legacy repo
 
   auth:
     enabled: true
@@ -116,7 +117,8 @@ valkey:
   architecture: standalone  # Not replication for staging
 
   image:
-    tag: 8.0.1-debian-12-r2  # Use stable version
+    repository: bitnamilegacy/valkey
+    tag: 8.0.1-debian-12-r2  # Use stable version from legacy repo
 
   master:
     persistence:

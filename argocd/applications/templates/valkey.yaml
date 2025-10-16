@@ -21,6 +21,9 @@ spec:
     helm:
       releaseName: valkey
       valuesObject:
+        image:
+          repository: {{ .Values.valkey.image.repository | default "bitnamilegacy/valkey" }}
+          tag: {{ .Values.valkey.image.tag | default "8.0.1-debian-12-r2" }}
         architecture: {{ .Values.valkey.architecture | default "standalone" }}
         master:
           persistence:
