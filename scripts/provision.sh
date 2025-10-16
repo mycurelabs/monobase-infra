@@ -61,7 +61,7 @@ USAGE:
     $0 --cluster CLUSTER_NAME [OPTIONS]
 
 REQUIRED:
-    --cluster NAME          Cluster name (must match directory in tofu/clusters/)
+    --cluster NAME          Cluster name (must match directory in clusters/)
 
 OPTIONS:
     --dry-run               Show what would be done without making changes
@@ -101,14 +101,14 @@ WORKFLOW:
     9. Display access information
 
 PREREQUISITES:
-    - Cluster config directory exists: tofu/clusters/{cluster-name}
+    - Cluster config directory exists: clusters/{cluster-name}
     - terraform or tofu installed
     - kubectl installed
     - Cloud provider credentials configured (DO_TOKEN, AWS, etc.)
 
 NEXT STEPS:
-    After provisioning, bootstrap applications with:
-    ./scripts/bootstrap.sh --client myclient --env production
+    After provisioning, bootstrap GitOps auto-discovery with:
+    ./scripts/bootstrap.sh
 
 EOF
     exit 0
@@ -189,7 +189,7 @@ fi
 print_success "kubectl found: $(kubectl version --client --short 2>/dev/null || kubectl version --client)"
 
 # Check cluster directory
-CLUSTER_DIR="${REPO_ROOT}/tofu/clusters/${CLUSTER_NAME}"
+CLUSTER_DIR="${REPO_ROOT}/clusters/${CLUSTER_NAME}"
 if [[ ! -d "$CLUSTER_DIR" ]]; then
     print_error "Cluster directory not found: $CLUSTER_DIR"
     echo ""
@@ -428,11 +428,18 @@ if [[ "$MERGE_KUBECONFIG" == "true" ]] && [[ -n "$KUBECONFIG_PATH" ]]; then
     echo "   kubectl get nodes  # Should work immediately"
     echo ""
     echo "2. Create client configuration:"
-    echo "   ./scripts/new-client-config.sh myclient myclient.com"
-    echo "   # Then edit config/myclient/values-production.yaml"
+    echo "   mkdir config/myclient-prod"
+    echo "   cp config/profiles/production-base.yaml config/myclient-prod/values-production.yaml"
+    echo "   vim config/myclient-prod/values-production.yaml  # Edit domain, namespace, etc."
     echo ""
-    echo "3. Bootstrap applications via GitOps:"
-    echo "   ./scripts/bootstrap.sh --client myclient --env production"
+    echo "3. Bootstrap GitOps auto-discovery (ONE-TIME):"
+    echo "   ./scripts/bootstrap.sh"
+    echo ""
+    echo "4. Commit and push to deploy:"
+    echo "   git add config/myclient-prod/"
+    echo "   git commit -m 'Add myclient-prod'"
+    echo "   git push"
+    echo "   # ✓ ArgoCD auto-detects and deploys!"
 else
     echo "1. Set kubeconfig environment variable:"
     if [[ -n "$KUBECONFIG_PATH" ]]; then
@@ -449,11 +456,18 @@ else
     echo "   kubectl cluster-info"
     echo ""
     echo "3. Create client configuration:"
-    echo "   ./scripts/new-client-config.sh myclient myclient.com"
-    echo "   # Then edit config/myclient/values-production.yaml"
+    echo "   mkdir config/myclient-prod"
+    echo "   cp config/profiles/production-base.yaml config/myclient-prod/values-production.yaml"
+    echo "   vim config/myclient-prod/values-production.yaml  # Edit domain, namespace, etc."
     echo ""
-    echo "4. Bootstrap applications via GitOps:"
-    echo "   ./scripts/bootstrap.sh --client myclient --env production"
+    echo "4. Bootstrap GitOps auto-discovery (ONE-TIME):"
+    echo "   ./scripts/bootstrap.sh"
+    echo ""
+    echo "5. Commit and push to deploy:"
+    echo "   git add config/myclient-prod/"
+    echo "   git commit -m 'Add myclient-prod'"
+    echo "   git push"
+    echo "   # ✓ ArgoCD auto-detects and deploys!"
 fi
 
 echo ""

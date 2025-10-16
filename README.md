@@ -21,14 +21,17 @@ This repository contains **complete infrastructure** for deploying applications 
 
 ```
 monobase-infra/
-├── tofu/                    # ← OPTIONAL: Cluster provisioning (OpenTofu/Terraform)
-│   ├── modules/             #    - AWS EKS, Azure AKS, GCP GKE
-│   │   ├── aws-eks/         #    - K3s on-premises, k3d local
-│   │   ├── azure-aks/       #    Only needed if provisioning clusters
-│   │   ├── gcp-gke/         #    Can skip if cluster already exists
-│   │   ├── on-prem-k3s/
-│   │   └── k3d-local/
-│   └── clusters/            #    Example cluster configurations
+├── terraform/               # ← OPTIONAL: OpenTofu/Terraform modules
+│   ├── modules/             #    - Reusable infrastructure modules
+│   │   ├── aws-eks/         #    - AWS EKS, Azure AKS, GCP GKE
+│   │   ├── azure-aks/       #    - K3s on-premises, k3d local
+│   │   ├── gcp-gke/         #    Only needed if provisioning clusters
+│   │   ├── on-prem-k3s/     #    Can skip if cluster already exists
+│   │   └── local-k3d/
+├── clusters/                # ← OPTIONAL: Cluster configurations
+│   ├── default-cluster/     #    Reference template for new clusters
+│   ├── k3d-local/           #    Local development cluster
+│   └── ...                  #    Your cluster configs (gitignored)
 ├── charts/                  # ← CORE: Helm charts for applications
 │   ├── api/
 │   ├── api-worker/
@@ -89,17 +92,17 @@ This repository includes OpenTofu/Terraform modules for provisioning Kubernetes 
 # 1. Provision cluster
 ./scripts/provision.sh --cluster k3d-local
 
-# 2. Bootstrap applications
-./scripts/bootstrap.sh --client monobase --env dev
+# 2. Bootstrap GitOps auto-discovery
+./scripts/bootstrap.sh
 ```
 
-See [tofu/README.md](tofu/README.md) for detailed provisioning documentation.
+See [terraform/README.md](terraform/README.md) for module documentation and [docs/getting-started/CLUSTER-PROVISIONING.md](docs/getting-started/CLUSTER-PROVISIONING.md) for detailed provisioning workflows.
 
 **This template works with ANY Kubernetes cluster regardless of how it was provisioned.**
 
 ## 🚀 Quick Start
 
-**One Command Deployment:** Empty cluster → Running applications
+**True GitOps:** Empty cluster → Git-driven auto-deployment
 
 ### Prerequisites
 
@@ -107,34 +110,47 @@ See [tofu/README.md](tofu/README.md) for detailed provisioning documentation.
 - `kubectl` configured and authenticated
 - `helm` 3.x installed
 
-### Deploy Everything
+### One-Time Bootstrap
 
 ```bash
 # 1. Fork and clone
 git clone https://github.com/YOUR-ORG/monobase-infra.git
 cd monobase-infra
 
-# 2. Create client configuration from base profile
-cp config/profiles/production-base.yaml config/myclient/values-production.yaml
+# 2. Bootstrap GitOps auto-discovery (ONE-TIME)
+./scripts/bootstrap.sh
+```
 
-# 3. Edit configuration (minimal overrides only)
-vim config/myclient/values-production.yaml
+**That's it for setup!** The bootstrap script:
+- ✅ Installs ArgoCD (if not present)
+- ✅ Deploys ApplicationSet for auto-discovery
+- ✅ ArgoCD now watches config/ directory
+- ✅ Outputs ArgoCD UI access info
+
+### Add Your First Client/Environment
+
+```bash
+# 3. Create client configuration from base profile
+mkdir config/myclient-prod
+cp config/profiles/production-base.yaml config/myclient-prod/values-production.yaml
+
+# 4. Edit configuration (minimal overrides only)
+vim config/myclient-prod/values-production.yaml
 # Required changes:
 #   - global.domain: myclient.com
 #   - global.namespace: myclient-prod
+#   - argocd.repoURL: https://github.com/YOUR-ORG/monobase-infra.git
 #   - api.image.tag: "5.215.2" (pin version)
 #   - account.image.tag: "1.0.0" (pin version)
 # Keep it minimal! (~60 lines vs 430 lines)
 
-# 4. Bootstrap entire stack (ArgoCD + all infrastructure + applications)
-./scripts/bootstrap.sh --client myclient --env production
+# 5. Commit and push to deploy
+git add config/myclient-prod/
+git commit -m "Add myclient-prod"
+git push
 ```
 
-**That's it!** The bootstrap script:
-- ✅ Installs ArgoCD (if not present)
-- ✅ Deploys all infrastructure via GitOps
-- ✅ Deploys applications with sync waves
-- ✅ Outputs ArgoCD UI access info
+**✓ ArgoCD auto-detects and deploys!** No manual commands needed.
 
 ### Monitor Deployment
 
@@ -143,11 +159,21 @@ vim config/myclient/values-production.yaml
 kubectl port-forward -n argocd svc/argocd-server 8080:443
 # Open: https://localhost:8080
 
-# Check application status
-kubectl get applications -n argocd
+# Check auto-discovered applications
+kubectl get applications -n argocd -l managed-by=applicationset
 
 # View pods
 kubectl get pods -n myclient-prod
+```
+
+### Update Your Deployment (True GitOps)
+
+```bash
+# Just edit, commit, and push - ArgoCD syncs automatically
+vim config/myclient-prod/values-production.yaml
+git commit -am "Update myclient-prod: increase replicas"
+git push
+# ✓ ArgoCD auto-syncs only myclient-prod
 ```
 
 ---
@@ -175,67 +201,28 @@ cd monobase-infra
 #    - Extract and save kubeconfig to ~/.kube/{cluster-name}
 #    - Test cluster connectivity
 
-# 4. Create client configuration
-./scripts/new-client-config.sh myclient myclient.com
+# 4. Bootstrap GitOps auto-discovery (ONE-TIME)
+./scripts/bootstrap.sh
 
-# 5. Edit configuration
-vim config/myclient/values-production.yaml
-# - global.namespace: myclient-prod
-# - global.storage.provider: cloud-default (EKS/AKS/GKE) or longhorn (on-prem)
-# - Image tags (replace "latest" with specific versions)
-# - Resource limits (CPU, memory)
-# - Storage sizes (PostgreSQL, MinIO, etc.)
-# - Hostnames for each service
+# 5. Create client configuration
+mkdir config/myclient-prod
+cp config/profiles/production-base.yaml config/myclient-prod/values-production.yaml
 
-# 6. Bootstrap applications
-export KUBECONFIG=~/.kube/myclient-eks  # Or your cluster name
-./scripts/bootstrap.sh --client myclient --env production
-```
+# 6. Edit configuration
+vim config/myclient-prod/values-production.yaml
+# Required changes:
+#   - global.domain: myclient.com
+#   - global.namespace: myclient-prod
+#   - global.storage.provider: cloud-default (EKS/AKS/GKE) or longhorn (on-prem)
+#   - argocd.repoURL: https://github.com/YOUR-ORG/monobase-infra.git
+#   - api.image.tag: "5.215.2" (pin version)
+#   - account.image.tag: "1.0.0" (pin version)
 
-### 4. Configure Secrets Management
-
-```bash
-vim config/myclient/secrets-mapping.yaml
-
-# Map your KMS secret paths:
-# - AWS Secrets Manager
-# - Azure Key Vault
-# - GCP Secret Manager
-# - SOPS encrypted files
-```
-
-### 5. Commit Your Configuration
-
-```bash
-git add config/myclient/
-git commit -m "Add MyClient production configuration"
-git push origin main
-```
-
-### 6. Deploy Infrastructure (One-Time Setup)
-
-```bash
-# Deploy core infrastructure to your cluster
-kubectl apply -f infrastructure/longhorn/
-kubectl apply -f infrastructure/envoy-gateway/
-kubectl apply -f infrastructure/external-secrets-operator/
-kubectl apply -f infrastructure/argocd/
-```
-
-### 7. Deploy Applications via ArgoCD
-
-```bash
-# Render templates with your config
-./scripts/render-templates.sh \\
-  --values config/myclient/values-production.yaml \\
-  --output rendered/myclient/
-
-# Deploy ArgoCD root application
-kubectl apply -f rendered/myclient/argocd/root-app.yaml
-
-# Watch deployment progress
-kubectl port-forward -n argocd svc/argocd-server 8080:443
-# Open https://localhost:8080
+# 7. Commit and push to deploy
+git add config/myclient-prod/
+git commit -m "Add myclient-prod"
+git push
+# ✓ ArgoCD auto-detects and deploys!
 ```
 
 ## ⚙️ Configuration Approach

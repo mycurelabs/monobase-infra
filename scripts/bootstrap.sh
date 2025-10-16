@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
-# Bootstrap Script: Empty Cluster → Running GitOps Applications
+# Bootstrap Script: Empty Cluster → GitOps Auto-Discovery
 #
-# This script automates the complete deployment from an empty Kubernetes cluster
-# to a fully running application stack via GitOps.
+# This script automates the complete GitOps setup from an empty Kubernetes cluster.
+# After bootstrap, ArgoCD automatically discovers and deploys all client/env configurations
+# from the config/ directory.
 #
 # Usage:
-#   ./scripts/bootstrap.sh --client myclient --env production
-#   ./scripts/bootstrap.sh --client myclient --env dev --k3d
+#   ./scripts/bootstrap.sh
+#   ./scripts/bootstrap.sh --skip-argocd
 #   ./scripts/bootstrap.sh --help
 
 set -euo pipefail
@@ -23,9 +24,6 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 # Default values
-CLIENT=""
-ENV=""
-VALUES_FILE=""
 KUBECONFIG="${KUBECONFIG:-$HOME/.kube/config}"
 WAIT_FOR_SYNC=false
 SKIP_ARGOCD=false
@@ -56,44 +54,59 @@ print_step() {
 # Function to show usage
 usage() {
     cat <<EOF
-Bootstrap Script: Deploy Full Stack via GitOps
+Bootstrap Script: GitOps Auto-Discovery Setup
+
+DESCRIPTION:
+    This script performs ONE-TIME setup of ArgoCD with auto-discovery.
+    After bootstrap, ArgoCD automatically detects all client/environment configurations
+    in config/ directory and deploys them via GitOps.
 
 USAGE:
-    $0 --client CLIENT --env ENVIRONMENT [OPTIONS]
-
-REQUIRED:
-    --client NAME           Client name (e.g., myclient)
-    --env ENVIRONMENT       Environment (production, staging, dev)
+    $0 [OPTIONS]
 
 OPTIONS:
-    --values FILE           Path to values file (auto-detected if not provided)
     --kubeconfig FILE       Path to kubeconfig (default: \$KUBECONFIG or ~/.kube/config)
-    --wait                  Wait for all applications to sync (default: false)
+    --wait                  Wait for ApplicationSet to be synced (default: false)
     --skip-argocd           Skip ArgoCD installation (assume already installed)
     --dry-run               Print commands without executing
     --help                  Show this help message
 
 EXAMPLES:
-    # Bootstrap production cluster
-    $0 --client myclient --env production
+    # Bootstrap new cluster (installs ArgoCD + ApplicationSet)
+    $0
 
-    # Bootstrap staging with explicit values file
-    $0 --client myclient --env staging --values config/myclient/values-staging.yaml
+    # Bootstrap with existing ArgoCD
+    $0 --skip-argocd
 
-    # Bootstrap and wait for all apps to sync
-    $0 --client myclient --env production --wait
+    # Bootstrap and wait for sync
+    $0 --wait
 
 WORKFLOW:
-    1. Validate inputs (client config, kubeconfig, cluster connectivity)
+    1. Validate prerequisites (kubectl, helm, cluster connectivity)
     2. Install ArgoCD (if not present)
     3. Wait for ArgoCD to be ready
-    4. Render Helm templates with client configuration
-    5. Deploy root-app (App-of-Apps pattern)
-    6. Output ArgoCD access information
-    7. (Optional) Wait for all applications to sync
+    4. Deploy ApplicationSet for auto-discovery
+    5. Output ArgoCD access information
+    6. (Optional) Wait for ApplicationSet to sync
+
+TRUE GITOPS WORKFLOW (After Bootstrap):
+    # Add new client/environment
+    mkdir config/newclient-prod
+    cp config/profiles/production-base.yaml config/newclient-prod/values-production.yaml
+    # Edit config/newclient-prod/values-production.yaml
+    git add config/newclient-prod/
+    git commit -m "Add newclient-prod"
+    git push
+    # ✓ ArgoCD auto-detects and deploys!
+
+    # Update existing client
+    vim config/myclient/values-production.yaml
+    git commit -m "Update myclient-prod: increase replicas"
+    git push
+    # ✓ ArgoCD auto-syncs only myclient-prod
 
 RESULT:
-    Empty cluster → Fully deployed application stack via GitOps
+    Empty cluster → ArgoCD with auto-discovery → Git-driven deployments
 
 EOF
     exit 0
@@ -102,18 +115,6 @@ EOF
 # Parse command line arguments
 while [[ $# -gt 0 ]]; do
     case $1 in
-        --client)
-            CLIENT="$2"
-            shift 2
-            ;;
-        --env)
-            ENV="$2"
-            shift 2
-            ;;
-        --values)
-            VALUES_FILE="$2"
-            shift 2
-            ;;
         --kubeconfig)
             KUBECONFIG="$2"
             shift 2
@@ -141,30 +142,10 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-# Validate required arguments
-if [[ -z "$CLIENT" ]]; then
-    print_error "Missing required argument: --client"
-    echo "Use --help for usage information"
-    exit 1
-fi
-
-if [[ -z "$ENV" ]]; then
-    print_error "Missing required argument: --env"
-    echo "Use --help for usage information"
-    exit 1
-fi
-
-# Auto-detect values file if not provided
-if [[ -z "$VALUES_FILE" ]]; then
-    VALUES_FILE="${REPO_ROOT}/config/${CLIENT}/values-${ENV}.yaml"
-fi
-
 print_step "Bootstrap Configuration"
-print_info "Client: $CLIENT"
-print_info "Environment: $ENV"
-print_info "Values file: $VALUES_FILE"
 print_info "Kubeconfig: $KUBECONFIG"
 print_info "Wait for sync: $WAIT_FOR_SYNC"
+print_info "Skip ArgoCD: $SKIP_ARGOCD"
 print_info "Dry run: $DRY_RUN"
 
 # Function to execute command with dry-run support
@@ -178,13 +159,6 @@ execute() {
 
 # Validate prerequisites
 print_step "Step 1: Validate Prerequisites"
-
-# Check if values file exists
-if [[ ! -f "$VALUES_FILE" ]]; then
-    print_error "Values file not found: $VALUES_FILE"
-    exit 1
-fi
-print_success "Values file exists: $VALUES_FILE"
 
 # Check kubectl
 if ! command -v kubectl &> /dev/null; then
@@ -251,32 +225,22 @@ else
     print_info "Assuming ArgoCD is already installed (--skip-argocd)"
 fi
 
-# Render templates
-print_step "Step 3: Render Helm Templates"
-OUTPUT_DIR="${REPO_ROOT}/rendered/${CLIENT}-${ENV}"
+# Deploy ApplicationSet for auto-discovery
+print_step "Step 3: Deploy ApplicationSet"
+APPLICATIONSET="${REPO_ROOT}/argocd/bootstrap/applicationset-auto-discover.yaml"
 
-print_info "Rendering templates to: $OUTPUT_DIR"
-execute "${SCRIPT_DIR}/render-templates.sh" \
-    --values "$VALUES_FILE" \
-    --output "$OUTPUT_DIR"
-
-print_success "Templates rendered successfully"
-
-# Deploy root-app
-print_step "Step 4: Deploy Root Application"
-ROOT_APP="${OUTPUT_DIR}/monobase/templates/root-app.yaml"
-
-if [[ ! -f "$ROOT_APP" ]]; then
-    print_error "Root app not found: $ROOT_APP"
+if [[ ! -f "$APPLICATIONSET" ]]; then
+    print_error "ApplicationSet not found: $APPLICATIONSET"
     exit 1
 fi
 
-print_info "Deploying root-app (App-of-Apps)..."
-execute kubectl --kubeconfig="$KUBECONFIG" apply -f "$ROOT_APP"
-print_success "Root application deployed"
+print_info "Deploying ApplicationSet for auto-discovery..."
+print_info "This will scan config/ directory and create applications for all client/env configs"
+execute kubectl --kubeconfig="$KUBECONFIG" apply -f "$APPLICATIONSET"
+print_success "ApplicationSet deployed - ArgoCD will now auto-discover all configs in config/"
 
 # Output ArgoCD access information
-print_step "Step 5: ArgoCD Access Information"
+print_step "Step 4: ArgoCD Access Information"
 
 if [[ "$DRY_RUN" == "false" ]] && [[ "$SKIP_ARGOCD" == "false" ]]; then
     # Get admin password
@@ -294,26 +258,28 @@ if [[ "$DRY_RUN" == "false" ]] && [[ "$SKIP_ARGOCD" == "false" ]]; then
     echo ""
 fi
 
-# Wait for applications to sync
+# Wait for ApplicationSet to sync
 if [[ "$WAIT_FOR_SYNC" == "true" ]]; then
-    print_step "Step 6: Wait for Applications to Sync"
+    print_step "Step 5: Wait for ApplicationSet to Sync"
 
     if [[ "$DRY_RUN" == "false" ]]; then
-        print_info "Waiting for all applications to sync (this may take several minutes)..."
+        print_info "Waiting for ApplicationSet to discover and create applications..."
 
-        # Wait for root-app to create child apps
-        sleep 10
+        # Wait for ApplicationSet to create applications
+        sleep 15
 
-        # Get all application names
+        # Get all application names created by ApplicationSet
         APP_NAMES=$(kubectl --kubeconfig="$KUBECONFIG" get applications -n argocd \
+            -l managed-by=applicationset \
             -o jsonpath='{.items[*].metadata.name}' 2>/dev/null || echo "")
 
         if [[ -z "$APP_NAMES" ]]; then
-            print_warning "No applications found yet, sync may still be in progress"
+            print_warning "No applications found yet - check that config/ directory has valid configs"
+            print_info "ApplicationSet scans: config/*/ (excluding config/profiles and config/example.com)"
         else
-            print_info "Found applications: $APP_NAMES"
+            print_success "ApplicationSet discovered applications: $APP_NAMES"
 
-            # Wait for each application
+            # Wait for each application to sync
             for APP in $APP_NAMES; do
                 print_info "Waiting for $APP to sync..."
                 kubectl --kubeconfig="$KUBECONFIG" wait --for=condition=Synced \
@@ -321,24 +287,45 @@ if [[ "$WAIT_FOR_SYNC" == "true" ]]; then
                     -n argocd \
                     --timeout=600s || print_warning "$APP sync timeout (may still be syncing)"
             done
-        fi
 
-        print_success "All applications synced (or timed out)"
+            print_success "All applications synced (or timed out)"
+        fi
     else
-        print_info "[DRY-RUN] Would wait for applications to sync"
+        print_info "[DRY-RUN] Would wait for ApplicationSet to sync"
     fi
 fi
 
 # Final summary
 print_step "Bootstrap Complete!"
 echo ""
-print_success "Cluster bootstrapped successfully"
-print_info "Client: $CLIENT"
-print_info "Environment: $ENV"
-print_info "Root app: $ROOT_APP"
+print_success "GitOps auto-discovery enabled!"
 echo ""
-print_info "Next steps:"
-echo "  1. Monitor deployment in ArgoCD UI"
-echo "  2. Check application health: kubectl get applications -n argocd"
-echo "  3. View pod status: kubectl get pods -n ${CLIENT}-${ENV}"
+print_info "What happens now:"
+echo "  - ArgoCD scans config/ directory for client/env configurations"
+echo "  - Creates applications automatically for each config found"
+echo "  - Syncs applications based on Git repository state"
+echo ""
+print_info "True GitOps workflow:"
+echo ""
+echo "  # Add new client/environment"
+echo "  mkdir config/newclient-prod"
+echo "  cp config/profiles/production-base.yaml config/newclient-prod/values-production.yaml"
+echo "  vim config/newclient-prod/values-production.yaml  # Edit domain, namespace, etc."
+echo "  git add config/newclient-prod/"
+echo "  git commit -m 'Add newclient-prod'"
+echo "  git push"
+echo "  # ✓ ArgoCD auto-detects and deploys!"
+echo ""
+echo "  # Update existing client"
+echo "  vim config/yourclient/values-production.yaml"
+echo "  git commit -am 'Update yourclient: increase replicas'"
+echo "  git push"
+echo "  # ✓ ArgoCD auto-syncs only yourclient"
+echo ""
+print_info "Monitor deployments:"
+echo "  kubectl get applications -n argocd"
+echo "  kubectl get applicationsets -n argocd"
+echo ""
+print_info "View discovered configs:"
+echo "  kubectl get applications -n argocd -l managed-by=applicationset"
 echo ""

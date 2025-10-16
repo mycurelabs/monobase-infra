@@ -21,6 +21,12 @@ global:
     provider: cloud-default  # Use cloud provider's default StorageClass
     className: ""  # Auto-detect from provider
 
+# ===== ArgoCD GitOps Configuration =====
+argocd:
+  # Git repository URL (required for GitOps)
+  repoURL: https://github.com/YOUR-ORG/monobase-infra.git  # ⚠️ REQUIRED: Change to your fork
+  targetRevision: main  # Branch to deploy from (main, staging, etc.)
+
 # ===== CORE: Monobase API =====
 api:
   enabled: true

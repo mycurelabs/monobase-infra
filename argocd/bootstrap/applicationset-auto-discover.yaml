@@ -1,0 +1,144 @@
+# ApplicationSet: Auto-Discover All Client/Environment Configurations
+#
+# This ApplicationSet automatically discovers all client/environment configurations
+# in the config/ directory and creates a root Application for each one.
+#
+# How it works:
+# 1. Scans config/* directories (excluding profiles/ and example.com/)
+# 2. For each directory found (e.g., config/clienta-prod/):
+#    - Creates a root Application named "clienta-prod-root"
+#    - Deploys to namespace "clienta-prod"
+#    - Uses values from config/clienta-prod/values-*.yaml
+# 3. Each root Application deploys the full stack (infrastructure + applications)
+#
+# True GitOps Workflow:
+# - Add new client: Create config/newclient-prod/ directory → git push
+# - Update client: Edit config/clienta-prod/values-production.yaml → git push
+# - ArgoCD automatically detects changes and syncs
+#
+# This is deployed ONCE during cluster bootstrap. After that, everything is Git-driven.
+
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: monobase-auto-discover
+  namespace: argocd
+spec:
+  # Prevent cascading deletes (safety)
+  syncPolicy:
+    preserveResourcesOnDeletion: true
+
+  generators:
+    # Git Directory Generator: Scans config/ for client/env directories
+    - git:
+        repoURL: https://github.com/YOUR-ORG/monobase-infra.git
+        revision: HEAD
+        directories:
+          # Scan all directories in config/
+          - path: config/*
+            # Exclude reference configs and profiles
+            exclude: |
+              config/profiles
+              config/example.com
+              config/.gitkeep
+
+  # Template for creating root Applications
+  template:
+    metadata:
+      # Application name: {directory-name}-root
+      # e.g., "clienta-prod-root", "clientb-staging-root"
+      name: '{{path.basename}}-root'
+      namespace: argocd
+      labels:
+        client-env: '{{path.basename}}'
+        managed-by: applicationset
+      annotations:
+        # Link back to config directory
+        config-path: '{{path}}'
+      finalizers:
+        - resources-finalizer.argocd.argoproj.io
+
+    spec:
+      project: default
+
+      source:
+        # Point to this Git repository
+        repoURL: https://github.com/YOUR-ORG/monobase-infra.git
+        targetRevision: HEAD
+        path: argocd/applications
+
+        # Use Helm to render application templates
+        helm:
+          # Value files are in the client/env config directory
+          # Pattern: config/{client-env}/values-{env}.yaml
+          # ArgoCD will auto-detect the values file
+          valueFiles:
+            - '../../{{path}}/values-production.yaml'
+            - '../../{{path}}/values-staging.yaml'
+            - '../../{{path}}/values-development.yaml'
+
+          # Ignore missing value files (only one will exist)
+          ignoreMissingValueFiles: true
+
+      destination:
+        # Deploy to the same cluster
+        server: https://kubernetes.default.svc
+        # Namespace matches directory name
+        # e.g., clienta-prod → clienta-prod namespace
+        namespace: '{{path.basename}}'
+
+      syncPolicy:
+        # Automated sync: Git push → automatic deployment
+        automated:
+          prune: true        # Remove resources deleted from Git
+          selfHeal: true     # Revert manual changes
+          allowEmpty: false  # Prevent accidental empty deploys
+
+        syncOptions:
+          - CreateNamespace=true              # Auto-create namespace if missing
+          - PrunePropagationPolicy=foreground # Delete in correct order
+          - PruneLast=true                    # Prune after new resources are healthy
+
+        retry:
+          limit: 5
+          backoff:
+            duration: 5s
+            factor: 2
+            maxDuration: 3m
+
+      # Ignore differences that are expected
+      ignoreDifferences:
+        # Ignore Helm managed fields
+        - group: "*"
+          kind: "*"
+          jsonPointers:
+            - /metadata/annotations/meta.helm.sh~1release-name
+            - /metadata/annotations/meta.helm.sh~1release-namespace
+
+# Usage:
+#
+# Deploy this ApplicationSet ONCE during cluster bootstrap:
+#   kubectl apply -f argocd/bootstrap/applicationset-auto-discover.yaml
+#
+# After that, just manage configs via Git:
+#
+# Add new client:
+#   mkdir config/newclient-prod
+#   cp config/example.com/values-production.yaml config/newclient-prod/
+#   # Edit config/newclient-prod/values-production.yaml
+#   git add config/newclient-prod/
+#   git commit -m "Add newclient-prod"
+#   git push
+#   # ✓ ArgoCD auto-detects and deploys!
+#
+# Update existing client:
+#   vim config/clienta-prod/values-production.yaml
+#   git commit -m "Update clienta-prod: increase replicas"
+#   git push
+#   # ✓ ArgoCD auto-syncs only clienta-prod
+#
+# Remove client:
+#   git rm -r config/oldclient-prod/
+#   git commit -m "Remove oldclient-prod"
+#   git push
+#   # ✓ ArgoCD auto-removes the Application (preserveResourcesOnDeletion=true prevents data loss)
