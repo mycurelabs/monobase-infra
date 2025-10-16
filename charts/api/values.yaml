@@ -182,6 +182,10 @@ postgresql:
   enabled: true
   architecture: replication
   replicaCount: 2
+  # Service name override - use when PostgreSQL is deployed separately
+  # Default: uses Release.Name (e.g., "api-postgresql")
+  # Set to "postgresql" when PostgreSQL has its own release
+  serviceName: ""
   auth:
     enabled: true
     existingSecret: ""

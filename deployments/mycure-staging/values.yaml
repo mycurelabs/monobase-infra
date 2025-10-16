@@ -60,6 +60,10 @@ api:
   externalSecrets:
     enabled: false  # No External Secrets for staging
 
+  postgresql:
+    serviceName: postgresql  # PostgreSQL deployed as separate release
+    architecture: standalone  # Match actual PostgreSQL deployment
+
 # ===== CORE: Monobase Account Frontend =====
 account:
   enabled: true
