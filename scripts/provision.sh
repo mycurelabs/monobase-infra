@@ -27,6 +27,7 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 CLUSTER_NAME=""
 DRY_RUN=false
 AUTO_APPROVE=false
+MERGE_KUBECONFIG=false
 TERRAFORM_CMD="terraform"
 
 # Function to print colored messages
@@ -65,23 +66,28 @@ REQUIRED:
 OPTIONS:
     --dry-run               Show what would be done without making changes
     --auto-approve          Skip confirmation prompts (use with caution)
+    --merge-kubeconfig      Merge kubeconfig into ~/.kube/config and switch context
     --help                  Show this help message
 
 EXAMPLES:
-    # Provision cluster (interactive)
+    # Provision cluster (interactive, separate kubeconfig)
     $0 --cluster mycure-doks-main
+
+    # Provision and auto-merge kubeconfig
+    $0 --cluster k3d-local --merge-kubeconfig
 
     # Dry run (preview changes)
     $0 --cluster mycure-doks-main --dry-run
 
-    # Auto-approve (for CI/CD)
-    $0 --cluster mycure-doks-main --auto-approve
+    # Auto-approve with kubeconfig merge
+    $0 --cluster mycure-doks-main --auto-approve --merge-kubeconfig
 
 IDEMPOTENCY:
     This script is fully idempotent and safe to run multiple times:
     - First run: Creates cluster infrastructure
     - Subsequent runs: Updates only what changed (or does nothing)
     - Uses Terraform state to track existing resources
+    - Kubeconfig merge: Only merges if context doesn't exist, otherwise just switches
 
 WORKFLOW:
     1. Validate prerequisites (terraform/tofu, kubectl)
@@ -90,8 +96,9 @@ WORKFLOW:
     4. Run terraform plan (shows changes)
     5. Run terraform apply (with confirmation unless --auto-approve)
     6. Extract kubeconfig → ~/.kube/{cluster-name}
-    7. Test cluster connectivity
-    8. Display access information
+    7. (Optional) Merge kubeconfig into ~/.kube/config (--merge-kubeconfig)
+    8. Test cluster connectivity
+    9. Display access information
 
 PREREQUISITES:
     - Cluster config directory exists: tofu/clusters/{cluster-name}
@@ -122,6 +129,10 @@ while [[ $# -gt 0 ]]; do
             AUTO_APPROVE=true
             shift
             ;;
+        --merge-kubeconfig)
+            MERGE_KUBECONFIG=true
+            shift
+            ;;
         --help|-h)
             usage
             ;;
@@ -144,6 +155,7 @@ print_step "Provisioning Configuration"
 print_info "Cluster: $CLUSTER_NAME"
 print_info "Dry run: $DRY_RUN"
 print_info "Auto approve: $AUTO_APPROVE"
+print_info "Merge kubeconfig: $MERGE_KUBECONFIG"
 
 # Function to execute command with dry-run support
 execute() {
@@ -306,6 +318,61 @@ else
     print_info "[DRY-RUN] Would extract kubeconfig to $KUBECONFIG_PATH"
 fi
 
+# Merge kubeconfig (optional, idempotent)
+if [[ "$MERGE_KUBECONFIG" == "true" ]] && [[ -n "$KUBECONFIG_PATH" ]]; then
+    print_step "Step 5.5: Merge Kubeconfig"
+
+    if [[ "$DRY_RUN" == "false" ]]; then
+        # Get context name from the new kubeconfig
+        CONTEXT_NAME=$(kubectl --kubeconfig="$KUBECONFIG_PATH" config current-context 2>/dev/null || echo "")
+
+        if [[ -z "$CONTEXT_NAME" ]]; then
+            print_warning "Could not determine context name from kubeconfig, skipping merge"
+        else
+            # Check if context already exists in default kubeconfig (idempotency)
+            if [[ -f "$HOME/.kube/config" ]] && kubectl config get-contexts "$CONTEXT_NAME" &> /dev/null; then
+                print_info "Context '$CONTEXT_NAME' already exists in ~/.kube/config"
+                print_info "Switching to existing context (idempotent)"
+                kubectl config use-context "$CONTEXT_NAME"
+                print_success "Switched to context: $CONTEXT_NAME"
+            else
+                # Context doesn't exist, perform merge
+                print_info "Merging kubeconfig into ~/.kube/config..."
+
+                # Backup existing config
+                if [[ -f "$HOME/.kube/config" ]]; then
+                    BACKUP_PATH="$HOME/.kube/config.backup.$(date +%s)"
+                    cp "$HOME/.kube/config" "$BACKUP_PATH"
+                    print_info "Backed up existing config to $BACKUP_PATH"
+                fi
+
+                # Create .kube directory if it doesn't exist
+                mkdir -p "$HOME/.kube"
+
+                # Merge configs
+                if [[ -f "$HOME/.kube/config" ]]; then
+                    # Merge with existing config
+                    KUBECONFIG="$HOME/.kube/config:$KUBECONFIG_PATH" kubectl config view --flatten > "$HOME/.kube/config.tmp"
+                else
+                    # No existing config, just copy
+                    cp "$KUBECONFIG_PATH" "$HOME/.kube/config.tmp"
+                fi
+
+                mv "$HOME/.kube/config.tmp" "$HOME/.kube/config"
+                chmod 600 "$HOME/.kube/config"
+
+                # Switch to new context
+                kubectl config use-context "$CONTEXT_NAME"
+
+                print_success "Kubeconfig merged into ~/.kube/config"
+                print_success "Switched to context: $CONTEXT_NAME"
+            fi
+        fi
+    else
+        print_info "[DRY-RUN] Would merge kubeconfig into ~/.kube/config (if context doesn't exist)"
+    fi
+fi
+
 # Test cluster connectivity
 if [[ -n "$KUBECONFIG_PATH" ]]; then
     print_step "Step 6: Verify Cluster Connectivity"
@@ -355,23 +422,40 @@ fi
 echo ""
 print_info "Next steps:"
 echo ""
-echo "1. Set kubeconfig environment variable:"
-if [[ -n "$KUBECONFIG_PATH" ]]; then
-    echo "   export KUBECONFIG=$KUBECONFIG_PATH"
+
+if [[ "$MERGE_KUBECONFIG" == "true" ]] && [[ -n "$KUBECONFIG_PATH" ]]; then
+    echo "1. Kubeconfig already merged and context switched"
+    echo "   kubectl get nodes  # Should work immediately"
+    echo ""
+    echo "2. Create client configuration:"
+    echo "   ./scripts/new-client-config.sh myclient myclient.com"
+    echo "   # Then edit config/myclient/values-production.yaml"
+    echo ""
+    echo "3. Bootstrap applications via GitOps:"
+    echo "   ./scripts/bootstrap.sh --client myclient --env production"
 else
-    echo "   (Configure kubeconfig manually for this cluster type)"
+    echo "1. Set kubeconfig environment variable:"
+    if [[ -n "$KUBECONFIG_PATH" ]]; then
+        echo "   export KUBECONFIG=$KUBECONFIG_PATH"
+        echo ""
+        echo "   Or merge into default kubeconfig:"
+        echo "   ./scripts/provision.sh --cluster $CLUSTER_NAME --merge-kubeconfig"
+    else
+        echo "   (Configure kubeconfig manually for this cluster type)"
+    fi
+    echo ""
+    echo "2. Verify cluster access:"
+    echo "   kubectl get nodes"
+    echo "   kubectl cluster-info"
+    echo ""
+    echo "3. Create client configuration:"
+    echo "   ./scripts/new-client-config.sh myclient myclient.com"
+    echo "   # Then edit config/myclient/values-production.yaml"
+    echo ""
+    echo "4. Bootstrap applications via GitOps:"
+    echo "   ./scripts/bootstrap.sh --client myclient --env production"
 fi
-echo ""
-echo "2. Verify cluster access:"
-echo "   kubectl get nodes"
-echo "   kubectl cluster-info"
-echo ""
-echo "3. Create client configuration:"
-echo "   ./scripts/new-client-config.sh myclient myclient.com"
-echo "   # Then edit config/myclient/values-production.yaml"
-echo ""
-echo "4. Bootstrap applications via GitOps:"
-echo "   ./scripts/bootstrap.sh --client myclient --env production"
+
 echo ""
 echo "IDEMPOTENCY: You can re-run this script anytime to update the cluster"
 echo "             or verify current state. Terraform only changes what's needed."
