@@ -1,0 +1,15 @@
+# Default values for namespace chart
+# These values are overridden by ArgoCD Application
+
+namespace:
+  name: default
+  labels: {}
+  annotations: {}
+
+resourceQuota:
+  enabled: false
+  limits:
+    cpu: "10"
+    memory: "20Gi"
+    persistentvolumeclaims: "10"
+    pods: "50"

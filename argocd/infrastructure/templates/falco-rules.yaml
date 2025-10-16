@@ -18,7 +18,7 @@ spec:
   source:
     repoURL: {{ .Values.argocd.repoURL }}
     targetRevision: {{ .Values.argocd.targetRevision | default "main" }}
-    path: infrastructure/security-tools/falco/rules
+    path: infrastructure/security/falco/rules
     directory:
       recurse: false
       include: '{api-rules.yaml,database-rules.yaml}'

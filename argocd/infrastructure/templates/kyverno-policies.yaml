@@ -18,7 +18,7 @@ spec:
   source:
     repoURL: {{ .Values.argocd.repoURL }}
     targetRevision: {{ .Values.argocd.targetRevision | default "main" }}
-    path: infrastructure/security-tools/kyverno/policies
+    path: infrastructure/security/kyverno/policies
     directory:
       recurse: false
       include: '*.yaml'
