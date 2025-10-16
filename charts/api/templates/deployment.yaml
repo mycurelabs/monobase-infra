@@ -98,12 +98,9 @@ spec:
             secretKeyRef:
               name: postgresql
               key: postgres-password
-        # DATABASE_URL for apps that expect it
+        # DATABASE_URL constructed from components using K8s variable expansion
         - name: DATABASE_URL
-          valueFrom:
-            secretKeyRef:
-              name: api-database-url
-              key: database-url
+          value: "postgresql://$(POSTGRESQL_USER):$(POSTGRESQL_PASSWORD)@$(POSTGRESQL_HOST):$(POSTGRESQL_PORT)/$(POSTGRESQL_DATABASE)"
         # Service URLs from dependencies
         {{- if .Values.valkey.enabled }}
         - name: REDIS_URL
