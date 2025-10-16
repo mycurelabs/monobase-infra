@@ -111,9 +111,17 @@ tofu version
 terragrunt --version
 ```
 
+## Documentation
+
+Comprehensive cluster provisioning documentation is available in the main docs:
+
+- **[Cluster Provisioning Guide](../docs/getting-started/CLUSTER-PROVISIONING.md)** - Complete provisioning workflows for all platforms
+- **[Cluster Sizing Guide](../docs/operations/CLUSTER-SIZING.md)** - Multi-tenant capacity planning and cost analysis
+- **[Module Development Guide](../docs/development/MODULE-DEVELOPMENT.md)** - Create custom OpenTofu modules
+
 ## Next Steps
 
-1. **Read:** [PLAN.md](PLAN.md) for complete architecture
+1. **Read:** [Cluster Provisioning Guide](../docs/getting-started/CLUSTER-PROVISIONING.md) for complete workflows
 2. **Implement:** Modules as needed (start with aws-eks or local-k3d)
 3. **Test:** Use local-k3d module for local testing
 4. **Deploy:** Provision production cluster, then deploy Monobase apps

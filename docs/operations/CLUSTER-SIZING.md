@@ -924,9 +924,9 @@ Before finalizing cluster size:
 
 ## Additional Resources
 
-- **Cluster Provisioning**: [CLUSTER-PROVISIONING.md](./CLUSTER-PROVISIONING.md)
-- **Module Development**: [MODULE-DEVELOPMENT.md](./MODULE-DEVELOPMENT.md)
-- **Architecture**: [../PLAN.md](../PLAN.md)
+- **Cluster Provisioning**: [CLUSTER-PROVISIONING.md](../getting-started/CLUSTER-PROVISIONING.md)
+- **Module Development**: [MODULE-DEVELOPMENT.md](../development/MODULE-DEVELOPMENT.md)
+- **Architecture**: [ARCHITECTURE.md](../architecture/ARCHITECTURE.md)
 - **Main README**: [../README.md](../README.md)
 
 ### External Resources

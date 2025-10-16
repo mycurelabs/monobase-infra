@@ -6,6 +6,7 @@ Navigate to comprehensive guides organized by category.
 
 New to monobase-infra? Start here.
 
+- **[CLUSTER-PROVISIONING.md](getting-started/CLUSTER-PROVISIONING.md)** - Provision Kubernetes clusters (AWS/Azure/GCP/DOKS/k3d)
 - **[CLIENT-ONBOARDING.md](getting-started/CLIENT-ONBOARDING.md)** - Fork, configure, and deploy your first client
 - **[DEPLOYMENT.md](getting-started/DEPLOYMENT.md)** - Complete step-by-step deployment guide
 - **[INFRASTRUCTURE-REQUIREMENTS.md](getting-started/INFRASTRUCTURE-REQUIREMENTS.md)** - Cluster specifications and prerequisites
@@ -23,6 +24,7 @@ Understand the system design and core components.
 
 Day-to-day operations, monitoring, and incident response.
 
+- **[CLUSTER-SIZING.md](operations/CLUSTER-SIZING.md)** - Multi-tenant cluster sizing and capacity planning
 - **[BACKUP_DR.md](operations/BACKUP_DR.md)** - 3-tier backup strategy and restore procedures
 - **[DISASTER_RECOVERY_RUNBOOKS.md](operations/DISASTER_RECOVERY_RUNBOOKS.md)** - DR scenarios and recovery procedures
 - **[SCALING-GUIDE.md](operations/SCALING-GUIDE.md)** - Horizontal pod autoscaling, storage expansion
@@ -41,6 +43,7 @@ Security hardening, compliance, and policies.
 
 Local development, testing, and validation.
 
+- **[MODULE-DEVELOPMENT.md](development/MODULE-DEVELOPMENT.md)** - Build custom Terraform/OpenTofu modules
 - **[K3D-TESTING.md](development/K3D-TESTING.md)** - Local testing with k3d clusters
 - **[K3D_TROUBLESHOOTING.md](development/K3D_TROUBLESHOOTING.md)** - k3d troubleshooting (Ubuntu 24.04 AppArmor fix)
 - **[TESTING-RESULTS.md](development/TESTING-RESULTS.md)** - Validation test results
@@ -62,6 +65,10 @@ Configuration parameters and historical documentation.
 ## Quick Navigation by Task
 
 ### I want to...
+
+**Provision a Kubernetes cluster:**
+1. [CLUSTER-PROVISIONING.md](getting-started/CLUSTER-PROVISIONING.md)
+2. [CLUSTER-SIZING.md](operations/CLUSTER-SIZING.md)
 
 **Deploy a new client:**
 1. [CLIENT-ONBOARDING.md](getting-started/CLIENT-ONBOARDING.md)
@@ -85,6 +92,9 @@ Configuration parameters and historical documentation.
 **Test locally:**
 1. [K3D-TESTING.md](development/K3D-TESTING.md)
 2. [K3D_TROUBLESHOOTING.md](development/K3D_TROUBLESHOOTING.md)
+
+**Build custom Terraform modules:**
+1. [MODULE-DEVELOPMENT.md](development/MODULE-DEVELOPMENT.md)
 
 **Configure values:**
 1. [VALUES-REFERENCE.md](reference/VALUES-REFERENCE.md)

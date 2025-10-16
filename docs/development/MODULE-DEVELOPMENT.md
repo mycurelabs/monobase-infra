@@ -1060,9 +1060,9 @@ Study these well-implemented modules:
 ## Getting Help
 
 - Review existing modules in `tofu/modules/`
-- Check PLAN.md for architecture overview
-- See CLUSTER-PROVISIONING.md for usage patterns
-- Consult MULTI-TENANT-SIZING.md for capacity planning
+- Check [ARCHITECTURE.md](../architecture/ARCHITECTURE.md) for architecture overview
+- See [CLUSTER-PROVISIONING.md](../getting-started/CLUSTER-PROVISIONING.md) for usage patterns
+- Consult [CLUSTER-SIZING.md](../operations/CLUSTER-SIZING.md) for capacity planning
 
 ---
 

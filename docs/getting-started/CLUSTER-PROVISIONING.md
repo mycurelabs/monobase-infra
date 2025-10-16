@@ -435,7 +435,7 @@ cluster_name = "monobase-{environment}-{region}"
 
 #### 2. Node Sizing
 
-See [MULTI-TENANT-SIZING.md](./MULTI-TENANT-SIZING.md) for detailed guidance.
+See [CLUSTER-SIZING.md](../operations/CLUSTER-SIZING.md) for detailed guidance.
 
 **Small (5-10 clients):**
 ```hcl
@@ -1152,9 +1152,9 @@ kubectl delete pod <pod-name> -n <namespace>
 
 ## Additional Resources
 
-- **Module Development**: [MODULE-DEVELOPMENT.md](./MODULE-DEVELOPMENT.md)
-- **Cluster Sizing**: [MULTI-TENANT-SIZING.md](./MULTI-TENANT-SIZING.md)
-- **Architecture**: [../PLAN.md](../PLAN.md)
+- **Module Development**: [MODULE-DEVELOPMENT.md](../development/MODULE-DEVELOPMENT.md)
+- **Cluster Sizing**: [CLUSTER-SIZING.md](../operations/CLUSTER-SIZING.md)
+- **Architecture**: [ARCHITECTURE.md](../architecture/ARCHITECTURE.md)
 - **Main README**: [../README.md](../README.md)
 
 ---
