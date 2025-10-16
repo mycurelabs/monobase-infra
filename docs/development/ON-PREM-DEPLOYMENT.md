@@ -67,12 +67,9 @@ echo "net.ipv4.ip_forward=1" | sudo tee -a /etc/sysctl.conf
 ### 2. Create Cluster Config
 
 ```bash
-# Bootstrap config
-./scripts/new-cluster-config.sh clinic-prod
-
-# Or copy manually
-cp -r tofu/clusters/default-cluster tofu/clusters/clinic-prod
-cd tofu/clusters/clinic-prod
+# Copy default cluster configuration
+cp -r clusters/default-cluster clusters/clinic-prod
+cd clusters/clinic-prod
 ```
 
 ### 3. Customize for K3s

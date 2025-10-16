@@ -193,8 +193,10 @@ CLUSTER_DIR="${REPO_ROOT}/clusters/${CLUSTER_NAME}"
 if [[ ! -d "$CLUSTER_DIR" ]]; then
     print_error "Cluster directory not found: $CLUSTER_DIR"
     echo ""
-    print_info "Create cluster configuration first with:"
-    echo "  ./scripts/new-cluster-config.sh $CLUSTER_NAME"
+    print_info "Create cluster configuration first:"
+    echo "  cp -r clusters/default-cluster clusters/$CLUSTER_NAME"
+    echo "  cd clusters/$CLUSTER_NAME"
+    echo "  vim terraform.tfvars  # Customize cluster configuration"
     exit 1
 fi
 print_success "Cluster directory exists: $CLUSTER_DIR"

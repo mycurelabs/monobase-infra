@@ -81,7 +81,6 @@ Contains:
 - ✅ **local-k3d** - Local testing and CI/CD automation
 - ✅ **default-cluster** - Complete reference configuration
 - ✅ **Terragrunt** - DRY configuration management
-- ✅ **Bootstrap script** - new-cluster-config.sh
 
 **Complete multi-cloud support: AWS, Azure, GCP, DigitalOcean, on-prem, local testing!**
 
