@@ -37,14 +37,14 @@ api:
     hostname: ""  # Empty = uses api.<global.domain>
 
   livenessProbe:
-    enabled: false  # Disabled: /health endpoint returns 404 in v0.1.1
-    path: /health
+    enabled: true
+    path: /livez
     initialDelaySeconds: 30
     periodSeconds: 10
 
   readinessProbe:
-    enabled: false  # Disabled: /ready endpoint returns 404 in v0.1.1
-    path: /ready
+    enabled: true
+    path: /readyz
     initialDelaySeconds: 10
     periodSeconds: 5
 
