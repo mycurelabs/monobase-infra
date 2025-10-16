@@ -146,7 +146,7 @@ valkey:
 
 # ===== OPTIONAL: MinIO (Object Storage) =====
 minio:
-  enabled: true
+  enabled: false  # TODO: Fix MinIO chart deployment issues
   mode: standalone
   persistence:
     enabled: true
