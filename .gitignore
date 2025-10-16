@@ -14,16 +14,7 @@ secrets/
 .env.local
 credentials.json
 
-# Client-specific deployments (should be in client's fork)
-deployments/*/
-!deployments/example-prod/
-!deployments/example-staging/
-!deployments/templates/
-
-# OpenTofu/Terraform
-clusters/*/
-!clusters/default-cluster/
-!clusters/k3d-local/
+# OpenTofu/Terraform state and cache
 terraform/**/.terraform/
 terraform/**/.terragrunt-cache/
 terraform/**/*.tfstate
