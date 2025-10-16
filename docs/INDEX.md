@@ -58,7 +58,8 @@ Configuration parameters and historical documentation.
 
 ## 📂 Other Documentation
 
-- **[TEMPLATE-USAGE.md](TEMPLATE-USAGE.md)** - Template fork workflow (see CLIENT-ONBOARDING.md for newer approach)
+- **[TEMPLATE-USAGE.md](TEMPLATE-USAGE.md)** - Template fork workflow and maintenance
+- **[STORAGE-PROVIDERS.md](STORAGE-PROVIDERS.md)** - Storage provider configuration reference
 
 ---
 

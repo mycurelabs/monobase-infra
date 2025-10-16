@@ -135,15 +135,26 @@ kubectl get nodes
 ```bash
 cd ../../..
 
-# Set storage provider to longhorn (for on-prem)
-./scripts/new-client-config.sh clinic-a clinic-a.local
+# Bootstrap cluster with ArgoCD + Infrastructure
+./scripts/bootstrap.sh
 
-# Edit config
-vim deployments/clinic-a/values-production.yaml
+# Create client configuration
+mkdir -p deployments/clinic-a-prod
+cp deployments/templates/production-base.yaml deployments/clinic-a-prod/values.yaml
+
+# Edit config - set storage provider to longhorn
+vim deployments/clinic-a-prod/values.yaml
 # Set: global.storage.provider: longhorn
+# Set: global.domain: clinic-a.local
+# Set: global.namespace: clinic-a-prod
 
-# Deploy
-helm install api charts/api -f deployments/clinic-a/values-production.yaml -n clinic-a-prod --create-namespace
+# Commit and push (ArgoCD ApplicationSet will auto-discover)
+git add deployments/clinic-a-prod/
+git commit -m "Add clinic-a-prod configuration"
+git push
+
+# Verify ApplicationSet discovered the config
+kubectl get applications -n argocd | grep clinic-a-prod
 ```
 
 ## High Availability Setup

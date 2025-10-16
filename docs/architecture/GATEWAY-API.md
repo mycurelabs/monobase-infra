@@ -16,8 +16,12 @@ Envoy Gateway configuration, HTTPRoute management, and zero-downtime routing.
 
 ### Shared Gateway (One-Time Setup)
 
+The Gateway is deployed automatically by ArgoCD (via bootstrap.sh).
+
+**Reference example** (see docs/components/envoy-gateway-gatewayclass.yaml):
+
 ```yaml
-# infrastructure/envoy-gateway/gateway.yaml
+# Example Gateway configuration
 apiVersion: gateway.networking.k8s.io/v1
 kind: Gateway
 metadata:
@@ -276,4 +280,6 @@ kubectl get svc -n gateway-system
 - ✅ Built-in TLS support
 - ✅ Cost-effective (single LoadBalancer)
 
-See: `infrastructure/envoy-gateway/` for configuration files.
+**Deployment:** Gateway is deployed automatically via ArgoCD (see `argocd/infrastructure/templates/envoy-gateway.yaml`)
+
+**Reference examples:** See `docs/components/envoy-gateway-*.yaml` for configuration examples

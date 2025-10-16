@@ -23,23 +23,21 @@ cd YOUR-FORK
 ## Step 2: Create Client Configuration
 
 ```bash
-# Use the bootstrap script (recommended)
-./scripts/new-client-config.sh myclient myclient.com
+# Create deployment configuration directory
+mkdir -p deployments/myclient-prod
+mkdir -p deployments/myclient-staging
 
-# This creates:
-# deployments/myclient/
-# ├── README.md
-# ├── values-staging.yaml
-# ├── values-production.yaml
-# └── secrets-mapping.yaml
+# Copy base templates
+cp deployments/templates/production-base.yaml deployments/myclient-prod/values.yaml
+cp deployments/templates/staging-base.yaml deployments/myclient-staging/values.yaml
 ```
 
 ## Step 3: Customize Configuration
 
-Edit the generated values files:
+Edit the values files:
 
 ```bash
-vim deployments/myclient/values-production.yaml
+vim deployments/myclient-prod/values.yaml
 ```
 
 **Key items to customize:**
@@ -92,25 +90,22 @@ vim deployments/myclient/values-production.yaml
 
 ## Step 4: Configure Secrets Management
 
-Edit secrets mapping:
-
-```bash
-vim deployments/myclient/secrets-mapping.yaml
-```
-
-Update with your KMS paths:
+Update secrets configuration in your values file:
 
 ```yaml
-provider: aws  # or azure, gcp, sops
+# deployments/myclient-prod/values.yaml
 
-# AWS example
-postgresql:
-  - secretKey: postgresql-root-password
-    remoteKey: myclient/prod/postgresql/root-password
-
-api:
-  - secretKey: JWT_SECRET
-    remoteKey: myclient/prod/api/jwt-secret
+externalSecrets:
+  provider: aws  # or azure, gcp, vault
+  
+  secrets:
+    postgresql:
+      - secretKey: postgresql-root-password
+        remoteKey: myclient/prod/postgresql/root-password
+    
+    api:
+      - secretKey: JWT_SECRET
+        remoteKey: myclient/prod/api/jwt-secret
 ```
 
 ## Step 5: Create Secrets in KMS
@@ -133,42 +128,43 @@ aws secretsmanager create-secret \\
 ## Step 6: Commit Configuration
 
 ```bash
-git add deployments/myclient/
-git commit -m "Add MyClient production configuration"
+git add deployments/myclient-prod/ deployments/myclient-staging/
+git commit -m "Add MyClient production and staging configurations"
 git push origin main
 ```
 
-## Step 7: Deploy Infrastructure (One-Time)
+## Step 7: Bootstrap Cluster (One-Time)
 
 ```bash
-# Deploy Longhorn (storage)
-kubectl apply -f infrastructure/longhorn/
+# Run bootstrap script to install ArgoCD + Infrastructure
+./scripts/bootstrap.sh
 
-# Deploy Envoy Gateway (routing)
-kubectl apply -f infrastructure/envoy-gateway/
+# This installs:
+# 1. ArgoCD itself
+# 2. Infrastructure Root Application (manages all cluster infrastructure)
+# 3. ApplicationSet (auto-discovers client configs in deployments/)
 
-# Deploy External Secrets Operator
-kubectl apply -f infrastructure/external-secrets-operator/
-
-# Deploy ArgoCD (GitOps)
-kubectl apply -f infrastructure/argocd/
-
-# Wait for all to be ready
-kubectl wait --for=condition=ready pod -l app=longhorn-manager -n longhorn-system --timeout=300s
+# Wait for infrastructure to deploy (5-10 minutes)
+kubectl get application -n argocd -w
 ```
 
-## Step 8: Deploy Applications via ArgoCD
+## Step 8: Verify Client Auto-Discovery
+
+ArgoCD ApplicationSet automatically discovers your client configurations:
 
 ```bash
-# Render templates with your config
-./scripts/render-templates.sh \\
-  --values deployments/myclient/values-production.yaml \\
-  --output rendered/myclient/
+# Wait for ApplicationSet to discover your config (~30 seconds)
+kubectl get applications -n argocd | grep myclient-prod
 
-# Deploy root app (deploys everything)
-kubectl apply -f rendered/myclient/argocd/root-app.yaml
+# You should see Applications created automatically:
+# - myclient-prod-namespace
+# - myclient-prod-security
+# - myclient-prod-postgresql
+# - myclient-prod-api
+# - myclient-prod-account
+# etc.
 
-# Watch deployment progress
+# Watch deployment progress via ArgoCD UI
 kubectl port-forward -n argocd svc/argocd-server 8080:443
 # Open https://localhost:8080
 ```
@@ -224,15 +220,7 @@ kubectl get svc -n gateway-system envoy-gateway
 ## Next Steps
 
 - Set up monitoring (if enabled)
-- Configure backups (Velero schedules)
+- Configure backups (managed automatically by Velero schedules)
 - Set up CI/CD for application updates
 - Review security hardening checklist
 - Schedule penetration testing
-
-## Phase 1 Status
-
-This is Phase 1 - foundation only. Subsequent phases will complete:
-- Full Helm templates (Phase 2)
-- Infrastructure YAMLs (Phase 3)
-- Complete documentation (Phase 5)
-- All scripts (Phase 6)

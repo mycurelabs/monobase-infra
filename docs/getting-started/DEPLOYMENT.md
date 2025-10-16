@@ -2,10 +2,20 @@
 
 Complete deployment procedures for Monobase Infrastructure.
 
+## ⚡ Quick Start: GitOps-First Approach (Recommended)
+
+**For the automated GitOps deployment using ArgoCD and bootstrap.sh**, see:
+- **[CLIENT-ONBOARDING.md](CLIENT-ONBOARDING.md)** - Complete GitOps workflow with bootstrap.sh
+- **[GITOPS-ARGOCD.md](../architecture/GITOPS-ARGOCD.md)** - GitOps architecture details
+
+The sections below document **manual deployment steps** as an alternative or reference.
+
+---
+
 ## Table of Contents
 
 1. [Pre-Deployment Checklist](#pre-deployment-checklist)
-2. [Infrastructure Deployment](#infrastructure-deployment)
+2. [Infrastructure Deployment](#infrastructure-deployment) *(Manual alternative to bootstrap.sh)*
 3. [Application Deployment](#application-deployment)
 4. [Post-Deployment Verification](#post-deployment-verification)
 5. [DNS Configuration](#dns-configuration)

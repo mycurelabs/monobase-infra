@@ -243,9 +243,12 @@ export KUBECONFIG=~/.kube/monobase-prod
 kubectl get nodes
 kubectl get pods -A
 
-# 10. Deploy Monobase applications (see ../charts/, ../deployments/)
+# 10. Bootstrap cluster with ArgoCD + Infrastructure
 cd ../../../
-./scripts/new-client-config.sh client-a client-a.com
+./scripts/bootstrap.sh
+
+# Then add client configurations in deployments/
+# ArgoCD ApplicationSet will auto-discover and deploy them
 ```
 
 ### Workflow 2: Using Terragrunt (DRY Configuration)
@@ -682,16 +685,17 @@ clusters/
 cd clusters/shared-prod
 tofu apply
 
-# 2. Deploy multiple clients to different namespaces
+# 2. Bootstrap cluster once
 cd ../../..
-./scripts/new-client-config.sh client-a client-a.com
-./scripts/new-client-config.sh client-b client-b.com
-./scripts/new-client-config.sh client-c client-c.com
+./scripts/bootstrap.sh
 
-# Each client gets:
-# - client-a-prod namespace
-# - client-b-prod namespace
-# - client-c-prod namespace
+# 3. Add client configurations in deployments/
+mkdir -p deployments/client-a-prod deployments/client-b-prod deployments/client-c-prod
+
+# ArgoCD ApplicationSet auto-discovers and creates:
+# - client-a-prod namespace + applications
+# - client-b-prod namespace + applications
+# - client-c-prod namespace + applications
 ```
 
 **Benefits:**
@@ -719,9 +723,8 @@ for cluster in us-east-prod eu-west-prod ap-south-prod; do
   cd ../../..
 done
 
-# Deploy clients to appropriate regions
-./scripts/new-client-config.sh us-client-a us-client-a.com
-./scripts/new-client-config.sh eu-client-b eu-client-b.com
+# Bootstrap each cluster, then add client configs
+# ArgoCD ApplicationSet auto-discovers configurations per cluster
 ```
 
 ### Scenario 3: Environment Separation
@@ -743,10 +746,9 @@ tofu apply
 cd ../staging
 tofu apply
 
-# Deploy to staging first, then production
-./scripts/new-client-config.sh client-a-staging client-a.com
-# Test thoroughly
-./scripts/new-client-config.sh client-a-prod client-a.com
+# Bootstrap both clusters
+# Add client configs to deployments/client-a-staging/ and deployments/client-a-prod/
+# ArgoCD ApplicationSet auto-discovers and deploys
 ```
 
 ### Scenario 4: Dedicated Enterprise Clusters
@@ -1027,15 +1029,20 @@ After successfully provisioning a cluster:
   # See ../charts/velero/
   ```
 
-- [ ] **Create first client namespace**
+- [ ] **Bootstrap cluster**
   ```bash
-  ./scripts/new-client-config.sh client-a client-a.com
+  ./scripts/bootstrap.sh
   ```
 
-- [ ] **Deploy Monobase API, API Worker, Monobase**
+- [ ] **Add client configuration**
   ```bash
-  helm install api charts/api -f deployments/client-a/values-production.yaml
-  # etc.
+  # Create client deployment config
+  mkdir -p deployments/client-a-prod
+  cp deployments/templates/production-base.yaml deployments/client-a-prod/values.yaml
+  vim deployments/client-a-prod/values.yaml  # Customize
+  git add deployments/client-a-prod/ && git commit && git push
+  
+  # ArgoCD ApplicationSet auto-discovers and deploys all applications
   ```
 
 ### Monitoring & Observability

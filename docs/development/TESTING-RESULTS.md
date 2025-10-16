@@ -2,6 +2,19 @@
 
 Complete validation and testing results for Monobase Infrastructure template.
 
+## ⚠️ Historical Document
+
+**Note:** This document reflects testing performed on 2025-10-13 for version 1.0.0.
+Some scripts and workflows mentioned here have since been replaced:
+- `new-client-config.sh` → Now using bootstrap.sh + manual config creation
+- `render-templates.sh` → Replaced by GitOps ApplicationSet auto-discovery
+
+For current deployment workflow, see:
+- [CLIENT-ONBOARDING.md](../getting-started/CLIENT-ONBOARDING.md)
+- [GITOPS-ARGOCD.md](../architecture/GITOPS-ARGOCD.md)
+
+---
+
 ## Test Execution Date
 
 **Date:** 2025-10-13
