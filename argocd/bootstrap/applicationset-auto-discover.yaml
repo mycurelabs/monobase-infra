@@ -31,17 +31,18 @@ spec:
   generators:
     # Git Directory Generator: Scans deployments/ for client/env directories
     - git:
-        repoURL: https://github.com/YOUR-ORG/monobase-infra.git
+        repoURL: https://github.com/monobaselabs/monobase-infra.git
         revision: HEAD
         directories:
-          # Scan all directories in deployments/
+          # Include: scan all directories in deployments/
           - path: deployments/*
-            # Exclude reference examples
-            exclude: |
-              deployments/example-prod
-              deployments/example-staging
-              deployments/example-k3d
-              deployments/.gitkeep
+          # Exclude: reference examples (each as separate entry)
+          - path: deployments/example-prod
+            exclude: true
+          - path: deployments/example-staging
+            exclude: true
+          - path: deployments/example-k3d
+            exclude: true
 
   # Template for creating root Applications
   template:
@@ -64,7 +65,7 @@ spec:
 
       source:
         # Point to this Git repository
-        repoURL: https://github.com/YOUR-ORG/monobase-infra.git
+        repoURL: https://github.com/monobaselabs/monobase-infra.git
         targetRevision: HEAD
         path: argocd/applications
 
