@@ -63,6 +63,9 @@ api:
   postgresql:
     serviceName: postgresql  # PostgreSQL deployed as separate release
     architecture: standalone  # Match actual PostgreSQL deployment
+    auth:
+      database: postgres  # Use default database
+      username: postgres  # Use default user
 
 # ===== CORE: Monobase Account Frontend =====
 account:
@@ -105,7 +108,7 @@ postgresql:
 
   auth:
     enabled: true
-    # Credentials managed by External Secrets
+    # Using default postgres user and database
 
   persistence:
     enabled: true
