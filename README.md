@@ -74,23 +74,26 @@ monobase-infra/
 
 ### Optional: Cluster Provisioning
 
-If you need to create Kubernetes clusters, use these tools **before** deploying this template:
+This repository includes OpenTofu/Terraform modules for provisioning Kubernetes clusters. Use the unified `provision.sh` script for all cluster types:
 
-**Infrastructure as Code (Recommended for Production):**
-- **OpenTofu/Terraform** - Full infrastructure control
-  - [AWS EKS Module](https://registry.terraform.io/modules/terraform-aws-modules/eks/aws)
-  - [Azure AKS Module](https://registry.terraform.io/modules/Azure/aks/azurerm)
-  - [GCP GKE Module](https://registry.terraform.io/modules/terraform-google-modules/kubernetes-engine/google)
-- **Terragrunt** - DRY Terraform wrapper for multi-environment setups
-- **Pulumi** - Modern IaC with programming languages
+**Supported Platforms:**
+- **AWS EKS** - `./scripts/provision.sh --cluster myclient-eks`
+- **Azure AKS** - `./scripts/provision.sh --cluster myclient-aks`
+- **GCP GKE** - `./scripts/provision.sh --cluster myclient-gke`
+- **DigitalOcean DOKS** - `./scripts/provision.sh --cluster myclient-doks`
+- **On-Premises K3s** - `./scripts/provision.sh --cluster myclient-k3s`
+- **Local k3d (Development)** - `./scripts/provision.sh --cluster k3d-local`
 
-**Quick Setup (Good for Testing):**
-- **eksctl** - `eksctl create cluster --name myclient --nodes 3 --node-type m6i.xlarge`
-- **az cli** - `az aks create --resource-group rg --name myclient --node-count 3`
-- **gcloud** - `gcloud container clusters create myclient --num-nodes=3`
+**Workflow:**
+```bash
+# 1. Provision cluster
+./scripts/provision.sh --cluster k3d-local
 
-**Complementary Framework:**
-- [k8s-iac-framework](https://github.com/malayh/k8s-iac-framework) - Full-stack IaC with OpenTofu + Terragrunt + apps
+# 2. Bootstrap applications
+./scripts/bootstrap.sh --client monobase --env dev
+```
+
+See [tofu/README.md](tofu/README.md) for detailed provisioning documentation.
 
 **This template works with ANY Kubernetes cluster regardless of how it was provisioned.**
 
@@ -158,33 +161,35 @@ If you need to create a Kubernetes cluster first:
 git clone https://github.com/YOUR-ORG/monobase-infra.git
 cd monobase-infra
 
-# 2. Provision cluster using OpenTofu
-cd tofu/clusters/
-cp -r default-cluster myclient-cluster
-cd myclient-cluster
+# 2. Provision cluster using unified script
+./scripts/provision.sh --cluster k3d-local
 
-# 3. Configure cluster
-vim terraform.tfvars
-# Set: cluster_name, region, deployment_profile (small/medium/large)
+# For other platforms:
+# ./scripts/provision.sh --cluster myclient-eks
+# ./scripts/provision.sh --cluster myclient-aks
+# ./scripts/provision.sh --cluster myclient-doks
 
-# 4. Create cluster
-tofu init
-tofu plan
-tofu apply
+# 3. Script will:
+#    - Initialize Terraform
+#    - Create cluster infrastructure
+#    - Extract and save kubeconfig to ~/.kube/{cluster-name}
+#    - Test cluster connectivity
 
-# 5. Get kubeconfig
-tofu output -raw kubeconfig > ~/.kube/myclient
-export KUBECONFIG=~/.kube/myclient
-
-# 6. Now follow Track 1 steps 2-6
-cd ../../../
+# 4. Create client configuration
 ./scripts/new-client-config.sh myclient myclient.com
+
+# 5. Edit configuration
+vim config/myclient/values-production.yaml
 # - global.namespace: myclient-prod
 # - global.storage.provider: cloud-default (EKS/AKS/GKE) or longhorn (on-prem)
 # - Image tags (replace "latest" with specific versions)
 # - Resource limits (CPU, memory)
 # - Storage sizes (PostgreSQL, MinIO, etc.)
 # - Hostnames for each service
+
+# 6. Bootstrap applications
+export KUBECONFIG=~/.kube/myclient-eks  # Or your cluster name
+./scripts/bootstrap.sh --client myclient --env production
 ```
 
 ### 4. Configure Secrets Management

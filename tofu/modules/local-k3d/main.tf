@@ -8,14 +8,15 @@ resource "k3d_cluster" "main" {
   image = "rancher/k3s:${var.k3s_version}"
 
   # Port mappings for LoadBalancer services
+  # Use alternative ports to avoid conflicts with production k8s
   port {
-    host_port      = 80
+    host_port      = var.http_port
     container_port = 80
     node_filters   = ["loadbalancer"]
   }
 
   port {
-    host_port      = 443
+    host_port      = var.https_port
     container_port = 443
     node_filters   = ["loadbalancer"]
   }

@@ -23,6 +23,7 @@ config/*/
 # OpenTofu/Terraform
 tofu/clusters/*/
 !tofu/clusters/default-cluster/
+!tofu/clusters/k3d-local/
 tofu/**/.terraform/
 tofu/**/.terragrunt-cache/
 tofu/**/*.tfstate

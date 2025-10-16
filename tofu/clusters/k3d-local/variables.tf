@@ -1,9 +1,9 @@
-# k3d Module - Variables
+# k3d Local Development Cluster - Variables
 
 variable "cluster_name" {
   description = "Name of the k3d cluster"
   type        = string
-  default     = "monobase-test"
+  default     = "monobase-dev"
 }
 
 variable "k3s_version" {
