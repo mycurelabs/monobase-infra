@@ -83,8 +83,8 @@ spec:
               key: LOG_LEVEL
         - name: PORT
           value: "7213"
-        # PostgreSQL connection - load password from PostgreSQL chart's secret
-        # Note: PostgreSQL may be deployed separately in GitOps, connection always configured
+        # PostgreSQL connection - individual components
+        # Note: PostgreSQL may be deployed separately in GitOps
         - name: POSTGRESQL_HOST
           value: {{ include "api.postgresql.host" . | quote }}
         - name: POSTGRESQL_PORT
@@ -98,6 +98,12 @@ spec:
             secretKeyRef:
               name: postgresql
               key: postgres-password
+        # DATABASE_URL for apps that expect it
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: api-database-url
+              key: database-url
         # Service URLs from dependencies
         {{- if .Values.valkey.enabled }}
         - name: REDIS_URL

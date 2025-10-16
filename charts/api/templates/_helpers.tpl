@@ -142,6 +142,16 @@ PostgreSQL username
 {{- end }}
 
 {{/*
+PostgreSQL connection URL template (app must substitute password from POSTGRESQL_PASSWORD env var)
+*/}}
+{{- define "api.postgresql.connectionUrl" -}}
+{{- $host := include "api.postgresql.host" . -}}
+{{- $database := include "api.postgresql.database" . -}}
+{{- $username := include "api.postgresql.username" . -}}
+postgresql://{{ $username }}@{{ $host }}:5432/{{ $database }}
+{{- end }}
+
+{{/*
 Valkey (Redis) URL - constructs connection URL from Valkey dependency
 */}}
 {{- define "api.valkey.url" -}}
