@@ -61,6 +61,9 @@ api:
       database: postgres  # Use default database
       username: postgres  # Use default user
 
+  mailpit:
+    enabled: true  # ✅ Enable Mailpit SMTP for staging
+
 # ===== CORE: Monobase Account Frontend =====
 account:
   enabled: true
@@ -182,6 +185,8 @@ minio:
     readOnlyRootFilesystem: false
 
 # ===== STAGING: Mailpit (Email Testing) =====
+# Note: Mailpit is deployed as separate ArgoCD app (Wave 2)
+# SMTP config is passed to API via api.mailpit.enabled above
 mailpit:
   enabled: true  # ✅ Enable for staging email testing
 
