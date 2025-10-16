@@ -20,14 +20,8 @@ spec:
     targetRevision: 14.x.x
     helm:
       releaseName: minio
-      valueFiles:
-        - ../../deployments/{{ .Values.global.namespace }}/values.yaml
       valuesObject:
-        mode: {{ .Values.minio.mode | default "standalone" }}
-        persistence:
-          enabled: {{ .Values.minio.persistence.enabled | default true }}
-          storageClass: {{ .Values.minio.persistence.storageClass | default "" }}
-          size: {{ .Values.minio.persistence.size | default "100Gi" }}
+        {{- toYaml .Values.minio | nindent 8 }}
 
   destination:
     server: https://kubernetes.default.svc
