@@ -38,15 +38,9 @@ api:
 
   livenessProbe:
     enabled: true
-    path: /livez
-    initialDelaySeconds: 30
-    periodSeconds: 10
 
   readinessProbe:
-    enabled: false  # Disabled: /readyz checks S3 which is not configured in staging
-    path: /readyz
-    initialDelaySeconds: 10
-    periodSeconds: 5
+    enabled: true
 
   podDisruptionBudget:
     enabled: false  # Not needed for single replica
@@ -152,7 +146,19 @@ valkey:
 
 # ===== OPTIONAL: MinIO (Object Storage) =====
 minio:
-  enabled: false  # Use DigitalOcean Spaces instead
+  enabled: true
+  architecture: standalone
+  persistence:
+    enabled: true
+    storageClass: ""  # Auto-detect
+    size: 10Gi
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
 
 # ===== STAGING: Mailpit (Email Testing) =====
 mailpit:

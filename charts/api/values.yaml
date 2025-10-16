@@ -207,7 +207,9 @@ valkey:
 # MinIO dependency configuration (optional S3 storage)
 minio:
   enabled: false
-  mode: distributed
+  mode: standalone
+  defaultBuckets: "monobase-files"
+  region: "us-east-1"
   replicas: 6
   persistence:
     enabled: true
