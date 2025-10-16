@@ -35,7 +35,7 @@ Layer 1: Infrastructure (THIS GUIDE)
 ├── Terragrunt manages configurations
 └── Creates: VPC, K8s cluster, IAM, networking
 
-Layer 2: Applications (../PLAN.md, ../charts/, ../config/)
+Layer 2: Applications (../PLAN.md, ../charts/, ../deployments/)
 ├── Helm charts deploy applications
 └── ArgoCD manages GitOps
 ```
@@ -243,7 +243,7 @@ export KUBECONFIG=~/.kube/monobase-prod
 kubectl get nodes
 kubectl get pods -A
 
-# 10. Deploy Monobase applications (see ../charts/, ../config/)
+# 10. Deploy Monobase applications (see ../charts/, ../deployments/)
 cd ../../../
 ./scripts/new-client-config.sh client-a client-a.com
 ```
@@ -404,7 +404,7 @@ tofu output -raw kubeconfig > ~/.kube/clinic-prod
 
 ### Understanding default-cluster/
 
-The `clusters/default-cluster/` is a **reference configuration** (like `config/example.com/` for apps).
+The `clusters/default-cluster/` is a **reference configuration** (like `deployments/example.com/` for apps).
 
 **Files:**
 
@@ -1034,7 +1034,7 @@ After successfully provisioning a cluster:
 
 - [ ] **Deploy Monobase API, API Worker, Monobase**
   ```bash
-  helm install api charts/api -f config/client-a/values-production.yaml
+  helm install api charts/api -f deployments/client-a/values-production.yaml
   # etc.
   ```
 

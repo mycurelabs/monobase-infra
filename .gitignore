@@ -14,11 +14,11 @@ secrets/
 .env.local
 credentials.json
 
-# Client-specific configurations (should be in client's fork)
-config/*/
-!config/example.com/
-!config/k3d-local/
-!config/profiles/
+# Client-specific deployments (should be in client's fork)
+deployments/*/
+!deployments/example-prod/
+!deployments/example-staging/
+!deployments/templates/
 
 # OpenTofu/Terraform
 clusters/*/

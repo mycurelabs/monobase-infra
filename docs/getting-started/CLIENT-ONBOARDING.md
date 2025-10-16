@@ -27,7 +27,7 @@ cd YOUR-FORK
 ./scripts/new-client-config.sh myclient myclient.com
 
 # This creates:
-# config/myclient/
+# deployments/myclient/
 # ├── README.md
 # ├── values-staging.yaml
 # ├── values-production.yaml
@@ -39,7 +39,7 @@ cd YOUR-FORK
 Edit the generated values files:
 
 ```bash
-vim config/myclient/values-production.yaml
+vim deployments/myclient/values-production.yaml
 ```
 
 **Key items to customize:**
@@ -95,7 +95,7 @@ vim config/myclient/values-production.yaml
 Edit secrets mapping:
 
 ```bash
-vim config/myclient/secrets-mapping.yaml
+vim deployments/myclient/secrets-mapping.yaml
 ```
 
 Update with your KMS paths:
@@ -133,7 +133,7 @@ aws secretsmanager create-secret \\
 ## Step 6: Commit Configuration
 
 ```bash
-git add config/myclient/
+git add deployments/myclient/
 git commit -m "Add MyClient production configuration"
 git push origin main
 ```
@@ -162,7 +162,7 @@ kubectl wait --for=condition=ready pod -l app=longhorn-manager -n longhorn-syste
 ```bash
 # Render templates with your config
 ./scripts/render-templates.sh \\
-  --values config/myclient/values-production.yaml \\
+  --values deployments/myclient/values-production.yaml \\
   --output rendered/myclient/
 
 # Deploy root app (deploys everything)

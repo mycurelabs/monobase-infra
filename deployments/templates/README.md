@@ -27,10 +27,10 @@ This directory contains **base configuration profiles** that provide production-
 **For Production:**
 ```bash
 # 1. Copy the base profile
-cp config/profiles/production-base.yaml config/myclient/values-production.yaml
+cp deployments/profiles/production-base.yaml deployments/myclient/values-production.yaml
 
 # 2. Edit only what's different
-vim config/myclient/values-production.yaml
+vim deployments/myclient/values-production.yaml
 # Change:
 # - global.domain: myclient.com
 # - global.namespace: myclient-prod
@@ -44,8 +44,8 @@ vim config/myclient/values-production.yaml
 
 **For Staging:**
 ```bash
-cp config/profiles/staging-base.yaml config/myclient/values-staging.yaml
-vim config/myclient/values-staging.yaml
+cp deployments/profiles/staging-base.yaml deployments/myclient/values-staging.yaml
+vim deployments/myclient/values-staging.yaml
 # Change:
 # - global.domain: staging.myclient.com
 # - global.namespace: myclient-staging
@@ -62,8 +62,8 @@ vim config/myclient/values-staging.yaml
 If your needs align with a specific size profile:
 
 ```bash
-cp config/profiles/production-medium.yaml config/myclient/values-production.yaml
-vim config/myclient/values-production.yaml
+cp deployments/profiles/production-medium.yaml deployments/myclient/values-production.yaml
+vim deployments/myclient/values-production.yaml
 # Only change domain and namespace
 ```
 
@@ -132,7 +132,7 @@ This creates a small, maintainable config file that documents only what's specia
 
 ### Before (Traditional Approach)
 ```yaml
-# config/myclient/values-production.yaml (430 lines)
+# deployments/myclient/values-production.yaml (430 lines)
 global:
   domain: myclient.com
   ...
@@ -167,7 +167,7 @@ api:
 
 ### After (Profile-Based Approach)
 ```yaml
-# config/myclient/values-production.yaml (60 lines)
+# deployments/myclient/values-production.yaml (60 lines)
 global:
   domain: myclient.com
   namespace: myclient-prod
@@ -191,25 +191,25 @@ To migrate existing configs to use profiles:
 
 ```bash
 # 1. Backup existing config
-cp config/myclient/values-production.yaml config/myclient/values-production.yaml.backup
+cp deployments/myclient/values-production.yaml deployments/myclient/values-production.yaml.backup
 
 # 2. Start fresh from base profile
-cp config/profiles/production-base.yaml config/myclient/values-production.yaml
+cp deployments/profiles/production-base.yaml deployments/myclient/values-production.yaml
 
 # 3. Merge in your specific overrides
 # Compare the backup file and add only what's different
 
 # 4. Verify the config works
-helm template api charts/api -f config/myclient/values-production.yaml
+helm template api charts/api -f deployments/myclient/values-production.yaml
 
 # 5. Delete the backup once verified
-rm config/myclient/values-production.yaml.backup
+rm deployments/myclient/values-production.yaml.backup
 ```
 
 ## See Also
 
-- `config/example.com/values-production-minimal.yaml` - Minimal production example (60 lines)
-- `config/example.com/values-staging-minimal.yaml` - Minimal staging example (40 lines)
-- `config/example.com/values-production.yaml` - Full reference config (430 lines)
+- `deployments/example.com/values-production-minimal.yaml` - Minimal production example (60 lines)
+- `deployments/example.com/values-staging-minimal.yaml` - Minimal staging example (40 lines)
+- `deployments/example.com/values-production.yaml` - Full reference config (430 lines)
 - `helm-dependencies/*.yaml` - Database/service configuration options
 - `charts/*/values.yaml` - All available chart options

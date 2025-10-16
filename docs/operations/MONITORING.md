@@ -30,7 +30,7 @@ Complete guide for optional Prometheus + Grafana monitoring stack.
 ### In Configuration
 
 ```yaml
-# config/myclient/values-production.yaml
+# deployments/myclient/values-production.yaml
 monitoring:
   enabled: true  # Enable the stack
   

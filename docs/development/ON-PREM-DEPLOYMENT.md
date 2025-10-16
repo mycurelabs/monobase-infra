@@ -142,11 +142,11 @@ cd ../../..
 ./scripts/new-client-config.sh clinic-a clinic-a.local
 
 # Edit config
-vim config/clinic-a/values-production.yaml
+vim deployments/clinic-a/values-production.yaml
 # Set: global.storage.provider: longhorn
 
 # Deploy
-helm install api charts/api -f config/clinic-a/values-production.yaml -n clinic-a-prod --create-namespace
+helm install api charts/api -f deployments/clinic-a/values-production.yaml -n clinic-a-prod --create-namespace
 ```
 
 ## High Availability Setup

@@ -9,7 +9,7 @@ Choosing and configuring storage for Monobase Infrastructure.
 ## Configuration
 
 ```yaml
-# config/myclient/values-production.yaml
+# deployments/myclient/values-production.yaml
 global:
   storage:
     provider: cloud-default  # Recommended for cloud deployments

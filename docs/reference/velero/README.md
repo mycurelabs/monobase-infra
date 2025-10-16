@@ -42,7 +42,7 @@ Velero is **always enabled** for all environments because backups are critical f
 1. **Render templates:**
    ```bash
    helm template myclient charts/monobase \
-     -f config/yourclient/values-production.yaml \
+     -f deployments/yourclient/values-production.yaml \
      --output-dir rendered/myclient-prod
    ```
 
@@ -74,7 +74,7 @@ ArgoCD ensures the controller is ready before creating schedules.
 Configure backup settings in your client values file:
 
 ```yaml
-# config/myclient/values-production.yaml
+# deployments/myclient/values-production.yaml
 backup:
   enabled: true  # Usually true for production
   provider: aws  # Options: aws, azure, gcp

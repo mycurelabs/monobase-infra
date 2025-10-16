@@ -98,7 +98,7 @@ Configuration parameters and historical documentation.
 
 **Configure values:**
 1. [VALUES-REFERENCE.md](reference/VALUES-REFERENCE.md)
-2. [config/profiles/README.md](../config/profiles/README.md)
+2. [deployments/templates/README.md](../deployments/templates/README.md)
 
 ---
 

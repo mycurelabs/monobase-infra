@@ -88,7 +88,7 @@ helm lint charts/account
 
 **Recommendation:** Run template rendering test:
 ```bash
-helm template test charts/api -f config/example.com/values-production.yaml
+helm template test charts/api -f deployments/example.com/values-production.yaml
 ```
 
 **Expected Result:** Should render without errors
@@ -100,7 +100,7 @@ helm template test charts/api -f config/example.com/values-production.yaml
 **Command:** `./scripts/new-client-config.sh testclient test.com`
 
 **Results:**
-- ✅ Created config/testclient/ directory
+- ✅ Created deployments/testclient/ directory
 - ✅ Copied all files from example.com
 - ✅ Replaced placeholders correctly:
   - example.com → test.com ✓

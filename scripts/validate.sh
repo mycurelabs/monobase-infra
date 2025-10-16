@@ -35,14 +35,14 @@ echo ""
 
 # Test 2: Verify only example.com in base template
 echo -e "${BLUE}[2/7] Verifying example.com reference usage...${NC}"
-EXAMPLE_COUNT=$(grep -r "example\.com" charts/ infrastructure/ config/example.com/ docs/ 2>/dev/null | wc -l | tr -d ' ')
+EXAMPLE_COUNT=$(grep -r "example\.com" charts/ infrastructure/ deployments/example-prod/ deployments/example-staging/ docs/ 2>/dev/null | wc -l | tr -d ' ')
 echo -e "  Found ${GREEN}$EXAMPLE_COUNT${NC} references to example.com (expected in reference config)"
 
-if [ ! -d "config/example.com" ]; then
-    echo -e "${RED}✗ config/example.com directory missing${NC}"
+if [ ! -d "deployments/example-prod" ] || [ ! -d "deployments/example-staging" ]; then
+    echo -e "${RED}✗ deployments/example-prod or deployments/example-staging directory missing${NC}"
     ERRORS=$((ERRORS + 1))
 else
-    echo -e "${GREEN}✓ Reference configuration exists${NC}"
+    echo -e "${GREEN}✓ Reference configurations exist${NC}"
 fi
 echo ""
 
@@ -51,12 +51,13 @@ echo -e "${BLUE}[3/7] Validating directory structure...${NC}"
 
 REQUIRED_DIRS=(
     "charts/api/templates"
-    "charts/api/templates"
     "charts/account/templates"
     "infrastructure/longhorn"
     "infrastructure/envoy-gateway"
     "infrastructure/security/networkpolicies"
-    "config/example.com"
+    "deployments/example-prod"
+    "deployments/example-staging"
+    "deployments/templates"
     "docs"
     "scripts"
 )

@@ -178,7 +178,7 @@ age-keygen -o age.key
 ```yaml
 # In repository root
 creation_rules:
-  - path_regex: config/.*/secrets\.enc\.yaml$
+  - path_regex: deployments/.*/secrets\.enc\.yaml$
     kms: 'arn:aws:kms:us-east-1:123456789012:key/key-id'
 ```
 
@@ -186,7 +186,7 @@ creation_rules:
 
 ```bash
 # Create secrets file
-cat > config/myclient/secrets.yaml <<EOF
+cat > deployments/myclient/secrets.yaml <<EOF
 postgresql:
   root-password: SecurePassword123
 api:
@@ -194,10 +194,10 @@ api:
 EOF
 
 # Encrypt with SOPS
-sops -e config/myclient/secrets.yaml > config/myclient/secrets.enc.yaml
+sops -e deployments/myclient/secrets.yaml > deployments/myclient/secrets.enc.yaml
 
 # Commit encrypted file (safe!)
-git add config/myclient/secrets.enc.yaml
+git add deployments/myclient/secrets.enc.yaml
 git commit -m "Add encrypted secrets"
 ```
 
@@ -233,4 +233,4 @@ kubectl rollout restart deployment api -n myclient-prod
 5. **Least privilege** - IAM policies restrict access
 6. **Monitor failures** - Alert on sync failures
 
-For complete secret mappings, see `config/example.com/secrets-mapping.yaml`.
+For complete secret mappings, see `deployments/example.com/secrets-mapping.yaml`.

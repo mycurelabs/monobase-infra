@@ -16,7 +16,7 @@ Complete guide to GitOps workflow using ArgoCD for Monobase Infrastructure.
 ```
 Git Repository (client fork)
   ├── charts/ (Helm charts)
-  ├── config/{client}/ (values files)
+  ├── deployments/{client}/ (values files)
   └── argocd/ (Application definitions)
           ↓
     ArgoCD watches repo
@@ -65,10 +65,10 @@ root-app.yaml (bootstrap)
 ./scripts/new-client-config.sh myclient myclient.com
 
 # 3. Customize values
-vim config/myclient/values-production.yaml
+vim deployments/myclient/values-production.yaml
 
 # 4. Commit to your fork
-git add config/myclient/
+git add deployments/myclient/
 git commit -m "Add MyClient configuration"
 git push origin main
 
@@ -89,11 +89,11 @@ kubectl port-forward -n argocd svc/argocd-server 8080:443
 
 ```bash
 # 1. Update configuration in Git
-vim config/myclient/values-production.yaml
+vim deployments/myclient/values-production.yaml
 # Change: image.tag: "5.215.2" → "5.216.0"
 
 # 2. Commit and push
-git add config/myclient/values-production.yaml
+git add deployments/myclient/values-production.yaml
 git commit -m "Update Monobase API to 5.216.0"
 git push origin main
 

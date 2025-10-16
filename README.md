@@ -36,9 +36,10 @@ monobase-infra/
 │   ├── api/
 │   ├── api-worker/
 │   └── account/
-├── config/                  # ← CORE: Client configurations
-│   ├── profiles/            #    Pre-configured size profiles
-│   └── example.com/         #    Example client config
+├── deployments/                  # ← CORE: Client/environment deployments
+│   ├── templates/           #    Base configuration templates
+│   ├── example-prod/        #    Production example
+│   └── example-staging/     #    Staging example
 ├── infrastructure/          # ← CORE: K8s infrastructure components
 │   ├── envoy-gateway/
 │   ├── argocd/
@@ -124,18 +125,18 @@ cd monobase-infra
 **That's it for setup!** The bootstrap script:
 - ✅ Installs ArgoCD (if not present)
 - ✅ Deploys ApplicationSet for auto-discovery
-- ✅ ArgoCD now watches config/ directory
+- ✅ ArgoCD now watches deployments/ directory
 - ✅ Outputs ArgoCD UI access info
 
 ### Add Your First Client/Environment
 
 ```bash
 # 3. Create client configuration from base profile
-mkdir config/myclient-prod
-cp config/profiles/production-base.yaml config/myclient-prod/values-production.yaml
+mkdir deployments/myclient-prod
+cp deployments/templates/production-base.yaml deployments/myclient-prod/values-production.yaml
 
 # 4. Edit configuration (minimal overrides only)
-vim config/myclient-prod/values-production.yaml
+vim deployments/myclient-prod/values-production.yaml
 # Required changes:
 #   - global.domain: myclient.com
 #   - global.namespace: myclient-prod
@@ -145,7 +146,7 @@ vim config/myclient-prod/values-production.yaml
 # Keep it minimal! (~60 lines vs 430 lines)
 
 # 5. Commit and push to deploy
-git add config/myclient-prod/
+git add deployments/myclient-prod/
 git commit -m "Add myclient-prod"
 git push
 ```
@@ -170,7 +171,7 @@ kubectl get pods -n myclient-prod
 
 ```bash
 # Just edit, commit, and push - ArgoCD syncs automatically
-vim config/myclient-prod/values-production.yaml
+vim deployments/myclient-prod/values-production.yaml
 git commit -am "Update myclient-prod: increase replicas"
 git push
 # ✓ ArgoCD auto-syncs only myclient-prod
@@ -205,11 +206,11 @@ cd monobase-infra
 ./scripts/bootstrap.sh
 
 # 5. Create client configuration
-mkdir config/myclient-prod
-cp config/profiles/production-base.yaml config/myclient-prod/values-production.yaml
+mkdir deployments/myclient-prod
+cp deployments/templates/production-base.yaml deployments/myclient-prod/values-production.yaml
 
 # 6. Edit configuration
-vim config/myclient-prod/values-production.yaml
+vim deployments/myclient-prod/values-production.yaml
 # Required changes:
 #   - global.domain: myclient.com
 #   - global.namespace: myclient-prod
@@ -219,7 +220,7 @@ vim config/myclient-prod/values-production.yaml
 #   - account.image.tag: "1.0.0" (pin version)
 
 # 7. Commit and push to deploy
-git add config/myclient-prod/
+git add deployments/myclient-prod/
 git commit -m "Add myclient-prod"
 git push
 # ✓ ArgoCD auto-detects and deploys!
@@ -232,19 +233,19 @@ git push
 This template uses a **profile-based configuration** system to minimize boilerplate and maximize maintainability:
 
 **Base Profiles:**
-- `config/profiles/production-base.yaml` - Production defaults (HA, backups, security)
-- `config/profiles/staging-base.yaml` - Staging defaults (single replicas, Mailpit enabled)
-- `config/profiles/production-{small|medium|large}.yaml` - Sized profiles
+- `deployments/templates/production-base.yaml` - Production defaults (HA, backups, security)
+- `deployments/templates/staging-base.yaml` - Staging defaults (single replicas, Mailpit enabled)
+- `deployments/templates/production-{small|medium|large}.yaml` - Sized profiles
 
 **Your Client Config:**
-1. Copy a base profile to `config/yourclient/values-{env}.yaml`
+1. Copy a base profile to `deployments/yourclient/values-{env}.yaml`
 2. Change only required values (domain, namespace, image tags)
 3. Override only what's different from the base
 4. Keep your config minimal (~60 lines instead of 430 lines)
 
 **Example:**
 ```yaml
-# config/myclient/values-production.yaml (60 lines)
+# deployments/myclient/values-production.yaml (60 lines)
 global:
   domain: myclient.com
   namespace: myclient-prod
@@ -260,7 +261,7 @@ postgresql:
 # Everything else inherits from production-base.yaml
 ```
 
-See `config/profiles/README.md` for detailed workflow and examples.
+See `deployments/templates/README.md` for detailed workflow and examples.
 
 ## 📋 What's Included
 
@@ -350,16 +351,16 @@ monobase-infra/                   # Base template repository
 │   ├── infrastructure/           # Infrastructure apps
 │   └── applications/             # Application apps
 │
-├── config/                       # Configuration directory
-│   ├── profiles/                 # Base configuration profiles
+├── deployments/                      # Configuration directory
+│   ├── templates/                # Base configuration templates
 │   │   ├── production-base.yaml  # Production defaults (copy this!)
 │   │   ├── staging-base.yaml     # Staging defaults
 │   │   └── README.md             # Configuration guide
-│   ├── example.com/              # Example configurations
-│   │   ├── values-production.yaml           # Full reference (430 lines)
-│   │   ├── values-production-minimal.yaml   # Minimal example (60 lines) ⭐
-│   │   └── values-staging-minimal.yaml      # Staging minimal (40 lines) ⭐
-│   └── [your-client]/            # Your client config goes here
+│   ├── example-prod/             # Production example (60 lines) ⭐
+│   │   └── values.yaml
+│   ├── example-staging/          # Staging example (40 lines) ⭐
+│   │   └── values.yaml
+│   └── [your-client-env]/        # Your client/env configs go here
 │
 ├── docs/                         # Documentation
 └── scripts/                      # Automation scripts
@@ -374,7 +375,7 @@ monobase-infra/                   # Base template repository
 **🚀 Getting Started:**
 - [Client Onboarding](docs/getting-started/CLIENT-ONBOARDING.md) - Fork, configure, deploy
 - [Deployment Guide](docs/getting-started/DEPLOYMENT.md) - Step-by-step deployment
-- [Configuration Profiles](config/profiles/README.md) - Profile-based config workflow
+- [Configuration Profiles](deployments/templates/README.md) - Profile-based config workflow
 
 **🏗️ Architecture:**
 - [System Architecture](docs/architecture/ARCHITECTURE.md) - Design decisions, components
@@ -407,7 +408,7 @@ git remote add upstream https://github.com/YOUR-ORG/monobase-infra.git
 git fetch upstream
 git merge upstream/main
 
-# Resolve any conflicts (usually keep your config/, accept upstream changes)
+# Resolve any conflicts (usually keep your deployments/, accept upstream changes)
 git push origin main
 ```
 

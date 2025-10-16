@@ -1,19 +1,19 @@
 # ApplicationSet: Auto-Discover All Client/Environment Configurations
 #
 # This ApplicationSet automatically discovers all client/environment configurations
-# in the config/ directory and creates a root Application for each one.
+# in the deployments/ directory and creates a root Application for each one.
 #
 # How it works:
-# 1. Scans config/* directories (excluding profiles/ and example.com/)
-# 2. For each directory found (e.g., config/clienta-prod/):
+# 1. Scans deployments/* directories (excluding templates/ and example-*)
+# 2. For each directory found (e.g., deployments/clienta-prod/):
 #    - Creates a root Application named "clienta-prod-root"
 #    - Deploys to namespace "clienta-prod"
-#    - Uses values from config/clienta-prod/values-*.yaml
+#    - Uses values from deployments/clienta-prod/values.yaml
 # 3. Each root Application deploys the full stack (infrastructure + applications)
 #
 # True GitOps Workflow:
-# - Add new client: Create config/newclient-prod/ directory → git push
-# - Update client: Edit config/clienta-prod/values-production.yaml → git push
+# - Add new client: Create deployments/newclient-prod/ directory → git push
+# - Update client: Edit deployments/clienta-prod/values.yaml → git push
 # - ArgoCD automatically detects changes and syncs
 #
 # This is deployed ONCE during cluster bootstrap. After that, everything is Git-driven.
@@ -29,18 +29,19 @@ spec:
     preserveResourcesOnDeletion: true
 
   generators:
-    # Git Directory Generator: Scans config/ for client/env directories
+    # Git Directory Generator: Scans deployments/ for client/env directories
     - git:
         repoURL: https://github.com/YOUR-ORG/monobase-infra.git
         revision: HEAD
         directories:
-          # Scan all directories in config/
-          - path: config/*
-            # Exclude reference configs and profiles
+          # Scan all directories in deployments/
+          - path: deployments/*
+            # Exclude reference configs and templates
             exclude: |
-              config/profiles
-              config/example.com
-              config/.gitkeep
+              deployments/templates
+              deployments/example-prod
+              deployments/example-staging
+              deployments/.gitkeep
 
   # Template for creating root Applications
   template:
@@ -69,16 +70,10 @@ spec:
 
         # Use Helm to render application templates
         helm:
-          # Value files are in the client/env config directory
-          # Pattern: config/{client-env}/values-{env}.yaml
-          # ArgoCD will auto-detect the values file
+          # Value files are in the client/env deployment directory
+          # Pattern: deployments/{client-env}/values.yaml
           valueFiles:
-            - '../../{{path}}/values-production.yaml'
-            - '../../{{path}}/values-staging.yaml'
-            - '../../{{path}}/values-development.yaml'
-
-          # Ignore missing value files (only one will exist)
-          ignoreMissingValueFiles: true
+            - '../../{{path}}/values.yaml'
 
       destination:
         # Deploy to the same cluster
@@ -120,25 +115,25 @@ spec:
 # Deploy this ApplicationSet ONCE during cluster bootstrap:
 #   kubectl apply -f argocd/bootstrap/applicationset-auto-discover.yaml
 #
-# After that, just manage configs via Git:
+# After that, just manage deployments via Git:
 #
 # Add new client:
-#   mkdir config/newclient-prod
-#   cp config/example.com/values-production.yaml config/newclient-prod/
-#   # Edit config/newclient-prod/values-production.yaml
-#   git add config/newclient-prod/
+#   mkdir deployments/newclient-prod
+#   cp deployments/templates/production-base.yaml deployments/newclient-prod/values.yaml
+#   # Edit deployments/newclient-prod/values.yaml
+#   git add deployments/newclient-prod/
 #   git commit -m "Add newclient-prod"
 #   git push
 #   # ✓ ArgoCD auto-detects and deploys!
 #
 # Update existing client:
-#   vim config/clienta-prod/values-production.yaml
+#   vim deployments/clienta-prod/values.yaml
 #   git commit -m "Update clienta-prod: increase replicas"
 #   git push
 #   # ✓ ArgoCD auto-syncs only clienta-prod
 #
 # Remove client:
-#   git rm -r config/oldclient-prod/
+#   git rm -r deployments/oldclient-prod/
 #   git commit -m "Remove oldclient-prod"
 #   git push
 #   # ✓ ArgoCD auto-removes the Application (preserveResourcesOnDeletion=true prevents data loss)

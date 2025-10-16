@@ -43,7 +43,7 @@ Complete deployment procedures for Monobase Infrastructure.
 
 ### Configuration Checklist
 
-- [ ] Client config created: `config/{client}/`
+- [ ] Client config created: `deployments/{client}/`
 - [ ] values-production.yaml customized
 - [ ] Image tags set to specific versions (not "latest")
 - [ ] Resource limits configured
@@ -339,25 +339,25 @@ kubectl get role -n myclient-prod
 # Deploy PostgreSQL
 helm install postgresql charts/api \\
   --namespace myclient-prod \\
-  --values config/myclient/values-production.yaml \\
+  --values deployments/myclient/values-production.yaml \\
   --set postgresql.enabled=true \\
   --set api.enabled=false
 
 # Deploy Monobase API
 helm install api charts/api \\
   --namespace myclient-prod \\
-  --values config/myclient/values-production.yaml \\
+  --values deployments/myclient/values-production.yaml \\
   --set postgresql.enabled=false
 
 # Deploy API Worker (if enabled)
 helm install api-worker charts/api-worker \\
   --namespace myclient-prod \\
-  --values config/myclient/values-production.yaml
+  --values deployments/myclient/values-production.yaml
 
 # Deploy Monobase Account
 helm install account charts/account \\
   --namespace myclient-prod \\
-  --values config/myclient/values-production.yaml
+  --values deployments/myclient/values-production.yaml
 ```
 
 ### Option B: Via ArgoCD (Recommended)

@@ -15,7 +15,7 @@ This is a **template and reference** only. Do not deploy this directly!
 ./scripts/new-client-config.sh yourclient yourdomain.com
 
 # OR copy manually
-cp -r config/example.com config/yourclient
+cp -r deployments/example.com deployments/yourclient
 ```
 
 ### 2. Customize Your Configuration
@@ -42,7 +42,7 @@ Edit `secrets-mapping.yaml` with your KMS secret paths:
 ### 4. Commit to Your Fork
 
 ```bash
-git add config/yourclient/
+git add deployments/yourclient/
 git commit -m "Add YourClient configuration"
 git push origin main
 ```
@@ -203,7 +203,7 @@ minio:
 
 ## Next Steps
 
-1. ✅ Copy this directory to `config/yourclient/`
+1. ✅ Copy this directory to `deployments/yourclient/`
 2. ✅ Customize all values (domain, namespaces, images, resources)
 3. ✅ Configure secrets mapping for your KMS
 4. ✅ Commit to your forked repository

@@ -7,7 +7,7 @@ Horizontal pod autoscaling, storage expansion, and capacity planning.
 ### Enable HPA
 
 ```yaml
-# In config/myclient/values-production.yaml
+# In deployments/myclient/values-production.yaml
 autoscaling:
   enabled: true
   

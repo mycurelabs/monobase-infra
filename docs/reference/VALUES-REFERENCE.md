@@ -587,9 +587,9 @@ podSecurityStandards:
 ## Reference Files
 
 For complete examples, see:
-- `config/example.com/values-staging.yaml` - All staging parameters
-- `config/example.com/values-production.yaml` - All production parameters
-- `config/example.com/secrets-mapping.yaml` - Secret mappings
+- `deployments/example.com/values-staging.yaml` - All staging parameters
+- `deployments/example.com/values-production.yaml` - All production parameters
+- `deployments/example.com/secrets-mapping.yaml` - Secret mappings
 
 For chart-specific schemas, see:
 - `charts/api/values.schema.json`

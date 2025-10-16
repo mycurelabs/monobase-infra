@@ -3,7 +3,7 @@
 #
 # This script automates the complete GitOps setup from an empty Kubernetes cluster.
 # After bootstrap, ArgoCD automatically discovers and deploys all client/env configurations
-# from the config/ directory.
+# from the deployments/ directory.
 #
 # Usage:
 #   ./scripts/bootstrap.sh
@@ -59,7 +59,7 @@ Bootstrap Script: GitOps Auto-Discovery Setup
 DESCRIPTION:
     This script performs ONE-TIME setup of ArgoCD with auto-discovery.
     After bootstrap, ArgoCD automatically detects all client/environment configurations
-    in config/ directory and deploys them via GitOps.
+    in deployments/ directory and deploys them via GitOps.
 
 USAGE:
     $0 [OPTIONS]
@@ -91,16 +91,16 @@ WORKFLOW:
 
 TRUE GITOPS WORKFLOW (After Bootstrap):
     # Add new client/environment
-    mkdir config/newclient-prod
-    cp config/profiles/production-base.yaml config/newclient-prod/values-production.yaml
-    # Edit config/newclient-prod/values-production.yaml
-    git add config/newclient-prod/
+    mkdir deployments/newclient-prod
+    cp deployments/templates/production-base.yaml deployments/newclient-prod/values-production.yaml
+    # Edit deployments/newclient-prod/values-production.yaml
+    git add deployments/newclient-prod/
     git commit -m "Add newclient-prod"
     git push
     # ✓ ArgoCD auto-detects and deploys!
 
     # Update existing client
-    vim config/myclient/values-production.yaml
+    vim deployments/myclient/values-production.yaml
     git commit -m "Update myclient-prod: increase replicas"
     git push
     # ✓ ArgoCD auto-syncs only myclient-prod
@@ -235,9 +235,9 @@ if [[ ! -f "$APPLICATIONSET" ]]; then
 fi
 
 print_info "Deploying ApplicationSet for auto-discovery..."
-print_info "This will scan config/ directory and create applications for all client/env configs"
+print_info "This will scan deployments/ directory and create applications for all client/env configs"
 execute kubectl --kubeconfig="$KUBECONFIG" apply -f "$APPLICATIONSET"
-print_success "ApplicationSet deployed - ArgoCD will now auto-discover all configs in config/"
+print_success "ApplicationSet deployed - ArgoCD will now auto-discover all configs in deployments/"
 
 # Output ArgoCD access information
 print_step "Step 4: ArgoCD Access Information"
@@ -274,8 +274,8 @@ if [[ "$WAIT_FOR_SYNC" == "true" ]]; then
             -o jsonpath='{.items[*].metadata.name}' 2>/dev/null || echo "")
 
         if [[ -z "$APP_NAMES" ]]; then
-            print_warning "No applications found yet - check that config/ directory has valid configs"
-            print_info "ApplicationSet scans: config/*/ (excluding config/profiles and config/example.com)"
+            print_warning "No applications found yet - check that deployments/ directory has valid configs"
+            print_info "ApplicationSet scans: deployments/*/ (excluding deployments/templates and deployments/example-prod and deployments/example-staging)"
         else
             print_success "ApplicationSet discovered applications: $APP_NAMES"
 
@@ -301,23 +301,23 @@ echo ""
 print_success "GitOps auto-discovery enabled!"
 echo ""
 print_info "What happens now:"
-echo "  - ArgoCD scans config/ directory for client/env configurations"
+echo "  - ArgoCD scans deployments/ directory for client/env configurations"
 echo "  - Creates applications automatically for each config found"
 echo "  - Syncs applications based on Git repository state"
 echo ""
 print_info "True GitOps workflow:"
 echo ""
 echo "  # Add new client/environment"
-echo "  mkdir config/newclient-prod"
-echo "  cp config/profiles/production-base.yaml config/newclient-prod/values-production.yaml"
-echo "  vim config/newclient-prod/values-production.yaml  # Edit domain, namespace, etc."
-echo "  git add config/newclient-prod/"
+echo "  mkdir deployments/newclient-prod"
+echo "  cp deployments/templates/production-base.yaml deployments/newclient-prod/values-production.yaml"
+echo "  vim deployments/newclient-prod/values-production.yaml  # Edit domain, namespace, etc."
+echo "  git add deployments/newclient-prod/"
 echo "  git commit -m 'Add newclient-prod'"
 echo "  git push"
 echo "  # ✓ ArgoCD auto-detects and deploys!"
 echo ""
 echo "  # Update existing client"
-echo "  vim config/yourclient/values-production.yaml"
+echo "  vim deployments/yourclient/values-production.yaml"
 echo "  git commit -am 'Update yourclient: increase replicas'"
 echo "  git push"
 echo "  # ✓ ArgoCD auto-syncs only yourclient"

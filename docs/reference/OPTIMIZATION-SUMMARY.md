@@ -17,11 +17,11 @@ This document summarizes the simplification and optimization work performed on t
 **Solution:** Created base profiles with comprehensive defaults, clients override only what's different.
 
 **Files Created:**
-- `config/profiles/production-base.yaml` (208 lines) - Production defaults
-- `config/profiles/staging-base.yaml` (167 lines) - Staging defaults
-- `config/profiles/README.md` - Complete workflow guide
-- `config/example.com/values-production-minimal.yaml` (75 lines) - Example
-- `config/example.com/values-staging-minimal.yaml` (58 lines) - Example
+- `deployments/templates/production-base.yaml` (208 lines) - Production defaults
+- `deployments/templates/staging-base.yaml` (167 lines) - Staging defaults
+- `deployments/templates/README.md` - Complete workflow guide
+- `deployments/example.com/values-production-minimal.yaml` (75 lines) - Example
+- `deployments/example.com/values-staging-minimal.yaml` (58 lines) - Example
 
 **Impact:**
 - Client production configs: 430 → 60 lines (85.7% reduction)
@@ -74,7 +74,7 @@ postgresql:
 
 **Updates:**
 - Added "Configuration Approach" section to README
-- Created `config/profiles/README.md` with complete guide
+- Created `deployments/templates/README.md` with complete guide
 - Updated Quick Start to use base profiles
 - Added migration guide for existing deployments
 - Documented storage provider auto-selection
@@ -87,7 +87,7 @@ postgresql:
 ### 4. Configuration Structure Cleanup ✅
 
 **Changes:**
-- Added `!config/profiles/` to .gitignore exceptions
+- Added `!deployments/templates/` to .gitignore exceptions
 - Organized profiles directory with base + sized profiles
 - Created minimal example configs (60 and 40 lines)
 - Marked examples with ⭐ for visibility
@@ -155,15 +155,15 @@ For existing deployments using the old 430-line config style:
 ### Step 1: Create Minimal Config
 ```bash
 # Backup existing config
-cp config/myclient/values-production.yaml config/myclient/values-production.yaml.backup
+cp deployments/myclient/values-production.yaml deployments/myclient/values-production.yaml.backup
 
 # Start from base profile
-cp config/profiles/production-base.yaml config/myclient/values-production.yaml
+cp deployments/templates/production-base.yaml deployments/myclient/values-production.yaml
 ```
 
 ### Step 2: Add Client-Specific Overrides
 ```bash
-vim config/myclient/values-production.yaml
+vim deployments/myclient/values-production.yaml
 # Add only:
 # - global.domain: myclient.com
 # - global.namespace: myclient-prod
@@ -176,7 +176,7 @@ vim config/myclient/values-production.yaml
 ```bash
 # Test rendering
 helm template api charts/api \
-  -f config/myclient/values-production.yaml \
+  -f deployments/myclient/values-production.yaml \
   --namespace myclient-prod \
   --dry-run
 
@@ -187,10 +187,10 @@ kubectl apply -f rendered/myclient-staging/
 ### Step 4: Cleanup
 ```bash
 # Once validated, remove backup
-rm config/myclient/values-production.yaml.backup
+rm deployments/myclient/values-production.yaml.backup
 
 # Commit minimal config
-git add config/myclient/
+git add deployments/myclient/
 git commit -m "refactor: Migrate to profile-based config"
 ```
 
