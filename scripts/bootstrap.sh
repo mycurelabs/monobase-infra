@@ -204,7 +204,7 @@ if [[ "$SKIP_ARGOCD" == "false" ]]; then
         execute helm upgrade --install argocd argo/argo-cd \
             --namespace argocd \
             --create-namespace \
-            --values "${REPO_ROOT}/bootstrap/argocd/helm-values.yaml" \
+            --values "${REPO_ROOT}/infrastructure/argocd/helm-values.yaml" \
             --wait \
             --timeout 5m
 

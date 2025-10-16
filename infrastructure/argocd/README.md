@@ -1,8 +1,8 @@
-# ArgoCD Bootstrap
+# ArgoCD Infrastructure
 
 ArgoCD is the GitOps engine that deploys and manages all applications in this repository.
 
-**Important:** ArgoCD is **bootstrap infrastructure** - it cannot deploy itself via GitOps. It must be installed first before deploying the root-app (App-of-Apps).
+**Important:** ArgoCD is **core infrastructure** - it cannot deploy itself via GitOps. It must be installed first before enabling auto-discovery.
 
 ## Purpose
 
@@ -11,8 +11,8 @@ This directory contains ArgoCD installation configuration used by the bootstrap 
 **You should NOT manually install ArgoCD.** Use the bootstrap script instead:
 
 ```bash
-# Bootstrap entire stack (includes ArgoCD + all apps)
-./scripts/bootstrap.sh --client myclient --env production
+# Bootstrap GitOps auto-discovery (includes ArgoCD installation)
+./scripts/bootstrap.sh
 ```
 
 ## Manual Installation (Not Recommended)
@@ -25,49 +25,38 @@ helm repo add argo https://argoproj.github.io/argo-helm
 helm install argocd argo/argo-cd \
   --namespace argocd \
   --create-namespace \
-  --values bootstrap/argocd/helm-values.yaml \
+  --values infrastructure/argocd/helm-values.yaml \
   --wait
 ```
 
 ## Files
 
 - **`helm-values.yaml`** - ArgoCD Helm chart configuration
-  - HA setup (3 replicas for server, repo-server, application-controller)
+  - HA setup (2-3 replicas for server, repo-server, application-controller)
+  - ApplicationSet controller enabled (required for auto-discovery!)
   - Resource limits
   - RBAC settings
   - Used by `scripts/bootstrap.sh`
 
-- **`httproute.yaml.template`** - Gateway API HTTPRoute for ArgoCD UI
-  - Exposes ArgoCD web interface
-  - Rendered and deployed by root-app
-  - Path: `argocd.{domain}`
+## ApplicationSet Auto-Discovery Pattern
 
-## App-of-Apps Pattern
-
-Once ArgoCD is installed, it deploys everything else using the "App-of-Apps" pattern:
+Once ArgoCD is installed, it auto-discovers all client/environment configurations using ApplicationSet:
 
 ```
-root-app (argocd/bootstrap/root-app.yaml.template)
-├── Security & Namespace (Wave -1, 0)
-│   ├── namespace
-│   ├── security-baseline
-│   └── kyverno (optional)
-├── Infrastructure (Wave 1)
-│   ├── longhorn (conditional)
-│   ├── envoy-gateway
-│   ├── external-secrets
-│   ├── cert-manager
-│   ├── velero
-│   └── falco (optional)
-├── Data Services (Wave 2)
-│   ├── postgresql
-│   ├── valkey
-│   ├── minio (optional)
-│   └── mailpit (dev/staging)
-└── Applications (Wave 3)
-    ├── api
-    └── account
+ApplicationSet (argocd/bootstrap/applicationset-auto-discover.yaml)
+├── Scans config/*/ directories
+├── Creates root Application for each config found
+│   ├── config/clienta-prod/ → clienta-prod-root
+│   ├── config/clientb-staging/ → clientb-staging-root
+│   └── ...
+└── Each root Application deploys full stack:
+    ├── Security & Namespace (Wave -1, 0)
+    ├── Infrastructure (Wave 1)
+    ├── Data Services (Wave 2)
+    └── Applications (Wave 3)
 ```
+
+**True GitOps**: Just add config directory + git push → ArgoCD deploys automatically!
 
 ## Access ArgoCD UI
 
@@ -95,17 +84,17 @@ Or via Gateway API (if configured):
 https://argocd.yourdomain.com
 ```
 
-## Bootstrap vs GitOps
+## Infrastructure vs GitOps
 
-**Bootstrap (this directory):**
+**Infrastructure (this directory):**
 - ArgoCD itself (installed once manually or via bootstrap.sh)
 - Cannot be managed by GitOps (chicken-and-egg problem)
-- Lives in `bootstrap/argocd/`
+- Lives in `infrastructure/argocd/` alongside other infrastructure components
 
 **GitOps (everything else):**
 - All infrastructure and applications
-- Managed by ArgoCD
-- Lives in `argocd/infrastructure/` and `argocd/applications/`
+- Managed by ArgoCD via ApplicationSet
+- Lives in `argocd/bootstrap/` (ApplicationSet) and `argocd/applications/` (templates)
 - Auto-syncs from Git
 
 ## Configuration
