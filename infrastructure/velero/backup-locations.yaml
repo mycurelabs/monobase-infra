@@ -1,0 +1,190 @@
+{{- if .Values.velero.enabled }}
+---
+# Velero Backup Storage Location (Cluster-Wide)
+# This is for infrastructure/cluster backups
+# Per-application backups use their own BackupStorageLocation in application charts
+
+{{- if eq .Values.velero.provider "aws" }}
+# AWS S3 Backup Storage Location
+apiVersion: velero.io/v1
+kind: BackupStorageLocation
+metadata:
+  name: default
+  namespace: velero
+  labels:
+    app.kubernetes.io/name: velero
+    app.kubernetes.io/component: backup-storage
+    backup-scope: infrastructure
+spec:
+  provider: aws
+  objectStorage:
+    bucket: {{ .Values.velero.aws.bucket | required "velero.aws.bucket is required when provider=aws" }}
+    prefix: infrastructure
+  config:
+    region: {{ .Values.velero.aws.region }}
+  # IRSA authentication - no credential secret needed
+  default: true
+
+---
+# AWS EBS Volume Snapshot Location
+apiVersion: velero.io/v1
+kind: VolumeSnapshotLocation
+metadata:
+  name: default
+  namespace: velero
+  labels:
+    app.kubernetes.io/name: velero
+    app.kubernetes.io/component: volume-snapshots
+spec:
+  provider: aws
+  config:
+    region: {{ .Values.velero.aws.region }}
+{{- end }}
+
+{{- if eq .Values.velero.provider "azure" }}
+# Azure Blob Storage Backup Location
+apiVersion: velero.io/v1
+kind: BackupStorageLocation
+metadata:
+  name: default
+  namespace: velero
+  labels:
+    app.kubernetes.io/name: velero
+    app.kubernetes.io/component: backup-storage
+    backup-scope: infrastructure
+spec:
+  provider: azure
+  objectStorage:
+    bucket: {{ .Values.velero.azure.blobContainer | required "velero.azure.blobContainer is required when provider=azure" }}
+    prefix: infrastructure
+  config:
+    resourceGroup: {{ .Values.velero.azure.resourceGroup | required "velero.azure.resourceGroup is required" }}
+    storageAccount: {{ .Values.velero.azure.storageAccount | required "velero.azure.storageAccount is required" }}
+    # Workload Identity authentication - no credential secret needed
+  default: true
+
+---
+# Azure Managed Disk Volume Snapshot Location
+apiVersion: velero.io/v1
+kind: VolumeSnapshotLocation
+metadata:
+  name: default
+  namespace: velero
+  labels:
+    app.kubernetes.io/name: velero
+    app.kubernetes.io/component: volume-snapshots
+spec:
+  provider: azure
+  config:
+    resourceGroup: {{ .Values.velero.azure.resourceGroup }}
+    {{- if .Values.velero.azure.subscriptionId }}
+    subscriptionId: {{ .Values.velero.azure.subscriptionId }}
+    {{- end }}
+{{- end }}
+
+{{- if eq .Values.velero.provider "gcp" }}
+# GCP Cloud Storage Backup Location
+apiVersion: velero.io/v1
+kind: BackupStorageLocation
+metadata:
+  name: default
+  namespace: velero
+  labels:
+    app.kubernetes.io/name: velero
+    app.kubernetes.io/component: backup-storage
+    backup-scope: infrastructure
+spec:
+  provider: gcp
+  objectStorage:
+    bucket: {{ .Values.velero.gcp.bucket | required "velero.gcp.bucket is required when provider=gcp" }}
+    prefix: infrastructure
+  config:
+    serviceAccount: {{ .Values.velero.gcp.serviceAccount | required "velero.gcp.serviceAccount is required" }}
+  # Workload Identity authentication - no credential secret needed
+  default: true
+
+---
+# GCP Persistent Disk Volume Snapshot Location
+apiVersion: velero.io/v1
+kind: VolumeSnapshotLocation
+metadata:
+  name: default
+  namespace: velero
+  labels:
+    app.kubernetes.io/name: velero
+    app.kubernetes.io/component: volume-snapshots
+spec:
+  provider: gcp
+  config:
+    project: {{ .Values.velero.gcp.projectId }}
+    snapshotLocation: {{ .Values.velero.gcp.region | default "us-central1" }}
+{{- end }}
+
+{{- if eq .Values.velero.provider "digitalocean" }}
+# DigitalOcean Spaces Backup Location (S3-compatible)
+apiVersion: velero.io/v1
+kind: BackupStorageLocation
+metadata:
+  name: default
+  namespace: velero
+  labels:
+    app.kubernetes.io/name: velero
+    app.kubernetes.io/component: backup-storage
+    backup-scope: infrastructure
+spec:
+  provider: aws
+  objectStorage:
+    bucket: {{ .Values.velero.digitalocean.bucket | required "velero.digitalocean.bucket is required when provider=digitalocean" }}
+    prefix: infrastructure
+  config:
+    region: {{ .Values.velero.digitalocean.region | default "nyc3" }}
+    s3Url: https://{{ .Values.velero.digitalocean.region | default "nyc3" }}.digitaloceanspaces.com
+    s3ForcePathStyle: "false"
+  credential:
+    name: velero-credentials
+    key: cloud
+  default: true
+
+---
+# DigitalOcean Volume Snapshot Location
+apiVersion: velero.io/v1
+kind: VolumeSnapshotLocation
+metadata:
+  name: default
+  namespace: velero
+  labels:
+    app.kubernetes.io/name: velero
+    app.kubernetes.io/component: volume-snapshots
+spec:
+  provider: digitalocean.com/velero
+  config:
+    region: {{ .Values.velero.digitalocean.region | default "nyc3" }}
+{{- end }}
+
+{{- if eq .Values.velero.provider "minio" }}
+# MinIO Backup Location (for K3D/local development)
+apiVersion: velero.io/v1
+kind: BackupStorageLocation
+metadata:
+  name: default
+  namespace: velero
+  labels:
+    app.kubernetes.io/name: velero
+    app.kubernetes.io/component: backup-storage
+    backup-scope: infrastructure
+spec:
+  provider: aws
+  objectStorage:
+    bucket: {{ .Values.velero.minio.bucket | default "velero-backups" }}
+    prefix: infrastructure
+  config:
+    region: minio
+    s3Url: {{ .Values.velero.minio.url | default "http://minio.velero.svc:9000" }}
+    s3ForcePathStyle: "true"
+    publicUrl: {{ .Values.velero.minio.publicUrl | default "http://localhost:9000" }}
+  credential:
+    name: velero-credentials
+    key: cloud
+  default: true
+{{- end }}
+{{- end }}

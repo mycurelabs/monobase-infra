@@ -35,8 +35,9 @@ vim charts/api/Chart.yaml
 # 2. Update reference config if needed
 vim deployments/example.com/values-production.yaml
 
-# 3. Update documentation
-vim docs/VALUES-REFERENCE.md
+# 3. Update documentation (co-located with code)
+vim charts/api/README.md  # If API parameters changed
+vim deployments/README.md  # If deployment-level parameters changed
 
 # 4. Test with example.com config
 helm template test charts/api \\

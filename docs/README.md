@@ -54,11 +54,6 @@ Local development, testing, and validation.
 
 
 
-## 📂 Reference Documentation
-
-- **[VALUES-REFERENCE.md](reference/VALUES-REFERENCE.md)** - Complete configuration parameter reference
-- **[OPTIMIZATION-SUMMARY.md](reference/OPTIMIZATION-SUMMARY.md)** - Infrastructure simplification history
-
 ---
 
 ## Quick Navigation by Task
@@ -93,19 +88,21 @@ Local development, testing, and validation.
 2. [K3D_TROUBLESHOOTING.md](development/K3D_TROUBLESHOOTING.md)
 
 **Build custom Terraform modules:**
-1. [MODULE-DEVELOPMENT.md](development/MODULE-DEVELOPMENT.md)
+1. [../terraform/CONTRIBUTING.md](../terraform/CONTRIBUTING.md)
 
 **Configure values:**
-1. [VALUES-REFERENCE.md](reference/VALUES-REFERENCE.md)
-2. [deployments/templates/README.md](../deployments/templates/README.md)
+1. [../deployments/README.md](../deployments/README.md) - Deployment configuration guide
+2. [../charts/README.md](../charts/README.md) - Global parameters and chart overview
+3. [../charts/api/README.md](../charts/api/README.md) - API-specific parameters
+4. [../charts/account/README.md](../charts/account/README.md) - Account frontend parameters
 
 ---
 
 ## Documentation Statistics
 
-- **Total docs:** 21 files
-- **Categories:** 6 (getting-started, architecture, operations, security, development, reference)
-- **Lines:** ~5,750 total
+- **Total docs:** 20 files
+- **Categories:** 5 (getting-started, architecture, operations, security, development)
+- **Lines:** ~5,200 total
 - **Organization:** Categorized by purpose, easy navigation
 
 ## Contributing to Documentation

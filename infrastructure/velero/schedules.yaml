@@ -1,0 +1,162 @@
+{{- if .Values.velero.enabled }}
+---
+# Daily Infrastructure Backup Schedule
+# Backs up all infrastructure namespaces daily at 3 AM
+# Excludes tenant namespaces (handled by per-app backup schedules)
+
+apiVersion: velero.io/v1
+kind: Schedule
+metadata:
+  name: infrastructure-daily
+  namespace: velero
+  labels:
+    app.kubernetes.io/name: velero
+    app.kubernetes.io/component: backup-schedule
+    backup-tier: infrastructure-daily
+    backup-scope: infrastructure
+spec:
+  schedule: {{ .Values.velero.schedules.infrastructure.daily.schedule | default "0 3 * * *" | quote }}
+  template:
+    # Include infrastructure namespaces
+    includedNamespaces:
+      - cert-manager
+      - envoy-gateway-system
+      - external-secrets-system
+      - longhorn-system
+      - velero
+      - monitoring
+      - kube-system
+      - argocd
+      {{- if .Values.kyverno.enabled }}
+      - kyverno
+      {{- end }}
+      {{- if .Values.falco.enabled }}
+      - falco
+      {{- end }}
+    
+    # Exclude tenant namespaces - they have their own backup schedules
+    excludedNamespaces:
+      - default
+      - kube-node-lease
+      - kube-public
+    
+    # Don't backup cluster resources in this schedule (separate weekly schedule)
+    includeClusterResources: false
+    
+    storageLocation: default
+    ttl: {{ .Values.velero.schedules.infrastructure.daily.retention | default "720h" }}  # 30 days
+    
+    # Volume snapshots
+    snapshotVolumes: true
+    defaultVolumesToFsBackup: true
+    snapshotMoveData: true
+    
+    # Resource ordering for consistent backups
+    orderedResources:
+      - namespaces
+      - persistentvolumes
+      - persistentvolumeclaims
+      - secrets
+      - configmaps
+      - serviceaccounts
+      - services
+      - deployments.apps
+      - statefulsets.apps
+      - daemonsets.apps
+      - jobs.batch
+      - cronjobs.batch
+    
+    labels:
+      backup-schedule: infrastructure-daily
+      backup-type: infrastructure
+      backup-scope: namespaces
+
+---
+# Weekly Cluster Resources Backup Schedule
+# Backs up cluster-wide resources weekly on Sunday at 4 AM
+# Includes CRDs, ClusterRoles, StorageClasses, etc.
+
+apiVersion: velero.io/v1
+kind: Schedule
+metadata:
+  name: cluster-resources-weekly
+  namespace: velero
+  labels:
+    app.kubernetes.io/name: velero
+    app.kubernetes.io/component: backup-schedule
+    backup-tier: cluster-weekly
+    backup-scope: cluster-resources
+spec:
+  schedule: {{ .Values.velero.schedules.cluster.weekly.schedule | default "0 4 * * 0" | quote }}
+  template:
+    # Only backup cluster-scoped resources
+    includeClusterResources: true
+    
+    # Include all cluster resources
+    includedResources:
+      - customresourcedefinitions
+      - clusterroles
+      - clusterrolebindings
+      - storageclasses
+      - volumesnapshotclasses
+      - ingressclasses
+      - priorityclasses
+      - runtimeclasses
+      - podsecuritypolicies
+      - validatingwebhookconfigurations
+      - mutatingwebhookconfigurations
+    
+    # Exclude namespaced resources
+    excludedNamespaces:
+      - "*"
+    
+    storageLocation: default
+    ttl: {{ .Values.velero.schedules.cluster.weekly.retention | default "2160h" }}  # 90 days
+    
+    # No volume snapshots for cluster resources
+    snapshotVolumes: false
+    
+    labels:
+      backup-schedule: cluster-weekly
+      backup-type: cluster-resources
+      backup-scope: cluster
+
+{{- if .Values.velero.schedules.infrastructure.hourly.enabled }}
+---
+# Hourly Infrastructure Backup Schedule (Optional - for critical infrastructure)
+# Backs up infrastructure namespaces every hour for fast recovery
+# Shorter retention period (72h) for frequent backups
+
+apiVersion: velero.io/v1
+kind: Schedule
+metadata:
+  name: infrastructure-hourly
+  namespace: velero
+  labels:
+    app.kubernetes.io/name: velero
+    app.kubernetes.io/component: backup-schedule
+    backup-tier: infrastructure-hourly
+    backup-scope: infrastructure
+spec:
+  schedule: {{ .Values.velero.schedules.infrastructure.hourly.schedule | default "0 * * * *" | quote }}
+  template:
+    includedNamespaces:
+      - cert-manager
+      - envoy-gateway-system
+      - external-secrets-system
+      - monitoring
+      - argocd
+    
+    includeClusterResources: false
+    storageLocation: default
+    ttl: {{ .Values.velero.schedules.infrastructure.hourly.retention | default "72h" }}  # 3 days
+    
+    snapshotVolumes: true
+    defaultVolumesToFsBackup: true
+    
+    labels:
+      backup-schedule: infrastructure-hourly
+      backup-type: infrastructure
+      backup-scope: incremental
+{{- end }}
+{{- end }}

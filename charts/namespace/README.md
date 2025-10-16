@@ -46,6 +46,36 @@ source:
 | `resourceQuota.limits.persistentvolumeclaims` | PVC limit | `"10"` |
 | `resourceQuota.limits.pods` | Pod limit | `"50"` |
 
+## Resource Quota Parameters
+
+Resource quotas limit resource consumption in multi-tenant clusters.
+
+### resourceQuotas.enabled
+- **Type:** boolean
+- **Default:** `true`
+- **Production:** `true` (for multi-tenant clusters)
+- **Description:** Enable ResourceQuotas for namespace
+
+### resourceQuotas.limits.cpu
+- **Type:** string
+- **Default:** `"50"`
+- **Description:** Total CPU limit for namespace
+
+### resourceQuotas.limits.memory
+- **Type:** string
+- **Default:** `"100Gi"`
+- **Description:** Total memory limit for namespace
+
+### resourceQuotas.limits.persistentvolumeclaims
+- **Type:** string
+- **Default:** `"20"`
+- **Description:** Maximum number of PVCs in namespace
+
+### resourceQuotas.limits.pods
+- **Type:** string
+- **Default:** `"100"`
+- **Description:** Maximum number of pods in namespace
+
 ## Files
 
 - `Chart.yaml` - Helm chart metadata
