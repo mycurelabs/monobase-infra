@@ -1,0 +1,42 @@
+{{- if .Values.longhorn.enabled }}
+# ArgoCD Application: Storage Resources
+# Deploys StorageClass resources after Longhorn is ready
+# Sync Wave 1 - Deployed after Longhorn operator (wave 0)
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: storage-resources
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"  # After longhorn operator
+  labels:
+    app.kubernetes.io/name: storage-resources
+    app.kubernetes.io/component: infrastructure
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  
+  source:
+    repoURL: {{ .Values.argocd.repoURL }}
+    targetRevision: {{ .Values.argocd.targetRevision }}
+    path: infrastructure/storage
+  
+  destination:
+    server: https://kubernetes.default.svc
+    # StorageClass is cluster-scoped (no namespace)
+  
+  syncPolicy:
+    automated:
+      prune: false      # NEVER auto-delete storage resources
+      selfHeal: true    # Auto-correct configuration drift
+    syncOptions:
+      - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 3m
+{{- end }}

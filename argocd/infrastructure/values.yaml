@@ -19,6 +19,29 @@ envoyGateway:
 externalSecrets:
   enabled: true
   version: 0.9.11
+  provider: aws  # Options: aws, azure, gcp, sops
+  
+  # AWS Secrets Manager configuration
+  aws:
+    region: us-east-1
+    roleArn: ""  # Set to IRSA role ARN (e.g., arn:aws:iam::123456789012:role/external-secrets-role)
+    serviceAccountName: external-secrets-sa
+  
+  # Azure Key Vault configuration
+  azure:
+    vaultUrl: ""  # Set to Key Vault URL (e.g., https://myvault.vault.azure.net/)
+    identityId: ""  # Set to Managed Identity client ID
+  
+  # GCP Secret Manager configuration
+  gcp:
+    projectId: ""  # Set to GCP project ID
+    region: us-central1
+    clusterName: ""  # Set to GKE cluster name
+    serviceAccountEmail: ""  # Set to GCP service account email
+  
+  # SOPS configuration (for Git-encrypted secrets)
+  sops:
+    enabled: false  # Set true to use SOPS instead of cloud provider
 
 # Longhorn - Distributed block storage
 longhorn:

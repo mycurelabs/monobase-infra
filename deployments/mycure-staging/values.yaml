@@ -1,0 +1,177 @@
+# MyCure Staging Configuration
+# Minimal configuration for staging environment on DOKS
+
+global:
+  domain: stg.mycure.md
+  namespace: mycure-staging
+  environment: staging
+
+  gateway:
+    name: shared-gateway
+    namespace: gateway-system
+
+  storage:
+    provider: cloud-default  # Use DigitalOcean Block Storage
+    className: ""  # Auto-detect (do-block-storage)
+
+# ===== CORE: Monobase API =====
+api:
+  enabled: true
+
+  image:
+    repository: ghcr.io/monobaselabs/api
+    tag: "0.1.0"
+    pullPolicy: IfNotPresent
+
+  replicas: 1  # Minimal for staging
+
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: 1
+      memory: 1Gi
+
+  gateway:
+    hostname: ""  # Empty = uses api.stg.mycure.md
+
+  livenessProbe:
+    enabled: true
+    path: /health
+    initialDelaySeconds: 30
+    periodSeconds: 10
+
+  readinessProbe:
+    enabled: true
+    path: /ready
+    initialDelaySeconds: 10
+    periodSeconds: 5
+
+  podDisruptionBudget:
+    enabled: false  # Not needed for single replica
+
+  autoscaling:
+    enabled: false  # No autoscaling for staging
+
+# ===== CORE: Monobase Account Frontend =====
+account:
+  enabled: true
+
+  image:
+    repository: ghcr.io/monobaselabs/accountapp
+    tag: "1.0.0"
+    pullPolicy: IfNotPresent
+
+  replicas: 1
+
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 250m
+      memory: 256Mi
+
+  gateway:
+    hostname: ""  # Empty = uses app.stg.mycure.md
+
+  podDisruptionBudget:
+    enabled: false
+
+# ===== CORE: PostgreSQL Database =====
+postgresql:
+  enabled: true
+
+  # Staging uses standalone (not replication)
+  architecture: standalone
+
+  auth:
+    enabled: true
+    # Credentials managed by External Secrets
+
+  persistence:
+    enabled: true
+    storageClass: ""  # Auto-detect (do-block-storage)
+    size: 20Gi  # Smaller for staging
+
+  resources:
+    requests:
+      cpu: 250m
+      memory: 1Gi
+    limits:
+      cpu: 1
+      memory: 2Gi
+
+  podDisruptionBudget:
+    enabled: false
+
+# ===== OPTIONAL: Valkey (Redis Cache) =====
+valkey:
+  enabled: true
+
+  architecture: standalone  # Not replication for staging
+
+  master:
+    persistence:
+      enabled: true
+      storageClass: ""
+      size: 4Gi
+
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+# ===== OPTIONAL: MinIO (Object Storage) =====
+minio:
+  enabled: false  # Use DigitalOcean Spaces instead
+
+# ===== STAGING: Mailpit (Email Testing) =====
+mailpit:
+  enabled: true  # ✅ Enable for staging email testing
+
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 100m
+      memory: 128Mi
+
+# ===== External Secrets =====
+externalSecrets:
+  enabled: false  # TODO: Enable when secrets are configured
+  provider: sops  # Or aws/azure/gcp
+
+# ===== Monitoring =====
+monitoring:
+  enabled: false  # Disable for minimal staging
+
+# ===== Backup (Velero) =====
+backup:
+  enabled: false  # Disable for staging
+
+# ===== Security =====
+networkPolicies:
+  enabled: true
+  defaultDeny: true
+
+podSecurityStandards:
+  enabled: true
+  level: restricted
+
+# Security tools (disabled for staging)
+security:
+  kyverno:
+    enabled: false
+
+  falco:
+    enabled: false
+
+# ===== Resource Quotas =====
+resourceQuotas:
+  enabled: false

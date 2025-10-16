@@ -12,6 +12,28 @@ Longhorn and MinIO storage management, expansion, and troubleshooting.
 
 ---
 
+## Longhorn Deployment
+
+### Automatic GitOps Deployment
+
+When `longhorn.enabled: true` in `argocd/infrastructure/values.yaml`, the bootstrap process automatically deploys:
+
+1. **Longhorn Operator** (sync wave 0) - Distributed storage system
+2. **StorageClass Resources** (sync wave 1) - Default storage classes
+
+**StorageClasses created:**
+- `longhorn` (default) - 3 replicas, encrypted, for production data
+- `longhorn-fast` - 2 replicas, no encryption, for cache/temp data  
+- `longhorn-archive` - 1 replica, encrypted, for backups/archives
+
+**Configuration files:**
+- Longhorn operator: `argocd/infrastructure/templates/longhorn.yaml`
+- StorageClasses: `infrastructure/storage/storageclass.yaml` (GitOps-managed)
+
+### Manual Deployment (if not using GitOps)
+
+If deploying Longhorn manually outside of ArgoCD, see the Longhorn documentation.
+
 ## Longhorn Operations
 
 ### Access Longhorn UI

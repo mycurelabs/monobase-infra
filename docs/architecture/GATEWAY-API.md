@@ -14,11 +14,19 @@ Envoy Gateway configuration, HTTPRoute management, and zero-downtime routing.
 
 ## Gateway Configuration
 
-### Shared Gateway (One-Time Setup)
+### Shared Gateway (Automatic Deployment)
 
-The Gateway is deployed automatically by ArgoCD (via bootstrap.sh).
+The Gateway is deployed **automatically by ArgoCD** during bootstrap.
 
-**Reference example** (see docs/components/envoy-gateway-gatewayclass.yaml):
+**What gets created:**
+- ✅ `shared-gateway` Gateway resource in `gateway-system` namespace
+- ✅ Wildcard TLS certificate (`wildcard-tls`) via cert-manager
+- ✅ HTTP to HTTPS redirect
+- ✅ LoadBalancer service (created by Envoy Gateway)
+
+**Configuration:** `infrastructure/gateway/shared-gateway.yaml` (managed via GitOps)
+
+**Reference example:**
 
 ```yaml
 # Example Gateway configuration
@@ -280,6 +288,9 @@ kubectl get svc -n gateway-system
 - ✅ Built-in TLS support
 - ✅ Cost-effective (single LoadBalancer)
 
-**Deployment:** Gateway is deployed automatically via ArgoCD (see `argocd/infrastructure/templates/envoy-gateway.yaml`)
+**Deployment:** 
+- Envoy Gateway operator: `argocd/infrastructure/templates/envoy-gateway.yaml` (sync wave 0)
+- Gateway resource: `argocd/infrastructure/templates/gateway-resources.yaml` (sync wave 1)
+- Configuration: `infrastructure/gateway/shared-gateway.yaml` (GitOps-managed)
 
-**Reference examples:** See `docs/components/envoy-gateway-*.yaml` for configuration examples
+**Reference examples:** See `docs/components/envoy-gateway-*.yaml` and `infrastructure/gateway/` for configuration

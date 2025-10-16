@@ -135,7 +135,9 @@ Comprehensive cluster provisioning documentation is available in the main docs:
 
 - **[Cluster Provisioning Guide](../docs/getting-started/CLUSTER-PROVISIONING.md)** - Complete provisioning workflows for all platforms
 - **[Cluster Sizing Guide](../docs/operations/CLUSTER-SIZING.md)** - Multi-tenant capacity planning and cost analysis
-- **[Module Development Guide](../docs/development/MODULE-DEVELOPMENT.md)** - Create custom OpenTofu modules
+
+**For Module Contributors:**
+- **[CONTRIBUTING.md](CONTRIBUTING.md)** - Complete guide for creating new OpenTofu modules
 
 ## Next Steps
 

@@ -44,11 +44,13 @@ Security hardening, compliance, and policies.
 
 Local development, testing, and validation.
 
-- **[MODULE-DEVELOPMENT.md](development/MODULE-DEVELOPMENT.md)** - Build custom Terraform/OpenTofu modules
 - **[K3D-TESTING.md](development/K3D-TESTING.md)** - Local testing with k3d clusters
 - **[K3D_TROUBLESHOOTING.md](development/K3D_TROUBLESHOOTING.md)** - k3d troubleshooting (Ubuntu 24.04 AppArmor fix)
 - **[TESTING-RESULTS.md](development/TESTING-RESULTS.md)** - Validation test results
 - **[ON-PREM-DEPLOYMENT.md](development/ON-PREM-DEPLOYMENT.md)** - Self-hosted cluster deployment
+
+**Terraform/OpenTofu Module Development:**
+- **[../terraform/CONTRIBUTING.md](../terraform/CONTRIBUTING.md)** - Build custom OpenTofu modules
 
 
 

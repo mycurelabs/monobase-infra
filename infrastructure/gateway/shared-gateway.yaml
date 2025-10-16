@@ -1,0 +1,119 @@
+# Shared Gateway Resource
+# Deployed automatically by ArgoCD when envoyGateway.enabled=true
+#
+# This is the cluster-wide gateway that all applications reference via HTTPRoutes.
+# Benefits:
+# - Single LoadBalancer IP (cost-effective)
+# - Zero-downtime client onboarding (just add HTTPRoute)
+# - Clean namespace isolation
+# - Flexible hostname management
+
+---
+# Gateway System Namespace
+# Created by Envoy Gateway operator, but declaring here for clarity
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: gateway-system
+  labels:
+    app.kubernetes.io/name: gateway-system
+    app.kubernetes.io/component: infrastructure
+    app.kubernetes.io/managed-by: argocd
+
+---
+# Shared Gateway Resource
+# All applications reference this gateway via HTTPRoutes
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: shared-gateway
+  namespace: gateway-system
+  labels:
+    app.kubernetes.io/name: shared-gateway
+    app.kubernetes.io/component: gateway
+    app.kubernetes.io/managed-by: argocd
+  annotations:
+    # Cert-manager will automatically provision wildcard certificates
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+spec:
+  # Use Envoy Gateway implementation
+  gatewayClassName: envoy-gateway
+  
+  # Gateway listeners
+  listeners:
+    # HTTPS listener - accepts all traffic on port 443
+    - name: https
+      port: 443
+      protocol: HTTPS
+      hostname: "*.example.com"  # Wildcard - accepts all subdomains
+      
+      # Allow HTTPRoutes from any namespace
+      allowedRoutes:
+        namespaces:
+          from: All  # Critical for multi-tenant architecture
+      
+      # TLS termination
+      tls:
+        mode: Terminate
+        certificateRefs:
+          # Wildcard certificate managed by cert-manager
+          - name: wildcard-tls
+            kind: Secret
+    
+    # Optional: HTTP listener for redirect to HTTPS
+    - name: http
+      port: 80
+      protocol: HTTP
+      hostname: "*.example.com"
+      allowedRoutes:
+        namespaces:
+          from: All
+
+---
+# HTTP to HTTPS Redirect Policy (Optional)
+# Automatically redirects all HTTP traffic to HTTPS
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: http-to-https-redirect
+  namespace: gateway-system
+  labels:
+    app.kubernetes.io/name: http-redirect
+    app.kubernetes.io/component: gateway
+spec:
+  parentRefs:
+    - name: shared-gateway
+      namespace: gateway-system
+      sectionName: http  # Attach to HTTP listener only
+  
+  hostnames:
+    - "*.example.com"  # Match all subdomains
+  
+  rules:
+    - filters:
+        - type: RequestRedirect
+          requestRedirect:
+            scheme: https
+            statusCode: 301  # Permanent redirect
+
+---
+# Wildcard TLS Certificate Request
+# cert-manager will provision this automatically via Let's Encrypt
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: wildcard-tls
+  namespace: gateway-system
+  labels:
+    app.kubernetes.io/name: wildcard-certificate
+    app.kubernetes.io/component: gateway
+spec:
+  secretName: wildcard-tls  # Referenced by Gateway
+  issuerRef:
+    name: letsencrypt-prod  # Production Let's Encrypt
+    kind: ClusterIssuer
+  dnsNames:
+    - "*.example.com"  # Wildcard certificate
+    - "example.com"    # Apex domain
+  # DNS-01 challenge (required for wildcard certificates)
+  # Configure per cloud provider in cert-manager setup

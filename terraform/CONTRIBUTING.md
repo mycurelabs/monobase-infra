@@ -244,7 +244,7 @@ Before creating a module, understand:
 ### Step 2: Create Directory Structure
 
 ```bash
-cd terraform/modules
+cd modules
 mkdir -p {provider}-{service}
 cd {provider}-{service}
 
@@ -580,7 +580,7 @@ Before considering a module complete:
 
 1. **Provision Test Cluster**
    ```bash
-   cd terraform/modules/{your-module}
+   cd modules/{your-module}
    tofu init
    tofu plan -var-file=test.tfvars
    tofu apply -var-file=test.tfvars
@@ -932,10 +932,9 @@ Use this checklist when creating a new module:
 ### Finalization
 - [ ] Run `tofu fmt` on all files
 - [ ] Run `tofu validate`
-- [ ] Update main terraform/README.md with new module
-- [ ] Test module from clusters/default-cluster
+- [ ] Update terraform/README.md with new module
+- [ ] Test module from example cluster configs
 - [ ] Create PR with module
-- [ ] Update PLAN.md status
 
 ---
 
@@ -1039,10 +1038,10 @@ resource "aws_vpc" "main" {
 
 Study these well-implemented modules:
 
-1. **terraform/modules/aws-eks/** - Complete production EKS
-2. **terraform/modules/local-k3d/** - Simple, focused k3d
-3. **terraform/modules/azure-aks/** - Azure Workload Identity pattern
-4. **terraform/modules/gcp-gke/** - GCP Autopilot option
+1. **modules/aws-eks/** - Complete production EKS
+2. **modules/local-k3d/** - Simple, focused k3d
+3. **modules/azure-aks/** - Azure Workload Identity pattern
+4. **modules/gcp-gke/** - GCP Autopilot option
 
 ---
 
@@ -1059,10 +1058,10 @@ Study these well-implemented modules:
 
 ## Getting Help
 
-- Review existing modules in `terraform/modules/`
-- Check [ARCHITECTURE.md](../architecture/ARCHITECTURE.md) for architecture overview
-- See [CLUSTER-PROVISIONING.md](../getting-started/CLUSTER-PROVISIONING.md) for usage patterns
-- Consult [CLUSTER-SIZING.md](../operations/CLUSTER-SIZING.md) for capacity planning
+- Review existing modules in `modules/`
+- Check [ARCHITECTURE.md](../docs/architecture/ARCHITECTURE.md) for architecture overview
+- See [CLUSTER-PROVISIONING.md](../docs/getting-started/CLUSTER-PROVISIONING.md) for usage patterns
+- Consult [CLUSTER-SIZING.md](../docs/operations/CLUSTER-SIZING.md) for capacity planning
 
 ---
 
