@@ -11,6 +11,7 @@ rendered/
 *-secrets.yaml
 secrets/
 .env
+.env.local
 credentials.json
 
 # Client-specific configurations (should be in client's fork)
