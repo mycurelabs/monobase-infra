@@ -1,58 +1,449 @@
-# Staging Configuration for example.com (MINIMAL EXAMPLE)
-#
-# This file shows the MINIMAL config needed when using staging-base.yaml as a starting point
-#
-# To create your own:
-# 1. cp config/profiles/staging-base.yaml config/yourclient/values-staging.yaml
-# 2. Edit only the values below
-# 3. Delete everything else (keep the config small and maintainable)
+# Staging Configuration Example
+# Complete staging reference for staging.example.com
+# Optimized for testing and validation with lower resource requirements
 
-# ===== REQUIRED: Client-specific values =====
 global:
-  domain: staging.example.com  # Or use subdomain: staging.example.com
+  domain: staging.example.com
   namespace: example-staging
   environment: staging
 
-# ===== OPTIONAL: Override defaults from staging-base.yaml =====
-
-# Example 1: Test specific versions
-api:
-  image:
-    tag: "feature-new-dashboard"  # Test branch build
-
-account:
-  image:
-    tag: "v1.1.0-rc1"  # Test release candidate
-
-# Example 2: Slightly larger database for realistic testing
-postgresql:
-  persistence:
-    size: 50Gi  # Override default of 20Gi
-
-# Example 3: Enable MinIO for S3 testing (optional)
-minio:
-  enabled: true
-  mode: standalone  # Single instance for staging
-  persistence:
-    size: 100Gi
-
-# Example 4: Custom mailpit hostname
-mailpit:
   gateway:
-    hostname: mail.staging.example.com
+    name: shared-gateway
+    namespace: gateway-system
 
-# ===== NOTES =====
-#
-# Everything else inherits from profiles/staging-base.yaml:
-# - Single replicas (no HA needed)
-# - Lower resource limits
-# - Mailpit enabled by default
-# - Valkey with no persistence
-# - Backup disabled
-# - Monitoring disabled
-#
-# Total config: ~40 lines instead of 270 lines!
-#
-# To see all available options, check:
-# - config/profiles/staging-base.yaml
-# - config/profiles/production-base.yaml (for comparison)
+  storage:
+    provider: cloud-default
+    className: ""
+
+# ===== ArgoCD GitOps Configuration =====
+argocd:
+  # Git repository URL (required for GitOps)
+  repoURL: https://github.com/YOUR-ORG/monobase-infra.git  # Change to your fork
+  targetRevision: main  # Branch to deploy from (main, staging, etc.)
+
+# ===== CORE: Monobase API =====
+api:
+  enabled: true
+
+  image:
+    repository: ghcr.io/YOUR-ORG/monobase-api
+    tag: "latest"  # OK for staging (use branch builds)
+    pullPolicy: Always  # Always pull latest for staging
+
+  replicas: 1  # Single replica for staging
+
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: 1
+      memory: 2Gi
+
+  gateway:
+    hostname: ""  # Empty = uses api.{global.domain}
+
+  livenessProbe:
+    enabled: true
+    path: /health
+    initialDelaySeconds: 30
+    periodSeconds: 10
+
+  readinessProbe:
+    enabled: true
+    path: /ready
+    initialDelaySeconds: 10
+    periodSeconds: 5
+
+  podDisruptionBudget:
+    enabled: false  # Not needed for single replica
+
+  autoscaling:
+    enabled: false  # Disabled for staging
+
+# ===== CORE: Monobase Account Frontend =====
+account:
+  enabled: true
+
+  image:
+    repository: ghcr.io/YOUR-ORG/monobase-account
+    tag: "latest"
+    pullPolicy: Always
+
+  replicas: 1
+
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+  gateway:
+    hostname: ""
+
+  podDisruptionBudget:
+    enabled: false
+
+# ===== CORE: PostgreSQL Database =====
+postgresql:
+  enabled: true
+
+  # Staging uses standalone mode (no replication)
+  architecture: standalone
+  replicaCount: 1
+
+  auth:
+    enabled: true
+
+  persistence:
+    enabled: true
+    storageClass: ""
+    size: 20Gi  # Smaller for staging
+
+  resources:
+    requests:
+      cpu: 500m
+      memory: 2Gi
+    limits:
+      cpu: 2
+      memory: 4Gi
+
+# ===== OPTIONAL: Valkey (Redis Cache) =====
+valkey:
+  enabled: true
+
+  architecture: standalone  # No replication for staging
+
+  master:
+    persistence:
+      enabled: false  # Disabled for staging (faster cleanup)
+
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 250m
+      memory: 256Mi
+
+# ===== OPTIONAL: MinIO (Object Storage) =====
+minio:
+  enabled: false  # Usually disabled (use cloud S3)
+
+# ===== STAGING: Mailpit Enabled =====
+mailpit:
+  enabled: true  # Enable for email testing
+
+  resources:
+    requests:
+      cpu: 50m
+      memory: 50Mi
+    limits:
+      cpu: 200m
+      memory: 200Mi
+
+  gateway:
+    hostname: mail.{global.domain}  # Web UI for viewing test emails
+
+# ===== External Secrets =====
+externalSecrets:
+  enabled: true
+  provider: aws
+
+# ===== Monitoring =====
+monitoring:
+  enabled: false  # Usually disabled to save resources
+
+# ===== Backup =====
+backup:
+  enabled: false  # Usually disabled for staging
+
+# ===== Security =====
+networkPolicies:
+  enabled: true  # Always enabled for security
+  defaultDeny: true
+
+podSecurityStandards:
+  enabled: true
+  level: restricted
+
+# Security tools (optional - usually disabled in staging to save resources)
+security:
+  kyverno:
+    enabled: false  # Usually disabled in staging (GitOps already provides guardrails)
+
+    # Kyverno configuration (applies if enabled) - lower resources for staging
+    replicaCount: 1  # Single replica for staging
+
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+      limits:
+        cpu: 200m
+        memory: 256Mi
+
+    podDisruptionBudget:
+      enabled: false
+
+    admissionController:
+      replicas: 1
+      resources:
+        requests:
+          cpu: 50m
+          memory: 64Mi
+        limits:
+          cpu: 200m
+          memory: 256Mi
+
+    backgroundController:
+      enabled: true
+      replicas: 1
+      resources:
+        requests:
+          cpu: 25m
+          memory: 32Mi
+        limits:
+          cpu: 100m
+          memory: 128Mi
+
+    cleanupController:
+      enabled: true
+      resources:
+        requests:
+          cpu: 25m
+          memory: 32Mi
+        limits:
+          cpu: 100m
+          memory: 64Mi
+
+    reportsController:
+      enabled: true
+      resources:
+        requests:
+          cpu: 25m
+          memory: 32Mi
+        limits:
+          cpu: 100m
+          memory: 128Mi
+
+    webhooksCleanup:
+      enabled: true
+
+    podSecurityContext:
+      runAsNonRoot: true
+      runAsUser: 1000
+      fsGroup: 1000
+      seccompProfile:
+        type: RuntimeDefault
+
+    containerSecurityContext:
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop:
+        - ALL
+      readOnlyRootFilesystem: true
+
+    metricsService:
+      create: true
+      type: ClusterIP
+      port: 8000
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8000"
+
+    serviceMonitor:
+      enabled: false
+      namespace: kyverno
+      interval: 30s
+
+    features:
+      generateValidatingAdmissionPolicy:
+        enabled: false
+      logging:
+        format: json
+        verbosity: 2
+
+    config:
+      excludeKyvernoNamespace: true
+      resourceFilters:
+      - '[Event,*,*]'
+      - '[*,kube-system,*]'
+      - '[*,kube-public,*]'
+      - '[*,kube-node-lease,*]'
+      - '[*,kyverno,*]'
+      - '[*,velero,*]'
+      - '[*,argocd,*]'
+      - '[*,cert-manager,*]'
+      - '[*,external-secrets-system,*]'
+      - '[*,longhorn-system,*]'
+      - '[*,monitoring,*]'
+      - '[*,falco,*]'
+      - '[Node,*,*]'
+      - '[APIService,*,*]'
+      - '[TokenReview,*,*]'
+      - '[SubjectAccessReview,*,*]'
+      - '[SelfSubjectAccessReview,*,*]'
+      - '[Binding,*,*]'
+      - '[ReplicaSet,*,*]'
+      - '[AdmissionReport,*,*]'
+      - '[ClusterAdmissionReport,*,*]'
+      - '[BackgroundScanReport,*,*]'
+      - '[ClusterBackgroundScanReport,*,*]'
+
+    admissionReports:
+      enabled: true
+
+    backgroundReports:
+      enabled: true
+
+    webhookTimeout: 10
+
+    upgradeController:
+      enabled: true
+
+    crds:
+      install: true
+      annotations: {}
+
+  falco:
+    enabled: false  # Usually disabled in staging (save resources, not production data)
+
+    # Falco configuration (applies if enabled) - lower resources for staging
+    daemonset:
+      updateStrategy:
+        type: RollingUpdate
+
+    resources:
+      requests:
+        cpu: 50m
+        memory: 128Mi
+      limits:
+        cpu: 200m
+        memory: 256Mi
+
+    podSecurityContext:
+      runAsNonRoot: true
+      runAsUser: 1000
+      fsGroup: 1000
+      seccompProfile:
+        type: RuntimeDefault
+
+    containerSecurityContext:
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop:
+        - ALL
+        add:
+        - SYS_PTRACE
+      readOnlyRootFilesystem: true
+      privileged: false
+
+    falco:
+      rulesFile:
+      - /etc/falco/falco_rules.yaml
+      - /etc/falco/falco_rules.local.yaml
+      - /etc/falco/rules.d
+
+      priority: warning  # Higher threshold for staging (reduce noise)
+
+      jsonOutput: true
+      jsonIncludeOutputProperty: true
+      jsonIncludeTagsProperty: true
+
+      logStderr: true
+      logSyslog: false
+      logLevel: info
+
+      webserver:
+        enabled: true
+        port: 8765
+        prometheus_metrics_enabled: true
+
+      syscall_event_drops:
+        actions:
+        - log
+        rate: 0.05
+        max_burst: 500
+
+      fileOutput:
+        enabled: true
+        keepAlive: false
+        filename: /var/log/falco/events.log
+
+      syslogOutput:
+        enabled: false
+
+      httpOutput:
+        enabled: false
+        url: ""
+        userAgent: "falco/0.1"
+
+      programOutput:
+        enabled: false
+        keepAlive: false
+        program: ""
+
+      grpc:
+        enabled: false
+        bindAddress: "unix:///run/falco/falco.sock"
+        threadiness: 0
+
+    driver:
+      enabled: true
+      kind: ebpf
+      ebpf:
+        hostNetwork: true
+        path: /usr/src/ebpf
+
+    tolerations:
+    - effect: NoSchedule
+      key: node-role.kubernetes.io/master
+      operator: Exists
+    - effect: NoSchedule
+      key: node-role.kubernetes.io/control-plane
+      operator: Exists
+
+    nodeSelector: {}
+
+    serviceAccount:
+      create: true
+      annotations: {}
+
+    rbac:
+      create: true
+
+    podSecurityPolicy:
+      create: false
+
+    customRules: {}
+
+    extraVolumes:
+    - name: custom-rules
+      configMap:
+        name: falco-custom-rules
+
+    extraVolumeMounts:
+    - name: custom-rules
+      mountPath: /etc/falco/rules.d
+      readOnly: true
+
+    services:
+    - name: metrics
+      type: ClusterIP
+      ports:
+      - port: 8765
+        targetPort: 8765
+        protocol: TCP
+        name: metrics
+
+    serviceMonitor:
+      enabled: false
+      interval: 30s
+      scrapeTimeout: 10s
+
+# ===== Resource Quotas =====
+resourceQuotas:
+  enabled: false

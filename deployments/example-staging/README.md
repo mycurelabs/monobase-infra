@@ -1,213 +1,135 @@
-# Reference Configuration (example.com)
+# Example Staging Deployment
 
-This directory contains **REFERENCE CONFIGURATION** showing all available parameters for the Monobase Infrastructure template.
+Reference configuration for staging/testing monobase deployment.
 
-## ⚠️ This is NOT a real client configuration
+## Overview
 
-This is a **template and reference** only. Do not deploy this directly!
+This is a **complete reference example** for staging environments. Copy this as a starting point for your own staging/testing deployments.
 
-## For New Clients
+## Key Features
 
-### 1. Copy This Directory
-
-```bash
-# Use the bootstrap script (recommended)
-./scripts/new-client-config.sh yourclient yourdomain.com
-
-# OR copy manually
-cp -r deployments/example.com deployments/yourclient
-```
-
-### 2. Customize Your Configuration
-
-Edit the copied files and replace:
-
-- `example.com` → your actual domain
-- `example` → your client identifier
-- `example-prod` / `example-staging` → your namespace names
-- Image tags: `"latest"` → specific versions (e.g., `"5.215.2"`)
-- Resource limits → your actual requirements
-- Storage sizes → based on your data volume
-- Replica counts → based on your scale
-
-### 3. Configure Secrets
-
-Edit `secrets-mapping.yaml` with your KMS secret paths:
-
-- AWS Secrets Manager paths
-- Azure Key Vault URIs
-- GCP Secret Manager names
-- SOPS encrypted file paths
-
-### 4. Commit to Your Fork
-
-```bash
-git add deployments/yourclient/
-git commit -m "Add YourClient configuration"
-git push origin main
-```
-
-## Configuration Files
-
-### values-staging.yaml
-
-Minimal configuration for staging/development environments:
-- Small replica counts (1-2)
-- Smaller resource limits
+- Single replica deployments (lower cost, faster iteration)
+- Reduced resource requirements vs. production
+- PostgreSQL standalone mode (no replication)
+- Valkey with no persistence (ephemeral cache)
 - Mailpit enabled for email testing
-- Optional components disabled
+- Backup disabled by default
+- Security policies enabled (test production settings)
 
-### values-production.yaml
+## Quick Start
 
-Production-ready configuration:
-- High availability (3+ replicas)
-- Production resource limits
-- All required security controls
-- Optional components (enable as needed)
+To create your own staging deployment:
 
-### secrets-mapping.yaml
+```bash
+# 1. Copy this directory
+cp -r deployments/example-staging deployments/myclient-staging
 
-Maps Kubernetes secret keys to KMS paths:
-- Database credentials
-- API keys
-- SMTP credentials
-- S3/MinIO credentials
-- JWT signing keys
+# 2. Customize configuration
+cd deployments/myclient-staging
+vim values.yaml
 
-## Key Configuration Patterns
+# Required changes:
+# - global.domain: staging.example.com → staging.yourclient.com
+# - global.namespace: example-staging → myclient-staging
+# - argocd.repoURL: YOUR-ORG/monobase-infra.git
+# - image tags: use "latest" or branch builds for testing
 
-### Namespace Strategy
-
-Use `{client}-{environment}` pattern:
-- `yourclient-staging`
-- `yourclient-production`
-
-Each namespace is isolated and can have independent:
-- Resource quotas
-- Network policies
-- RBAC permissions
-
-### Hostname Flexibility
-
-Each service hostname is fully configurable:
-
-```yaml
-global:
-  domain: example.com  # Default base domain
-
-api:
-  gateway:
-    hostname: ""  # Empty = uses api.example.com (default)
-    # OR set explicitly: api.custom-domain.com
-
-api-worker:
-  gateway:
-    hostname: sync.example.com  # Explicit
-
-account:
-  gateway:
-    hostname: ""  # Uses app.example.com (default)
+# 3. Commit and push
+git add deployments/myclient-staging/
+git commit -m "Add myclient staging deployment"
+git push
 ```
 
-### Optional Components
+ArgoCD will auto-discover the new deployment from the `deployments/` directory.
 
-Enable only what you need:
+## Configuration Highlights
+
+### Optimized for Testing
+
+Staging environment uses:
+
+- **Single replicas** (API, Account, PostgreSQL)
+- **Lower resource limits** (~50% of production)
+- **Smaller storage** (20Gi PostgreSQL vs. 50Gi prod)
+- **No persistence for Valkey** (faster cleanup)
+- **Always pull images** (test latest builds)
+
+### Email Testing
+
+Mailpit is enabled by default:
 
 ```yaml
-# Sync service - enable for offline/mobile sync
-api-worker:
-  enabled: true  # Set false if not needed
-
-# Search engine - enable for full-text search
-valkey:
-  enabled: true  # Set false if not needed
-
-# Self-hosted S3 - enable if cost-sensitive, disable for AWS S3
-minio:
-  enabled: true  # Set false to use external S3
-
-# Email testing - enable for dev/staging ONLY
 mailpit:
-  enabled: false  # NEVER enable in production
-
-# Monitoring - enable for production visibility
-monitoring:
-  enabled: false  # Enable when needed
+  enabled: true
+  gateway:
+    hostname: mail.{global.domain}
 ```
 
-## Best Practices
+Access at: `http://mail.staging.example.com`
 
 ### Image Tags
 
-❌ **Never use in production:**
-```yaml
-image:
-  tag: "latest"
-```
-
-✅ **Always pin versions:**
-```yaml
-image:
-  tag: "5.215.2"  # Specific, tested version
-```
-
-### Resource Limits
-
-Start with reference values and adjust based on actual usage:
+Use `latest` or branch builds for rapid testing:
 
 ```yaml
-resources:
-  requests:
-    cpu: 500m      # Guaranteed resources
-    memory: 1Gi
-  limits:
-    cpu: 2         # Maximum allowed
-    memory: 4Gi
-```
-
-Monitor actual usage and tune accordingly.
-
-### Storage Sizing
-
-Base storage sizes on data growth projections:
-
-```yaml
-postgresql:
-  persistence:
-    size: 50Gi    # Start small, expand as needed
-
-minio:
-  persistence:
-    size: 250Gi   # Per node (6 nodes = 1TB usable with EC:2)
-```
-
-Note: Longhorn supports volume expansion without downtime.
-
-### High Availability
-
-Production should always use:
-- PostgreSQL: 3 replicas (replica set)
-- Monobase API: 2-3 replicas (load balanced)
-- MinIO: 6+ nodes (distributed, erasure coded)
-
-```yaml
-postgresql:
-  replicas: 3  # Required for HA
-
 api:
-  replicas: 3  # Minimum 2 for HA
-
-minio:
-  replicas: 6  # For 1TB usable with EC:2
+  image:
+    tag: "latest"
+    pullPolicy: Always  # Always pull for staging
 ```
+
+## Resource Requirements
+
+Estimated minimum cluster resources:
+
+- **CPU**: ~2 vCPU (API: 1, PostgreSQL: 1, Account: 0.5, Valkey: 0.25)
+- **Memory**: ~4GB (API: 2Gi, PostgreSQL: 4Gi, Account: 512Mi, Valkey: 256Mi)
+- **Storage**: ~20GB (PostgreSQL only, Valkey ephemeral)
+
+About 50% of production resource requirements.
+
+## Testing Workflow
+
+1. **Deploy feature branches** using `latest` or branch-specific tags
+2. **Test email flows** via Mailpit UI
+3. **Verify database migrations** in standalone PostgreSQL
+4. **Validate configurations** before promoting to production
+5. **Test API integrations** with realistic data
+
+## Security Testing
+
+Staging mirrors production security settings:
+
+- **NetworkPolicies**: Enabled (test connectivity rules)
+- **Pod Security Standards**: Restricted (validate compliance)
+- **TLS**: Automatic via cert-manager
+
+Optional tools are disabled by default to save resources:
+
+```yaml
+security:
+  kyverno.enabled: false   # Disable unless testing policies
+  falco.enabled: false     # Disable unless testing runtime security
+```
+
+## Differences from Production
+
+| Feature | Staging | Production |
+|---------|---------|------------|
+| Replicas | 1 | 2-3 |
+| Resources | ~50% | 100% |
+| PostgreSQL | Standalone | Replication |
+| Valkey persistence | Disabled | Enabled |
+| Mailpit | Enabled | **NEVER** |
+| Backup | Disabled | Enabled |
+| Monitoring | Disabled | Optional |
 
 ## Next Steps
 
-1. ✅ Copy this directory to `deployments/yourclient/`
-2. ✅ Customize all values (domain, namespaces, images, resources)
-3. ✅ Configure secrets mapping for your KMS
-4. ✅ Commit to your forked repository
-5. ✅ Deploy infrastructure (one-time setup)
-6. ✅ Deploy applications via ArgoCD
+1. ✅ Copy this directory to `deployments/yourclient-staging/`
+2. ✅ Update domain and namespace
+3. ✅ Configure for your testing workflow
+4. ✅ Commit and push to your fork
+5. ✅ ArgoCD will auto-deploy the new application
 
-See **[CLIENT-ONBOARDING.md](../../docs/CLIENT-ONBOARDING.md)** for detailed deployment instructions.
+See [DEPLOYMENT.md](../../docs/getting-started/DEPLOYMENT.md) for detailed instructions.

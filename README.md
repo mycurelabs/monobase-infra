@@ -36,10 +36,10 @@ monobase-infra/
 │   ├── api/
 │   ├── api-worker/
 │   └── account/
-├── deployments/                  # ← CORE: Client/environment deployments
-│   ├── templates/           #    Base configuration templates
-│   ├── example-prod/        #    Production example
-│   └── example-staging/     #    Staging example
+├── deployments/             # ← CORE: Client/environment deployments
+│   ├── example-prod/        #    Production reference example
+│   ├── example-staging/     #    Staging reference example
+│   └── example-k3d/         #    Local k3d development example
 ├── infrastructure/          # ← CORE: K8s infrastructure components
 │   ├── envoy-gateway/
 │   ├── argocd/
@@ -131,19 +131,17 @@ cd monobase-infra
 ### Add Your First Client/Environment
 
 ```bash
-# 3. Create client configuration from base profile
-mkdir deployments/myclient-prod
-cp deployments/templates/production-base.yaml deployments/myclient-prod/values-production.yaml
+# 3. Create client configuration from example
+cp -r deployments/example-prod deployments/myclient-prod
 
-# 4. Edit configuration (minimal overrides only)
-vim deployments/myclient-prod/values-production.yaml
+# 4. Edit configuration
+vim deployments/myclient-prod/values.yaml
 # Required changes:
 #   - global.domain: myclient.com
 #   - global.namespace: myclient-prod
 #   - argocd.repoURL: https://github.com/YOUR-ORG/monobase-infra.git
-#   - api.image.tag: "5.215.2" (pin version)
-#   - account.image.tag: "1.0.0" (pin version)
-# Keep it minimal! (~60 lines vs 430 lines)
+#   - api.image.tag: "5.215.2" (pin version, not "latest")
+#   - account.image.tag: "1.0.0" (pin version, not "latest")
 
 # 5. Commit and push to deploy
 git add deployments/myclient-prod/
@@ -196,18 +194,17 @@ cd monobase-infra
 ./scripts/bootstrap.sh
 
 # 5. Create client configuration
-mkdir deployments/myclient-prod
-cp deployments/templates/production-base.yaml deployments/myclient-prod/values-production.yaml
+cp -r deployments/example-prod deployments/myclient-prod
 
 # 6. Edit configuration
-vim deployments/myclient-prod/values-production.yaml
+vim deployments/myclient-prod/values.yaml
 # Required changes:
 #   - global.domain: myclient.com
 #   - global.namespace: myclient-prod
 #   - global.storage.provider: cloud-default (EKS/AKS/GKE) or longhorn (on-prem)
 #   - argocd.repoURL: https://github.com/YOUR-ORG/monobase-infra.git
-#   - api.image.tag: "5.215.2" (pin version)
-#   - account.image.tag: "1.0.0" (pin version)
+#   - api.image.tag: "5.215.2" (pin version, not "latest")
+#   - account.image.tag: "1.0.0" (pin version, not "latest")
 
 # 7. Commit and push to deploy
 git add deployments/myclient-prod/
@@ -218,40 +215,38 @@ git push
 
 ## ⚙️ Configuration Approach
 
-### Profile-Based Configuration (Recommended)
+### Example-Based Configuration
 
-This template uses a **profile-based configuration** system to minimize boilerplate and maximize maintainability:
+This template provides **complete reference examples** for each environment type:
 
-**Base Profiles:**
-- `deployments/templates/production-base.yaml` - Production defaults (HA, backups, security)
-- `deployments/templates/staging-base.yaml` - Staging defaults (single replicas, Mailpit enabled)
-- `deployments/templates/production-{small|medium|large}.yaml` - Sized profiles
+**Reference Examples:**
+- `deployments/example-prod/` - Complete production configuration (HA, backups, security)
+- `deployments/example-staging/` - Complete staging configuration (single replicas, Mailpit enabled)
+- `deployments/example-k3d/` - Complete local development configuration (minimal resources)
 
 **Your Client Config:**
-1. Copy a base profile to `deployments/yourclient/values-{env}.yaml`
-2. Change only required values (domain, namespace, image tags)
-3. Override only what's different from the base
-4. Keep your config minimal (~60 lines instead of 430 lines)
+1. Copy the appropriate example to `deployments/yourclient-{env}/`
+2. Edit `values.yaml` to change required values (domain, namespace, image tags)
+3. Customize as needed (resources, replicas, optional components)
 
 **Example:**
-```yaml
-# deployments/myclient/values-production.yaml (60 lines)
-global:
-  domain: myclient.com
-  namespace: myclient-prod
+```bash
+# Create production deployment
+cp -r deployments/example-prod deployments/myclient-prod
+vim deployments/myclient-prod/values.yaml
+# Change: domain, namespace, image tags, backup bucket
 
-api:
-  image:
-    tag: "5.215.2"  # Pin version
+# Create staging deployment
+cp -r deployments/example-staging deployments/myclient-staging
+vim deployments/myclient-staging/values.yaml
+# Change: domain, namespace
 
-postgresql:
-  persistence:
-    size: 200Gi  # Override default of 50Gi
-
-# Everything else inherits from production-base.yaml
+git add deployments/myclient-*
+git commit -m "Add myclient deployments"
+git push
 ```
 
-See `deployments/templates/README.md` for detailed workflow and examples.
+See example READMEs for detailed configuration guides.
 
 ## 📋 What's Included
 
@@ -335,15 +330,16 @@ monobase-infra/                   # Base template repository
 │   ├── infrastructure/           # Infrastructure apps
 │   └── applications/             # Application apps
 │
-├── deployments/                      # Configuration directory
-│   ├── templates/                # Base configuration templates
-│   │   ├── production-base.yaml  # Production defaults (copy this!)
-│   │   ├── staging-base.yaml     # Staging defaults
-│   │   └── README.md             # Configuration guide
-│   ├── example-prod/             # Production example (60 lines) ⭐
-│   │   └── values.yaml
-│   ├── example-staging/          # Staging example (40 lines) ⭐
-│   │   └── values.yaml
+├── deployments/                  # Configuration directory
+│   ├── example-prod/             # Production reference example ⭐
+│   │   ├── values.yaml           #   Complete production config (505 lines)
+│   │   └── README.md             #   Production deployment guide
+│   ├── example-staging/          # Staging reference example ⭐
+│   │   ├── values.yaml           #   Complete staging config (450 lines)
+│   │   └── README.md             #   Staging deployment guide
+│   ├── example-k3d/              # Local k3d development example ⭐
+│   │   ├── values.yaml           #   Complete dev config (155 lines)
+│   │   └── README.md             #   Local development guide
 │   └── [your-client-env]/        # Your client/env configs go here
 │
 ├── docs/                         # Documentation
@@ -359,7 +355,7 @@ monobase-infra/                   # Base template repository
 **🚀 Getting Started:**
 - [Client Onboarding](docs/getting-started/CLIENT-ONBOARDING.md) - Fork, configure, deploy
 - [Deployment Guide](docs/getting-started/DEPLOYMENT.md) - Step-by-step deployment
-- [Configuration Profiles](deployments/templates/README.md) - Profile-based config workflow
+- [Example Deployments](deployments/) - Production, staging, and k3d reference examples
 
 **🏗️ Architecture:**
 - [System Architecture](docs/architecture/ARCHITECTURE.md) - Design decisions, components

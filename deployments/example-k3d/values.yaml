@@ -1,5 +1,6 @@
-# k3d Local Testing Configuration
-# Optimized for local development on laptop/workstation
+# k3d Local Development Configuration Example
+# Complete reference for local k3d testing
+# Optimized for laptop/workstation development
 
 global:
   domain: local.test

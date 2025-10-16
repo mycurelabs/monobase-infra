@@ -4,7 +4,7 @@
 # in the deployments/ directory and creates a root Application for each one.
 #
 # How it works:
-# 1. Scans deployments/* directories (excluding templates/ and example-*)
+# 1. Scans deployments/* directories (excluding example-* reference configs)
 # 2. For each directory found (e.g., deployments/clienta-prod/):
 #    - Creates a root Application named "clienta-prod-root"
 #    - Deploys to namespace "clienta-prod"
@@ -36,11 +36,11 @@ spec:
         directories:
           # Scan all directories in deployments/
           - path: deployments/*
-            # Exclude reference configs and templates
+            # Exclude reference examples
             exclude: |
-              deployments/templates
               deployments/example-prod
               deployments/example-staging
+              deployments/example-k3d
               deployments/.gitkeep
 
   # Template for creating root Applications
@@ -118,8 +118,7 @@ spec:
 # After that, just manage deployments via Git:
 #
 # Add new client:
-#   mkdir deployments/newclient-prod
-#   cp deployments/templates/production-base.yaml deployments/newclient-prod/values.yaml
+#   cp -r deployments/example-prod deployments/newclient-prod
 #   # Edit deployments/newclient-prod/values.yaml
 #   git add deployments/newclient-prod/
 #   git commit -m "Add newclient-prod"

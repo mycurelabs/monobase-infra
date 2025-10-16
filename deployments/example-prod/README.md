@@ -1,213 +1,128 @@
-# Reference Configuration (example.com)
+# Example Production Deployment
 
-This directory contains **REFERENCE CONFIGURATION** showing all available parameters for the Monobase Infrastructure template.
+Reference configuration for production monobase deployment.
 
-## ⚠️ This is NOT a real client configuration
+## Overview
 
-This is a **template and reference** only. Do not deploy this directly!
+This is a **complete reference example** showing all production configuration options. Copy this as a starting point for your own production deployments.
 
-## For New Clients
+## Key Features
 
-### 1. Copy This Directory
+- High availability (2+ replicas for critical services)
+- Production resource limits and requests
+- PostgreSQL replication (1 primary + 1 replica)
+- Valkey (Redis) with persistence
+- Backup enabled with Velero
+- Security hardening (NetworkPolicies, PSS restricted)
+- Optional: Kyverno and Falco (disabled by default)
 
-```bash
-# Use the bootstrap script (recommended)
-./scripts/new-client-config.sh yourclient yourdomain.com
+## Quick Start
 
-# OR copy manually
-cp -r deployments/example.com deployments/yourclient
-```
-
-### 2. Customize Your Configuration
-
-Edit the copied files and replace:
-
-- `example.com` → your actual domain
-- `example` → your client identifier
-- `example-prod` / `example-staging` → your namespace names
-- Image tags: `"latest"` → specific versions (e.g., `"5.215.2"`)
-- Resource limits → your actual requirements
-- Storage sizes → based on your data volume
-- Replica counts → based on your scale
-
-### 3. Configure Secrets
-
-Edit `secrets-mapping.yaml` with your KMS secret paths:
-
-- AWS Secrets Manager paths
-- Azure Key Vault URIs
-- GCP Secret Manager names
-- SOPS encrypted file paths
-
-### 4. Commit to Your Fork
+To create your own production deployment:
 
 ```bash
-git add deployments/yourclient/
-git commit -m "Add YourClient configuration"
-git push origin main
+# 1. Copy this directory
+cp -r deployments/example-prod deployments/myclient-prod
+
+# 2. Customize configuration
+cd deployments/myclient-prod
+vim values.yaml
+
+# Required changes:
+# - global.domain: example.com → yourclient.com
+# - global.namespace: example-prod → myclient-prod
+# - argocd.repoURL: YOUR-ORG/monobase-infra.git
+# - image tags: "latest" → specific versions (e.g., "5.215.2")
+# - backup.bucket: "" → "myclient-prod-backups"
+# - backup.region: "" → "us-east-1" (or your region)
+
+# 3. Commit and push
+git add deployments/myclient-prod/
+git commit -m "Add myclient production deployment"
+git push
 ```
 
-## Configuration Files
+ArgoCD will auto-discover the new deployment from the `deployments/` directory.
 
-### values-staging.yaml
+## Configuration Highlights
 
-Minimal configuration for staging/development environments:
-- Small replica counts (1-2)
-- Smaller resource limits
-- Mailpit enabled for email testing
-- Optional components disabled
+### Minimal Changes Needed
 
-### values-production.yaml
+Most settings have sensible defaults. You only need to change:
 
-Production-ready configuration:
-- High availability (3+ replicas)
-- Production resource limits
-- All required security controls
-- Optional components (enable as needed)
-
-### secrets-mapping.yaml
-
-Maps Kubernetes secret keys to KMS paths:
-- Database credentials
-- API keys
-- SMTP credentials
-- S3/MinIO credentials
-- JWT signing keys
-
-## Key Configuration Patterns
-
-### Namespace Strategy
-
-Use `{client}-{environment}` pattern:
-- `yourclient-staging`
-- `yourclient-production`
-
-Each namespace is isolated and can have independent:
-- Resource quotas
-- Network policies
-- RBAC permissions
-
-### Hostname Flexibility
-
-Each service hostname is fully configurable:
-
-```yaml
-global:
-  domain: example.com  # Default base domain
-
-api:
-  gateway:
-    hostname: ""  # Empty = uses api.example.com (default)
-    # OR set explicitly: api.custom-domain.com
-
-api-worker:
-  gateway:
-    hostname: sync.example.com  # Explicit
-
-account:
-  gateway:
-    hostname: ""  # Uses app.example.com (default)
-```
+1. **Domain and namespace** (lines 6-7)
+2. **Git repository URL** (line 22)
+3. **Image tags** (pin specific versions, not "latest")
+4. **Backup bucket and region** (lines 178-179)
 
 ### Optional Components
 
-Enable only what you need:
-
 ```yaml
-# Sync service - enable for offline/mobile sync
-api-worker:
-  enabled: true  # Set false if not needed
+# MinIO (object storage)
+minio.enabled: false  # Use cloud S3 by default
 
-# Search engine - enable for full-text search
-valkey:
-  enabled: true  # Set false if not needed
+# Monitoring
+monitoring.enabled: false  # Enable when needed
 
-# Self-hosted S3 - enable if cost-sensitive, disable for AWS S3
-minio:
-  enabled: true  # Set false to use external S3
-
-# Email testing - enable for dev/staging ONLY
-mailpit:
-  enabled: false  # NEVER enable in production
-
-# Monitoring - enable for production visibility
-monitoring:
-  enabled: false  # Enable when needed
+# Security tools
+security.kyverno.enabled: false   # Enable for policy enforcement
+security.falco.enabled: false     # Enable for runtime security
 ```
 
-## Best Practices
+## Resource Requirements
 
-### Image Tags
+Estimated minimum cluster resources:
 
-❌ **Never use in production:**
-```yaml
-image:
-  tag: "latest"
-```
+- **CPU**: ~4 vCPU (API: 2, PostgreSQL: 2, Account: 0.5, Valkey: 0.5)
+- **Memory**: ~8GB (API: 2Gi, PostgreSQL: 4Gi, Account: 512Mi, Valkey: 1Gi)
+- **Storage**: ~60GB (PostgreSQL: 50Gi, Valkey: 8Gi)
 
-✅ **Always pin versions:**
-```yaml
-image:
-  tag: "5.215.2"  # Specific, tested version
-```
+Scale up based on traffic and data volume.
 
-### Resource Limits
+## Security
 
-Start with reference values and adjust based on actual usage:
+Production security is enabled by default:
 
-```yaml
-resources:
-  requests:
-    cpu: 500m      # Guaranteed resources
-    memory: 1Gi
-  limits:
-    cpu: 2         # Maximum allowed
-    memory: 4Gi
-```
+- **NetworkPolicies**: Default deny, explicit allow rules
+- **Pod Security Standards**: Restricted level
+- **TLS**: Automatic via cert-manager
+- **Secrets**: Managed by External Secrets Operator
 
-Monitor actual usage and tune accordingly.
+Optional security tools (enable as needed):
 
-### Storage Sizing
+- **Kyverno**: Policy enforcement (multi-team environments)
+- **Falco**: Runtime security monitoring (compliance requirements)
 
-Base storage sizes on data growth projections:
+## Backup Strategy
+
+Daily backups enabled by default:
 
 ```yaml
-postgresql:
-  persistence:
-    size: 50Gi    # Start small, expand as needed
-
-minio:
-  persistence:
-    size: 250Gi   # Per node (6 nodes = 1TB usable with EC:2)
+backup:
+  schedules:
+    daily:
+      enabled: true
+      schedule: "0 2 * * *"  # 2 AM daily
+      retention: 720h        # 30 days
 ```
 
-Note: Longhorn supports volume expansion without downtime.
+Optional: Enable hourly or weekly schedules for stricter RPO/compliance.
 
-### High Availability
+## High Availability
 
-Production should always use:
-- PostgreSQL: 3 replicas (replica set)
-- Monobase API: 2-3 replicas (load balanced)
-- MinIO: 6+ nodes (distributed, erasure coded)
+Production uses HA configuration:
 
-```yaml
-postgresql:
-  replicas: 3  # Required for HA
-
-api:
-  replicas: 3  # Minimum 2 for HA
-
-minio:
-  replicas: 6  # For 1TB usable with EC:2
-```
+- **API**: 2 replicas + autoscaling (2-5 pods)
+- **Account**: 2 replicas
+- **PostgreSQL**: 1 primary + 1 replica
+- **Valkey**: Master-replica architecture
 
 ## Next Steps
 
-1. ✅ Copy this directory to `deployments/yourclient/`
-2. ✅ Customize all values (domain, namespaces, images, resources)
-3. ✅ Configure secrets mapping for your KMS
-4. ✅ Commit to your forked repository
-5. ✅ Deploy infrastructure (one-time setup)
-6. ✅ Deploy applications via ArgoCD
+1. ✅ Copy this directory to `deployments/yourclient-prod/`
+2. ✅ Update domain, namespace, and image tags
+3. ✅ Configure backup bucket and region
+4. ✅ Commit and push to your fork
+5. ✅ ArgoCD will auto-deploy the new application
 
-See **[CLIENT-ONBOARDING.md](../../docs/CLIENT-ONBOARDING.md)** for detailed deployment instructions.
+See [DEPLOYMENT.md](../../docs/getting-started/DEPLOYMENT.md) for detailed instructions.
