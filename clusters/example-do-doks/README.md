@@ -10,9 +10,9 @@ cp -r clusters/example-do-doks clusters/myclient-doks
 
 # 2. Customize configuration
 cd clusters/myclient-doks
-vim terraform.tfvars
+vim terraform.tfvars  # Edit cluster_name, region, node_size, etc.
 
-# 3. Provision
+# 3. Provision using automation script
 ./scripts/provision.sh --cluster myclient-doks
 ```
 

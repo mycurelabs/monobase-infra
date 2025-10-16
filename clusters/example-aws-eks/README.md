@@ -18,17 +18,11 @@ cp -r clusters/example-aws-eks clusters/myclient-eks
 cd clusters/myclient-eks
 vim terraform.tfvars  # Customize cluster_name, region, etc.
 
-# 3. Provision (recommended - uses unified script)
+# 3. Provision using automation script
 ./scripts/provision.sh --cluster myclient-eks
-
-# OR provision manually:
-terraform init
-terraform plan
-terraform apply
-
-# 4. Configure kubectl
-aws eks update-kubeconfig --region us-east-1 --name myclient-eks
 ```
+
+The provision script handles all setup automatically, including kubeconfig configuration.
 
 ## Configuration Options
 

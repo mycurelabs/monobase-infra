@@ -10,12 +10,7 @@ Quick local Kubernetes cluster for development and testing.
 ## Quick Start
 
 ```bash
-# Provision (recommended)
 ./scripts/provision.sh --cluster k3d-local
-
-# OR manually:
-cd clusters/example-k3d
-terraform init && terraform apply
 ```
 
 ## Features
@@ -28,7 +23,6 @@ terraform init && terraform apply
 ## Cleanup
 
 ```bash
+cd clusters/k3d-local
 terraform destroy
-# OR
-k3d cluster delete k3d-local
 ```

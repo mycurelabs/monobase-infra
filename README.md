@@ -155,17 +155,7 @@ git push
 
 ### Monitor Deployment
 
-```bash
-# Access ArgoCD UI
-kubectl port-forward -n argocd svc/argocd-server 8080:443
-# Open: https://localhost:8080
-
-# Check auto-discovered applications
-kubectl get applications -n argocd -l managed-by=applicationset
-
-# View pods
-kubectl get pods -n myclient-prod
-```
+The bootstrap script outputs ArgoCD UI access information. Use the admin credentials provided to log in and monitor your deployments through the ArgoCD web interface.
 
 ### Update Your Deployment (True GitOps)
 

@@ -37,8 +37,6 @@ vim terraform.tfvars  # Edit cluster name, region, size, etc.
 
 ### 3. Provision Cluster
 
-**Option A: Using Unified Script (Recommended)**
-
 ```bash
 ./scripts/provision.sh --cluster myclient-eks
 ```
@@ -48,15 +46,6 @@ The script will:
 - Create the cluster
 - Save kubeconfig to `~/.kube/myclient-eks`
 - Test connectivity
-
-**Option B: Manual Terraform**
-
-```bash
-cd clusters/myclient-eks
-terraform init
-terraform plan
-terraform apply
-```
 
 ### 4. Bootstrap GitOps
 
@@ -157,6 +146,8 @@ After provisioning your cluster:
    ```
 
 ## Cleanup
+
+To destroy a cluster, manually run terraform destroy in the cluster directory:
 
 ```bash
 cd clusters/myclient-eks
