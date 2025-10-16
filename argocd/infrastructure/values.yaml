@@ -59,6 +59,63 @@ kyverno:
 velero:
   enabled: false  # Enable for production clusters with backup requirements
   version: 7.1.4
+  provider: aws  # Options: aws, azure, gcp, digitalocean, minio
+  
+  # AWS S3 configuration
+  aws:
+    region: us-east-1
+    bucket: ""  # Set to S3 bucket name (e.g., my-cluster-velero-backups)
+    roleArn: ""  # Auto-populated from terraform output (IRSA)
+  
+  # Azure Blob Storage configuration
+  azure:
+    resourceGroup: ""  # Set to Azure resource group
+    storageAccount: ""  # Set to storage account name
+    blobContainer: ""  # Set to blob container name (e.g., velero-backups)
+    subscriptionId: ""  # Optional, auto-detected if not set
+    identityClientId: ""  # Auto-populated from terraform output (Workload Identity)
+  
+  # GCP Cloud Storage configuration
+  gcp:
+    bucket: ""  # Set to GCS bucket name (e.g., my-cluster-velero-backups)
+    projectId: ""  # Set to GCP project ID
+    region: us-central1
+    serviceAccount: ""  # Auto-populated from terraform output (Workload Identity)
+  
+  # DigitalOcean Spaces configuration
+  digitalocean:
+    bucket: ""  # Set to Spaces bucket name
+    region: nyc3  # Spaces region: nyc3, sfo3, sgp1, fra1, ams3
+    accessKey: ""  # Via External Secrets or manual secret
+    secretKey: ""  # Via External Secrets or manual secret
+  
+  # MinIO configuration (for K3D/local development)
+  minio:
+    bucket: velero-backups
+    url: http://minio.velero.svc:9000
+    publicUrl: http://localhost:9000
+    accessKey: minio
+    secretKey: minio123
+  
+  # Backup schedules configuration
+  schedules:
+    # Infrastructure namespace backups
+    infrastructure:
+      daily:
+        enabled: true
+        schedule: "0 3 * * *"  # 3 AM daily
+        retention: 720h  # 30 days
+      hourly:
+        enabled: false  # Optional, for critical infrastructure
+        schedule: "0 * * * *"  # Every hour
+        retention: 72h  # 3 days
+    
+    # Cluster-wide resource backups
+    cluster:
+      weekly:
+        enabled: true
+        schedule: "0 4 * * 0"  # 4 AM Sunday
+        retention: 2160h  # 90 days
 
 # Falco - Runtime security monitoring
 falco:

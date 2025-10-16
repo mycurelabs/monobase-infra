@@ -65,11 +65,41 @@ spec:
           podVolumePath: /var/lib/kubelet/pods
           privileged: true
         initContainers:
+{{- if or (eq .Values.velero.provider "aws") (eq .Values.velero.provider "digitalocean") (eq .Values.velero.provider "minio") }}
           - name: velero-plugin-for-aws
             image: velero/velero-plugin-for-aws:v1.10.0
             volumeMounts:
               - mountPath: /target
                 name: plugins
+{{- end }}
+{{- if eq .Values.velero.provider "azure" }}
+          - name: velero-plugin-for-microsoft-azure
+            image: velero/velero-plugin-for-microsoft-azure:v1.10.0
+            volumeMounts:
+              - mountPath: /target
+                name: plugins
+{{- end }}
+{{- if eq .Values.velero.provider "gcp" }}
+          - name: velero-plugin-for-gcp
+            image: velero/velero-plugin-for-gcp:v1.10.0
+            volumeMounts:
+              - mountPath: /target
+                name: plugins
+{{- end }}
+        serviceAccount:
+          server:
+            create: true
+            name: velero
+            annotations:
+{{- if eq .Values.velero.provider "aws" }}
+              eks.amazonaws.com/role-arn: {{ .Values.velero.aws.roleArn }}
+{{- end }}
+{{- if eq .Values.velero.provider "azure" }}
+              azure.workload.identity/client-id: {{ .Values.velero.azure.identityClientId }}
+{{- end }}
+{{- if eq .Values.velero.provider "gcp" }}
+              iam.gke.io/gcp-service-account: {{ .Values.velero.gcp.serviceAccount }}
+{{- end }}
 
   destination:
     server: https://kubernetes.default.svc

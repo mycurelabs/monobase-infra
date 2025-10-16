@@ -38,7 +38,7 @@ graph TB
         end
         
         subgraph "client-a-prod namespace"
-            Monobase API1[⚕️ Monobase API API<br/>3 replicas]
+            Monobase API1[⚕️ Monobase API<br/>3 replicas]
             Monobase Account1[📱 Monobase Account<br/>2 replicas]
             API Worker1[🔄 API Worker<br/>2 replicas]
             PostgreSQL1[(🗄️ PostgreSQL<br/>3-node replica)]
@@ -46,7 +46,7 @@ graph TB
         end
         
         subgraph "client-b-prod namespace"
-            Monobase API2[⚕️ Monobase API API]
+            Monobase API2[⚕️ Monobase API]
             Apps2[📱 Apps...]
         end
         
@@ -96,7 +96,7 @@ graph TB
 **Optional:**
 - API Worker (real-time sync)
 - MinIO (self-hosted S3)
-- Valkey (search engine)
+- Valkey (Redis-compatible cache)
 - Velero (Kubernetes backups)
 - Prometheus + Grafana (monitoring)
 
@@ -117,7 +117,7 @@ sequenceDiagram
     participant DNS as 🌐 DNS
     participant LB as ⚖️ LoadBalancer
     participant GW as 🚪 Envoy Gateway
-    participant API as ⚕️ Monobase API API
+    participant API as ⚕️ Monobase API
     participant DB as 🗄️ PostgreSQL
     participant S3 as 📦 MinIO/S3
     
@@ -218,7 +218,7 @@ graph TB
         │  ┌─────┴──────┬────────┬────────┐│
         │  │            │        │        ││
         │ ┌▼──────┐ ┌──▼────┐ ┌▼──────┐ ││
-        │ │Monobase API│ │ API Worker │ │MyCure │ ││
+        │ │Monobase API│ │ API Worker │ │Account│ ││
         │ │ App   │ │       │ │ App   │ ││
         │ │2-3 rep│ │2 rep  │ │2 rep  │ ││
         │ └───┬───┘ └───┬───┘ └───────┘ ││
@@ -242,7 +242,7 @@ graph TB
 
 ### Data Flow
 
-**1. User Request → Monobase API API:**
+**1. User Request → Monobase API:**
 ```
 Browser → DNS → LoadBalancer → Gateway (443) 
   → HTTPRoute (api.myclient.com) → Monobase API Service (7500) 
@@ -258,7 +258,7 @@ Browser → DNS → LoadBalancer → Gateway (443)
 
 **3. File Upload Flow:**
 ```
-Client → Monobase API API → MinIO S3 API (9000)
+Client → Monobase API → MinIO S3 API (9000)
   → Longhorn PVC → Distributed storage across nodes
 ```
 
@@ -509,7 +509,7 @@ Explicit ALLOW rules:
 ```
 ┌─────────────────────────────────────────┐
 │           Applications                  │
-│  Monobase API, API Worker, Monobase Account             │
+│  Monobase API, API Worker, Account             │
 │  /metrics endpoints                     │
 └──────────────┬──────────────────────────┘
                │ scrape
@@ -637,7 +637,7 @@ Cluster
                │ HTTPS only
 ┌──────────────▼──────────────────────────┐
 │  Application Zone                       │
-│  - Monobase API, API Worker, Monobase Account           │
+│  - Monobase API, API Worker, Account           │
 │  - NetworkPolicy: allow from Gateway    │
 │  - Pod Security: restricted             │
 └──────────────┬──────────────────────────┘
@@ -745,7 +745,7 @@ The Monobase Infrastructure template provides:
 **Architecture:** Simple, proven, production-ready
 
 For detailed operational procedures, see:
-- [DEPLOYMENT.md](DEPLOYMENT.md) - Deployment steps
-- [STORAGE.md](STORAGE.md) - Storage operations
-- [BACKUP-RECOVERY.md](BACKUP-RECOVERY.md) - DR procedures
-- [SCALING-GUIDE.md](SCALING-GUIDE.md) - Scaling guide
+- [DEPLOYMENT.md](../getting-started/DEPLOYMENT.md) - Deployment steps
+- [STORAGE.md](../operations/STORAGE.md) - Storage operations
+- [BACKUP_DR.md](../operations/BACKUP_DR.md) - DR procedures
+- [SCALING-GUIDE.md](../operations/SCALING-GUIDE.md) - Scaling guide
