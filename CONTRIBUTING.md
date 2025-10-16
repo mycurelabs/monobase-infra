@@ -26,7 +26,7 @@ Thank you for your interest in contributing to the Monobase Infrastructure proje
 - **[mise](https://mise.jdx.dev)** - Manages all development tool versions (terraform, kubectl, helm, linters, etc.)
 - **Docker** - For local testing with k3d
 
-All other tools (terraform, kubectl, helm, tflint, yamllint, shellcheck, markdownlint, just) are automatically installed by mise.
+All other tools are automatically installed by mise (see `mise.toml` for complete list).
 
 ### Local Development Setup
 
@@ -55,7 +55,7 @@ All other tools (terraform, kubectl, helm, tflint, yamllint, shellcheck, markdow
 
 3. **Install all development tools** (one command!)
    ```bash
-   mise install  # Reads .tool-versions and installs everything
+   mise install  # Reads mise.toml and installs everything
    ```
 
 4. **Create a k3d cluster for testing** (optional)
@@ -75,7 +75,6 @@ All other tools (terraform, kubectl, helm, tflint, yamllint, shellcheck, markdow
 ### Branching Strategy
 
 - `main` - Production-ready code
-- `develop` - Integration branch for features
 - `feature/your-feature-name` - Feature branches
 - `fix/issue-description` - Bug fix branches
 

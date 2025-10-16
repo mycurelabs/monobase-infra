@@ -186,3 +186,31 @@ find . -name ".terraform" -type d -exec rm -rf {} + 2>/dev/null || true
 find . -name "*.tfstate*" -type f -delete 2>/dev/null || true
 echo "✓ Cleanup complete"
 """
+
+
+# Scripts - Operations and Administration
+# =============================================================================
+
+[tasks.bootstrap]
+description = "Bootstrap empty cluster with GitOps (ArgoCD auto-discovery)"
+run = 'bash scripts/bootstrap.sh "$@"'
+
+[tasks.provision]
+description = "Provision Kubernetes cluster using Terraform/OpenTofu"
+run = 'bash scripts/provision.sh "$@"'
+
+[tasks.admin]
+description = "Port-forward to admin UIs (argocd, grafana, prometheus, etc.)"
+run = 'bash scripts/admin-access.sh "$@"'
+
+[tasks.validate-template]
+description = "Validate infrastructure template (check for hardcoded values)"
+run = 'bash scripts/validate.sh "$@"'
+
+[tasks.validate-secrets]
+description = "Validate secrets configuration and connectivity"
+run = 'bash scripts/validate-secrets.sh "$@"'
+
+[tasks.resize-storage]
+description = "Resize StatefulSet PVCs without downtime"
+run = 'bash scripts/resize-statefulset-storage.sh "$@"'
