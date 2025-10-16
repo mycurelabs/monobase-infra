@@ -88,8 +88,8 @@ spec:
         - name: POSTGRESQL_PASSWORD
           valueFrom:
             secretKeyRef:
-              name: {{ .Release.Name }}-postgresql
-              key: password
+              name: postgresql
+              key: postgres-password
         - name: DATABASE_URL
           value: {{ include "api.postgresql.connectionString" . | quote }}
         # Service URLs from dependencies
