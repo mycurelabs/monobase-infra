@@ -20,8 +20,6 @@ spec:
     targetRevision: 16.x.x
     helm:
       releaseName: postgresql
-      valueFiles:
-        - ../../deployments/{{ .Values.global.namespace }}/values.yaml
       valuesObject:
         global:
           postgresql:

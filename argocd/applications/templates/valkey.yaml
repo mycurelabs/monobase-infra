@@ -20,8 +20,6 @@ spec:
     targetRevision: 2.x.x
     helm:
       releaseName: valkey
-      valueFiles:
-        - ../../deployments/{{ .Values.global.namespace }}/values.yaml
       valuesObject:
         architecture: {{ .Values.valkey.architecture | default "standalone" }}
         master:

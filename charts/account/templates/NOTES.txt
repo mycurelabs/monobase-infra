@@ -1,36 +1,36 @@
 {{- if .Values.enabled }}
-🎉 MyCureApp has been deployed!
+🎉 Account Frontend has been deployed!
 
 Chart: {{ .Chart.Name }}-{{ .Chart.Version }}
 Release: {{ .Release.Name }}
-Namespace: {{ include "mycureapp.namespace" . }}
+Namespace: {{ include "account.namespace" . }}
 
 📋 Deployment Information:
   - Replicas: {{ .Values.replicaCount }}
   - Image: {{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}
-  - Service: {{ include "mycureapp.fullname" . }}:{{ .Values.service.port }}
+  - Service: {{ include "account.fullname" . }}:{{ .Values.service.port }}
 
 🌐 Access Information:
 {{- if .Values.gateway.enabled }}
-  MyCureApp: https://{{ include "mycureapp.gateway.hostname" . }}
-  
+  Account App: https://{{ include "account.gateway.hostname" . }}
+
   Open in browser:
-  open https://{{ include "mycureapp.gateway.hostname" . }}
+  open https://{{ include "account.gateway.hostname" . }}
 {{- else }}
   Gateway is disabled. Use port-forward to access:
-  kubectl port-forward -n {{ include "mycureapp.namespace" . }} svc/{{ include "mycureapp.fullname" . }} 8080:{{ .Values.service.port }}
+  kubectl port-forward -n {{ include "account.namespace" . }} svc/{{ include "account.fullname" . }} 8080:{{ .Values.service.port }}
   # Open http://localhost:8080
 {{- end }}
 
 🔍 Next Steps:
   1. Verify pods are running:
-     kubectl get pods -n {{ include "mycureapp.namespace" . }} -l app.kubernetes.io/name={{ include "mycureapp.name" . }}
+     kubectl get pods -n {{ include "account.namespace" . }} -l app.kubernetes.io/name={{ include "account.name" . }}
 
   2. Check logs:
-     kubectl logs -n {{ include "mycureapp.namespace" . }} -l app.kubernetes.io/name={{ include "mycureapp.name" . }} --tail=50
+     kubectl logs -n {{ include "account.namespace" . }} -l app.kubernetes.io/name={{ include "account.name" . }} --tail=50
 
   3. Test frontend:
-     curl https://{{ include "mycureapp.gateway.hostname" . }}
+     curl https://{{ include "account.gateway.hostname" . }}
 
 📱 Frontend Features:
   - Static file serving (nginx)
@@ -39,5 +39,5 @@ Namespace: {{ include "mycureapp.namespace" . }}
   - Environment variable injection
 
 {{- else }}
-MyCureApp is disabled (enabled: false)
+Account Frontend is disabled (enabled: false)
 {{- end }}
