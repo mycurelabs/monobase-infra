@@ -54,6 +54,9 @@ api:
   autoscaling:
     enabled: false  # No autoscaling for staging
 
+  backup:
+    enabled: false  # No Velero backups for staging
+
 # ===== CORE: Monobase Account Frontend =====
 account:
   enabled: true
