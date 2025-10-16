@@ -43,7 +43,7 @@ api:
     periodSeconds: 10
 
   readinessProbe:
-    enabled: true
+    enabled: false  # Disabled: /readyz checks S3 which is not configured in staging
     path: /readyz
     initialDelaySeconds: 10
     periodSeconds: 5
