@@ -323,14 +323,15 @@ kubectl create secret generic longhorn-crypto \\
 **PostgreSQL Encryption:**
 
 ```yaml
-# Enable in helm-dependencies/postgresql-values.yaml
-encryption:
-  enabled: true
-  existingSecret: postgresql-encryption-key
+# Enable in deployments/*/values.yaml
+postgresql:
+  encryption:
+    enabled: true
+    existingSecret: postgresql-encryption-key
 
-tls:
-  enabled: true
-  mode: requireTLS
+  tls:
+    enabled: true
+    mode: requireTLS
 ```
 
 ### 2. Encryption in Transit

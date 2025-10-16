@@ -318,15 +318,9 @@ Internet → Envoy Gateway (shared, HA) → HTTPRoutes (per client/env) → Appl
 monobase-infra/                   # Base template repository
 ├── charts/                       # Custom Helm charts
 │   ├── api/                  # Monobase API application chart
-│   ├── api-worker/                    # API Worker application chart
 │   └── account/                # Monobase Account frontend chart
 │
-├── helm-dependencies/            # Bitnami/community chart configurations
-│   ├── postgresql-values.yaml       # PostgreSQL configuration
-│   ├── minio-values.yaml         # MinIO configuration
-│   └── valkey-values.yaml    # Valkey configuration
-│
-├── infrastructure/               # Infrastructure templates
+├── infrastructure/               # Infrastructure manifests & configs
 │   ├── longhorn/                 # Block storage
 │   ├── envoy-gateway/            # Gateway API
 │   ├── argocd/                   # GitOps

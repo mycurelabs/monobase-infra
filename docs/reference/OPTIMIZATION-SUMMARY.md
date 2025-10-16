@@ -105,11 +105,11 @@ postgresql:
 - Independent lifecycle management
 - **Decision:** Keep as-is (GitOps best practice)
 
-### ✅ helm-dependencies/ Directory
+### ❌ helm-dependencies/ Directory (REMOVED)
 - 4 files with ~250 lines of Bitnami chart configurations
 - Production-ready PostgreSQL tuning
 - Security defaults (NetworkPolicies, PSS)
-- **Decision:** Keep as-is (good documentation and defaults)
+- **Decision:** Removed - not used by ArgoCD Applications (values specified inline or in deployments/)
 
 ### ✅ ArgoCD Template Files
 - 12 templates, ~40 lines each
