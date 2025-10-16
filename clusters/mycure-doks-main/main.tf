@@ -1,0 +1,47 @@
+# MyCure DOKS Cluster - Main Configuration
+# Minimal staging cluster for MyCure in Singapore region
+
+terraform {
+  required_version = ">= 1.6"
+
+  required_providers {
+    digitalocean = {
+      source  = "digitalocean/digitalocean"
+      version = "~> 2.0"
+    }
+  }
+}
+
+provider "digitalocean" {
+  # Token is read from DIGITALOCEAN_TOKEN or DIGITALOCEAN_ACCESS_TOKEN env var
+}
+
+module "doks_cluster" {
+  source = "../../terraform/modules/do-doks"
+
+  cluster_name       = var.cluster_name
+  region             = var.region
+  kubernetes_version = var.kubernetes_version
+
+  # Custom node pool (no autoscaling)
+  deployment_profile = "custom"
+  node_size          = var.node_size
+  node_count         = var.node_count
+  min_nodes          = var.min_nodes
+  max_nodes          = var.max_nodes
+
+  # No HA control plane (minimal cost)
+  ha_control_plane = var.ha_control_plane
+
+  # Auto-upgrade settings
+  auto_upgrade  = var.auto_upgrade
+  surge_upgrade = var.surge_upgrade
+
+  # Maintenance window (Sunday 4 AM UTC = Sunday 12 PM PHT)
+  maintenance_window_day  = var.maintenance_window_day
+  maintenance_window_hour = var.maintenance_window_hour
+
+  vpc_cidr = var.vpc_cidr
+
+  tags = var.tags
+}

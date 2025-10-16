@@ -7,5 +7,5 @@ global:
   environment: production
 
 argocd:
-  repoURL: https://github.com/monobaselabs/monobase-infra.git
+  repoURL: https://github.com/mycurelabs/monobase-infra.git
   targetRevision: main

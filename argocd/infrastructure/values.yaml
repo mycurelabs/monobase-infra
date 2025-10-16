@@ -2,7 +2,7 @@
 # These control cluster-wide infrastructure components
 
 argocd:
-  repoURL: https://github.com/monobaselabs/monobase-infra.git
+  repoURL: https://github.com/mycurelabs/monobase-infra.git
   targetRevision: main
 
 # Cert Manager - TLS certificate automation

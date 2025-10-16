@@ -31,7 +31,7 @@ spec:
   generators:
     # Git Directory Generator: Scans deployments/ for client/env directories
     - git:
-        repoURL: https://github.com/monobaselabs/monobase-infra.git
+        repoURL: https://github.com/mycurelabs/monobase-infra.git
         revision: HEAD
         directories:
           # Include: scan all directories in deployments/
