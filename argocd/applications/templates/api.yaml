@@ -20,8 +20,26 @@ spec:
     targetRevision: {{ .Values.argocd.targetRevision | default "main" }}
     helm:
       releaseName: api
-      valueFiles:
-        - ../../deployments/{{ .Values.global.namespace }}/values.yaml
+      valuesObject:
+        global: {{ .Values.global | toYaml | nindent 8 }}
+        replicaCount: {{ .Values.api.replicaCount | default 2 }}
+        image: {{ .Values.api.image | toYaml | nindent 10 }}
+        resources: {{ .Values.api.resources | toYaml | nindent 10 }}
+        {{- if .Values.api.gateway }}
+        gateway: {{ .Values.api.gateway | toYaml | nindent 10 }}
+        {{- end }}
+        {{- if .Values.api.livenessProbe }}
+        livenessProbe: {{ .Values.api.livenessProbe | toYaml | nindent 10 }}
+        {{- end }}
+        {{- if .Values.api.readinessProbe }}
+        readinessProbe: {{ .Values.api.readinessProbe | toYaml | nindent 10 }}
+        {{- end }}
+        {{- if .Values.api.podDisruptionBudget }}
+        podDisruptionBudget: {{ .Values.api.podDisruptionBudget | toYaml | nindent 10 }}
+        {{- end }}
+        {{- if .Values.api.autoscaling }}
+        autoscaling: {{ .Values.api.autoscaling | toYaml | nindent 10 }}
+        {{- end }}
 
   destination:
     server: https://kubernetes.default.svc
