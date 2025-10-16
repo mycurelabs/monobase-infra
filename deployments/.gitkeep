@@ -1,2 +1,0 @@
-# Keep config/ directory in Git
-# Client-specific configurations go in config/{client}/ subdirectories
