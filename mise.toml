@@ -40,7 +40,7 @@ _.file = ".env.local"
 
 [tasks.fmt]
 description = "Format all code (Terraform)"
-run = "terraform fmt -recursive tofu/"
+run = "terraform fmt -recursive terraform/"
 
 # Linting
 # =============================================================================
@@ -49,11 +49,12 @@ run = "terraform fmt -recursive tofu/"
 description = "Lint Terraform files with tflint"
 run = """
 echo "Linting Terraform files..."
-(cd tofu/modules/aws-eks && tflint --config=../../../.tflint.hcl)
-(cd tofu/modules/azure-aks && tflint --config=../../../.tflint.hcl)
-(cd tofu/modules/gcp-gke && tflint --config=../../../.tflint.hcl)
-(cd tofu/modules/on-prem-k3s && tflint --config=../../../.tflint.hcl)
-(cd tofu/modules/k3d-local && tflint --config=../../../.tflint.hcl)
+(cd terraform/modules/aws-eks && tflint --config=../../../.tflint.hcl)
+(cd terraform/modules/azure-aks && tflint --config=../../../.tflint.hcl)
+(cd terraform/modules/gcp-gke && tflint --config=../../../.tflint.hcl)
+(cd terraform/modules/do-doks && tflint --config=../../../.tflint.hcl)
+(cd terraform/modules/on-prem-k3s && tflint --config=../../../.tflint.hcl)
+(cd terraform/modules/local-k3d && tflint --config=../../../.tflint.hcl)
 """
 
 [tasks.lint-yaml]
@@ -83,6 +84,7 @@ run = """
 echo "Linting Helm charts..."
 helm lint charts/api
 helm lint charts/account
+helm lint charts/namespace
 """
 
 [tasks.lint]
@@ -97,19 +99,21 @@ run = "echo '✓ All linting complete'"
 description = "Validate Terraform modules"
 run = """
 echo "Validating Terraform modules..."
-(cd tofu/modules/aws-eks && terraform init -backend=false && terraform validate)
-(cd tofu/modules/azure-aks && terraform init -backend=false && terraform validate)
-(cd tofu/modules/gcp-gke && terraform init -backend=false && terraform validate)
-(cd tofu/modules/on-prem-k3s && terraform init -backend=false && terraform validate)
-(cd tofu/modules/k3d-local && terraform init -backend=false && terraform validate)
+(cd terraform/modules/aws-eks && terraform init -backend=false && terraform validate)
+(cd terraform/modules/azure-aks && terraform init -backend=false && terraform validate)
+(cd terraform/modules/gcp-gke && terraform init -backend=false && terraform validate)
+(cd terraform/modules/do-doks && terraform init -backend=false && terraform validate)
+(cd terraform/modules/on-prem-k3s && terraform init -backend=false && terraform validate)
+(cd terraform/modules/local-k3d && terraform init -backend=false && terraform validate)
 """
 
 [tasks.validate-helm]
 description = "Validate Helm charts"
 run = """
 echo "Validating Helm charts..."
-helm template test charts/api --values config/profiles/staging.yaml --dry-run > /dev/null
-helm template test charts/account --values config/profiles/staging.yaml --dry-run > /dev/null
+helm template test charts/api --dry-run > /dev/null
+helm template test charts/account --dry-run > /dev/null
+helm template test charts/namespace --dry-run > /dev/null
 """
 
 [tasks.validate]
@@ -156,25 +160,6 @@ else
 fi
 """
 
-# Development
-# =============================================================================
-
-[tasks.dev-up]
-description = "Start local k3d development environment"
-run = "./scripts/k3d-dev.sh up"
-
-[tasks.dev-down]
-description = "Stop and cleanup k3d development environment"
-run = "./scripts/k3d-dev.sh down"
-
-[tasks.dev-reset]
-description = "Reset k3d development environment (fresh start)"
-run = "./scripts/k3d-dev.sh reset"
-
-[tasks.dev-status]
-description = "Show k3d development environment status"
-run = "./scripts/k3d-dev.sh status"
-
 # Utilities
 # =============================================================================
 
@@ -183,7 +168,6 @@ description = "Clean up temporary files"
 run = """
 echo "Cleaning up..."
 find . -name ".terraform" -type d -exec rm -rf {} + 2>/dev/null || true
-find . -name "*.tfstate*" -type f -delete 2>/dev/null || true
 echo "✓ Cleanup complete"
 """
 
