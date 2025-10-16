@@ -1,14 +1,14 @@
-# ArgoCD Application: Monitoring Stack
-# Sync Wave 1 - Deploy monitoring (optional)
-
 {{- if .Values.monitoring.enabled }}
+# ArgoCD Application: Monitoring Stack
+# Sync Wave 0 - Deploy monitoring (cluster-wide, optional)
+
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
   name: monitoring
   namespace: argocd
   annotations:
-    argocd.argoproj.io/sync-wave: "1"
+    argocd.argoproj.io/sync-wave: "0"
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:
@@ -17,11 +17,9 @@ spec:
   source:
     chart: kube-prometheus-stack
     repoURL: https://prometheus-community.github.io/helm-charts
-    targetRevision: 56.0.0
+    targetRevision: {{ .Values.monitoring.version | default "56.0.0" }}
     helm:
       releaseName: monitoring
-      values: |
-        {{- toYaml .Values.monitoring | nindent 8 }}
   
   destination:
     server: https://kubernetes.default.svc

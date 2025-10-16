@@ -1,0 +1,50 @@
+# Default values for monobase-infrastructure Helm chart
+# These control cluster-wide infrastructure components
+
+argocd:
+  repoURL: https://github.com/YOUR-ORG/monobase-infra.git
+  targetRevision: main
+
+# Cert Manager - TLS certificate automation
+certManager:
+  enabled: true
+  version: v1.14.2
+
+# Envoy Gateway - Gateway API implementation
+envoyGateway:
+  enabled: true
+  version: v1.0.1
+
+# External Secrets - Secret management
+externalSecrets:
+  enabled: true
+  version: 0.9.11
+
+# Longhorn - Distributed block storage
+longhorn:
+  enabled: false  # Usually use cloud provider storage
+  version: 1.6.0
+
+# Kyverno - Policy engine
+kyverno:
+  enabled: false  # Optional, enable for policy enforcement
+  version: 3.2.0
+  policies:
+    enabled: false  # Only if kyverno.enabled=true
+
+# Velero - Backup and disaster recovery
+velero:
+  enabled: false  # Enable for production clusters with backup requirements
+  version: 7.1.4
+
+# Falco - Runtime security monitoring
+falco:
+  enabled: false  # Optional, enable for runtime threat detection
+  version: 4.6.1
+  rules:
+    enabled: false  # Only if falco.enabled=true
+
+# Monitoring - Prometheus + Grafana stack
+monitoring:
+  enabled: false  # Optional, enable for observability
+  version: latest

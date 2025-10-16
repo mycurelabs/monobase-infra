@@ -1,15 +1,15 @@
+{{- if and .Values.falco.enabled .Values.falco.rules.enabled }}
 # ArgoCD Application: Falco Custom Rules
-# Sync Wave 2 - Deploy custom rules after Falco DaemonSet
-# Only deployed if security.falco.enabled=true
+# Sync Wave 1 - Deploy custom rules after Falco DaemonSet
+# Only deployed if falco.enabled=true AND falco.rules.enabled=true
 
-{{- if .Values.security.falco.enabled }}
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
   name: falco-rules
   namespace: argocd
   annotations:
-    argocd.argoproj.io/sync-wave: "2"
+    argocd.argoproj.io/sync-wave: "1"
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:

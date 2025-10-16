@@ -38,20 +38,38 @@ helm install argocd argo/argo-cd \
   - RBAC settings
   - Used by `scripts/bootstrap.sh`
 
-## ApplicationSet Auto-Discovery Pattern
+## GitOps Architecture
 
-Once ArgoCD is installed, it auto-discovers all client/environment configurations using ApplicationSet:
+Once ArgoCD is installed, it manages TWO layers:
+
+### Layer 1: Cluster-Wide Infrastructure (GitOps)
+
+```
+Infrastructure Root (argocd/bootstrap/infrastructure-root.yaml)
+├── Deployed ONCE per cluster
+└── Manages cluster-wide components via GitOps:
+    ├── cert-manager (TLS certificates)
+    ├── envoy-gateway (Gateway API)
+    ├── external-secrets (Secret management)
+    ├── velero (Backups)
+    ├── longhorn (Storage, optional)
+    ├── kyverno (Policy engine, optional)
+    └── monitoring (Observability, optional)
+```
+
+**Benefits:** Drift correction, updates via git push, full ArgoCD visibility
+
+### Layer 2: Per-Client Applications (GitOps Auto-Discovery)
 
 ```
 ApplicationSet (argocd/bootstrap/applicationset-auto-discover.yaml)
-├── Scans config/*/ directories
-├── Creates root Application for each config found
-│   ├── config/clienta-prod/ → clienta-prod-root
-│   ├── config/clientb-staging/ → clientb-staging-root
+├── Scans deployments/*/ directories
+├── Creates Applications for each client/env found
+│   ├── deployments/clienta-prod/ → clienta-prod-*
+│   ├── deployments/clientb-staging/ → clientb-staging-*
 │   └── ...
-└── Each root Application deploys full stack:
-    ├── Security & Namespace (Wave -1, 0)
-    ├── Infrastructure (Wave 1)
+└── Each client gets full stack:
+    ├── Namespace + Security (Wave -1, 0)
     ├── Data Services (Wave 2)
     └── Applications (Wave 3)
 ```
@@ -84,18 +102,22 @@ Or via Gateway API (if configured):
 https://argocd.yourdomain.com
 ```
 
-## Infrastructure vs GitOps
+## Bootstrap vs GitOps
 
-**Infrastructure (this directory):**
-- ArgoCD itself (installed once manually or via bootstrap.sh)
+**Bootstrap (Manual, Once):**
+- ArgoCD itself (installed via bootstrap.sh)
 - Cannot be managed by GitOps (chicken-and-egg problem)
-- Lives in `infrastructure/argocd/` alongside other infrastructure components
+- Configuration: `infrastructure/argocd/helm-values.yaml`
 
-**GitOps (everything else):**
-- All infrastructure and applications
-- Managed by ArgoCD via ApplicationSet
-- Lives in `argocd/bootstrap/` (ApplicationSet) and `argocd/applications/` (templates)
-- Auto-syncs from Git
+**GitOps (Managed by ArgoCD):**
+- Cluster-wide infrastructure (cert-manager, gateways, storage, etc.)
+  - Configuration: `argocd/infrastructure/values.yaml`
+  - Application: `argocd/bootstrap/infrastructure-root.yaml`
+- Per-client applications (namespace, security, databases, apps)
+  - Configuration: `deployments/*/values.yaml`
+  - ApplicationSet: `argocd/bootstrap/applicationset-auto-discover.yaml`
+
+After bootstrap, **only ArgoCD itself** requires manual management. Everything else is GitOps!
 
 ## Configuration
 

@@ -85,9 +85,10 @@ WORKFLOW:
     1. Validate prerequisites (kubectl, helm, cluster connectivity)
     2. Install ArgoCD (if not present)
     3. Wait for ArgoCD to be ready
-    4. Deploy ApplicationSet for auto-discovery
-    5. Output ArgoCD access information
-    6. (Optional) Wait for ApplicationSet to sync
+    4. Deploy Infrastructure Root Application (cluster-wide GitOps)
+    5. Deploy ApplicationSet for per-client auto-discovery
+    6. Output ArgoCD access information
+    7. (Optional) Wait for ApplicationSet to sync
 
 TRUE GITOPS WORKFLOW (After Bootstrap):
     # Add new client/environment
@@ -225,8 +226,22 @@ else
     print_info "Assuming ArgoCD is already installed (--skip-argocd)"
 fi
 
+# Deploy Infrastructure Root Application
+print_step "Step 3: Deploy Cluster Infrastructure"
+INFRASTRUCTURE_ROOT="${REPO_ROOT}/argocd/bootstrap/infrastructure-root.yaml"
+
+if [[ ! -f "$INFRASTRUCTURE_ROOT" ]]; then
+    print_error "Infrastructure root not found: $INFRASTRUCTURE_ROOT"
+    exit 1
+fi
+
+print_info "Deploying cluster-wide infrastructure via GitOps..."
+print_info "This will deploy: cert-manager, envoy-gateway, external-secrets, velero, etc."
+execute kubectl --kubeconfig="$KUBECONFIG" apply -f "$INFRASTRUCTURE_ROOT"
+print_success "Infrastructure root deployed - ArgoCD managing cluster infrastructure!"
+
 # Deploy ApplicationSet for auto-discovery
-print_step "Step 3: Deploy ApplicationSet"
+print_step "Step 4: Deploy ApplicationSet for Per-Client Apps"
 APPLICATIONSET="${REPO_ROOT}/argocd/bootstrap/applicationset-auto-discover.yaml"
 
 if [[ ! -f "$APPLICATIONSET" ]]; then
@@ -240,7 +255,7 @@ execute kubectl --kubeconfig="$KUBECONFIG" apply -f "$APPLICATIONSET"
 print_success "ApplicationSet deployed - ArgoCD will now auto-discover all configs in deployments/"
 
 # Output ArgoCD access information
-print_step "Step 4: ArgoCD Access Information"
+print_step "Step 5: ArgoCD Access Information"
 
 if [[ "$DRY_RUN" == "false" ]] && [[ "$SKIP_ARGOCD" == "false" ]]; then
     # Get admin password
@@ -260,7 +275,7 @@ fi
 
 # Wait for ApplicationSet to sync
 if [[ "$WAIT_FOR_SYNC" == "true" ]]; then
-    print_step "Step 5: Wait for ApplicationSet to Sync"
+    print_step "Step 6: Wait for ApplicationSet to Sync"
 
     if [[ "$DRY_RUN" == "false" ]]; then
         print_info "Waiting for ApplicationSet to discover and create applications..."

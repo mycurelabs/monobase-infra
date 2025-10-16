@@ -1,5 +1,6 @@
+{{- if .Values.envoyGateway.enabled }}
 # ArgoCD Application: Envoy Gateway
-# Sync Wave 1 - Deploy gateway infrastructure
+# Sync Wave 0 - Deploy gateway infrastructure (cluster-wide)
 
 apiVersion: argoproj.io/v1alpha1
 kind: Application
@@ -7,7 +8,7 @@ metadata:
   name: envoy-gateway
   namespace: argocd
   annotations:
-    argocd.argoproj.io/sync-wave: "1"
+    argocd.argoproj.io/sync-wave: "0"
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:
@@ -16,11 +17,9 @@ spec:
   source:
     chart: gateway-helm
     repoURL: https://gateway.envoyproxy.io
-    targetRevision: 1.0.0
+    targetRevision: {{ .Values.envoyGateway.version | default "v1.0.1" }}
     helm:
       releaseName: envoy-gateway
-      values: |
-        {{- toYaml .Values.envoyGateway | nindent 8 }}
   
   destination:
     server: https://kubernetes.default.svc
@@ -37,3 +36,4 @@ spec:
       backoff:
         duration: 5s
         maxDuration: 3m
+{{- end }}

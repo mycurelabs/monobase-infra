@@ -1,8 +1,8 @@
+{{- if .Values.kyverno.enabled }}
 # ArgoCD Application: Kyverno
-# Sync Wave 0 - Deploy policy engine before applications
-# Only deployed if security.kyverno.enabled=true
+# Sync Wave 0 - Deploy policy engine (cluster-wide)
+# Only deployed if kyverno.enabled=true
 
-{{- if .Values.security.kyverno.enabled }}
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -18,11 +18,9 @@ spec:
   source:
     chart: kyverno
     repoURL: https://kyverno.github.io/kyverno/
-    targetRevision: 3.2.0
+    targetRevision: {{ .Values.kyverno.version | default "3.2.0" }}
     helm:
       releaseName: kyverno
-      valuesObject:
-        {{- toYaml .Values.security.kyverno | nindent 8 }}
 
   destination:
     server: https://kubernetes.default.svc

@@ -1,190 +1,312 @@
 # ArgoCD Application Definitions
 
-This directory contains ArgoCD Application resources that define how applications are deployed.
+This directory contains ArgoCD Application resources for GitOps-managed infrastructure and applications.
 
-## Structure
+## Architecture Overview
+
+**Two-Layer GitOps Architecture:**
+
+1. **Cluster-Wide Infrastructure** (bootstrap/infrastructure-root.yaml)
+   - Deployed ONCE per cluster
+   - Manages: cert-manager, gateways, storage, security, backups
+   - Auto-syncs from Git (drift correction enabled)
+
+2. **Per-Client Applications** (bootstrap/applicationset-auto-discover.yaml)
+   - Deployed ONCE per cluster
+   - Auto-discovers client/env configs in deployments/
+   - Creates per-client Applications automatically
+
+## Directory Structure
 
 ```
 argocd/
 ├── bootstrap/
-│   └── root-app.yaml.template           # App-of-Apps (deploys everything)
-├── infrastructure/
-│   ├── namespace.yaml.template          # Namespace + PSS labels (Wave -1)
-│   ├── security-baseline.yaml.template  # NetworkPolicies + RBAC (Wave 0)
-│   ├── kyverno.yaml.template            # Policy engine (Wave 0, optional)
-│   ├── kyverno-policies.yaml.template   # Policies (Wave 1, optional)
-│   ├── longhorn.yaml.template           # Storage (Wave 1, conditional)
-│   ├── envoy-gateway.yaml.template      # Gateway API (Wave 1)
-│   ├── external-secrets.yaml.template   # Secrets (Wave 1)
-│   ├── cert-manager.yaml.template       # TLS certificates (Wave 1)
-│   ├── velero.yaml.template             # Backups (Wave 1)
-│   ├── falco.yaml.template              # Runtime security (Wave 1, optional)
-│   └── falco-rules.yaml.template        # Custom rules (Wave 2, optional)
-└── applications/
-    ├── postgresql.yaml.template         # Database (Wave 2)
-    ├── valkey.yaml.template             # Cache (Wave 2)
-    ├── minio.yaml.template              # Object storage (Wave 2, optional)
-    ├── mailpit.yaml.template            # Email testing (Wave 2, dev only)
-    ├── api.yaml.template                # Backend API (Wave 3)
-    └── account.yaml.template            # Frontend (Wave 3)
+│   ├── infrastructure-root.yaml           # Cluster-wide infrastructure
+│   └── applicationset-auto-discover.yaml  # Per-client auto-discovery
+├── infrastructure/                        # Helm chart for cluster infrastructure
+│   ├── Chart.yaml
+│   ├── values.yaml
+│   └── templates/
+│       ├── cert-manager.yaml             # TLS certificates (Wave 0)
+│       ├── envoy-gateway.yaml            # Gateway API (Wave 0)
+│       ├── external-secrets.yaml          # Secret management (Wave 0)
+│       ├── velero.yaml                   # Backups (Wave 0)
+│       ├── longhorn.yaml                 # Storage (Wave 0, optional)
+│       ├── kyverno.yaml                  # Policy engine (Wave 0, optional)
+│       ├── kyverno-policies.yaml         # Policies (Wave 1, optional)
+│       ├── falco.yaml                    # Runtime security (Wave 0, optional)
+│       ├── falco-rules.yaml              # Custom rules (Wave 1, optional)
+│       └── monitoring.yaml               # Observability (Wave 0, optional)
+└── applications/                          # Helm chart for per-client apps
+    ├── Chart.yaml
+    ├── values.yaml
+    └── templates/
+        ├── namespace.yaml                # Namespace + PSS (Wave -1)
+        ├── security-baseline.yaml        # NetworkPolicies + RBAC (Wave 0)
+        ├── postgresql.yaml               # Database (Wave 2)
+        ├── valkey.yaml                   # Cache (Wave 2)
+        ├── minio.yaml                    # Object storage (Wave 2, optional)
+        ├── mailpit.yaml                  # Email testing (Wave 2, dev only)
+        ├── api.yaml                      # Backend API (Wave 3)
+        └── account.yaml                  # Frontend (Wave 3)
 ```
 
-## App-of-Apps Pattern
-
-The **root-app** (bootstrap) creates all other applications using the "App-of-Apps" pattern:
-
-```
-root-app (bootstrap)
-├── Security & Namespace (Sync Wave -1, 0)
-│   ├── namespace (Wave -1, with Pod Security Standards)
-│   ├── security-baseline (Wave 0, NetworkPolicies + RBAC)
-│   └── kyverno (Wave 0, optional policy engine)
-├── Infrastructure (Sync Wave 1)
-│   ├── kyverno-policies (Wave 1, if Kyverno enabled)
-│   ├── longhorn (Wave 1, if storage.provider=longhorn)
-│   ├── envoy-gateway (Wave 1)
-│   ├── external-secrets (Wave 1)
-│   ├── cert-manager (Wave 1)
-│   ├── velero (Wave 1, backup controller)
-│   └── falco (Wave 1, optional runtime security)
-├── Data & Services (Sync Wave 2)
-│   ├── falco-rules (Wave 2, if Falco enabled)
-│   ├── postgresql (database)
-│   ├── valkey (cache)
-│   ├── minio (object storage, optional)
-│   └── mailpit (email testing, dev/staging only)
-└── Applications (Sync Wave 3)
-    ├── api (backend)
-    └── account (frontend)
-```
-
-## Sync Waves
-
-Sync waves ensure ordered deployment. ArgoCD waits for each wave to be healthy before proceeding to the next.
-
-### Wave -1: Namespace & Security Foundation
-- **namespace** - Creates namespace with Pod Security Standards labels
-  - Labels: `pod-security.kubernetes.io/enforce=restricted`
-  - Source: `infrastructure/namespaces/`
-
-### Wave 0: Security Baseline & Policy Engine
-- **security-baseline** - NetworkPolicies and RBAC (always deployed)
-  - Default-deny NetworkPolicies
-  - Least-privilege RBAC roles
-  - Source: `infrastructure/security/`
-- **kyverno** - Policy engine controller (optional, conditional)
-  - Only if `security.kyverno.enabled=true`
-  - Admission webhook for policy enforcement
-  - Source: Helm chart `kyverno/kyverno:3.2.0`
-
-### Wave 1: Infrastructure Components
-- **kyverno-policies** - ClusterPolicies (optional, conditional)
-  - Only if `security.kyverno.enabled=true`
-  - Pod security, labels, registry restrictions
-  - Source: `infrastructure/security-tools/kyverno/policies/`
-- **longhorn** - Storage provider (conditional)
-  - Only if `global.storage.provider=longhorn`
-  - CSI driver for persistent volumes
-  - Source: Helm chart `longhorn/longhorn:1.6.0`
-- **envoy-gateway** - Gateway API implementation (always deployed)
-  - HTTP routing, TLS termination
-  - Source: Helm chart `gateway/gateway:v1.0.1`
-- **external-secrets** - Secret management (always deployed)
-  - Syncs secrets from cloud providers
-  - Source: Helm chart `external-secrets/external-secrets:0.9.11`
-- **cert-manager** - TLS certificate automation (always deployed)
-  - Let's Encrypt integration
-  - Source: Helm chart `jetstack/cert-manager:v1.14.2`
-- **velero** - Backup controller (always deployed)
-  - Cluster-wide backup infrastructure
-  - Source: Helm chart `vmware-tanzu/velero:7.1.4`
-- **falco** - Runtime security monitoring (optional, conditional)
-  - Only if `security.falco.enabled=true`
-  - eBPF-based threat detection DaemonSet
-  - Source: Helm chart `falcosecurity/falco:4.6.1`
-
-### Wave 2: Data Services & Custom Rules
-- **falco-rules** - Custom Falco rules (optional, conditional)
-  - Only if `security.falco.enabled=true`
-  - API-specific and database-specific rules
-  - Source: `infrastructure/security-tools/falco/rules/`
-- **postgresql** - Database (always deployed)
-  - Primary database for API
-  - Source: Helm chart `bitnami/postgresql:14.x`
-- **valkey** - Redis cache (always deployed)
-  - Session and cache storage
-  - Source: Helm chart `bitnami/valkey:7.x`
-- **minio** - Object storage (optional, conditional)
-  - Only if `minio.enabled=true`
-  - S3-compatible storage
-  - Source: Helm chart `bitnami/minio:latest`
-- **mailpit** - Email testing (dev/staging only)
-  - Only if `mailpit.enabled=true`
-  - SMTP server for testing
-  - Source: Helm chart `jouve/mailpit:latest`
-
-### Wave 3: Applications
-- **api** - Monobase API backend (always deployed)
-  - Main application backend
-  - Includes Velero backup schedules
-  - Source: `charts/api/`
-- **account** - Monobase Account frontend (always deployed)
-  - User-facing frontend
-  - Source: `charts/account/`
-
-## Conditional Deployment
-
-Some components deploy conditionally based on configuration:
-
-| Component | Condition | Default (Production) | Default (Staging) |
-|-----------|-----------|----------------------|-------------------|
-| **kyverno** | `security.kyverno.enabled=true` | `false` | `false` |
-| **kyverno-policies** | `security.kyverno.enabled=true` | `false` | `false` |
-| **falco** | `security.falco.enabled=true` | `false` | `false` |
-| **falco-rules** | `security.falco.enabled=true` | `false` | `false` |
-| **longhorn** | `global.storage.provider=longhorn` | `false` (use cloud) | `false` (use cloud) |
-| **minio** | `minio.enabled=true` | `false` (use S3) | `false` (use S3) |
-| **mailpit** | `mailpit.enabled=true` | `false` (use real SMTP) | `true` |
-
-**Note:** Security baseline (NetworkPolicies, RBAC, PSS), Velero, and core infrastructure are **always deployed** in all environments.
-
-All dependencies are deployed as **separate ArgoCD Applications**, not as Helm chart sub-charts. This provides:
-- Independent lifecycle management
-- Better observability in ArgoCD UI
-- Granular sync policies (e.g., `prune: false` for databases)
-- Ability to deploy databases before applications
-
-## Template Variables
-
-All `.template` files contain placeholders:
-
-- `{{ .Values.global.domain }}` → Client's domain
-- `{{ .Values.global.namespace }}` → Client's namespace
-- `{{ .Release.Name }}` → Release name
-
-Use `scripts/render-templates.sh` to render with client values.
-
-## Deployment
+## Bootstrap Workflow
 
 ```bash
-# 1. Render templates with client values
-./scripts/render-templates.sh \\
-  --values config/myclient/values-production.yaml \\
-  --output rendered/myclient/
+# Step 1: Install ArgoCD (manual, once)
+./scripts/bootstrap.sh
 
-# 2. Deploy root app (deploys everything)
-kubectl apply -f rendered/myclient/argocd/root-app.yaml
+# This installs:
+# 1. ArgoCD itself
+# 2. Infrastructure Root Application (cluster infrastructure via GitOps)
+# 3. ApplicationSet (per-client auto-discovery)
 
-# 3. Watch progress in ArgoCD UI
-kubectl port-forward -n argocd svc/argocd-server 8080:443
-# Open https://localhost:8080
+# Step 2: Add client/env configurations
+mkdir deployments/myclient-prod
+cp deployments/templates/production-base.yaml deployments/myclient-prod/values.yaml
+vim deployments/myclient-prod/values.yaml  # Edit domain, namespace, etc.
+git add deployments/myclient-prod/
+git commit -m "Add myclient-prod"
+git push
+
+# Step 3: ArgoCD auto-discovers and deploys!
+# - Infrastructure already deployed (cluster-wide)
+# - ApplicationSet creates myclient-prod Applications
+# - All synced from Git automatically
 ```
 
-## Phase 3 Implementation
+## Deployment Layers
 
-Full implementation includes:
-- Complete Application templates with sync waves
-- Health checks and sync policies
-- Auto-sync configuration
-- Rollback procedures
-- Multi-environment support
+### Layer 1: Cluster Infrastructure (Wave 0-1)
+
+**Managed by:** `argocd/bootstrap/infrastructure-root.yaml`
+
+**Deploys:** Cluster-wide components (ONE instance per cluster)
+
+| Component | Wave | Enabled By Default | Purpose |
+|-----------|------|-------------------|---------|
+| cert-manager | 0 | ✅ Yes | TLS certificate automation |
+| envoy-gateway | 0 | ✅ Yes | Gateway API implementation |
+| external-secrets | 0 | ✅ Yes | Secret management |
+| velero | 0 | ✅ Yes | Backup and disaster recovery |
+| longhorn | 0 | ❌ No | Distributed block storage |
+| kyverno | 0 | ❌ No | Policy engine |
+| kyverno-policies | 1 | ❌ No | Policy definitions |
+| falco | 0 | ❌ No | Runtime security monitoring |
+| falco-rules | 1 | ❌ No | Custom security rules |
+| monitoring | 0 | ❌ No | Prometheus + Grafana |
+
+**Configuration:** Edit `argocd/infrastructure/values.yaml` to enable/disable components.
+
+**GitOps Benefits:**
+- ✅ Drift detection and auto-correction
+- ✅ Updates via git push
+- ✅ Full visibility in ArgoCD UI
+- ✅ Declarative infrastructure as code
+
+### Layer 2: Per-Client Applications (Wave -1 through 3)
+
+**Managed by:** `argocd/bootstrap/applicationset-auto-discover.yaml`
+
+**Deploys:** Per-client/environment resources (ONE set per client/env)
+
+| Component | Wave | Scope | Purpose |
+|-----------|------|-------|---------|
+| namespace | -1 | Per-client | Namespace with Pod Security Standards |
+| security-baseline | 0 | Per-client | NetworkPolicies + RBAC |
+| postgresql | 2 | Per-client | Database instance |
+| valkey | 2 | Per-client | Redis cache instance |
+| minio | 2 | Per-client | Object storage (optional) |
+| mailpit | 2 | Per-client | Email testing (dev/staging) |
+| api | 3 | Per-client | Backend application |
+| account | 3 | Per-client | Frontend application |
+
+**Configuration:** Each client has `deployments/{client-env}/values.yaml`
+
+**GitOps Workflow:**
+```bash
+# Add new client
+mkdir deployments/newclient-prod
+cp deployments/templates/production-base.yaml deployments/newclient-prod/values.yaml
+vim deployments/newclient-prod/values.yaml
+git add deployments/newclient-prod/ && git commit -m "Add newclient-prod" && git push
+# ✓ ArgoCD auto-creates all Applications for newclient-prod
+
+# Update existing client
+vim deployments/existingclient-prod/values.yaml
+git commit -am "Update existingclient: enable minio" && git push
+# ✓ ArgoCD auto-syncs only existingclient-prod
+```
+
+## Sync Waves Explained
+
+Sync waves control deployment order. ArgoCD waits for each wave to be healthy before proceeding.
+
+**Infrastructure (Cluster-Wide):**
+- Wave 0: Core infrastructure (cert-manager, gateways, storage, secrets, backups)
+- Wave 1: Dependent components (policies, custom rules)
+
+**Applications (Per-Client):**
+- Wave -1: Namespace creation (Pod Security Standards labels)
+- Wave 0: Security baseline (NetworkPolicies, RBAC)
+- Wave 2: Data services (PostgreSQL, Valkey, MinIO, Mailpit)
+- Wave 3: Applications (API, Account frontend)
+
+**Example Flow for New Client:**
+```
+1. Wave -1: Create namespace "myclient-prod" with PSS labels
+2. Wave 0: Deploy NetworkPolicies and RBAC to "myclient-prod"
+3. Wave 2: Deploy PostgreSQL, Valkey to "myclient-prod"
+4. Wave 3: Deploy API, Account to "myclient-prod"
+   (API waits for PostgreSQL to be healthy)
+```
+
+## Managing Infrastructure
+
+### Enable/Disable Components
+
+Edit `argocd/infrastructure/values.yaml`:
+
+```yaml
+# Enable Longhorn storage
+longhorn:
+  enabled: true
+  version: 1.6.0
+
+# Enable Kyverno policies
+kyverno:
+  enabled: true
+  version: 3.2.0
+  policies:
+    enabled: true
+```
+
+Git commit and push - ArgoCD auto-syncs!
+
+### Update Component Versions
+
+Edit `argocd/infrastructure/values.yaml`:
+
+```yaml
+certManager:
+  enabled: true
+  version: v1.15.0  # Updated from v1.14.2
+```
+
+Git commit and push - ArgoCD upgrades cert-manager!
+
+### View Infrastructure Status
+
+```bash
+# View infrastructure Application
+kubectl get application infrastructure -n argocd
+
+# View all infrastructure components
+kubectl get applications -n argocd -l app.kubernetes.io/component=cluster-infrastructure
+
+# Check sync status
+argocd app get infrastructure
+```
+
+## Managing Per-Client Applications
+
+### Add New Client/Environment
+
+```bash
+mkdir deployments/newclient-staging
+cp deployments/templates/staging-base.yaml deployments/newclient-staging/values.yaml
+
+# Edit values
+vim deployments/newclient-staging/values.yaml
+
+# Commit and push
+git add deployments/newclient-staging/
+git commit -m "Add newclient-staging environment"
+git push
+
+# ArgoCD auto-discovers within ~30 seconds
+kubectl get applications -n argocd | grep newclient-staging
+```
+
+### Update Existing Client
+
+```bash
+# Edit configuration
+vim deployments/myclient-prod/values.yaml
+
+# Commit and push
+git commit -am "myclient-prod: increase API replicas to 3"
+git push
+
+# ArgoCD auto-syncs within seconds
+argocd app sync myclient-prod-api
+```
+
+### Remove Client/Environment
+
+```bash
+git rm -r deployments/oldclient-prod/
+git commit -m "Remove oldclient-prod"
+git push
+
+# ApplicationSet auto-removes Applications
+# (preserveResourcesOnDeletion=true prevents data loss)
+```
+
+## Troubleshooting
+
+### Infrastructure Not Deploying
+
+```bash
+# Check infrastructure Application status
+kubectl get application infrastructure -n argocd -o yaml
+
+# Check ArgoCD logs
+kubectl logs -n argocd -l app.kubernetes.io/name=argocd-application-controller
+
+# Manually sync
+argocd app sync infrastructure
+```
+
+### ApplicationSet Not Discovering Configs
+
+```bash
+# Check ApplicationSet status
+kubectl get applicationset monobase-auto-discover -n argocd -o yaml
+
+# Verify deployments/ directory structure
+ls -la deployments/
+
+# Check ApplicationSet logs
+kubectl logs -n argocd -l app.kubernetes.io/name=argocd-applicationset-controller
+```
+
+### Application Stuck in Progressing
+
+```bash
+# Check specific application
+kubectl get application myclient-prod-api -n argocd -o yaml
+
+# View sync status
+argocd app get myclient-prod-api
+
+# Check application logs
+kubectl logs -n myclient-prod -l app=api
+```
+
+## Architecture Benefits
+
+✅ **Full GitOps:** All infrastructure and applications managed via Git  
+✅ **Drift Correction:** Auto-healing enabled for all components  
+✅ **Scalability:** Add clients via git push, no manual kubectl  
+✅ **Visibility:** Single ArgoCD UI for all infrastructure + apps  
+✅ **Safety:** Sync waves prevent deployment race conditions  
+✅ **Flexibility:** Enable/disable components per cluster or per client  
+
+## References
+
+- Bootstrap script: `scripts/bootstrap.sh`
+- Infrastructure values: `argocd/infrastructure/values.yaml`
+- Application templates: `argocd/applications/templates/`
+- Deployment configs: `deployments/*/values.yaml`

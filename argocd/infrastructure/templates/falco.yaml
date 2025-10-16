@@ -1,15 +1,15 @@
+{{- if .Values.falco.enabled }}
 # ArgoCD Application: Falco
-# Sync Wave 1 - Deploy runtime security monitoring
-# Only deployed if security.falco.enabled=true
+# Sync Wave 0 - Deploy runtime security monitoring (cluster-wide)
+# Only deployed if falco.enabled=true
 
-{{- if .Values.security.falco.enabled }}
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
   name: falco
   namespace: argocd
   annotations:
-    argocd.argoproj.io/sync-wave: "1"
+    argocd.argoproj.io/sync-wave: "0"
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:
@@ -18,11 +18,9 @@ spec:
   source:
     chart: falco
     repoURL: https://falcosecurity.github.io/charts
-    targetRevision: 4.6.1
+    targetRevision: {{ .Values.falco.version | default "4.6.1" }}
     helm:
       releaseName: falco
-      valuesObject:
-        {{- toYaml .Values.security.falco | nindent 8 }}
 
   destination:
     server: https://kubernetes.default.svc
