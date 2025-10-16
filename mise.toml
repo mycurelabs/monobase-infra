@@ -1,6 +1,28 @@
 # Monobase Infrastructure - mise configuration
 # Tool management + task runner
 # Docs: https://mise.jdx.dev
+#
+# This project uses mise exclusively for tool version management.
+# All tools are declared here (no .tool-versions file).
+
+# =============================================================================
+# Tools
+# =============================================================================
+
+[tools]
+# Infrastructure as Code
+terraform = "1.9.8"
+kubectl = "1.31.1"
+helm = "3.16.2"
+k3d = "5.8.3"
+doctl = "latest"
+yq = "latest"
+
+# Linters and Formatters
+tflint = "0.54.0"
+yamllint = "1.35.1"
+shellcheck = "0.10.0"
+markdownlint-cli2 = "0.15.0"
 
 # =============================================================================
 # Tasks - Run with: mise run <task>
