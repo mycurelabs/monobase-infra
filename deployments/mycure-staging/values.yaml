@@ -86,6 +86,9 @@ postgresql:
   # Staging uses standalone (not replication)
   architecture: standalone
 
+  image:
+    tag: 16.4.0-debian-12-r13  # Use stable version
+
   auth:
     enabled: true
     # Credentials managed by External Secrets
@@ -111,6 +114,9 @@ valkey:
   enabled: true
 
   architecture: standalone  # Not replication for staging
+
+  image:
+    tag: 8.0.1-debian-12-r2  # Use stable version
 
   master:
     persistence:
