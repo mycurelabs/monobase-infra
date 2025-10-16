@@ -27,7 +27,7 @@ spec:
     validate:
       message: >-
         Container images must be from approved registries:
-        - ghcr.io/YOUR-ORG/* (your organization)
+        - ghcr.io/monobaselabs/* (your organization)
         - bitnami/* (trusted third-party charts)
         - registry.k8s.io/* (Kubernetes official)
         - quay.io/jetstack/* (cert-manager)
@@ -47,7 +47,7 @@ spec:
               operator: NotIn
               value:
               # Your organization registry
-              - "ghcr.io/YOUR-ORG/*"
+              - "ghcr.io/monobaselabs/*"
 
               # Trusted third-party registries
               - "bitnami/*"

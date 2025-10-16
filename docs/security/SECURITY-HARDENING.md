@@ -222,13 +222,13 @@ image:
 # - scratch (static binaries)
 
 # 3. Scan images for vulnerabilities
-trivy image ghcr.io/YOUR-ORG/api:5.215.2
+trivy image ghcr.io/monobaselabs/api:5.215.2
 
 # 4. Sign images (optional)
-cosign sign ghcr.io/YOUR-ORG/api:5.215.2
+cosign sign ghcr.io/monobaselabs/api:5.215.2
 
 # 5. Verify signatures
-cosign verify ghcr.io/YOUR-ORG/api:5.215.2
+cosign verify ghcr.io/monobaselabs/api:5.215.2
 ```
 
 ---
@@ -593,7 +593,7 @@ kubectl delete pod suspicious-pod-xyz -n myclient-prod
 
 # Patch vulnerabilities
 kubectl set image deployment/api \\
-  api=ghcr.io/YOUR-ORG/api:5.215.3-patched \\
+  api=ghcr.io/monobaselabs/api:5.215.3-patched \\
   -n myclient-prod
 ```
 
@@ -625,7 +625,7 @@ velero restore create incident-recovery \\
 
 ```bash
 # Scan container images
-trivy image ghcr.io/YOUR-ORG/api:5.215.2
+trivy image ghcr.io/monobaselabs/api:5.215.2
 
 # Scan Helm charts
 trivy config charts/api

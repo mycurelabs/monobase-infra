@@ -18,7 +18,7 @@ api:
   enabled: true
   replicaCount: 3
   image:
-    repository: ghcr.io/YOUR-ORG/monobase-api
+    repository: ghcr.io/monobaselabs/api
     tag: "5.215.2"
 
 postgresql:
@@ -53,7 +53,7 @@ helm install myclient-api ./charts/api -f deployments/myclient-prod/values.yaml
 
 ### api.image.repository
 - **Type:** string
-- **Default:** `ghcr.io/YOUR-ORG/api`
+- **Default:** `ghcr.io/monobaselabs/api`
 - **Description:** Container image repository
 
 ### api.image.tag

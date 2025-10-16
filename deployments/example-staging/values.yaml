@@ -18,7 +18,7 @@ global:
 # ===== ArgoCD GitOps Configuration =====
 argocd:
   # Git repository URL (required for GitOps)
-  repoURL: https://github.com/YOUR-ORG/monobase-infra.git  # Change to your fork
+  repoURL: https://github.com/monobaselabs/monobase-infra.git  # Change to your fork
   targetRevision: main  # Branch to deploy from (main, staging, etc.)
 
 # ===== CORE: Monobase API =====
@@ -26,7 +26,7 @@ api:
   enabled: true
 
   image:
-    repository: ghcr.io/YOUR-ORG/monobase-api
+    repository: ghcr.io/monobaselabs/api
     tag: "latest"  # OK for staging (use branch builds)
     pullPolicy: Always  # Always pull latest for staging
 
@@ -66,7 +66,7 @@ account:
   enabled: true
 
   image:
-    repository: ghcr.io/YOUR-ORG/monobase-account
+    repository: ghcr.io/monobaselabs/accountapp
     tag: "latest"
     pullPolicy: Always
 

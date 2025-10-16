@@ -80,7 +80,7 @@ Required for GitOps auto-discovery.
 #### argocd.repoURL
 - **Type:** string
 - **Required:** Yes
-- **Example:** `https://github.com/YOUR-ORG/monobase-infra.git`
+- **Example:** `https://github.com/monobaselabs/monobase-infra.git`
 - **Description:** Git repository URL for GitOps
 
 #### argocd.targetRevision
@@ -274,7 +274,7 @@ global:
   environment: staging
 
 argocd:
-  repoURL: https://github.com/YOUR-ORG/monobase-infra.git
+  repoURL: https://github.com/monobaselabs/monobase-infra.git
   targetRevision: staging
 
 api:
@@ -311,7 +311,7 @@ global:
   environment: production
 
 argocd:
-  repoURL: https://github.com/YOUR-ORG/monobase-infra.git
+  repoURL: https://github.com/monobaselabs/monobase-infra.git
   targetRevision: main
 
 api:

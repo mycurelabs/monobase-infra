@@ -65,7 +65,7 @@ Clients can pull template updates from the base repository:
 
 ```bash
 # One-time setup
-git remote add upstream https://github.com/YOUR-ORG/monobase-infra.git
+git remote add upstream https://github.com/monobaselabs/monobase-infra.git
 
 # Pull latest updates
 git fetch upstream

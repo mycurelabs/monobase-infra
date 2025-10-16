@@ -9,9 +9,9 @@ keywords:
   - react
   - vite
   - account
-home: https://github.com/YOUR-ORG/monobase-infra
+home: https://github.com/monobaselabs/monobase-infra
 sources:
-  - https://github.com/YOUR-ORG/monobase
+  - https://github.com/monobaselabs/monobase
 maintainers:
   - name: Your Organization
     email: devops@example.com

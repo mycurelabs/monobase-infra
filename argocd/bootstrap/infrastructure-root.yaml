@@ -25,7 +25,7 @@ spec:
   project: default
 
   source:
-    repoURL: https://github.com/YOUR-ORG/monobase-infra.git
+    repoURL: https://github.com/monobaselabs/monobase-infra.git
     targetRevision: HEAD
     path: argocd/infrastructure
 

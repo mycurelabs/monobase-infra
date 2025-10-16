@@ -115,7 +115,7 @@ See [terraform/README.md](terraform/README.md) for module documentation and [doc
 
 ```bash
 # 1. Fork and clone
-git clone https://github.com/YOUR-ORG/monobase-infra.git
+git clone https://github.com/monobaselabs/monobase-infra.git
 cd monobase-infra
 
 # 2. Bootstrap GitOps auto-discovery (ONE-TIME)
@@ -139,7 +139,7 @@ vim deployments/myclient-prod/values.yaml
 # Required changes:
 #   - global.domain: myclient.com
 #   - global.namespace: myclient-prod
-#   - argocd.repoURL: https://github.com/YOUR-ORG/monobase-infra.git
+#   - argocd.repoURL: https://github.com/monobaselabs/monobase-infra.git
 #   - api.image.tag: "5.215.2" (pin version, not "latest")
 #   - account.image.tag: "1.0.0" (pin version, not "latest")
 
@@ -173,7 +173,7 @@ If you need to create a Kubernetes cluster first:
 
 ```bash
 # 1. Fork and clone (same as above)
-git clone https://github.com/YOUR-ORG/monobase-infra.git
+git clone https://github.com/monobaselabs/monobase-infra.git
 cd monobase-infra
 
 # 2. Provision cluster using unified script
@@ -202,7 +202,7 @@ vim deployments/myclient-prod/values.yaml
 #   - global.domain: myclient.com
 #   - global.namespace: myclient-prod
 #   - global.storage.provider: cloud-default (EKS/AKS/GKE) or longhorn (on-prem)
-#   - argocd.repoURL: https://github.com/YOUR-ORG/monobase-infra.git
+#   - argocd.repoURL: https://github.com/monobaselabs/monobase-infra.git
 #   - api.image.tag: "5.215.2" (pin version, not "latest")
 #   - account.image.tag: "1.0.0" (pin version, not "latest")
 
@@ -382,7 +382,7 @@ Clients can pull template updates from the base repository:
 
 ```bash
 # In your forked repo (one-time setup)
-git remote add upstream https://github.com/YOUR-ORG/monobase-infra.git
+git remote add upstream https://github.com/monobaselabs/monobase-infra.git
 
 # Pull latest template updates
 git fetch upstream

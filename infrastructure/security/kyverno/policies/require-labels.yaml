@@ -132,4 +132,4 @@ spec:
 #     spec:
 #       containers:
 #       - name: api
-#         image: ghcr.io/YOUR-ORG/monobase-api:5.215.2
+#         image: ghcr.io/monobaselabse/api:5.215.2

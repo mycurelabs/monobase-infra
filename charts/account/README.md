@@ -20,7 +20,7 @@ account:
   enabled: true
   replicaCount: 2
   image:
-    repository: ghcr.io/YOUR-ORG/monobase-account
+    repository: ghcr.io/monobaselabs/accountapp
     tag: "1.0.0"
 ```
 
@@ -50,7 +50,7 @@ helm install myclient-account ./charts/account -f deployments/myclient-prod/valu
 
 ### account.image.repository
 - **Type:** string
-- **Default:** `ghcr.io/YOUR-ORG/account`
+- **Default:** `ghcr.io/monobaselabs/accountapp`
 - **Description:** Container image repository
 
 ### account.image.tag

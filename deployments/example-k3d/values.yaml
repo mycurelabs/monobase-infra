@@ -44,7 +44,7 @@ account:
   replicas: 1
 
   image:
-    repository: ghcr.io/YOUR-ORG/monobase-account
+    repository: ghcr.io/monobaselabs/accountapp
     pullPolicy: IfNotPresent
     tag: "latest"
 
