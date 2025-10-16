@@ -148,6 +148,9 @@ valkey:
 minio:
   enabled: true
   architecture: standalone
+  global:
+    security:
+      allowInsecureImages: true
   image:
     registry: quay.io
     repository: minio/minio
