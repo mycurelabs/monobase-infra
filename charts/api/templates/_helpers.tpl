@@ -173,12 +173,12 @@ http://minio.{{ $namespace }}.svc.cluster.local:9000
 {{- end }}
 
 {{/*
-Mailpit SMTP URL - constructs connection URL from Mailpit dependency
+Mailpit SMTP Host - constructs hostname for Mailpit SMTP service
 */}}
-{{- define "api.mailpit.url" -}}
+{{- define "api.mailpit.host" -}}
 {{- if .Values.mailpit.enabled -}}
 {{- $release := .Release.Name -}}
 {{- $namespace := include "api.namespace" . -}}
-smtp://{{ $release }}-mailpit.{{ $namespace }}.svc.cluster.local:1025
+{{ $release }}-mailpit-smtp.{{ $namespace }}.svc.cluster.local
 {{- end -}}
 {{- end }}

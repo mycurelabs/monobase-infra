@@ -133,8 +133,12 @@ spec:
           value: "900"
         {{- end }}
         {{- if .Values.mailpit.enabled }}
-        - name: SMTP_URL
-          value: {{ include "api.mailpit.url" . | quote }}
+        - name: SMTP_HOST
+          value: {{ include "api.mailpit.host" . | quote }}
+        - name: SMTP_PORT
+          value: "25"
+        - name: SMTP_SECURE
+          value: "false"
         {{- end }}
         # Load non-DB secrets from External Secrets Operator
         {{- if .Values.externalSecrets.enabled }}
