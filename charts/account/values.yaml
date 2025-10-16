@@ -31,7 +31,7 @@ podAnnotations: {}
 
 podSecurityContext:
   runAsNonRoot: true
-  runAsUser: 101  # nginx user
+  runAsUser: 101  # caddy-k8s user
   fsGroup: 101
   seccompProfile:
     type: RuntimeDefault

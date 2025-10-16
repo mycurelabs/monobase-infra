@@ -65,20 +65,20 @@ spec:
           value: {{ $value | quote }}
         {{- end }}
         {{- end }}
-        # Frontend volumes for tmp and cache (read-only root filesystem)
+        # Caddy volumes for tmp, data, and config (read-only root filesystem)
         volumeMounts:
         - name: tmp
           mountPath: /tmp
-        - name: cache
-          mountPath: /var/cache/nginx
-        - name: run
-          mountPath: /var/run
+        - name: caddy-data
+          mountPath: /data
+        - name: caddy-config
+          mountPath: /config
       volumes:
       - name: tmp
         emptyDir: {}
-      - name: cache
+      - name: caddy-data
         emptyDir: {}
-      - name: run
+      - name: caddy-config
         emptyDir: {}
       {{- with .Values.nodeSelector }}
       nodeSelector:
