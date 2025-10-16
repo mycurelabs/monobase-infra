@@ -27,11 +27,11 @@ api:
 
   resources:
     requests:
-      cpu: 250m
-      memory: 512Mi
+      cpu: 100m  # Reduced for small cluster
+      memory: 256Mi  # Reduced for small cluster
     limits:
-      cpu: 1
-      memory: 1Gi
+      cpu: 500m
+      memory: 512Mi
 
   gateway:
     hostname: ""  # Empty = uses api.<global.domain>
@@ -67,11 +67,11 @@ account:
 
   resources:
     requests:
-      cpu: 100m
-      memory: 128Mi
+      cpu: 50m  # Reduced for small cluster
+      memory: 64Mi  # Reduced for small cluster
     limits:
-      cpu: 250m
-      memory: 256Mi
+      cpu: 200m
+      memory: 128Mi
 
   gateway:
     hostname: ""  # Empty = uses app.<global.domain>
@@ -100,11 +100,11 @@ postgresql:
 
   resources:
     requests:
-      cpu: 250m
-      memory: 1Gi
+      cpu: 100m  # Reduced for small cluster
+      memory: 512Mi  # Reduced for small cluster
     limits:
-      cpu: 1
-      memory: 2Gi
+      cpu: 500m
+      memory: 1Gi
 
   podDisruptionBudget:
     enabled: false
@@ -126,11 +126,11 @@ valkey:
 
   resources:
     requests:
-      cpu: 100m
-      memory: 256Mi
+      cpu: 50m  # Reduced for small cluster
+      memory: 128Mi  # Reduced for small cluster
     limits:
-      cpu: 500m
-      memory: 512Mi
+      cpu: 250m
+      memory: 256Mi
 
 # ===== OPTIONAL: MinIO (Object Storage) =====
 minio:
@@ -142,11 +142,11 @@ mailpit:
 
   resources:
     requests:
-      cpu: 50m
-      memory: 64Mi
+      cpu: 25m  # Reduced for small cluster
+      memory: 32Mi  # Reduced for small cluster
     limits:
       cpu: 100m
-      memory: 128Mi
+      memory: 64Mi
 
 # ===== External Secrets =====
 externalSecrets:
