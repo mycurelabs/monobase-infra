@@ -149,7 +149,8 @@ minio:
   enabled: true
   architecture: standalone
   image:
-    repository: quay.io/minio/minio
+    registry: quay.io
+    repository: minio/minio
     tag: latest
   persistence:
     enabled: true
