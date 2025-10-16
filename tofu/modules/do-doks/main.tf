@@ -88,7 +88,9 @@ resource "digitalocean_kubernetes_cluster" "main" {
 resource "digitalocean_firewall" "cluster" {
   name = "${var.cluster_name}-firewall"
 
-  tags = [digitalocean_kubernetes_cluster.main.id]
+  droplet_ids = flatten([
+    for node in digitalocean_kubernetes_cluster.main.node_pool[0].nodes : node.droplet_id
+  ])
 
   # Allow all outbound
   outbound_rule {
