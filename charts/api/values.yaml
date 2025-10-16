@@ -71,7 +71,7 @@ resources:
 livenessProbe:
   enabled: true
   httpGet:
-    path: /health
+    path: /livez
     port: 7213
   initialDelaySeconds: 30
   periodSeconds: 10
@@ -81,7 +81,7 @@ livenessProbe:
 readinessProbe:
   enabled: true
   httpGet:
-    path: /health
+    path: /readyz
     port: 7213
   initialDelaySeconds: 10
   periodSeconds: 5
