@@ -31,7 +31,7 @@ This guide walks you through:
 
 ```
 Layer 1: Infrastructure (THIS GUIDE)
-├── tofu/ modules provision clusters
+├── terraform/ modules provision clusters
 ├── Terragrunt manages configurations
 └── Creates: VPC, K8s cluster, IAM, networking
 
@@ -163,10 +163,10 @@ Choose the right module based on your deployment target:
 ```bash
 # 1. Copy reference cluster config
 cd /path/to/monobase-infra
-cp -r tofu/clusters/default-cluster tofu/clusters/production-cluster
+cp -r clusters/default-cluster clusters/production-cluster
 
 # 2. Navigate to new cluster
-cd tofu/clusters/production-cluster
+cd clusters/production-cluster
 
 # 3. Edit configuration
 vim terraform.tfvars
@@ -254,13 +254,13 @@ cd ../../../
 
 ```bash
 # 1. Edit root Terragrunt config (if needed)
-vim tofu/terragrunt.hcl
+vim terraform/terragrunt.hcl
 ```
 
 
 Root config (already configured):
 ```hcl
-# tofu/terragrunt.hcl
+# terraform/terragrunt.hcl
 
 remote_state {
   backend = "s3"
@@ -276,10 +276,10 @@ remote_state {
 
 ```bash
 # 2. Copy default-cluster
-cp -r tofu/clusters/default-cluster tofu/clusters/production-cluster
+cp -r clusters/default-cluster clusters/production-cluster
 
 # 3. Use terragrunt.hcl instead of backend.tf
-cd tofu/clusters/production-cluster
+cd clusters/production-cluster
 rm backend.tf backend.tf.example
 
 # 4. Edit cluster config
@@ -305,8 +305,8 @@ terragrunt output -raw kubeconfig > ~/.kube/monobase-prod
 
 ```bash
 # 1. Copy k3d config
-cp -r tofu/clusters/default-cluster tofu/clusters/local-test
-cd tofu/clusters/local-test
+cp -r clusters/default-cluster clusters/local-test
+cd clusters/local-test
 
 # 2. Switch to k3d module
 vim main.tf
@@ -357,8 +357,8 @@ tofu destroy
 # - Open required ports (6443, 8472, 10250, etc.)
 
 # 2. Copy k3s config
-cp -r tofu/clusters/default-cluster tofu/clusters/clinic-onprem
-cd tofu/clusters/clinic-onprem
+cp -r clusters/default-cluster clusters/clinic-onprem
+cd clusters/clinic-onprem
 
 # 3. Switch to k3s module
 vim main.tf
@@ -404,7 +404,7 @@ tofu output -raw kubeconfig > ~/.kube/clinic-prod
 
 ### Understanding default-cluster/
 
-The `tofu/clusters/default-cluster/` is a **reference configuration** (like `config/example.com/` for apps).
+The `clusters/default-cluster/` is a **reference configuration** (like `config/example.com/` for apps).
 
 **Files:**
 
@@ -568,7 +568,7 @@ Then adjust provider-specific variables in `terraform.tfvars`.
 By default, state is stored locally:
 
 ```
-tofu/clusters/my-cluster/
+clusters/my-cluster/
 └── terraform.tfstate  # ⚠️ Do not commit to git
 ```
 
@@ -672,14 +672,14 @@ S3 Bucket: your-company-terraform-state
 **Goal:** One cluster for all clients (5-30 clients)
 
 ```
-tofu/clusters/
+clusters/
 └── shared-prod/       # One cluster, multiple client namespaces
 ```
 
 **Workflow:**
 ```bash
 # 1. Provision shared cluster
-cd tofu/clusters/shared-prod
+cd clusters/shared-prod
 tofu apply
 
 # 2. Deploy multiple clients to different namespaces
@@ -704,7 +704,7 @@ cd ../../..
 **Goal:** Clusters in different regions for latency/compliance
 
 ```
-tofu/clusters/
+clusters/
 ├── us-east-prod/      # US clients
 ├── eu-west-prod/      # EU clients (GDPR)
 └── ap-south-prod/     # Asia clients
@@ -714,7 +714,7 @@ tofu/clusters/
 ```bash
 # Provision each cluster
 for cluster in us-east-prod eu-west-prod ap-south-prod; do
-  cd tofu/clusters/$cluster
+  cd clusters/$cluster
   tofu apply
   cd ../../..
 done
@@ -729,7 +729,7 @@ done
 **Goal:** Separate clusters for production and staging
 
 ```
-tofu/clusters/
+clusters/
 ├── production/        # Production workloads
 └── staging/          # Testing and staging
 ```
@@ -737,7 +737,7 @@ tofu/clusters/
 **Workflow:**
 ```bash
 # Provision both clusters
-cd tofu/clusters/production
+cd clusters/production
 tofu apply
 
 cd ../staging
@@ -754,7 +754,7 @@ tofu apply
 **Goal:** Large clients get dedicated clusters
 
 ```
-tofu/clusters/
+clusters/
 ├── shared-prod/              # Small clients (multi-tenant)
 └── enterprise-client-a/      # Large client (dedicated)
 ```
@@ -771,8 +771,8 @@ tofu/clusters/
 
 ```bash
 # Set up all clusters
-tofu -chdir=tofu/clusters/us-prod output -raw kubeconfig > ~/.kube/us-prod
-tofu -chdir=tofu/clusters/eu-prod output -raw kubeconfig > ~/.kube/eu-prod
+tofu -chdir=clusters/us-prod output -raw kubeconfig > ~/.kube/us-prod
+tofu -chdir=clusters/eu-prod output -raw kubeconfig > ~/.kube/eu-prod
 
 # Merge into single kubeconfig
 export KUBECONFIG=~/.kube/us-prod:~/.kube/eu-prod
@@ -919,7 +919,7 @@ Unable to connect to the server: dial tcp: lookup xyz.eks.amazonaws.com: no such
 cat ~/.kube/config
 
 # Re-generate kubeconfig
-cd tofu/clusters/my-cluster
+cd clusters/my-cluster
 tofu output -raw kubeconfig > ~/.kube/my-cluster
 export KUBECONFIG=~/.kube/my-cluster
 
@@ -961,8 +961,8 @@ tofu init
 
 If issues persist:
 
-1. **Check module README**: `tofu/modules/{module}/README.md`
-2. **Review module code**: `tofu/modules/{module}/main.tf`
+1. **Check module README**: `terraform/modules/{module}/README.md`
+2. **Review module code**: `terraform/modules/{module}/main.tf`
 3. **Enable debug logging**:
    ```bash
    export TF_LOG=DEBUG

@@ -1,38 +1,34 @@
-# Infrastructure Provisioning (OpenTofu + Terragrunt)
+# Terraform/OpenTofu Modules
 
-Provision Kubernetes clusters for Monobase Infrastructure deployments.
+Reusable infrastructure-as-code modules for provisioning Kubernetes clusters.
 
 ## Overview
 
-This directory provides **cluster provisioning** using OpenTofu (open-source Terraform) and Terragrunt.
+This directory contains **reusable Terraform/OpenTofu modules** for cluster provisioning.
 
-**Scope:** Creates Kubernetes clusters (EKS, AKS, GKE, DOKS, K3s, k3d)
+**What's here:** Infrastructure modules (internal implementation)
+**What you deploy:** Cluster configurations in `../clusters/` (root level)
 **Complements:** Application deployment in `../charts/` and `../config/`
 
 ## Quick Start
 
+**Note:** You typically work with cluster configs in `../clusters/`, not these modules directly.
+
 ```bash
-# 1. Copy reference cluster config
-cp -r tofu/clusters/default-cluster tofu/clusters/myclient-cluster
+# Cluster configs are at root level now:
+../clusters/
+├── default-cluster/     # Reference template
+├── k3d-local/           # Local dev
+└── your-cluster/        # Your clusters (gitignored)
 
-# 2. Customize
-cd tofu/clusters/myclient-cluster
-vim terraform.tfvars  # Edit cluster name, region, node sizes
+# Use the provision script:
+./scripts/provision.sh --cluster your-cluster
 
-# 3. Provision cluster
-tofu init
-tofu plan
-tofu apply
-
-# 4. Get kubeconfig
-tofu output -raw kubeconfig > ~/.kube/myclient-cluster
-export KUBECONFIG=~/.kube/myclient-cluster
-kubectl get nodes
-
-# 5. Deploy applications (use existing Monobase workflow)
-cd ../../..
-./scripts/new-client-config.sh client-a client-a.com
-# Deploy via Helm/ArgoCD
+# Or manually:
+cd ../clusters/your-cluster
+terraform init
+terraform plan
+terraform apply
 ```
 
 ## Modules
@@ -53,7 +49,7 @@ Choose based on deployment target:
 **One cluster hosts multiple clients:**
 
 ```
-Single Cluster (provisioned via tofu/)
+Single Cluster (provisioned via ../clusters/)
 ├── client-a-prod namespace    ← Deploy via monobase-infra charts
 ├── client-b-prod namespace    ← Deploy via monobase-infra charts
 ├── client-c-staging namespace ← Deploy via monobase-infra charts
@@ -64,10 +60,10 @@ Single Cluster (provisioned via tofu/)
 
 ## Reference Configuration
 
-**`clusters/default-cluster/`** - Complete reference (like `config/example.com/`)
+**`../clusters/default-cluster/`** - Complete reference template (at root level)
 
 Contains:
-- main.tf - Module usage
+- main.tf - Module usage (references modules from this directory)
 - variables.tf - All parameters
 - terraform.tfvars - Example values
 - terragrunt.hcl - Terragrunt config

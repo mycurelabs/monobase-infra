@@ -37,7 +37,7 @@ if ! [[ "$CLUSTER_NAME" =~ ^[a-z0-9-]+$ ]]; then
     exit 1
 fi
 
-if [ -d "tofu/clusters/$CLUSTER_NAME" ]; then
+if [ -d "clusters/$CLUSTER_NAME" ]; then
     echo -e "${RED}Error: Cluster '$CLUSTER_NAME' already exists${NC}"
     exit 1
 fi
@@ -59,12 +59,12 @@ fi
 
 echo ""
 echo -e "${BLUE}[1/3] Copying default-cluster...${NC}"
-cp -r tofu/clusters/default-cluster tofu/clusters/$CLUSTER_NAME
+cp -r clusters/default-cluster clusters/$CLUSTER_NAME
 echo -e "${GREEN}✓ Copied${NC}"
 
 echo ""
 echo -e "${BLUE}[2/3] Replacing placeholders...${NC}"
-cd tofu/clusters/$CLUSTER_NAME
+cd clusters/$CLUSTER_NAME
 
 sed -i.bak "s/monobase-default-cluster/monobase-$CLUSTER_NAME/g" terraform.tfvars
 sed -i.bak "s/us-east-1/$REGION/g" terraform.tfvars
@@ -87,10 +87,10 @@ echo ""
 echo -e "${YELLOW}Next steps:${NC}"
 echo ""
 echo -e "1. Customize cluster config:"
-echo -e "   ${BLUE}vim tofu/clusters/$CLUSTER_NAME/terraform.tfvars${NC}"
+echo -e "   ${BLUE}vim clusters/$CLUSTER_NAME/terraform.tfvars${NC}"
 echo ""
 echo -e "2. Configure backend (S3 bucket):"
-echo -e "   ${BLUE}vim tofu/clusters/$CLUSTER_NAME/backend.tf${NC}"
+echo -e "   ${BLUE}vim clusters/$CLUSTER_NAME/backend.tf${NC}"
 echo ""
 echo -e "3. Provision cluster (idempotent - safe to re-run):"
 echo -e "   ${BLUE}./scripts/provision.sh --cluster $CLUSTER_NAME${NC}"

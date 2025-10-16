@@ -15,7 +15,7 @@ terraform {
 }
 
 module "k3d_cluster" {
-  source = "../../modules/local-k3d"
+  source = "../../terraform/modules/local-k3d"
 
   cluster_name         = var.cluster_name
   k3s_version          = var.k3s_version

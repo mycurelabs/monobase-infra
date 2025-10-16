@@ -2,7 +2,7 @@
 # REFERENCE - Copy to clusters/your-cluster/ and customize
 
 module "eks_cluster" {
-  source = "../../modules/aws-eks"
+  source = "../../terraform/modules/aws-eks"
 
   cluster_name       = var.cluster_name
   region             = var.region
