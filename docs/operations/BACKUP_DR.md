@@ -2,6 +2,15 @@
 
 Complete backup procedures, restore operations, and disaster recovery plans.
 
+## Implementation
+
+**Current Tool**: Velero (Kubernetes backup/restore solution)  
+**Setup Guide**: [infrastructure/velero/README.md](../../infrastructure/velero/README.md)
+
+> Velero is the current implementation but can be replaced with alternative solutions. This document focuses on backup **strategy** and **procedures** that remain consistent regardless of the underlying tool.
+
+---
+
 ## 3-Tier Backup Strategy
 
 | Tier | Frequency | Retention | Storage | RTO | RPO | Use Case |

@@ -42,13 +42,6 @@ Security hardening, compliance, and policies.
 
 ## 🧪 Development
 
-Local development, testing, and validation.
-
-- **[K3D-TESTING.md](development/K3D-TESTING.md)** - Local testing with k3d clusters
-- **[K3D_TROUBLESHOOTING.md](development/K3D_TROUBLESHOOTING.md)** - k3d troubleshooting (Ubuntu 24.04 AppArmor fix)
-- **[TESTING-RESULTS.md](development/TESTING-RESULTS.md)** - Validation test results
-- **[ON-PREM-DEPLOYMENT.md](development/ON-PREM-DEPLOYMENT.md)** - Self-hosted cluster deployment
-
 **Terraform/OpenTofu Module Development:**
 - **[../terraform/CONTRIBUTING.md](../terraform/CONTRIBUTING.md)** - Build custom OpenTofu modules
 
@@ -83,10 +76,6 @@ Local development, testing, and validation.
 1. [SECURITY-HARDENING.md](security/SECURITY-HARDENING.md)
 2. [SECURITY_COMPLIANCE.md](security/SECURITY_COMPLIANCE.md)
 
-**Test locally:**
-1. [K3D-TESTING.md](development/K3D-TESTING.md)
-2. [K3D_TROUBLESHOOTING.md](development/K3D_TROUBLESHOOTING.md)
-
 **Build custom Terraform modules:**
 1. [../terraform/CONTRIBUTING.md](../terraform/CONTRIBUTING.md)
 
@@ -101,7 +90,7 @@ Local development, testing, and validation.
 ## Documentation Statistics
 
 - **Total docs:** 20 files
-- **Categories:** 5 (getting-started, architecture, operations, security, development)
+- **Categories:** 4 (getting-started, architecture, operations, security)
 - **Lines:** ~5,200 total
 - **Organization:** Categorized by purpose, easy navigation
 

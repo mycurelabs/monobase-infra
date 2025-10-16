@@ -181,3 +181,127 @@ velero:
   enabled: true
   provider: digitalocean
   digitalocean:
+    bucket: prod-cluster-velero-backups
+    region: nyc3
+    # Requires credentials secret
+```
+
+---
+
+## Troubleshooting
+
+### BackupStorageLocation Unavailable
+```bash
+# Check status
+kubectl describe backupstoragelocation default -n velero
+
+# Common fixes:
+# 1. Verify bucket exists and name is correct
+# 2. Check IAM/identity permissions
+# 3. Verify region matches bucket location
+
+# Check Velero logs
+kubectl logs -n velero deployment/velero | grep -i error
+```
+
+### Cloud Authentication Issues
+
+**AWS IRSA:**
+```bash
+# Verify service account annotation
+kubectl get sa velero -n velero -o yaml | grep eks.amazonaws.com
+# Should show: eks.amazonaws.com/role-arn: arn:aws:iam::...
+
+# Test IAM role permissions
+aws iam get-role --role-name my-cluster-velero
+```
+
+**Azure Workload Identity:**
+```bash
+# Verify service account annotation
+kubectl get sa velero -n velero -o yaml | grep azure.workload.identity
+# Should show client-id annotation
+
+# Test permissions
+az role assignment list --assignee <identity-client-id>
+```
+
+**GCP Workload Identity:**
+```bash
+# Verify service account annotation
+kubectl get sa velero -n velero -o yaml | grep iam.gke.io
+# Should show gcp-service-account annotation
+
+# Test permissions
+gcloud projects get-iam-policy <project-id> \
+  --flatten="bindings[].members" \
+  --filter="bindings.members:serviceAccount:*velero*"
+```
+
+### Volume Snapshots Not Working
+```bash
+# Verify CSI driver installed
+kubectl get csidriver
+
+# For AWS: Check EBS CSI driver
+kubectl get pods -n kube-system | grep ebs-csi
+
+# Check snapshot configuration
+kubectl get volumesnapshotlocation -n velero
+kubectl describe volumesnapshotlocation default -n velero
+```
+
+### Scheduled Backups Not Running
+```bash
+# Check schedule status
+kubectl get schedule -n velero
+kubectl describe schedule infrastructure-daily -n velero
+
+# Check for controller errors
+kubectl logs -n velero deployment/velero | grep schedule
+
+# Verify cron syntax (use https://crontab.guru/)
+```
+
+---
+
+## File Reference
+
+| File | Purpose |
+|------|---------|
+| `backup-locations.yaml` | BackupStorageLocation + VolumeSnapshotLocation for all clouds |
+| `schedules.yaml` | Cluster-level backup schedules (infrastructure + cluster resources) |
+| `credentials-template.yaml` | Credential setup examples for each cloud provider |
+| `README.md` | This file - implementation setup guide |
+
+**Per-app backups**: Configured in application Helm charts (e.g., `charts/api/templates/velero-schedules.yaml`)
+
+---
+
+## Resources
+
+- **Backup Strategy**: [docs/operations/BACKUP_DR.md](../../docs/operations/BACKUP_DR.md)
+- **DR Runbooks**: [docs/operations/DISASTER_RECOVERY_RUNBOOKS.md](../../docs/operations/DISASTER_RECOVERY_RUNBOOKS.md)
+- **Velero Docs**: https://velero.io/docs/
+- **Velero GitHub**: https://github.com/vmware-tanzu/velero
+
+---
+
+## Quick Commands
+
+```bash
+# Manual backup
+velero backup create test-backup --include-namespaces cert-manager --wait
+
+# List backups
+velero backup get
+
+# Restore from backup
+velero restore create --from-backup infrastructure-daily-<timestamp>
+
+# Check logs
+kubectl logs -n velero deployment/velero
+velero backup logs <backup-name>
+```
+
+For complete disaster recovery procedures, see the operations documentation.
