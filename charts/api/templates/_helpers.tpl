@@ -113,23 +113,32 @@ local-path
 {{- end }}
 
 {{/*
-PostgreSQL connection string - constructs DATABASE_URL from PostgreSQL dependency
+PostgreSQL host - constructs hostname from PostgreSQL dependency
 Supports both standalone and replication architectures
-Note: Always generates connection string; PostgreSQL may be deployed separately in GitOps
 */}}
-{{- define "api.postgresql.connectionString" -}}
+{{- define "api.postgresql.host" -}}
 {{- $serviceName := .Values.postgresql.serviceName | default (printf "%s-postgresql" .Release.Name) -}}
 {{- $namespace := include "api.namespace" . -}}
-{{- $database := .Values.postgresql.auth.database | default "monobase" -}}
-{{- $username := .Values.postgresql.auth.username | default "monobase" -}}
 {{- $architecture := .Values.postgresql.architecture | default "replication" -}}
 {{- if eq $architecture "replication" -}}
-{{- /* Use primary for writes */ -}}
-postgresql://{{ $username }}:${POSTGRESQL_PASSWORD}@{{ $serviceName }}-primary.{{ $namespace }}.svc.cluster.local:5432/{{ $database }}
+{{- printf "%s-primary.%s.svc.cluster.local" $serviceName $namespace -}}
 {{- else -}}
-{{- /* Standalone mode */ -}}
-postgresql://{{ $username }}:${POSTGRESQL_PASSWORD}@{{ $serviceName }}.{{ $namespace }}.svc.cluster.local:5432/{{ $database }}
+{{- printf "%s.%s.svc.cluster.local" $serviceName $namespace -}}
 {{- end -}}
+{{- end }}
+
+{{/*
+PostgreSQL database name
+*/}}
+{{- define "api.postgresql.database" -}}
+{{- .Values.postgresql.auth.database | default "monobase" -}}
+{{- end }}
+
+{{/*
+PostgreSQL username
+*/}}
+{{- define "api.postgresql.username" -}}
+{{- .Values.postgresql.auth.username | default "monobase" -}}
 {{- end }}
 
 {{/*

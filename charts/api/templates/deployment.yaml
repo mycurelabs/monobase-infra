@@ -85,13 +85,19 @@ spec:
           value: "7213"
         # PostgreSQL connection - load password from PostgreSQL chart's secret
         # Note: PostgreSQL may be deployed separately in GitOps, connection always configured
+        - name: POSTGRESQL_HOST
+          value: {{ include "api.postgresql.host" . | quote }}
+        - name: POSTGRESQL_PORT
+          value: "5432"
+        - name: POSTGRESQL_DATABASE
+          value: {{ include "api.postgresql.database" . | quote }}
+        - name: POSTGRESQL_USER
+          value: {{ include "api.postgresql.username" . | quote }}
         - name: POSTGRESQL_PASSWORD
           valueFrom:
             secretKeyRef:
               name: postgresql
               key: postgres-password
-        - name: DATABASE_URL
-          value: {{ include "api.postgresql.connectionString" . | quote }}
         # Service URLs from dependencies
         {{- if .Values.valkey.enabled }}
         - name: REDIS_URL
