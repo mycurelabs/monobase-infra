@@ -19,7 +19,6 @@ Understand the system design and core components.
 - **[ARCHITECTURE.md](architecture/ARCHITECTURE.md)** - System architecture, design decisions, component overview
 - **[GITOPS-ARGOCD.md](architecture/GITOPS-ARGOCD.md)** - GitOps workflow with ArgoCD App-of-Apps pattern
 - **[GATEWAY-API.md](architecture/GATEWAY-API.md)** - Envoy Gateway, HTTPRoutes, and traffic routing
-- **[STORAGE.md](architecture/STORAGE.md)** - Storage providers (Longhorn, cloud CSI drivers)
 
 ## ⚙️ Operations
 
@@ -29,6 +28,7 @@ Day-to-day operations, monitoring, and incident response.
 - **[BACKUP_DR.md](operations/BACKUP_DR.md)** - 3-tier backup strategy and restore procedures
 - **[DISASTER_RECOVERY_RUNBOOKS.md](operations/DISASTER_RECOVERY_RUNBOOKS.md)** - DR scenarios and recovery procedures
 - **[SCALING-GUIDE.md](operations/SCALING-GUIDE.md)** - Horizontal pod autoscaling, storage expansion
+- **[STORAGE.md](operations/STORAGE.md)** - Storage provider selection, Longhorn/MinIO operations, expansion, troubleshooting
 - **[MONITORING.md](operations/MONITORING.md)** - Prometheus, Grafana, alerting
 - **[SECRETS-MANAGEMENT.md](operations/SECRETS-MANAGEMENT.md)** - External Secrets Operator, KMS integration
 - **[TROUBLESHOOTING.md](operations/TROUBLESHOOTING.md)** - Common issues and solutions
@@ -57,9 +57,7 @@ Local development, testing, and validation.
 ## 📂 Reference Documentation
 
 - **[VALUES-REFERENCE.md](reference/VALUES-REFERENCE.md)** - Complete configuration parameter reference
-- **[STORAGE-PROVIDERS.md](reference/STORAGE-PROVIDERS.md)** - Storage provider configuration reference
 - **[OPTIMIZATION-SUMMARY.md](reference/OPTIMIZATION-SUMMARY.md)** - Infrastructure simplification history
-- **[TEMPLATE-USAGE.md](getting-started/TEMPLATE-USAGE.md)** - Template fork workflow and maintenance
 
 ---
 

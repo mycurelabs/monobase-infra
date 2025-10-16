@@ -1,0 +1,55 @@
+{{- if .Values.monitoring.enabled }}
+# ArgoCD Application: Monitoring Resources
+# Deploys Prometheus rules, Grafana dashboards, and ServiceMonitors
+# Sync Wave 1 - Deployed after kube-prometheus-stack (wave 0)
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: monitoring-resources
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"  # After monitoring stack
+  labels:
+    app.kubernetes.io/name: monitoring-resources
+    app.kubernetes.io/component: infrastructure
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  
+  source:
+    repoURL: {{ .Values.argocd.repoURL }}
+    targetRevision: {{ .Values.argocd.targetRevision }}
+    path: infrastructure/monitoring
+    
+    # Exclude helm-values.yaml (used by main monitoring app)
+    directory:
+      exclude: 'helm-values.yaml'
+  
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring
+  
+  syncPolicy:
+    automated:
+      prune: true       # Remove old rules/dashboards
+      selfHeal: true    # Auto-correct configuration drift
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 3m
+  
+  # Ignore expected differences
+  ignoreDifferences:
+    # PrometheusRule status is managed by operator
+    - group: monitoring.coreos.com
+      kind: PrometheusRule
+      jsonPointers:
+        - /status
+{{- end }}

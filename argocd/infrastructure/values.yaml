@@ -70,4 +70,31 @@ falco:
 # Monitoring - Prometheus + Grafana stack
 monitoring:
   enabled: false  # Optional, enable for observability
-  version: latest
+  version: 56.0.0
+  
+  # Prometheus configuration
+  prometheus:
+    retention: 30d  # How long to keep metrics
+    storageSize: 50Gi  # Prometheus data storage
+    storageClass: ""  # Auto-detect from cluster default
+  
+  # Grafana configuration
+  grafana:
+    adminPassword: ""  # Set via secret or leave empty for default
+    storageSize: 10Gi  # Grafana dashboard/config storage
+    storageClass: ""  # Auto-detect
+  
+  # Alertmanager configuration
+  alertmanager:
+    enabled: true
+    storageClass: ""  # Auto-detect
+    
+    # Slack notifications (optional)
+    slack:
+      webhookUrl: ""  # Set to Slack webhook URL for alerts
+    
+    # Email notifications (optional)
+    email:
+      smarthost: ""  # SMTP server (e.g., smtp.gmail.com:587)
+      from: ""  # From email address
+      to: ""  # To email address

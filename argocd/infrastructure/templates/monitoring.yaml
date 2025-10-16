@@ -20,6 +20,14 @@ spec:
     targetRevision: {{ .Values.monitoring.version | default "56.0.0" }}
     helm:
       releaseName: monitoring
+      valueFiles:
+        - $values/infrastructure/monitoring/helm-values.yaml
+  
+  # Additional source for custom values
+  sources:
+    - repoURL: {{ .Values.argocd.repoURL }}
+      targetRevision: {{ .Values.argocd.targetRevision }}
+      ref: values
   
   destination:
     server: https://kubernetes.default.svc

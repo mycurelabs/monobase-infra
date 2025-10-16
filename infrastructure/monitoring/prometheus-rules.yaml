@@ -1,0 +1,246 @@
+# Prometheus Alerting Rules
+# Deployed automatically by ArgoCD when monitoring.enabled=true
+#
+# Alert Severity Levels:
+# - critical: Page immediately, production impacting
+# - warning: Investigate soon, potential issues
+# - info: Track trends, no immediate action
+
+---
+# Infrastructure Alerts - Node Health
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: infrastructure-nodes
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: prometheus-rules
+    app.kubernetes.io/component: monitoring
+    prometheus: kube-prometheus
+spec:
+  groups:
+    - name: node-health
+      interval: 30s
+      rules:
+        - alert: NodeDown
+          expr: up{job="node-exporter"} == 0
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Node {{ $labels.instance }} is down"
+            description: "Node has been unreachable for more than 5 minutes"
+
+        - alert: NodeHighCPU
+          expr: (100 - (avg by (instance) (irate(node_cpu_seconds_total{mode="idle"}[5m])) * 100)) > 80
+          for: 15m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Node {{ $labels.instance }} has high CPU usage"
+            description: "CPU usage is {{ $value | humanize }}% for 15+ minutes"
+
+        - alert: NodeHighMemory
+          expr: (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100 > 80
+          for: 15m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Node {{ $labels.instance }} has high memory usage"
+            description: "Memory usage is {{ $value | humanize }}% for 15+ minutes"
+
+        - alert: NodeDiskFillingUp
+          expr: (1 - (node_filesystem_avail_bytes{fstype!="tmpfs"} / node_filesystem_size_bytes{fstype!="tmpfs"})) * 100 > 80
+          for: 15m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Node {{ $labels.instance }} disk filling up"
+            description: "Disk {{ $labels.device }} is {{ $value | humanize }}% full"
+
+        - alert: NodeDiskCritical
+          expr: (1 - (node_filesystem_avail_bytes{fstype!="tmpfs"} / node_filesystem_size_bytes{fstype!="tmpfs"})) * 100 > 90
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Node {{ $labels.instance }} disk critically full"
+            description: "Disk {{ $labels.device }} is {{ $value | humanize }}% full - action required"
+
+---
+# Pod Alerts - Container Health
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: infrastructure-pods
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: prometheus-rules
+    prometheus: kube-prometheus
+spec:
+  groups:
+    - name: pod-health
+      interval: 30s
+      rules:
+        - alert: PodCrashLooping
+          expr: rate(kube_pod_container_status_restarts_total[15m]) > 0
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Pod {{ $labels.namespace }}/{{ $labels.pod }} is crash looping"
+            description: "Pod has restarted {{ $value | humanize }} times in 15 minutes"
+
+        - alert: PodNotReady
+          expr: kube_pod_status_phase{phase!="Running"} == 1
+          for: 15m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Pod {{ $labels.namespace }}/{{ $labels.pod }} not ready"
+            description: "Pod has been in {{ $labels.phase }} state for 15+ minutes"
+
+        - alert: PodHighMemory
+          expr: (container_memory_usage_bytes / container_spec_memory_limit_bytes) * 100 > 90
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Pod {{ $labels.namespace }}/{{ $labels.pod }} high memory"
+            description: "Memory usage at {{ $value | humanize }}% of limit"
+
+---
+# Application Alerts - Monobase API
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: application-api
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: prometheus-rules
+    prometheus: kube-prometheus
+spec:
+  groups:
+    - name: api-performance
+      interval: 30s
+      rules:
+        - alert: APIHighErrorRate
+          expr: |
+            (sum(rate(http_requests_total{status=~"5.."}[5m])) by (namespace) / 
+             sum(rate(http_requests_total[5m])) by (namespace)) * 100 > 5
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "API error rate high in {{ $labels.namespace }}"
+            description: "5xx error rate is {{ $value | humanize }}% over 5 minutes"
+
+        - alert: APIHighLatency
+          expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m])) > 1
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: "API latency high in {{ $labels.namespace }}"
+            description: "P95 latency is {{ $value | humanize }}s"
+
+        - alert: APIDown
+          expr: up{job="api"} == 0
+          for: 2m
+          labels:
+            severity: critical
+          annotations:
+            summary: "API is down in {{ $labels.namespace }}"
+            description: "API has been unreachable for 2+ minutes"
+
+---
+# Storage Alerts - Longhorn & PVCs
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: storage-health
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: prometheus-rules
+    prometheus: kube-prometheus
+spec:
+  groups:
+    - name: storage-alerts
+      interval: 60s
+      rules:
+        - alert: PersistentVolumeFillingUp
+          expr: (kubelet_volume_stats_used_bytes / kubelet_volume_stats_capacity_bytes) * 100 > 80
+          for: 15m
+          labels:
+            severity: warning
+          annotations:
+            summary: "PVC {{ $labels.namespace }}/{{ $labels.persistentvolumeclaim }} filling up"
+            description: "Volume is {{ $value | humanize }}% full"
+
+        - alert: PersistentVolumeCritical
+          expr: (kubelet_volume_stats_used_bytes / kubelet_volume_stats_capacity_bytes) * 100 > 90
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: "PVC {{ $labels.namespace }}/{{ $labels.persistentvolumeclaim }} critically full"
+            description: "Volume is {{ $value | humanize }}% full - expansion needed"
+
+---
+# Gateway Alerts - Envoy Gateway
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: gateway-health
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: prometheus-rules
+    prometheus: kube-prometheus
+spec:
+  groups:
+    - name: gateway-alerts
+      interval: 30s
+      rules:
+        - alert: GatewayHighErrorRate
+          expr: |
+            (sum(rate(envoy_http_downstream_rq_xx{envoy_response_code_class="5"}[5m])) / 
+             sum(rate(envoy_http_downstream_rq_xx[5m]))) * 100 > 5
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Gateway 5xx error rate high"
+            description: "5xx error rate is {{ $value | humanize }}%"
+
+---
+# Certificate Alerts
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: certificate-alerts
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: prometheus-rules
+    prometheus: kube-prometheus
+spec:
+  groups:
+    - name: certificates
+      interval: 60s
+      rules:
+        - alert: CertificateExpiringSoon
+          expr: (certmanager_certificate_expiration_timestamp_seconds - time()) / 86400 < 7
+          for: 1h
+          labels:
+            severity: warning
+          annotations:
+            summary: "Certificate {{ $labels.name }} expiring soon"
+            description: "Certificate expires in {{ $value | humanize }} days"
+
+        - alert: CertificateExpiryCritical
+          expr: (certmanager_certificate_expiration_timestamp_seconds - time()) / 86400 < 2
+          for: 1h
+          labels:
+            severity: critical
+          annotations:
+            summary: "Certificate {{ $labels.name }} expiring imminently"
+            description: "Certificate expires in {{ $value | humanize }} days"

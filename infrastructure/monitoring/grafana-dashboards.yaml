@@ -1,0 +1,162 @@
+# Grafana Dashboards Configuration
+# Deployed automatically by ArgoCD when monitoring.enabled=true
+#
+# Dashboards are imported from grafana.com or defined inline
+# Grafana sidecar automatically loads ConfigMaps with label: grafana_dashboard="1"
+
+---
+# README: Dashboard Configuration
+# Full dashboard JSON is extensive. Options:
+# 1. Use Grafana dashboard IDs (imported from grafana.com)
+# 2. Define custom dashboards inline (shown below for simple examples)
+# 3. Add dashboard JSON files in separate ConfigMaps
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboard-readme
+  namespace: monitoring
+  labels:
+    grafana_dashboard: "1"
+data:
+  readme.json: |
+    {
+      "dashboard": {
+        "title": "Monobase Monitoring - Getting Started",
+        "panels": [
+          {
+            "title": "Welcome to Monobase Monitoring",
+            "type": "text",
+            "gridPos": {"h": 8, "w": 24, "x": 0, "y": 0},
+            "options": {
+              "content": "# Monobase Infrastructure Monitoring\\n\\nDashboards available:\\n- **Cluster Overview**: Node and pod metrics\\n- **API Performance**: API latency, throughput, errors\\n- **Database Performance**: PostgreSQL metrics\\n- **Storage Health**: Longhorn volume metrics\\n- **Gateway Metrics**: HTTPRoute and traffic stats\\n\\n**Recommended Community Dashboards:**\\n- Kubernetes Cluster Monitoring (Dashboard ID: 7249)\\n- Node Exporter Full (Dashboard ID: 1860)\\n- PostgreSQL Database (Dashboard ID: 9628)\\n\\n**Custom Dashboards:**\\nAdd your own dashboards by creating ConfigMaps with label `grafana_dashboard='1'`"
+            }
+          }
+        ]
+      }
+    }
+
+---
+# Cluster Overview Dashboard
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboard-cluster
+  namespace: monitoring
+  labels:
+    grafana_dashboard: "1"
+data:
+  cluster-overview.json: |
+    {
+      "dashboard": {
+        "title": "Cluster Overview",
+        "tags": ["monobase", "cluster"],
+        "timezone": "browser",
+        "panels": [
+          {
+            "title": "Nodes Status",
+            "type": "stat",
+            "targets": [{
+              "expr": "count(kube_node_info)",
+              "refId": "A"
+            }],
+            "gridPos": {"h": 4, "w": 6, "x": 0, "y": 0}
+          },
+          {
+            "title": "Pods Running",
+            "type": "stat",
+            "targets": [{
+              "expr": "count(kube_pod_info{phase='Running'})",
+              "refId": "A"
+            }],
+            "gridPos": {"h": 4, "w": 6, "x": 6, "y": 0}
+          },
+          {
+            "title": "CPU Usage",
+            "type": "graph",
+            "targets": [{
+              "expr": "100 - (avg(irate(node_cpu_seconds_total{mode='idle'}[5m])) * 100)",
+              "refId": "A"
+            }],
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 4}
+          },
+          {
+            "title": "Memory Usage",
+            "type": "graph",
+            "targets": [{
+              "expr": "(1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100",
+              "refId": "A"
+            }],
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 4}
+          }
+        ]
+      }
+    }
+
+---
+# API Performance Dashboard
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboard-api
+  namespace: monitoring
+  labels:
+    grafana_dashboard: "1"
+data:
+  api-performance.json: |
+    {
+      "dashboard": {
+        "title": "Monobase API Performance",
+        "tags": ["monobase", "api"],
+        "panels": [
+          {
+            "title": "Request Rate",
+            "type": "graph",
+            "targets": [{
+              "expr": "sum(rate(http_requests_total[5m])) by (namespace)",
+              "legendFormat": "{{ "{{" }}namespace{{ "}}" }}",
+              "refId": "A"
+            }],
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0}
+          },
+          {
+            "title": "Error Rate",
+            "type": "graph",
+            "targets": [{
+              "expr": "sum(rate(http_requests_total{status=~'5..'}[5m])) by (namespace)",
+              "legendFormat": "{{ "{{" }}namespace{{ "}}" }}",
+              "refId": "A"
+            }],
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0}
+          },
+          {
+            "title": "Latency (P95)",
+            "type": "graph",
+            "targets": [{
+              "expr": "histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m]))",
+              "legendFormat": "P95",
+              "refId": "A"
+            }],
+            "gridPos": {"h": 8, "w": 24, "x": 0, "y": 8}
+          }
+        ]
+      }
+    }
+
+---
+# NOTE: For Production Dashboards
+# Import comprehensive community dashboards via Grafana UI:
+#
+# Kubernetes Cluster:
+# - Dashboard ID: 7249 (Kubernetes Cluster Monitoring)
+# - Dashboard ID: 15760 (Kubernetes / Views / Global)
+#
+# Node Metrics:
+# - Dashboard ID: 1860 (Node Exporter Full)
+# - Dashboard ID: 11074 (Node Exporter for Prometheus)
+#
+# PostgreSQL:
+# - Dashboard ID: 9628 (PostgreSQL Database)
+# - Dashboard ID: 12485 (PostgreSQL Exporter Quickstart)
+#
+# Or create custom dashboards and export as JSON, then add as ConfigMaps
