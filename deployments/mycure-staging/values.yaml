@@ -20,7 +20,7 @@ api:
 
   image:
     repository: ghcr.io/monobaselabs/api
-    tag: "0.1.2"
+    tag: "0.1.3"
     pullPolicy: IfNotPresent
 
   replicaCount: 1  # Minimal for staging
