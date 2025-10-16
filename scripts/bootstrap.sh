@@ -27,7 +27,6 @@ CLIENT=""
 ENV=""
 VALUES_FILE=""
 KUBECONFIG="${KUBECONFIG:-$HOME/.kube/config}"
-K3D_MODE=false
 WAIT_FOR_SYNC=false
 SKIP_ARGOCD=false
 DRY_RUN=false
@@ -69,7 +68,6 @@ REQUIRED:
 OPTIONS:
     --values FILE           Path to values file (auto-detected if not provided)
     --kubeconfig FILE       Path to kubeconfig (default: \$KUBECONFIG or ~/.kube/config)
-    --k3d                   K3d mode (use k3d-specific settings)
     --wait                  Wait for all applications to sync (default: false)
     --skip-argocd           Skip ArgoCD installation (assume already installed)
     --dry-run               Print commands without executing
@@ -81,9 +79,6 @@ EXAMPLES:
 
     # Bootstrap staging with explicit values file
     $0 --client myclient --env staging --values config/myclient/values-staging.yaml
-
-    # Bootstrap local k3d cluster
-    $0 --client myclient --env dev --k3d
 
     # Bootstrap and wait for all apps to sync
     $0 --client myclient --env production --wait
@@ -123,10 +118,6 @@ while [[ $# -gt 0 ]]; do
             KUBECONFIG="$2"
             shift 2
             ;;
-        --k3d)
-            K3D_MODE=true
-            shift
-            ;;
         --wait)
             WAIT_FOR_SYNC=true
             shift
@@ -165,11 +156,7 @@ fi
 
 # Auto-detect values file if not provided
 if [[ -z "$VALUES_FILE" ]]; then
-    if [[ "$K3D_MODE" == "true" ]]; then
-        VALUES_FILE="${REPO_ROOT}/config/k3d-local/values-${ENV}.yaml"
-    else
-        VALUES_FILE="${REPO_ROOT}/config/${CLIENT}/values-${ENV}.yaml"
-    fi
+    VALUES_FILE="${REPO_ROOT}/config/${CLIENT}/values-${ENV}.yaml"
 fi
 
 print_step "Bootstrap Configuration"
@@ -177,7 +164,6 @@ print_info "Client: $CLIENT"
 print_info "Environment: $ENV"
 print_info "Values file: $VALUES_FILE"
 print_info "Kubeconfig: $KUBECONFIG"
-print_info "K3d mode: $K3D_MODE"
 print_info "Wait for sync: $WAIT_FOR_SYNC"
 print_info "Dry run: $DRY_RUN"
 
@@ -240,8 +226,8 @@ if [[ "$SKIP_ARGOCD" == "false" ]]; then
         execute helm repo add argo https://argoproj.github.io/argo-helm
         execute helm repo update
 
-        # Install ArgoCD
-        execute helm install argocd argo/argo-cd \
+        # Install or upgrade ArgoCD (idempotent)
+        execute helm upgrade --install argocd argo/argo-cd \
             --namespace argocd \
             --create-namespace \
             --values "${REPO_ROOT}/bootstrap/argocd/helm-values.yaml" \
@@ -271,7 +257,6 @@ OUTPUT_DIR="${REPO_ROOT}/rendered/${CLIENT}-${ENV}"
 
 print_info "Rendering templates to: $OUTPUT_DIR"
 execute "${SCRIPT_DIR}/render-templates.sh" \
-    --client "$CLIENT" \
     --values "$VALUES_FILE" \
     --output "$OUTPUT_DIR"
 
