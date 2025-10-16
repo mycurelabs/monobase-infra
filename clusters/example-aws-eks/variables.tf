@@ -1,15 +1,13 @@
-# Default Cluster - Variables
+# AWS EKS Cluster - Variable Declarations
 
 variable "cluster_name" {
   description = "Name of the EKS cluster"
   type        = string
-  default     = "monobase-default-cluster"
 }
 
 variable "region" {
-  description = "AWS region"
+  description = "AWS region (e.g., us-east-1, us-west-2, eu-west-1)"
   type        = string
-  default     = "us-east-1"
 }
 
 variable "kubernetes_version" {
@@ -25,15 +23,9 @@ variable "vpc_cidr" {
 }
 
 variable "availability_zones" {
-  description = "Availability zones"
+  description = "List of availability zones (leave empty for auto-detection)"
   type        = list(string)
-  default     = ["us-east-1a", "us-east-1b", "us-east-1c"]
-}
-
-variable "enable_private_endpoint" {
-  description = "Enable private API endpoint"
-  type        = bool
-  default     = false
+  default     = []
 }
 
 variable "enable_public_endpoint" {
@@ -42,8 +34,20 @@ variable "enable_public_endpoint" {
   default     = true
 }
 
+variable "api_access_cidrs" {
+  description = "CIDR blocks allowed to access EKS API"
+  type        = list(string)
+  default     = ["0.0.0.0/0"] # CHANGE IN PRODUCTION
+}
+
+variable "deployment_profile" {
+  description = "Deployment size: small (1-5 clients), medium (5-15), large (15+)"
+  type        = string
+  default     = "small"
+}
+
 variable "node_groups" {
-  description = "EKS node group configurations"
+  description = "Custom node group config (leave empty to use deployment_profile)"
   type = map(object({
     instance_types = list(string)
     desired_size   = number
@@ -57,19 +61,11 @@ variable "node_groups" {
       effect = string
     })), [])
   }))
-  default = {
-    general = {
-      instance_types = ["m6i.2xlarge"]
-      desired_size   = 5
-      max_size       = 20
-      min_size       = 3
-      disk_size      = 100
-    }
-  }
+  default = {}
 }
 
 variable "enable_ebs_csi_driver" {
-  description = "Enable EBS CSI driver"
+  description = "Enable EBS CSI driver (required for storage)"
   type        = bool
   default     = true
 }
@@ -81,7 +77,7 @@ variable "enable_cluster_autoscaler" {
 }
 
 variable "enable_irsa" {
-  description = "Enable IRSA"
+  description = "Enable IAM Roles for Service Accounts"
   type        = bool
   default     = true
 }
@@ -92,12 +88,20 @@ variable "enable_flow_logs" {
   default     = true
 }
 
+variable "velero_backup_bucket" {
+  description = "S3 bucket for Velero backups (scopes IAM permissions)"
+  type        = string
+  default     = ""
+}
+
+variable "route53_zone_arns" {
+  description = "Route53 zone ARNs for cert-manager (scopes IAM permissions)"
+  type        = list(string)
+  default     = []
+}
+
 variable "tags" {
-  description = "Tags for all resources"
+  description = "Additional tags for all resources"
   type        = map(string)
-  default = {
-    Environment = "production"
-    ManagedBy   = "opentofu"
-    Project     = "monobase-infrastructure"
-  }
+  default     = {}
 }

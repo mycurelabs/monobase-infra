@@ -1,43 +1,41 @@
-# k3d Local Development Cluster - Variables
-
 variable "cluster_name" {
   description = "Name of the k3d cluster"
   type        = string
-  default     = "monobase-dev"
+  default     = "k3d-local"
 }
 
 variable "k3s_version" {
-  description = "K3s/Kubernetes version"
+  description = "K3s version"
   type        = string
-  default     = "v1.28.3-k3s1"
+  default     = "v1.28.5-k3s1"
 }
 
 variable "servers" {
-  description = "Number of server nodes"
+  description = "Number of server nodes (control plane)"
   type        = number
   default     = 1
 }
 
 variable "agents" {
-  description = "Number of agent nodes"
+  description = "Number of agent nodes (workers)"
   type        = number
-  default     = 2
+  default     = 3
 }
 
 variable "http_port" {
-  description = "Host port for HTTP (80)"
+  description = "HTTP port to expose (LoadBalancer)"
   type        = number
-  default     = 8080
+  default     = 80
 }
 
 variable "https_port" {
-  description = "Host port for HTTPS (443)"
+  description = "HTTPS port to expose (LoadBalancer)"
   type        = number
-  default     = 8443
+  default     = 443
 }
 
 variable "disable_traefik" {
-  description = "Disable Traefik (use Envoy Gateway instead)"
+  description = "Disable built-in Traefik (use Envoy Gateway instead)"
   type        = bool
   default     = true
 }
