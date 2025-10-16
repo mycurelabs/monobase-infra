@@ -9,6 +9,7 @@ New to monobase-infra? Start here.
 - **[CLUSTER-PROVISIONING.md](getting-started/CLUSTER-PROVISIONING.md)** - Provision Kubernetes clusters (AWS/Azure/GCP/DOKS/k3d)
 - **[CLIENT-ONBOARDING.md](getting-started/CLIENT-ONBOARDING.md)** - Fork, configure, and deploy your first client
 - **[DEPLOYMENT.md](getting-started/DEPLOYMENT.md)** - Complete step-by-step deployment guide
+- **[TEMPLATE-USAGE.md](getting-started/TEMPLATE-USAGE.md)** - Template fork workflow and maintenance
 - **[INFRASTRUCTURE-REQUIREMENTS.md](getting-started/INFRASTRUCTURE-REQUIREMENTS.md)** - Cluster specifications and prerequisites
 
 ## 🏗️ Architecture
@@ -49,17 +50,14 @@ Local development, testing, and validation.
 - **[TESTING-RESULTS.md](development/TESTING-RESULTS.md)** - Validation test results
 - **[ON-PREM-DEPLOYMENT.md](development/ON-PREM-DEPLOYMENT.md)** - Self-hosted cluster deployment
 
-## 📖 Reference
 
-Configuration parameters and historical documentation.
+
+## 📂 Reference Documentation
 
 - **[VALUES-REFERENCE.md](reference/VALUES-REFERENCE.md)** - Complete configuration parameter reference
+- **[STORAGE-PROVIDERS.md](reference/STORAGE-PROVIDERS.md)** - Storage provider configuration reference
 - **[OPTIMIZATION-SUMMARY.md](reference/OPTIMIZATION-SUMMARY.md)** - Infrastructure simplification history
-
-## 📂 Other Documentation
-
-- **[TEMPLATE-USAGE.md](TEMPLATE-USAGE.md)** - Template fork workflow and maintenance
-- **[STORAGE-PROVIDERS.md](STORAGE-PROVIDERS.md)** - Storage provider configuration reference
+- **[TEMPLATE-USAGE.md](getting-started/TEMPLATE-USAGE.md)** - Template fork workflow and maintenance
 
 ---
 
