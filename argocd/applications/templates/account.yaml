@@ -21,16 +21,8 @@ spec:
     helm:
       releaseName: account
       valuesObject:
-        global: {{ .Values.global | toYaml | nindent 8 }}
-        replicaCount: {{ .Values.account.replicaCount | default 2 }}
-        image: {{ .Values.account.image | toYaml | nindent 10 }}
-        resources: {{ .Values.account.resources | toYaml | nindent 10 }}
-        {{- if .Values.account.gateway }}
-        gateway: {{ .Values.account.gateway | toYaml | nindent 10 }}
-        {{- end }}
-        {{- if .Values.account.podDisruptionBudget }}
-        podDisruptionBudget: {{ .Values.account.podDisruptionBudget | toYaml | nindent 10 }}
-        {{- end }}
+        {{- toYaml .Values.account | nindent 8 }}
+        global: {{ .Values.global | toYaml | nindent 10 }}
 
   destination:
     server: https://kubernetes.default.svc

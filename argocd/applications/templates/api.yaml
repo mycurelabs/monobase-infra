@@ -21,25 +21,8 @@ spec:
     helm:
       releaseName: api
       valuesObject:
-        global: {{ .Values.global | toYaml | nindent 8 }}
-        replicaCount: {{ .Values.api.replicaCount | default 2 }}
-        image: {{ .Values.api.image | toYaml | nindent 10 }}
-        resources: {{ .Values.api.resources | toYaml | nindent 10 }}
-        {{- if .Values.api.gateway }}
-        gateway: {{ .Values.api.gateway | toYaml | nindent 10 }}
-        {{- end }}
-        {{- if .Values.api.livenessProbe }}
-        livenessProbe: {{ .Values.api.livenessProbe | toYaml | nindent 10 }}
-        {{- end }}
-        {{- if .Values.api.readinessProbe }}
-        readinessProbe: {{ .Values.api.readinessProbe | toYaml | nindent 10 }}
-        {{- end }}
-        {{- if .Values.api.podDisruptionBudget }}
-        podDisruptionBudget: {{ .Values.api.podDisruptionBudget | toYaml | nindent 10 }}
-        {{- end }}
-        {{- if .Values.api.autoscaling }}
-        autoscaling: {{ .Values.api.autoscaling | toYaml | nindent 10 }}
-        {{- end }}
+        {{- toYaml .Values.api | nindent 8 }}
+        global: {{ .Values.global | toYaml | nindent 10 }}
 
   destination:
     server: https://kubernetes.default.svc
