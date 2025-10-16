@@ -16,7 +16,7 @@ spec:
   source:
     repoURL: {{ .Values.argocd.repoURL }}
     targetRevision: {{ .Values.argocd.targetRevision | default "main" }}
-    path: infrastructure/namespaces
+    path: charts/namespace
     helm:
       values: |
         namespace:
