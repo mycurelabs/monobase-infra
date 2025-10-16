@@ -94,10 +94,9 @@ nodeSelector: {}
 tolerations: []
 affinity: {}
 
-# Frontend configuration (injected at build time or via ConfigMap)
+# Frontend configuration (passed as environment variables)
 config:
-  VITE_API_URL: ""  # Will be set to API URL
-  VITE_ENVIRONMENT: production
+  API_URL: ""  # Set to API public URL (e.g., https://api.example.com)
 
 networkPolicy:
   enabled: true

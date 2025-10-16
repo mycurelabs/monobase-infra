@@ -82,6 +82,9 @@ account:
   gateway:
     hostname: ""  # Empty = uses app.<global.domain>
 
+  config:
+    API_URL: "https://api.stg.mycureapp.com"
+
   podDisruptionBudget:
     enabled: false
 
