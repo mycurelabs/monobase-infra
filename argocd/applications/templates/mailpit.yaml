@@ -20,8 +20,6 @@ spec:
     targetRevision: 0.x.x
     helm:
       releaseName: mailpit
-      valueFiles:
-        - ../../deployments/{{ .Values.global.namespace }}/values.yaml
       valuesObject:
         resources:
           requests:

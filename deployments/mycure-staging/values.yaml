@@ -112,7 +112,7 @@ postgresql:
 
 # ===== OPTIONAL: Valkey (Redis Cache) =====
 valkey:
-  enabled: true
+  enabled: false  # Not needed for staging
 
   architecture: standalone  # Not replication for staging
 
