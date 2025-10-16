@@ -31,39 +31,6 @@ spec:
         nodeAgent:
           podVolumePath: /var/lib/kubelet/pods
           privileged: true
-{{- if .Values.velero.enabled }}
-# ArgoCD Application: Velero
-# Sync Wave 0 - Deploy backup infrastructure (cluster-wide)
-
-apiVersion: argoproj.io/v1alpha1
-kind: Application
-metadata:
-  name: velero
-  namespace: argocd
-  annotations:
-    argocd.argoproj.io/sync-wave: "0"
-  finalizers:
-    - resources-finalizer.argocd.argoproj.io
-spec:
-  project: default
-
-  source:
-    chart: velero
-    repoURL: https://vmware-tanzu.github.io/helm-charts
-    targetRevision: {{ .Values.velero.version | default "7.1.4" }}
-    helm:
-      releaseName: velero
-      values: |
-        configuration:
-          defaultBackupTTL: 720h
-          defaultVolumesToFsBackup: true
-        credentials:
-          useSecret: true
-          existingSecret: velero-credentials
-        deployNodeAgent: true
-        nodeAgent:
-          podVolumePath: /var/lib/kubelet/pods
-          privileged: true
         initContainers:
 {{- if or (eq .Values.velero.provider "aws") (eq .Values.velero.provider "digitalocean") (eq .Values.velero.provider "minio") }}
           - name: velero-plugin-for-aws
