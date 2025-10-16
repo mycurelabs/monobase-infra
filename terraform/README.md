@@ -17,9 +17,10 @@ This directory contains **reusable Terraform/OpenTofu modules** for cluster prov
 ```bash
 # Cluster configs are at root level now:
 ../clusters/
-├── default-cluster/     # Reference template
-├── k3d-local/           # Local dev
-└── your-cluster/        # Your clusters (gitignored)
+├── example-aws-eks/     # AWS EKS reference
+├── example-do-doks/     # DigitalOcean DOKS reference
+├── example-k3d/         # Local k3d reference
+└── your-cluster/        # Your clusters (create from examples)
 
 # Use the provision script:
 ./scripts/provision.sh --cluster your-cluster
@@ -58,29 +59,51 @@ Single Cluster (provisioned via ../clusters/)
 
 **Cluster sizing:** Autoscales from 3-20 nodes based on client load
 
-## Reference Configuration
+### Sizing Guidelines
 
-**`../clusters/default-cluster/`** - Complete reference template (at root level)
+All modules support flexible multi-tenant sizing:
 
-Contains:
+| Cluster Size | Clients | Node Count | vCPU/Node | RAM/Node | Total Resources |
+|--------------|---------|------------|-----------|----------|-----------------|
+| **Small** | 1-5 | 3 nodes | 2-4 vCPU | 4-16 GB | 6-12 vCPU, 12-48 GB |
+| **Medium** | 5-15 | 5-10 nodes | 4-8 vCPU | 16-32 GB | 20-80 vCPU, 80-320 GB |
+| **Large** | 15+ | 10-30 nodes | 8-16 vCPU | 32-64 GB | 80-480 vCPU, 320-1920 GB |
+
+**Auto-scaling:** All modules include cluster autoscaler to dynamically adjust based on workload.
+
+See individual module READMEs for platform-specific instance types and detailed sizing examples.
+
+## Reference Configurations
+
+Example cluster configurations are provided (at root level):
+
+- **`../clusters/example-aws-eks/`** - AWS EKS production cluster
+- **`../clusters/example-do-doks/`** - DigitalOcean DOKS cluster
+- **`../clusters/example-k3d/`** - Local k3d development cluster
+
+Each contains:
 - main.tf - Module usage (references modules from this directory)
 - variables.tf - All parameters
 - terraform.tfvars - Example values
-- terragrunt.hcl - Terragrunt config
-- README.md - Customization guide
+- outputs.tf - Output definitions
 
 ## Implementation Status
 
 **✅ 100% COMPLETE - All 6 Modules Implemented**
 
+**Modules:**
 - ✅ **AWS EKS** - Production multi-tenant EKS with IRSA, autoscaling
 - ✅ **Azure AKS** - Production AKS with Workload Identity
 - ✅ **GCP GKE** - Production GKE with Workload Identity
 - ✅ **DigitalOcean DOKS** - Cost-optimized managed Kubernetes (~78% cheaper than EKS)
 - ✅ **on-prem-k3s** - Healthcare on-prem with K3s, HA, MetalLB
 - ✅ **local-k3d** - Local testing and CI/CD automation
-- ✅ **default-cluster** - Complete reference configuration
-- ✅ **Terragrunt** - DRY configuration management
+
+**Example Clusters:**
+- ✅ **example-aws-eks** - AWS EKS reference configuration
+- ✅ **example-do-doks** - DigitalOcean DOKS reference configuration
+- ✅ **example-k3d** - Local k3d reference configuration
+- ✅ **Terragrunt** - DRY configuration management (optional)
 
 **Complete multi-cloud support: AWS, Azure, GCP, DigitalOcean, on-prem, local testing!**
 

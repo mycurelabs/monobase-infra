@@ -1,5 +1,18 @@
 # Root Terragrunt Configuration
 # DRY configuration for all cluster deployments
+#
+# OPTIONAL: This configuration enables S3 backend for remote state.
+# If you don't want to use S3, simply don't use terragrunt - use terraform/tofu directly.
+#
+# S3 Backend Setup (one-time, before using terragrunt):
+# 1. Create S3 bucket:
+#    aws s3api create-bucket --bucket monobase-terraform-state-$(aws sts get-caller-identity --query Account --output text) --region us-east-1
+# 2. Enable versioning:
+#    aws s3api put-bucket-versioning --bucket monobase-terraform-state-$(aws sts get-caller-identity --query Account --output text) --versioning-configuration Status=Enabled
+# 3. Create DynamoDB table for locking:
+#    aws dynamodb create-table --table-name monobase-terraform-locks --attribute-definitions AttributeName=LockID,AttributeType=S --key-schema AttributeName=LockID,KeyType=HASH --billing-mode PAY_PER_REQUEST --region us-east-1
+#
+# Alternative: Use local state by working directly with terraform/tofu (skip terragrunt)
 
 # Configure Terragrunt to automatically store tfstate files in S3
 remote_state {

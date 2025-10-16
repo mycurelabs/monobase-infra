@@ -24,19 +24,30 @@ module "k3d_test" {
 }
 ```
 
-## Quick Start
+## After Provisioning
+
+### Get kubeconfig
 
 ```bash
-cd tofu/modules/local-k3d
-tofu init
-tofu apply
-
-# Get kubeconfig
+# Via Terraform output
 export KUBECONFIG=$(tofu output -raw kubeconfig_file)
-kubectl get nodes
 
-# Deploy Monobase
-helm install api ../../../charts/api -f ../../../config/k3d-local/values-development.yaml
+# Or use file path
+export KUBECONFIG=$(tofu output -raw kubeconfig_file)
+
+# Verify
+kubectl get nodes
+```
+
+### Deploy Monobase Application Stack
+
+```bash
+# Use existing Monobase workflow
+cd ../../..
+./scripts/new-client-config.sh client-a client-a.local
+
+# Deploy via Helm
+helm install api charts/api -f config/client-a/values-development.yaml
 ```
 
 ## CI/CD Example (GitHub Actions)

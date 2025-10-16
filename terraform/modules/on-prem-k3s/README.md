@@ -74,15 +74,25 @@ module "k3s_cluster" {
 
 ## After Provisioning
 
-```bash
-# Get kubeconfig
-export KUBECONFIG=$(tofu output -raw kubeconfig_path)
-kubectl get nodes
+### Get kubeconfig
 
-# Deploy Monobase stack
+```bash
+# Via Terraform output
+export KUBECONFIG=$(tofu output -raw kubeconfig_path)
+
+# Verify
+kubectl get nodes
+```
+
+### Deploy Monobase Application Stack
+
+```bash
+# Use existing Monobase workflow
 cd ../../..
 ./scripts/new-client-config.sh clinic-a clinic-a.local
-# Deploy apps
+
+# Deploy via ArgoCD or Helm
+helm install api charts/api -f config/clinic-a/values-production.yaml
 ```
 
 ## HA Configuration
