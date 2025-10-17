@@ -33,10 +33,18 @@ spec:
         {{- end }}
     spec:
       serviceAccountName: {{ include "external-dns.serviceAccountName" (dict "instance" $instance "root" $root) }}
-      {{- with $root.Values.securityContext }}
+      # Pod-level security context (required for PodSecurity restricted)
       securityContext:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
+        {{- if $root.Values.securityContext }}
+        {{- toYaml $root.Values.securityContext | nindent 8 }}
+        {{- else }}
+        # Default secure pod context for restricted PodSecurity
+        runAsNonRoot: true
+        runAsUser: 65534
+        fsGroup: 65534
+        seccompProfile:
+          type: RuntimeDefault
+        {{- end }}
       containers:
       - name: external-dns
         image: "{{ $root.Values.image.registry }}/{{ $root.Values.image.repository }}:{{ $root.Values.image.tag }}"
@@ -121,6 +129,7 @@ spec:
         {{- end }}
 
         securityContext:
+          allowPrivilegeEscalation: false
           readOnlyRootFilesystem: true
           runAsNonRoot: true
           runAsUser: 65534
