@@ -45,13 +45,71 @@ check_command() {
     return 0
 }
 
-check_kubeconfig() {
-    if [ -z "${KUBECONFIG:-}" ]; then
-        log_error "KUBECONFIG not set"
-        log_info "Set it with: export KUBECONFIG=/path/to/kubeconfig"
+select_kubeconfig() {
+    echo
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo " Select Kubernetes Cluster"
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo
+
+    # Find all kubeconfig files
+    local kubeconfigs=()
+    local kubeconfig_paths=()
+
+    # Check default location
+    if [ -f "${HOME}/.kube/config" ]; then
+        kubeconfigs+=("Default (~/.kube/config)")
+        kubeconfig_paths+=("${HOME}/.kube/config")
+    fi
+
+    # Check ~/.kube/ directory for other configs
+    if [ -d "${HOME}/.kube" ]; then
+        while IFS= read -r file; do
+            local basename=$(basename "$file")
+            # Skip default config (already added), directories, and backup files
+            if [ "$file" != "${HOME}/.kube/config" ] && [ -f "$file" ] && [[ ! "$basename" =~ \.backup\. ]]; then
+                kubeconfigs+=("$basename")
+                kubeconfig_paths+=("$file")
+            fi
+        done < <(find "${HOME}/.kube" -maxdepth 1 -type f 2>/dev/null | sort)
+    fi
+
+    if [ ${#kubeconfigs[@]} -eq 0 ]; then
+        log_error "No kubeconfig files found"
+        log_info "Create a cluster first with: mise run provision"
         return 1
     fi
 
+    # Display options
+    echo "Available clusters:"
+    echo
+    for i in "${!kubeconfigs[@]}"; do
+        echo "  $((i+1))) ${kubeconfigs[$i]}"
+    done
+    echo "  $((${#kubeconfigs[@]}+1))) Use current KUBECONFIG (${KUBECONFIG:-not set})"
+    echo "  $((${#kubeconfigs[@]}+2))) Exit"
+    echo
+
+    read -rp "Enter choice [1-$((${#kubeconfigs[@]}+2))]: " choice
+    echo
+
+    if [ "$choice" -eq "$((${#kubeconfigs[@]}+2))" ] 2>/dev/null; then
+        exit 0
+    elif [ "$choice" -eq "$((${#kubeconfigs[@]}+1))" ] 2>/dev/null; then
+        if [ -z "${KUBECONFIG:-}" ]; then
+            log_warn "KUBECONFIG not set, using kubectl default"
+        fi
+    elif [ "$choice" -ge 1 ] 2>/dev/null && [ "$choice" -le "${#kubeconfigs[@]}" ]; then
+        export KUBECONFIG="${kubeconfig_paths[$((choice-1))]}"
+        log_info "Using kubeconfig: ${KUBECONFIG}"
+    else
+        log_error "Invalid choice"
+        select_kubeconfig
+        return $?
+    fi
+}
+
+check_kubeconfig() {
     if ! kubectl cluster-info &> /dev/null; then
         log_error "Cannot connect to Kubernetes cluster"
         return 1
@@ -62,101 +120,8 @@ check_kubeconfig() {
 }
 
 # ==============================================================================
-# Provider Selection
+# Shared TLS Functions
 # ==============================================================================
-
-show_provider_menu() {
-    echo
-    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    echo " Secrets Management - Provider Selection"
-    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    echo
-    echo "Choose your secrets provider:"
-    echo
-    echo "  1) SOPS + age (Recommended - Free, Git-encrypted)"
-    echo "  2) AWS Secrets Manager (Requires AWS account)"
-    echo "  3) Azure Key Vault (Requires Azure subscription)"
-    echo "  4) GCP Secret Manager (Requires GCP project)"
-    echo "  5) Manual (Plain K8s secrets - Testing only)"
-    echo "  6) Exit"
-    echo
-    read -rp "Enter choice [1-6]: " choice
-    echo
-
-    case $choice in
-        1) setup_sops ;;
-        2) setup_aws ;;
-        3) setup_azure ;;
-        4) setup_gcp ;;
-        5) setup_manual ;;
-        6) exit 0 ;;
-        *) log_error "Invalid choice"; show_provider_menu ;;
-    esac
-}
-
-# ==============================================================================
-# SOPS + age Setup
-# ==============================================================================
-
-setup_sops() {
-    log_info "Setting up SOPS + age encryption..."
-
-    # Check required commands
-    check_command sops || return 1
-    check_command age || return 1
-    check_kubeconfig || return 1
-
-    # Check if age key exists
-    AGE_KEY_FILE="${REPO_ROOT}/age.agekey"
-
-    if [ -f "$AGE_KEY_FILE" ]; then
-        log_warn "Age key already exists at: $AGE_KEY_FILE"
-        read -rp "Use existing key? (y/n): " use_existing
-        if [[ ! "$use_existing" =~ ^[Yy]$ ]]; then
-            log_info "Generating new age keypair..."
-            age-keygen -o "$AGE_KEY_FILE"
-            log_success "Generated new age keypair"
-        fi
-    else
-        log_info "Generating age keypair..."
-        age-keygen -o "$AGE_KEY_FILE"
-        log_success "Generated age keypair at: $AGE_KEY_FILE"
-    fi
-
-    # Extract public key
-    AGE_PUBLIC_KEY=$(grep "# public key:" "$AGE_KEY_FILE" | cut -d: -f2 | tr -d ' ')
-    log_info "Age public key: $AGE_PUBLIC_KEY"
-
-    # Update .sops.yaml
-    log_info "Updating .sops.yaml with age public key..."
-    sed -i "s/AGE_PUBLIC_KEY_PLACEHOLDER/$AGE_PUBLIC_KEY/g" "${REPO_ROOT}/.sops.yaml"
-    log_success "Updated .sops.yaml"
-
-    # Collect TLS configuration
-    collect_tls_config
-
-    # Create bootstrap secret in cluster
-    log_info "Creating sops-age-key secret in cert-manager namespace..."
-    kubectl create namespace cert-manager --dry-run=client -o yaml | kubectl apply -f -
-    kubectl create secret generic sops-age-key \
-        --from-file=age.agekey="$AGE_KEY_FILE" \
-        --namespace=cert-manager \
-        --dry-run=client -o yaml | kubectl apply -f -
-    log_success "Created sops-age-key secret"
-
-    # Encrypt Cloudflare token
-    encrypt_cloudflare_token_sops
-
-    # Update ExternalSecrets configuration
-    log_info "Updating External Secrets configuration for SOPS..."
-    update_infrastructure_values "sops"
-
-    # Template ClusterIssuers
-    template_clusterissuers
-
-    log_success "SOPS setup complete!"
-    show_next_steps_sops
-}
 
 collect_tls_config() {
     echo
@@ -165,33 +130,9 @@ collect_tls_config() {
 
     read -rp "Enter your email for Let's Encrypt notifications: " LETSENCRYPT_EMAIL
     read -rp "Enter your DNS zone (e.g., mycureapp.com): " DNS_ZONE
-    read -rsp "Enter your Cloudflare API token: " CLOUDFLARE_API_TOKEN
-    echo
+    read -rp "Enter your Cloudflare API token: " CLOUDFLARE_API_TOKEN
 
     export LETSENCRYPT_EMAIL DNS_ZONE CLOUDFLARE_API_TOKEN
-}
-
-encrypt_cloudflare_token_sops() {
-    log_info "Encrypting Cloudflare API token..."
-
-    # Create plaintext secret
-    TEMP_SECRET="/tmp/cloudflare-token-plaintext.yaml"
-    cat > "$TEMP_SECRET" <<EOF
-apiVersion: v1
-kind: Secret
-metadata:
-  name: cloudflare-api-token
-  namespace: cert-manager
-type: Opaque
-stringData:
-  api-token: "${CLOUDFLARE_API_TOKEN}"
-EOF
-
-    # Encrypt with SOPS
-    sops --encrypt "$TEMP_SECRET" > "${REPO_ROOT}/infrastructure/tls/cloudflare-token.enc.yaml"
-    rm "$TEMP_SECRET"
-
-    log_success "Encrypted Cloudflare API token"
 }
 
 template_clusterissuers() {
@@ -237,84 +178,37 @@ update_infrastructure_values() {
     log_success "Updated infrastructure values"
 }
 
-show_next_steps_sops() {
-    echo
-    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    echo " Next Steps"
-    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    echo
-    log_success "SOPS setup complete!"
-    echo
-    echo "1. Backup your age private key securely:"
-    echo "   ${AGE_KEY_FILE}"
-    echo
-    echo "2. Commit the encrypted files to Git:"
-    echo "   git add ."
-    echo "   git commit -m \"feat: Add TLS certificate automation with SOPS\""
-    echo "   git push"
-    echo
-    echo "3. Wait for ArgoCD to sync (or trigger manually)"
-    echo
-    echo "4. Verify ClusterIssuer is ready:"
-    echo "   kubectl get clusterissuer"
-    echo
-    echo "5. Check certificate provisioning:"
-    echo "   kubectl get certificate -n gateway-system"
-    echo
-}
-
 # ==============================================================================
-# Placeholder functions for other providers
+# Provider Selection
 # ==============================================================================
 
-setup_aws() {
-    log_warn "AWS Secrets Manager setup not yet implemented"
-    log_info "This will be implemented in a future update"
-    log_info "For now, use SOPS + age or Manual setup"
-    show_provider_menu
-}
-
-setup_azure() {
-    log_warn "Azure Key Vault setup not yet implemented"
-    log_info "This will be implemented in a future update"
-    log_info "For now, use SOPS + age or Manual setup"
-    show_provider_menu
-}
-
-setup_gcp() {
-    log_warn "GCP Secret Manager setup not yet implemented"
-    log_info "This will be implemented in a future update"
-    log_info "For now, use SOPS + age or Manual setup"
-    show_provider_menu
-}
-
-setup_manual() {
-    log_warn "Manual setup creates plain Kubernetes secrets"
-    log_warn "This is NOT recommended for production!"
-    log_warn "Secrets will NOT be backed up in Git"
+show_provider_menu() {
     echo
-    read -rp "Continue? (y/n): " confirm
-    if [[ ! "$confirm" =~ ^[Yy]$ ]]; then
-        show_provider_menu
-        return
-    fi
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo " Secrets Management - Provider Selection"
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo
+    echo "Choose your secrets provider:"
+    echo
+    echo "  1) SOPS + age (Recommended - Free, Git-encrypted)"
+    echo "  2) AWS Secrets Manager (Requires AWS account)"
+    echo "  3) Azure Key Vault (Requires Azure subscription)"
+    echo "  4) GCP Secret Manager (Requires GCP project)"
+    echo "  5) Manual (Plain K8s secrets - Testing only)"
+    echo "  6) Exit"
+    echo
+    read -rp "Enter choice [1-6]: " choice
+    echo
 
-    check_kubeconfig || return 1
-    collect_tls_config
-
-    log_info "Creating plain Kubernetes secret..."
-    kubectl create namespace cert-manager --dry-run=client -o yaml | kubectl apply -f -
-    kubectl create secret generic cloudflare-api-token \
-        --from-literal=api-token="${CLOUDFLARE_API_TOKEN}" \
-        --namespace=cert-manager \
-        --dry-run=client -o yaml | kubectl apply -f -
-
-    # Template ClusterIssuers
-    template_clusterissuers
-    update_infrastructure_values "manual"
-
-    log_success "Manual setup complete"
-    log_warn "Remember: Your secrets are NOT backed up!"
+    case $choice in
+        1) source "${SCRIPT_DIR}/secrets-sops.sh" && setup_sops ;;
+        2) source "${SCRIPT_DIR}/secrets-aws.sh" && setup_aws && show_provider_menu ;;
+        3) source "${SCRIPT_DIR}/secrets-azure.sh" && setup_azure && show_provider_menu ;;
+        4) source "${SCRIPT_DIR}/secrets-gcp.sh" && setup_gcp && show_provider_menu ;;
+        5) source "${SCRIPT_DIR}/secrets-manual.sh" && setup_manual ;;
+        6) exit 0 ;;
+        *) log_error "Invalid choice"; show_provider_menu ;;
+    esac
 }
 
 # ==============================================================================

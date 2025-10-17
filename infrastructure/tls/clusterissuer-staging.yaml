@@ -17,7 +17,7 @@ spec:
 
     # Email for Let's Encrypt notifications (expiry, etc.)
     # This is templated and replaced by scripts/secrets.sh
-    email: "{{ LETSENCRYPT_EMAIL }}"
+    email: "caretheextramile@gmail.com"
 
     # Secret to store ACME account private key
     privateKeySecretRef:
@@ -34,4 +34,4 @@ spec:
               key: api-token
         selector:
           dnsZones:
-            - "{{ DNS_ZONE }}"  # Templated by scripts/secrets.sh
+            - "mycureapp.com"  # Templated by scripts/secrets.sh

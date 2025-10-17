@@ -12,9 +12,9 @@ certManager:
 
 # Cert Manager Resources - ClusterIssuers and certificate configuration
 certManagerIssuers:
-  enabled: false  # Enable after running scripts/secrets.sh
-  email: ""  # Email for Let's Encrypt notifications (set by scripts/secrets.sh)
-  dnsZone: ""  # DNS zone for DNS-01 challenge (e.g., mycureapp.com)
+  enabled: true
+  email: "caretheextramile@gmail.com" notifications (set by scripts/secrets.sh)
+  dnsZone: "mycureapp.com" for DNS-01 challenge (e.g., mycureapp.com)
 
 # Envoy Gateway - Gateway API implementation
 envoyGateway:
@@ -59,7 +59,7 @@ gateway:
 externalSecrets:
   enabled: true
   version: 0.9.11
-  provider: aws  # Options: aws, azure, gcp, sops
+  provider: sops  # Options: aws, azure, gcp, sops
   
   # AWS Secrets Manager configuration
   aws:
@@ -99,7 +99,7 @@ kyverno:
 velero:
   enabled: false  # Enable for production clusters with backup requirements
   version: 7.1.4
-  provider: aws  # Options: aws, azure, gcp, digitalocean, minio
+  provider: sops  # Options: aws, azure, gcp, digitalocean, minio
   
   # AWS S3 configuration
   aws:

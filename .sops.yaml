@@ -7,7 +7,7 @@ creation_rules:
   # Encrypt all .enc.yaml files with age
   - path_regex: \.enc\.yaml$
     age: >-
-      AGE_PUBLIC_KEY_PLACEHOLDER
+      age17j6tzuf4q5pxv9c2p7786cdv6puqsw3xmmsjm9p9ee6hm4pw9gasqem40y
     # Only encrypt the 'data' and 'stringData' fields in Kubernetes secrets
     # Leave metadata and structure visible
     encrypted_regex: '^(data|stringData)$'
@@ -15,13 +15,13 @@ creation_rules:
   # Encrypt all .enc.json files with age
   - path_regex: \.enc\.json$
     age: >-
-      AGE_PUBLIC_KEY_PLACEHOLDER
+      age17j6tzuf4q5pxv9c2p7786cdv6puqsw3xmmsjm9p9ee6hm4pw9gasqem40y
 
   # Encrypt specific secret files
   - path_regex: secrets/.*\.yaml$
     age: >-
-      AGE_PUBLIC_KEY_PLACEHOLDER
+      age17j6tzuf4q5pxv9c2p7786cdv6puqsw3xmmsjm9p9ee6hm4pw9gasqem40y
     encrypted_regex: '^(data|stringData|password|token|key|secret)$'
 
-# Note: AGE_PUBLIC_KEY_PLACEHOLDER will be replaced by scripts/secrets.sh
+# Note: age17j6tzuf4q5pxv9c2p7786cdv6puqsw3xmmsjm9p9ee6hm4pw9gasqem40y will be replaced by scripts/secrets.sh
 # with your actual age public key (e.g., age1ql3z7hjy54pw3hyww5ayyfg7...)
