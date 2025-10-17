@@ -10,8 +10,9 @@ spec:
   parentRefs:
     - name: {{ include "api.gateway.name" . }}
       namespace: {{ include "api.gateway.namespace" . }}
+      sectionName: https  # Only attach to HTTPS listener
       {{- if .Values.gateway.sectionName }}
-      sectionName: {{ .Values.gateway.sectionName }}
+      # Override: {{ .Values.gateway.sectionName }}
       {{- end }}
   hostnames:
     - {{ include "api.gateway.hostname" . }}

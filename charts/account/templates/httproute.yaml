@@ -10,6 +10,7 @@ spec:
   parentRefs:
     - name: {{ include "account.gateway.name" . }}
       namespace: {{ include "account.gateway.namespace" . }}
+      sectionName: https  # Only attach to HTTPS listener
   hostnames:
     - {{ include "account.gateway.hostname" . }}
   rules:
