@@ -110,14 +110,13 @@ global:
   # Trigger loop on create (in addition to interval)
   triggerLoopOnEvent: true
 
-# Security context for pods
+# Pod-level security context (PodSecurity restricted compliant)
 securityContext:
   runAsNonRoot: true
   runAsUser: 65534  # nobody user
   fsGroup: 65534
-  capabilities:
-    drop:
-      - ALL
+  seccompProfile:
+    type: RuntimeDefault
 
 # Pod annotations
 podAnnotations: {}
