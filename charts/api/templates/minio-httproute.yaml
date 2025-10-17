@@ -12,7 +12,7 @@ spec:
     - name: {{ include "api.gateway.name" . }}
       namespace: {{ include "api.gateway.namespace" . }}
   hostnames:
-    - {{ .Values.minio.gateway.hostname | default (printf "storage.%s" .Values.global.domain) }}
+    - {{ if .Values.minio.gateway }}{{ .Values.minio.gateway.hostname | default (printf "storage.%s" .Values.global.domain) }}{{ else }}{{ printf "storage.%s" .Values.global.domain }}{{ end }}
   rules:
     # S3 API and MinIO Console
     - matches:
