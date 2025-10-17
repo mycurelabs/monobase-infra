@@ -17,7 +17,7 @@ spec:
   source:
     chart: minio
     repoURL: https://charts.min.io/
-    targetRevision: 5.x.x
+    targetRevision: 8.x.x
     helm:
       releaseName: minio
       valuesObject:

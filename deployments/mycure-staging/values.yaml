@@ -149,17 +149,20 @@ valkey:
 
 # ===== OPTIONAL: MinIO (Object Storage) =====
 minio:
-  enabled: false  # TODO: Fix MinIO chart deployment issues
+  enabled: true
   mode: standalone
+  replicas: 1
   persistence:
     enabled: true
-    storageClass: ""  # Auto-detect
+    storageClass: ""  # Auto-detect (do-block-storage)
     size: 10Gi
   resources:
     requests:
-      cpu: 50m
-      memory: 128Mi
-  replicas: 1
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
   rootUser: minioadmin
   rootPassword: minioadmin
   buckets:
@@ -171,11 +174,15 @@ minio:
     runAsUser: 1000
     runAsGroup: 1000
     fsGroup: 1000
+    fsGroupChangePolicy: OnRootMismatch
+  podSecurityContext:
+    runAsUser: 1000
+    runAsGroup: 1000
+    fsGroup: 1000
     runAsNonRoot: true
     seccompProfile:
       type: RuntimeDefault
   containerSecurityContext:
-    enabled: true
     runAsUser: 1000
     runAsNonRoot: true
     allowPrivilegeEscalation: false
