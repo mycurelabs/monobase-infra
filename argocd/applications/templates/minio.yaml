@@ -1,6 +1,7 @@
 {{- if .Values.minio.enabled }}
 # ArgoCD Application: MinIO (Object Storage)
 # Sync Wave 2 - Deploy storage before applications
+# Uses local wrapper chart that includes official MinIO chart + Gateway HTTPRoute
 
 apiVersion: argoproj.io/v1alpha1
 kind: Application
@@ -15,12 +16,14 @@ spec:
   project: default
 
   source:
-    chart: minio
-    repoURL: https://charts.min.io/
-    targetRevision: 5.x.x  # Use official MinIO Helm chart
+    repoURL: {{ .Values.global.repoURL | default "https://github.com/monobaselabs/monobase-infra.git" }}
+    targetRevision: {{ .Values.global.targetRevision | default "main" }}
+    path: charts/minio
     helm:
       releaseName: minio
       valuesObject:
+        global:
+          {{- toYaml .Values.global | nindent 10 }}
         {{- toYaml .Values.minio | nindent 8 }}
 
   destination:

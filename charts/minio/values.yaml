@@ -1,0 +1,92 @@
+# Default values for MinIO chart
+# This is a YAML-formatted file with sensible defaults
+# Override these values in deployment-specific values files
+
+# Global configuration (shared across charts)
+global:
+  domain: example.com
+  namespace: example-prod
+  environment: production
+  gateway:
+    name: shared-gateway
+    namespace: gateway-system
+
+enabled: false  # Master enable/disable for both MinIO and HTTPRoute
+
+nameOverride: ""
+fullnameOverride: ""
+
+# ===== Official MinIO Chart Values (passed to subchart) =====
+# These values are passed through to the official MinIO Helm chart dependency
+# See https://github.com/minio/minio/tree/master/helm/minio for all options
+
+mode: standalone
+replicas: 1
+
+rootUser: minioadmin
+rootPassword: minioadmin
+
+persistence:
+  enabled: true
+  storageClass: longhorn
+  size: 250Gi
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+# Bucket configuration for official MinIO chart
+buckets:
+  - name: monobase-files
+    policy: none
+    purge: false
+
+region: "us-east-1"
+defaultBuckets: "monobase-files"
+
+# Security contexts for restricted PodSecurity standards
+# These settings have been debugged and tested
+securityContext:
+  enabled: true
+  runAsUser: 1000
+  runAsGroup: 1000
+  fsGroup: 1000
+  runAsNonRoot: true
+  seccompProfile:
+    type: RuntimeDefault
+
+containerSecurityContext:
+  enabled: true
+  runAsUser: 1000
+  runAsNonRoot: true
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: false
+  capabilities:
+    drop:
+      - ALL
+
+# ===== Custom Gateway API Configuration =====
+# HTTPRoute configuration for exposing MinIO via Envoy Gateway
+
+gateway:
+  enabled: true
+  hostname: ""  # Empty = uses storage.{global.domain}
+  parentRefs:
+    - name: shared-gateway
+      namespace: gateway-system
+  
+  # Rate limiting configuration for MinIO traffic
+  rateLimit:
+    enabled: true
+    # Per-IP download rate limit
+    perIP:
+      requests: 100
+      unit: Second
+    # Burst limit
+    burst:
+      requests: 1000
+      unit: Minute

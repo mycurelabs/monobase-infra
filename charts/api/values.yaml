@@ -204,18 +204,6 @@ valkey:
       storageClass: longhorn
       size: 8Gi
 
-# MinIO dependency configuration (optional S3 storage)
-minio:
-  enabled: false
-  mode: standalone
-  defaultBuckets: "monobase-files"
-  region: "us-east-1"
-  replicas: 6
-  persistence:
-    enabled: true
-    storageClass: longhorn
-    size: 250Gi
-
 # Mailpit dependency configuration (email testing for dev/staging)
 mailpit:
   enabled: false

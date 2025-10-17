@@ -201,6 +201,11 @@ minio:
       drop:
         - ALL
 
+  # Gateway API HTTPRoute configuration
+  gateway:
+    enabled: true
+    hostname: ""  # Empty = uses storage.stg.mycureapp.com
+
 # ===== STAGING: Mailpit (Email Testing) =====
 # Note: Mailpit is deployed as separate ArgoCD app (Wave 2)
 # SMTP config is passed to API via api.mailpit.enabled above
