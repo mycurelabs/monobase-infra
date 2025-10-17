@@ -1,0 +1,62 @@
+# Shared Gateway Resource
+# All applications reference this gateway via HTTPRoutes
+# Benefits:
+# - Single LoadBalancer IP (cost-effective)
+# - Zero-downtime client onboarding (just add HTTPRoute)
+# - Clean namespace isolation
+# - Flexible hostname management
+
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: {{ include "gateway.gatewayName" . }}
+  namespace: {{ include "gateway.namespace" . }}
+  labels:
+    {{- include "gateway.labels" . | nindent 4 }}
+  annotations:
+    {{- if .Values.tls.certManager.enabled }}
+    # Cert-manager will automatically provision wildcard certificates
+    cert-manager.io/cluster-issuer: {{ include "gateway.clusterIssuer" . }}
+    {{- end }}
+    {{- with .Values.annotations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  # Use Envoy Gateway implementation
+  gatewayClassName: {{ .Values.gateway.gatewayClassName }}
+
+  # Gateway listeners
+  listeners:
+    {{- if .Values.gateway.listeners.https.enabled }}
+    # HTTPS listener - accepts all traffic on port 443
+    - name: https
+      port: {{ .Values.gateway.listeners.https.port }}
+      protocol: {{ .Values.gateway.listeners.https.protocol }}
+      hostname: {{ include "gateway.wildcardDomain" . | quote }}
+
+      # Allow HTTPRoutes from any namespace
+      allowedRoutes:
+        namespaces:
+          from: All  # Critical for multi-tenant architecture
+
+      {{- if .Values.tls.enabled }}
+      # TLS termination
+      tls:
+        mode: Terminate
+        certificateRefs:
+          # Wildcard certificate managed by cert-manager
+          - name: {{ include "gateway.tlsSecretName" . }}
+            kind: Secret
+      {{- end }}
+    {{- end }}
+
+    {{- if .Values.gateway.listeners.http.enabled }}
+    # HTTP listener (for redirect to HTTPS or plain HTTP)
+    - name: http
+      port: {{ .Values.gateway.listeners.http.port }}
+      protocol: {{ .Values.gateway.listeners.http.protocol }}
+      hostname: {{ include "gateway.wildcardDomain" . | quote }}
+      allowedRoutes:
+        namespaces:
+          from: All
+    {{- end }}

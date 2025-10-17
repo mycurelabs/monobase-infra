@@ -17,12 +17,16 @@ metadata:
     - resources-finalizer.argocd.argoproj.io
 spec:
   project: default
-  
+
   source:
     repoURL: {{ .Values.argocd.repoURL }}
     targetRevision: {{ .Values.argocd.targetRevision }}
-    path: infrastructure/gateway
-  
+    path: charts/gateway
+    helm:
+      releaseName: gateway
+      valuesObject:
+        {{- toYaml .Values.gateway | nindent 8 }}
+
   destination:
     server: https://kubernetes.default.svc
     namespace: gateway-system

@@ -1,0 +1,64 @@
+# Default values for gateway chart
+# This chart deploys a shared Gateway resource for multi-tenant applications
+
+# Base domain for the gateway
+# Override this in deployment-specific values (e.g., stg.mycureapp.com)
+domain: example.com
+
+# Gateway configuration
+gateway:
+  # Gateway name (referenced by HTTPRoutes)
+  name: shared-gateway
+
+  # Gateway namespace
+  namespace: gateway-system
+
+  # GatewayClass to use (must exist in cluster)
+  gatewayClassName: envoy-gateway
+
+  # Listeners configuration
+  listeners:
+    # HTTPS listener
+    https:
+      enabled: true
+      port: 443
+      protocol: HTTPS
+
+    # HTTP listener (for redirect to HTTPS)
+    http:
+      enabled: true
+      port: 80
+      protocol: HTTP
+
+# TLS/Certificate configuration
+tls:
+  # Enable TLS certificate management
+  enabled: true
+
+  # Secret name for TLS certificate
+  secretName: wildcard-tls
+
+  # Cert-manager configuration
+  certManager:
+    # Enable cert-manager integration
+    enabled: true
+
+    # ClusterIssuer to use for certificate issuance
+    clusterIssuer: letsencrypt-prod
+
+    # Include apex domain in certificate
+    includeApex: true
+
+# HTTP to HTTPS redirect
+httpRedirect:
+  # Enable automatic HTTP to HTTPS redirect
+  enabled: true
+
+  # HTTP status code for redirect (301 = permanent, 302 = temporary)
+  statusCode: 301
+
+# Labels to apply to all resources
+labels: {}
+
+# Annotations to apply to all resources
+annotations: {}

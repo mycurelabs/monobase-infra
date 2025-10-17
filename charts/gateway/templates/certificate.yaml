@@ -1,0 +1,25 @@
+{{- if and .Values.tls.enabled .Values.tls.certManager.enabled }}
+# Wildcard TLS Certificate Request
+# cert-manager will provision this automatically via Let's Encrypt
+
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ include "gateway.tlsSecretName" . }}
+  namespace: {{ include "gateway.namespace" . }}
+  labels:
+    {{- include "gateway.labels" . | nindent 4 }}
+    app.kubernetes.io/name: wildcard-certificate
+spec:
+  secretName: {{ include "gateway.tlsSecretName" . }}  # Referenced by Gateway
+  issuerRef:
+    name: {{ include "gateway.clusterIssuer" . }}  # Production Let's Encrypt
+    kind: ClusterIssuer
+  dnsNames:
+    - {{ include "gateway.wildcardDomain" . | quote }}  # Wildcard certificate
+    {{- if .Values.tls.certManager.includeApex }}
+    - {{ .Values.domain | quote }}  # Apex domain
+    {{- end }}
+  # DNS-01 challenge (required for wildcard certificates)
+  # Configure per cloud provider in cert-manager setup
+{{- end }}

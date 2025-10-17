@@ -14,6 +14,11 @@ global:
     provider: cloud-default  # Use DigitalOcean Block Storage
     className: ""  # Auto-detect (do-block-storage)
 
+# ===== INFRASTRUCTURE: Gateway Configuration =====
+gateway:
+  # Override domain for staging environment
+  domain: stg.mycureapp.com
+
 # ===== CORE: Monobase API =====
 api:
   enabled: true
