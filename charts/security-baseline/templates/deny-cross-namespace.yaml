@@ -21,11 +21,11 @@ spec:
     - from:
         - podSelector: {}
 
-    # Allow from Gateway (exception)
+    # Allow from Envoy Gateway (exception)
     - from:
         - namespaceSelector:
             matchLabels:
-              kubernetes.io/metadata.name: gateway-system
+              kubernetes.io/metadata.name: envoy-gateway-system
 
     # Allow from monitoring (exception, if enabled)
     - from:

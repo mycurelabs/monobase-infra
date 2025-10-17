@@ -19,14 +19,14 @@ spec:
     - Ingress
 
   ingress:
-    # Allow from Gateway namespace
+    # Allow from Gateway namespace (Envoy Gateway pods run here)
     - from:
         - namespaceSelector:
             matchLabels:
-              kubernetes.io/metadata.name: gateway-system
+              kubernetes.io/metadata.name: envoy-gateway-system
       ports:
         - protocol: TCP
-          port: 7500
+          port: 7213
 
 ---
 # Allow Gateway → API Worker
@@ -49,7 +49,7 @@ spec:
     - from:
         - namespaceSelector:
             matchLabels:
-              kubernetes.io/metadata.name: gateway-system
+              kubernetes.io/metadata.name: envoy-gateway-system
       ports:
         - protocol: TCP
           port: 8080
@@ -75,7 +75,7 @@ spec:
     - from:
         - namespaceSelector:
             matchLabels:
-              kubernetes.io/metadata.name: gateway-system
+              kubernetes.io/metadata.name: envoy-gateway-system
       ports:
         - protocol: TCP
           port: 8080
@@ -101,16 +101,14 @@ spec:
     - from:
         - namespaceSelector:
             matchLabels:
-              kubernetes.io/metadata.name: gateway-system
+              kubernetes.io/metadata.name: envoy-gateway-system
       ports:
         - protocol: TCP
           port: 9000  # S3 API
 
 ---
 # Notes:
-# 1. Gateway namespace must be labeled:
-#    kubectl label namespace gateway-system kubernetes.io/metadata.name=gateway-system
-#
-# 2. This allows ONLY Gateway to reach applications
+# 1. Envoy Gateway pods run in envoy-gateway-system namespace
+# 2. This allows ONLY Envoy Gateway to reach applications
 # 3. Direct pod-to-pod traffic is still blocked
 # 4. Applications can't reach each other (use allow-apps-to-apps.yaml if needed)
