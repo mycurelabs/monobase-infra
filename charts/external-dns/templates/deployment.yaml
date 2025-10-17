@@ -86,7 +86,9 @@ spec:
 
         {{- if eq $instance.provider "cloudflare" }}
         # Cloudflare-specific arguments
-        - --cloudflare-proxied={{ $instance.cloudflare.proxied | default false }}
+        {{- if $instance.cloudflare.proxied }}
+        - --cloudflare-proxied
+        {{- end }}
         {{- range $instance.cloudflare.zoneidFilters }}
         - --cloudflare-zone-id-filter={{ . }}
         {{- end }}
