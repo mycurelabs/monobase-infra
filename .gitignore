@@ -8,7 +8,7 @@ rendered/
 
 # Secrets (NEVER commit secrets)
 *.secret.yaml
-*-secrets.yaml
+*-secret.yaml  # Match files like my-secret.yaml, but not external-secrets.yaml
 secrets/
 .env
 .env.local
