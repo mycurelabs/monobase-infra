@@ -220,6 +220,34 @@ mailpit:
       cpu: 100m
       memory: 64Mi
 
+# ===== External DNS =====
+# Automatic DNS record management from HTTPRoutes and Services
+externalDNS:
+  enabled: true
+
+  instances:
+    # Primary Cloudflare account for mycureapp.com
+    - name: primary
+      enabled: true
+      provider: cloudflare
+
+      domainFilters:
+        - mycureapp.com
+
+      cloudflare:
+        proxied: false  # DNS only, no Cloudflare proxy
+        apiTokenSecretRef:
+          name: cloudflare-api-token
+          key: api-token
+
+      resources:
+        requests:
+          cpu: 10m
+          memory: 32Mi
+        limits:
+          cpu: 50m
+          memory: 64Mi
+
 # ===== External Secrets =====
 externalSecrets:
   enabled: false  # TODO: Enable when secrets are configured

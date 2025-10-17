@@ -1,0 +1,151 @@
+{{- if .Values.enabled }}
+{{- range .Values.instances }}
+{{- if .enabled }}
+{{- $instance := . }}
+{{- $root := $ }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "external-dns.instanceResourceName" (dict "instance" $instance "root" $root) }}
+  namespace: {{ $root.Release.Namespace }}
+  labels:
+    {{- include "external-dns.labels" $root | nindent 4 }}
+    app.kubernetes.io/component: {{ $instance.name }}
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "external-dns.instanceSelectorLabels" (dict "instance" $instance "root" $root) | nindent 6 }}
+  template:
+    metadata:
+      annotations:
+        checksum/config: {{ printf "%v" $instance | sha256sum }}
+        {{- with $root.Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      labels:
+        {{- include "external-dns.instanceSelectorLabels" (dict "instance" $instance "root" $root) | nindent 8 }}
+        {{- with $root.Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      serviceAccountName: {{ include "external-dns.serviceAccountName" (dict "instance" $instance "root" $root) }}
+      {{- with $root.Values.securityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+      - name: external-dns
+        image: "{{ $root.Values.image.registry }}/{{ $root.Values.image.repository }}:{{ $root.Values.image.tag }}"
+        imagePullPolicy: {{ $root.Values.image.pullPolicy }}
+        args:
+        # Provider
+        - --provider={{ $instance.provider }}
+
+        # Sources to watch
+        {{- range $root.Values.global.sources }}
+        - --source={{ . }}
+        {{- end }}
+
+        # Namespace filter (watch only this namespace)
+        - --namespace={{ $root.Release.Namespace }}
+
+        # Domain filters
+        {{- range $instance.domainFilters }}
+        - --domain-filter={{ . }}
+        {{- end }}
+
+        # Policy
+        - --policy={{ $root.Values.global.policy }}
+
+        # Registry
+        - --registry={{ $root.Values.global.registry }}
+        - --txt-prefix={{ $root.Values.global.txtPrefix }}
+        - --txt-owner-id={{ $root.Release.Namespace }}-{{ $instance.name }}
+
+        # Logging
+        - --log-level={{ $root.Values.global.logLevel }}
+        - --log-format={{ $root.Values.global.logFormat }}
+
+        # Timing
+        - --interval={{ $root.Values.global.interval }}
+        {{- if $root.Values.global.triggerLoopOnEvent }}
+        - --events
+        {{- end }}
+
+        {{- if eq $instance.provider "cloudflare" }}
+        # Cloudflare-specific arguments
+        - --cloudflare-proxied={{ $instance.cloudflare.proxied | default false }}
+        {{- range $instance.cloudflare.zoneidFilters }}
+        - --cloudflare-zone-id-filter={{ . }}
+        {{- end }}
+        {{- end }}
+
+        {{- if eq $instance.provider "aws" }}
+        # AWS-specific arguments
+        {{- if $instance.aws.region }}
+        - --aws-zone-type={{ $instance.aws.zoneType | default "public" }}
+        {{- end }}
+        {{- end }}
+
+        {{- if eq $instance.provider "google" }}
+        # Google Cloud DNS-specific arguments
+        {{- if $instance.google.project }}
+        - --google-project={{ $instance.google.project }}
+        {{- end }}
+        {{- end }}
+
+        env:
+        {{- if eq $instance.provider "cloudflare" }}
+        - name: CF_API_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: {{ $instance.cloudflare.apiTokenSecretRef.name }}
+              key: {{ $instance.cloudflare.apiTokenSecretRef.key | default "api-token" }}
+        {{- end }}
+
+        {{- if eq $instance.provider "digitalocean" }}
+        - name: DO_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: {{ $instance.digitalocean.apiTokenSecretRef.name }}
+              key: {{ $instance.digitalocean.apiTokenSecretRef.key | default "token" }}
+        {{- end }}
+
+        {{- with $instance.resources }}
+        resources:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+
+        securityContext:
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+          runAsUser: 65534
+          capabilities:
+            drop:
+              - ALL
+
+      {{- with $root.Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+
+      {{- with $root.Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+
+      {{- with $root.Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+
+      {{- with $root.Values.priorityClassName }}
+      priorityClassName: {{ . }}
+      {{- end }}
+{{- end }}
+{{- end }}
+{{- end }}

@@ -1,0 +1,26 @@
+apiVersion: v2
+name: external-dns
+description: Multi-instance External DNS for automatic DNS record management from Kubernetes resources
+type: application
+version: 1.0.0
+appVersion: "0.14.0"
+
+keywords:
+  - dns
+  - external-dns
+  - gateway-api
+  - httproute
+  - cloudflare
+  - route53
+
+maintainers:
+  - name: MyCure DevOps
+    email: devops@mycureapp.com
+
+# Dependencies
+dependencies: []
+
+# Annotations
+annotations:
+  category: Infrastructure
+  licenses: Apache-2.0

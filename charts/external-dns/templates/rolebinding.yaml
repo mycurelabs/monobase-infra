@@ -1,0 +1,25 @@
+{{- if .Values.enabled }}
+{{- range .Values.instances }}
+{{- if .enabled }}
+{{- $instance := . }}
+{{- $root := $ }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "external-dns.instanceResourceName" (dict "instance" $instance "root" $root) }}
+  namespace: {{ $root.Release.Namespace }}
+  labels:
+    {{- include "external-dns.labels" $root | nindent 4 }}
+    app.kubernetes.io/component: {{ $instance.name }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: external-dns
+subjects:
+- kind: ServiceAccount
+  name: {{ include "external-dns.serviceAccountName" (dict "instance" $instance "root" $root) }}
+  namespace: {{ $root.Release.Namespace }}
+{{- end }}
+{{- end }}
+{{- end }}

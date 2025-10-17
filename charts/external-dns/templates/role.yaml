@@ -1,0 +1,37 @@
+{{- if .Values.enabled }}
+{{- if gt (len .Values.instances) 0 }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: external-dns
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "external-dns.labels" . | nindent 4 }}
+rules:
+# Read Gateway API resources in this namespace
+- apiGroups: ["gateway.networking.k8s.io"]
+  resources: ["httproutes", "tcproutes", "tlsroutes", "grpcroutes"]
+  verbs: ["get", "list", "watch"]
+
+# Read Services in this namespace
+- apiGroups: [""]
+  resources: ["services"]
+  verbs: ["get", "list", "watch"]
+
+# Manage Endpoints for TXT record ownership tracking
+- apiGroups: [""]
+  resources: ["endpoints"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+
+# Read pods for service discovery
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["get", "list", "watch"]
+
+# Read nodes (for some providers)
+- apiGroups: [""]
+  resources: ["nodes"]
+  verbs: ["get", "list", "watch"]
+{{- end }}
+{{- end }}
