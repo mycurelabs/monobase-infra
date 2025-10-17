@@ -32,6 +32,10 @@ spec:
     # Use Helm to render infrastructure components
     helm:
       releaseName: infrastructure
+      # Cluster-specific values override defaults
+      # Pattern: clusters/{cluster-name}/infrastructure-values.yaml
+      valueFiles:
+        - ../../clusters/mycure-doks-main/infrastructure-values.yaml
 
   destination:
     server: https://kubernetes.default.svc

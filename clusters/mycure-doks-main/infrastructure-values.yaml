@@ -1,0 +1,10 @@
+# Infrastructure values for mycure-doks-main cluster
+# This file contains cluster-specific infrastructure configuration
+# that overrides the defaults in argocd/infrastructure/values.yaml
+
+# Gateway configuration - shared across all deployments on this cluster
+gateway:
+  # Base domain for this cluster (all deployments will use subdomains)
+  # Staging: stg.mycureapp.com
+  # Production deployments could use: mycureapp.com
+  domain: stg.mycureapp.com
