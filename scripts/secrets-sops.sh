@@ -52,20 +52,29 @@ setup_sops() {
     # Collect TLS configuration
     collect_tls_config
 
-    # Create bootstrap secret in cluster
+    # Create bootstrap secret in cert-manager namespace
     log_info "Creating sops-age-key secret in cert-manager namespace..."
     kubectl create namespace cert-manager --dry-run=client -o yaml | kubectl apply -f -
     kubectl create secret generic sops-age-key \
         --from-file=age.agekey="$AGE_KEY_FILE" \
         --namespace=cert-manager \
         --dry-run=client -o yaml | kubectl apply -f -
-    log_success "Created sops-age-key secret"
+    log_success "Created sops-age-key secret in cert-manager namespace"
+
+    # Create secret in argocd namespace (for KSOPS plugin)
+    log_info "Creating sops-age-key secret in argocd namespace (for KSOPS)..."
+    kubectl create namespace argocd --dry-run=client -o yaml | kubectl apply -f -
+    kubectl create secret generic sops-age-key \
+        --from-file=keys.txt="$AGE_KEY_FILE" \
+        --namespace=argocd \
+        --dry-run=client -o yaml | kubectl apply -f -
+    log_success "Created sops-age-key secret in argocd namespace"
 
     # Encrypt Cloudflare token
     encrypt_cloudflare_token_sops
 
-    # Decrypt and apply Cloudflare secret to cluster
-    apply_cloudflare_secret_sops
+    # Note: Secret application is now handled by ArgoCD via KSOPS
+    log_info "Cloudflare secret encrypted - ArgoCD will decrypt and apply via KSOPS"
 
     # Update infrastructure configuration
     log_info "Updating infrastructure configuration..."
@@ -106,17 +115,8 @@ EOF
     log_success "Encrypted Cloudflare API token to $OUTPUT_FILE"
 }
 
-apply_cloudflare_secret_sops() {
-    log_info "Applying decrypted Cloudflare secret to cluster..."
-
-    # Decrypt and apply to cluster
-    ENCRYPTED_FILE="${REPO_ROOT}/infrastructure/tls/cloudflare-token.enc.yaml"
-    export SOPS_AGE_KEY_FILE="$AGE_KEY_FILE"
-
-    sops --decrypt "$ENCRYPTED_FILE" | kubectl apply -f -
-
-    log_success "Applied Cloudflare secret to cert-manager namespace"
-}
+# Note: This function has been removed - secrets are now applied via ArgoCD + KSOPS
+# ArgoCD will automatically decrypt SOPS secrets during sync using the KSOPS plugin
 
 show_next_steps_sops() {
     echo
@@ -124,22 +124,24 @@ show_next_steps_sops() {
     echo " Next Steps"
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
     echo
-    log_success "SOPS setup complete!"
+    log_success "SOPS + KSOPS setup complete!"
     echo
     echo "1. Backup your age private key securely:"
     echo "   ${REPO_ROOT}/age.agekey"
     echo
     echo "2. Commit the encrypted files to Git:"
     echo "   git add ."
-    echo "   git commit -m \"feat: Add TLS certificate automation with SOPS\""
+    echo "   git commit -m \"feat: Add KSOPS GitOps secret management\""
     echo "   git push"
     echo
-    echo "3. Wait for ArgoCD to sync (or trigger manually)"
+    echo "3. ArgoCD will automatically decrypt and apply secrets via KSOPS"
     echo
-    echo "4. Verify ClusterIssuer is ready:"
-    echo "   kubectl get clusterissuer"
+    echo "4. Verify TLS secrets application:"
+    echo "   kubectl get application tls-secrets -n argocd"
     echo
     echo "5. Check certificate provisioning:"
     echo "   kubectl get certificate -n gateway-system"
+    echo
+    echo "Note: Secrets are now managed via GitOps - no manual kubectl apply needed!"
     echo
 }
