@@ -10,6 +10,12 @@ certManager:
   enabled: true
   version: v1.14.2
 
+# Cert Manager Resources - ClusterIssuers and certificate configuration
+certManagerIssuers:
+  enabled: false  # Enable after running scripts/secrets.sh
+  email: ""  # Email for Let's Encrypt notifications (set by scripts/secrets.sh)
+  dnsZone: ""  # DNS zone for DNS-01 challenge (e.g., mycureapp.com)
+
 # Envoy Gateway - Gateway API implementation
 envoyGateway:
   enabled: true

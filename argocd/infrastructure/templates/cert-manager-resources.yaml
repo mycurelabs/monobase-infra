@@ -1,0 +1,55 @@
+{{- if .Values.certManagerIssuers.enabled }}
+# ArgoCD Application: cert-manager TLS Resources
+# Deploys ClusterIssuers and ExternalSecrets for TLS certificate automation
+# Sync Wave 1 - After cert-manager (wave 0), before gateway (wave 1)
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: cert-manager-resources
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+  labels:
+    app.kubernetes.io/name: cert-manager-resources
+    app.kubernetes.io/component: infrastructure
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+
+  source:
+    repoURL: {{ .Values.argocd.repoURL }}
+    targetRevision: {{ .Values.argocd.targetRevision }}
+    path: infrastructure/tls
+
+  destination:
+    server: https://kubernetes.default.svc
+    # Resources will be created in their respective namespaces
+    # ClusterIssuers are cluster-scoped
+    # ExternalSecret goes to cert-manager namespace
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 3m
+
+  # Ignore differences in status fields
+  ignoreDifferences:
+    - group: cert-manager.io
+      kind: ClusterIssuer
+      jsonPointers:
+        - /status
+    - group: external-secrets.io
+      kind: ExternalSecret
+      jsonPointers:
+        - /status
+{{- end }}

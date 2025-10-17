@@ -1,0 +1,24 @@
+# mise (formerly rtx) - Development Tools Configuration
+# https://mise.jdx.dev/
+#
+# Install all tools: mise install
+# Update tools: mise upgrade
+
+[tools]
+# Kubernetes Tools
+kubectl = "latest"
+helm = "latest"
+argocd = "latest"
+
+# Terraform
+terraform = "latest"
+
+# Secrets Management
+sops = "latest"       # Mozilla SOPS - Secrets encryption
+age = "latest"        # age - Simple encryption tool for SOPS
+
+# Cloud CLIs (optional - install only if using cloud providers)
+# Uncomment the providers you need:
+# aws-cli = "latest"    # AWS Secrets Manager
+# azure-cli = "latest"  # Azure Key Vault
+# gcloud = "latest"     # GCP Secret Manager

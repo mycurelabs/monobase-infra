@@ -14,6 +14,15 @@ secrets/
 .env.local
 credentials.json
 
+# Age private keys (NEVER commit)
+age.agekey
+*.agekey
+.age-key
+
+# Plaintext secrets before encryption
+*-plaintext.yaml
+*.decrypted.yaml
+
 # OpenTofu/Terraform state and cache
 terraform/**/.terraform/
 terraform/**/.terragrunt-cache/
@@ -51,6 +60,4 @@ temp/
 # Logs
 *.log
 
-# SOPS encrypted files (raw)
-*.enc.yaml
 **/charts/*.tgz

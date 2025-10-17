@@ -1,0 +1,27 @@
+# SOPS Configuration
+# Defines encryption rules for secrets
+# https://github.com/getsops/sops
+
+# Creation rules - define which keys to use for new files
+creation_rules:
+  # Encrypt all .enc.yaml files with age
+  - path_regex: \.enc\.yaml$
+    age: >-
+      AGE_PUBLIC_KEY_PLACEHOLDER
+    # Only encrypt the 'data' and 'stringData' fields in Kubernetes secrets
+    # Leave metadata and structure visible
+    encrypted_regex: '^(data|stringData)$'
+
+  # Encrypt all .enc.json files with age
+  - path_regex: \.enc\.json$
+    age: >-
+      AGE_PUBLIC_KEY_PLACEHOLDER
+
+  # Encrypt specific secret files
+  - path_regex: secrets/.*\.yaml$
+    age: >-
+      AGE_PUBLIC_KEY_PLACEHOLDER
+    encrypted_regex: '^(data|stringData|password|token|key|secret)$'
+
+# Note: AGE_PUBLIC_KEY_PLACEHOLDER will be replaced by scripts/secrets.sh
+# with your actual age public key (e.g., age1ql3z7hjy54pw3hyww5ayyfg7...)
