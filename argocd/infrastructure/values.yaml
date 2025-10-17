@@ -13,8 +13,8 @@ certManager:
 # Cert Manager Resources - ClusterIssuers and certificate configuration
 certManagerIssuers:
   enabled: true
-  email: "caretheextramile@gmail.com" notifications (set by scripts/secrets.sh)
-  dnsZone: "mycureapp.com" for DNS-01 challenge (e.g., mycureapp.com)
+  email: "caretheextramile@gmail.com"  # Email for Let's Encrypt notifications (set by scripts/secrets.sh)
+  dnsZone: "mycureapp.com"  # DNS zone for DNS-01 challenge (e.g., mycureapp.com)
 
 # Envoy Gateway - Gateway API implementation
 envoyGateway:

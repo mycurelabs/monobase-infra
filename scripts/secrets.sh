@@ -164,11 +164,11 @@ update_infrastructure_values() {
     log_info "Updating infrastructure values..."
 
     # Enable certManagerIssuers
-    sed -i "s|enabled: false  # Enable after running scripts/secrets.sh|enabled: true|" \
+    sed -i "s|enabled: false  # Enable after running scripts/secrets.sh|enabled: true  # Enable after running scripts/secrets.sh|" \
         "${REPO_ROOT}/argocd/infrastructure/values.yaml"
-    sed -i "s|email: \"\"  # Email for Let's Encrypt|email: \"${LETSENCRYPT_EMAIL}\"|" \
+    sed -i "s|email: \"\"|email: \"${LETSENCRYPT_EMAIL}\"|" \
         "${REPO_ROOT}/argocd/infrastructure/values.yaml"
-    sed -i "s|dnsZone: \"\"  # DNS zone|dnsZone: \"${DNS_ZONE}\"|" \
+    sed -i "s|dnsZone: \"\"|dnsZone: \"${DNS_ZONE}\"|" \
         "${REPO_ROOT}/argocd/infrastructure/values.yaml"
 
     # Update external secrets provider
