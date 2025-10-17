@@ -1,0 +1,116 @@
+# Allow Traffic from Gateway to Applications
+# Permits Envoy Gateway to route traffic to Monobase API, API Worker, Monobase Account
+
+---
+# Allow Gateway → Monobase API
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-gateway-to-api
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    security-policy: allow-ingress
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: api
+
+  policyTypes:
+    - Ingress
+
+  ingress:
+    # Allow from Gateway namespace
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: gateway-system
+      ports:
+        - protocol: TCP
+          port: 7500
+
+---
+# Allow Gateway → API Worker
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-gateway-to-api-worker
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    security-policy: allow-ingress
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: api-worker
+
+  policyTypes:
+    - Ingress
+
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: gateway-system
+      ports:
+        - protocol: TCP
+          port: 8080
+
+---
+# Allow Gateway → Monobase Account
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-gateway-to-account
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    security-policy: allow-ingress
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: account
+
+  policyTypes:
+    - Ingress
+
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: gateway-system
+      ports:
+        - protocol: TCP
+          port: 8080
+
+---
+# Allow Gateway → MinIO (if enabled)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-gateway-to-minio
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    security-policy: allow-ingress
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: minio
+
+  policyTypes:
+    - Ingress
+
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: gateway-system
+      ports:
+        - protocol: TCP
+          port: 9000  # S3 API
+
+---
+# Notes:
+# 1. Gateway namespace must be labeled:
+#    kubectl label namespace gateway-system kubernetes.io/metadata.name=gateway-system
+#
+# 2. This allows ONLY Gateway to reach applications
+# 3. Direct pod-to-pod traffic is still blocked
+# 4. Applications can't reach each other (use allow-apps-to-apps.yaml if needed)

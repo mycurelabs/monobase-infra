@@ -1,0 +1,84 @@
+# Allow Applications to Access Database
+# Permits API to connect to PostgreSQL
+
+---
+# Allow API → PostgreSQL
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-api-to-postgresql
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    security-policy: allow-egress
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: postgresql
+
+  policyTypes:
+    - Ingress
+
+  ingress:
+    # Allow from API
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: api
+      ports:
+        - protocol: TCP
+          port: 5432
+
+---
+# Egress from API to PostgreSQL
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-api-egress-to-postgresql
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    security-policy: allow-egress
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: api
+
+  policyTypes:
+    - Egress
+
+  egress:
+    # To PostgreSQL
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: postgresql
+      ports:
+        - protocol: TCP
+          port: 5432
+
+    # To DNS (required for service discovery)
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+        - podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+
+    # To Kubernetes API (for service discovery)
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: TCP
+          port: 443
+
+---
+# Notes:
+# 1. Only API backend can access PostgreSQL
+# 2. Account (frontend) has NO database access (security!)
+# 3. DNS access required for service name resolution
+# 4. Kubernetes API access needed for service discovery

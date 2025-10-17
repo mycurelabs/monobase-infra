@@ -16,10 +16,12 @@ spec:
   source:
     repoURL: {{ .Values.argocd.repoURL }}
     targetRevision: {{ .Values.argocd.targetRevision | default "main" }}
-    path: infrastructure/security
-    directory:
-      recurse: true
-      include: '{networkpolicies/*.yaml,rbac/*.yaml.template}'
+    path: charts/security-baseline
+    helm:
+      releaseName: security-baseline
+      valuesObject:
+        global:
+          namespace: {{ .Values.global.namespace }}
 
   destination:
     server: https://kubernetes.default.svc

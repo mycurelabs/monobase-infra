@@ -1,0 +1,150 @@
+# Allow Applications to Access Storage (MinIO, Typesense)
+
+---
+# Allow Monobase API → MinIO (if enabled)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-api-to-minio
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    security-policy: allow-egress
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: api
+
+  policyTypes:
+    - Egress
+
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: minio
+      ports:
+        - protocol: TCP
+          port: 9000  # S3 API
+
+---
+# Allow Monobase API → Typesense (if enabled)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-api-to-typesense
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    security-policy: allow-egress
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: api
+
+  policyTypes:
+    - Egress
+
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: typesense
+      ports:
+        - protocol: TCP
+          port: 8108
+
+---
+# Allow ingress to MinIO from Monobase API
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-minio-from-api
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    security-policy: allow-ingress
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: minio
+
+  policyTypes:
+    - Ingress
+
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: api
+      ports:
+        - protocol: TCP
+          port: 9000
+
+---
+# Allow ingress to Typesense from Monobase API
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-typesense-from-api
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    security-policy: allow-ingress
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: typesense
+
+  policyTypes:
+    - Ingress
+
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: api
+      ports:
+        - protocol: TCP
+          port: 8108
+
+---
+# Allow external HTTPS (for external APIs, SMTP, etc.)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-apps-egress-https
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    security-policy: allow-egress
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: api
+
+  policyTypes:
+    - Egress
+
+  egress:
+    # Allow HTTPS to internet (for external APIs)
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: TCP
+          port: 443
+
+    # Allow SMTP (if using external email service)
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: TCP
+          port: 587  # SMTP TLS
+        - protocol: TCP
+          port: 465  # SMTPS
+
+---
+# Notes:
+# 1. MinIO and Typesense are optional (check .Values before applying)
+# 2. Only Monobase API accesses these services
+# 3. Monobase Account and API Worker do NOT need storage access
+# 4. External HTTPS needed for:
+#    - Payment APIs (Stripe, PayPal)
+#    - SMS APIs (Twilio)
+#    - Email services (SendGrid, SES)
+#    - Third-party integrations

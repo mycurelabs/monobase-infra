@@ -1,0 +1,32 @@
+# Default values for security-baseline chart
+# This chart deploys security baseline resources including NetworkPolicies and RBAC
+
+# Global configuration
+global:
+  # Target namespace where security policies will be deployed
+  # This should be overridden per environment (e.g., mycure-staging, mycure-prod)
+  namespace: default
+
+# NetworkPolicy configuration
+networkPolicies:
+  # Enable default deny all policy (recommended for zero-trust security)
+  defaultDenyAll: true
+
+  # Enable cross-namespace traffic restrictions
+  denyCrossNamespace: true
+
+  # Enable application-specific policies
+  allowAppsToDb: true
+  allowAppsToStorage: true
+  allowGatewayToApps: true
+
+# RBAC configuration
+rbac:
+  # Enable RBAC policies
+  enabled: true
+
+# Labels to apply to all resources
+labels: {}
+
+# Annotations to apply to all resources
+annotations: {}

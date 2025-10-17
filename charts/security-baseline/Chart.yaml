@@ -1,0 +1,13 @@
+apiVersion: v2
+name: security-baseline
+description: Security baseline with NetworkPolicies and RBAC for Kubernetes applications
+type: application
+version: 0.1.0
+appVersion: "1.0"
+keywords:
+  - security
+  - networkpolicy
+  - rbac
+  - zero-trust
+maintainers:
+  - name: Monobase Labs
