@@ -114,18 +114,18 @@ spec:
         - name: STORAGE_PUBLIC_ENDPOINT
           value: {{ include "api.minio.url" . | quote }}
         - name: STORAGE_BUCKET
-          value: {{ .Values.minio.defaultBuckets | default "monobase-files" | quote }}
+          value: {{ (index .Values.minio.buckets 0).name | default "monobase-files" | quote }}
         - name: STORAGE_REGION
           value: {{ .Values.minio.region | default "us-east-1" | quote }}
         - name: STORAGE_ACCESS_KEY_ID
           valueFrom:
             secretKeyRef:
-              name: {{ .Values.minio.auth.existingSecret | default "minio" }}
+              name: minio
               key: rootUser
         - name: STORAGE_SECRET_ACCESS_KEY
           valueFrom:
             secretKeyRef:
-              name: {{ .Values.minio.auth.existingSecret | default "minio" }}
+              name: minio
               key: rootPassword
         - name: STORAGE_UPLOAD_URL_EXPIRY
           value: "300"
