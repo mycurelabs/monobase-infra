@@ -151,11 +151,19 @@ valkey:
 minio:
   enabled: true
   mode: standalone
-  replicas: 1
+  
+  auth:
+    rootUser: minioadmin
+    rootPassword: minioadmin
+  
+  statefulset:
+    replicaCount: 1  # Bitnami uses statefulset.replicaCount
+  
   persistence:
     enabled: true
     storageClass: ""  # Auto-detect (do-block-storage)
     size: 10Gi
+  
   resources:
     requests:
       cpu: 100m
@@ -163,33 +171,13 @@ minio:
     limits:
       cpu: 500m
       memory: 512Mi
-  rootUser: minioadmin
-  rootPassword: minioadmin
-  buckets:
-    - name: monobase-files
-      policy: none
-      purge: false
-  securityContext:
-    enabled: true
-    runAsUser: 1000
-    runAsGroup: 1000
-    fsGroup: 1000
-    fsGroupChangePolicy: OnRootMismatch
-  podSecurityContext:
-    runAsUser: 1000
-    runAsGroup: 1000
-    fsGroup: 1000
-    runAsNonRoot: true
-    seccompProfile:
-      type: RuntimeDefault
-  containerSecurityContext:
-    runAsUser: 1000
-    runAsNonRoot: true
-    allowPrivilegeEscalation: false
-    capabilities:
-      drop:
-        - ALL
-    readOnlyRootFilesystem: false
+  
+  defaultBuckets: "monobase-files"
+  
+  # Bitnami chart has secure defaults:
+  # - podSecurityContext: fsGroup 1001, runAsNonRoot true
+  # - containerSecurityContext: runAsUser 1001, allowPrivilegeEscalation false
+  # - capabilities dropped, readOnlyRootFilesystem true
 
 # ===== STAGING: Mailpit (Email Testing) =====
 # Note: Mailpit is deployed as separate ArgoCD app (Wave 2)

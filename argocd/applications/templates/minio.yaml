@@ -16,8 +16,8 @@ spec:
 
   source:
     chart: minio
-    repoURL: https://charts.min.io/
-    targetRevision: 8.x.x
+    repoURL: registry-1.docker.io/bitnamicharts
+    targetRevision: 17.x.x
     helm:
       releaseName: minio
       valuesObject:
