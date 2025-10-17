@@ -21,12 +21,13 @@ spec:
     helm:
       releaseName: api
       valuesObject:
-        {{- toYaml .Values.api | nindent 8 }}
+        {{- $apiValues := omit .Values.api "postgresql" "minio" "valkey" "mailpit" }}
+        {{- toYaml $apiValues | nindent 8 }}
         global: {{ .Values.global | toYaml | nindent 10 }}
-        minio: {{ .Values.minio | toYaml | nindent 10 }}
-        postgresql: {{ .Values.postgresql | toYaml | nindent 10 }}
-        valkey: {{ .Values.valkey | toYaml | nindent 10 }}
-        mailpit: {{ .Values.mailpit | toYaml | nindent 10 }}
+        minio: {{ merge (.Values.api.minio | default dict) .Values.minio | toYaml | nindent 10 }}
+        postgresql: {{ merge (.Values.api.postgresql | default dict) .Values.postgresql | toYaml | nindent 10 }}
+        valkey: {{ merge (.Values.api.valkey | default dict) .Values.valkey | toYaml | nindent 10 }}
+        mailpit: {{ merge (.Values.api.mailpit | default dict) .Values.mailpit | toYaml | nindent 10 }}
 
   destination:
     server: https://kubernetes.default.svc
