@@ -64,8 +64,11 @@ setup_sops() {
     # Encrypt Cloudflare token
     encrypt_cloudflare_token_sops
 
-    # Update ExternalSecrets configuration
-    log_info "Updating External Secrets configuration for SOPS..."
+    # Decrypt and apply Cloudflare secret to cluster
+    apply_cloudflare_secret_sops
+
+    # Update infrastructure configuration
+    log_info "Updating infrastructure configuration..."
     update_infrastructure_values "sops"
 
     # Template ClusterIssuers
@@ -101,6 +104,18 @@ EOF
     mv "$TEMP_FILE" "$OUTPUT_FILE"
 
     log_success "Encrypted Cloudflare API token to $OUTPUT_FILE"
+}
+
+apply_cloudflare_secret_sops() {
+    log_info "Applying decrypted Cloudflare secret to cluster..."
+
+    # Decrypt and apply to cluster
+    ENCRYPTED_FILE="${REPO_ROOT}/infrastructure/tls/cloudflare-token.enc.yaml"
+    export SOPS_AGE_KEY_FILE="$AGE_KEY_FILE"
+
+    sops --decrypt "$ENCRYPTED_FILE" | kubectl apply -f -
+
+    log_success "Applied Cloudflare secret to cert-manager namespace"
 }
 
 show_next_steps_sops() {
