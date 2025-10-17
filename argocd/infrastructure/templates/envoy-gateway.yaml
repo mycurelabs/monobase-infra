@@ -20,6 +20,7 @@ spec:
     targetRevision: {{ .Values.envoyGateway.version | default "v1.2.0" }}
     helm:
       releaseName: envoy-gateway
+      skipCrds: true  # Use existing Gateway API CRDs, don't try to replace them
   
   destination:
     server: https://kubernetes.default.svc
