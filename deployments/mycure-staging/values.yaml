@@ -154,7 +154,7 @@ valkey:
 
 # ===== OPTIONAL: MinIO (Object Storage) =====
 minio:
-  enabled: true
+  enabled: false  # Temporarily disabled to clear ArgoCD cache
   mode: standalone
   replicas: 1
 
