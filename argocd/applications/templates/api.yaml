@@ -23,6 +23,10 @@ spec:
       valuesObject:
         {{- toYaml .Values.api | nindent 8 }}
         global: {{ .Values.global | toYaml | nindent 10 }}
+        minio: {{ .Values.minio | toYaml | nindent 10 }}
+        postgresql: {{ .Values.postgresql | toYaml | nindent 10 }}
+        valkey: {{ .Values.valkey | toYaml | nindent 10 }}
+        mailpit: {{ .Values.mailpit | toYaml | nindent 10 }}
 
   destination:
     server: https://kubernetes.default.svc
