@@ -13,7 +13,7 @@ certManager:
 # Envoy Gateway - Gateway API implementation
 envoyGateway:
   enabled: true
-  version: v1.0.1
+  version: v1.2.0
 
 # External Secrets - Secret management
 externalSecrets:
