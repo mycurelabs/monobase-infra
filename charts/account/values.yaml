@@ -51,7 +51,7 @@ service:
 
 gateway:
   enabled: true
-  hostname: ""  # Empty = uses app.{global.domain}
+  hostname: ""  # Empty = uses account.{global.domain}
   parentRefs:
     - name: shared-gateway
       namespace: gateway-system

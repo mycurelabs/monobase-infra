@@ -61,13 +61,13 @@ Create the name of the service account to use
 {{- end }}
 
 {{/*
-Gateway hostname - defaults to app.{global.domain}
+Gateway hostname - defaults to account.{global.domain}
 */}}
 {{- define "account.gateway.hostname" -}}
 {{- if .Values.gateway.hostname }}
 {{- .Values.gateway.hostname }}
 {{- else }}
-{{- printf "app.%s" .Values.global.domain }}
+{{- printf "account.%s" .Values.global.domain }}
 {{- end }}
 {{- end }}
 

@@ -61,13 +61,13 @@ Create the name of the service mycure to use
 {{- end }}
 
 {{/*
-Gateway hostname - defaults to app.{global.domain}
+Gateway hostname - defaults to mycure.{global.domain}
 */}}
 {{- define "mycure.gateway.hostname" -}}
 {{- if .Values.gateway.hostname }}
 {{- .Values.gateway.hostname }}
 {{- else }}
-{{- printf "app.%s" .Values.global.domain }}
+{{- printf "mycure.%s" .Values.global.domain }}
 {{- end }}
 {{- end }}
 

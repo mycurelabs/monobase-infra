@@ -51,7 +51,7 @@ service:
 
 gateway:
   enabled: true
-  hostname: ""  # Empty = uses app.{global.domain}
+  hostname: ""  # Empty = uses mycure.{global.domain}
 
 resources:
   requests:
