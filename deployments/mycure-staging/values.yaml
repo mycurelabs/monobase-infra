@@ -308,6 +308,8 @@ minio:
   gateway:
     enabled: true
     hostname: ""  # Empty = uses storage.stg.mycureapp.com
+    rateLimit:
+      enabled: false  # Disable - BackendTrafficPolicy not supported by gateway
 
 # ===== STAGING: Mailpit (Email Testing) =====
 # Note: Mailpit is deployed as separate ArgoCD app (Wave 2)
