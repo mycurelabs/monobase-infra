@@ -114,14 +114,14 @@ local-path
 
 {{/*
 MongoDB host - constructs hostname from MongoDB dependency
-Supports both standalone and replication architectures
+Supports both standalone and replicaset architectures
 */}}
 {{- define "hapihub.mongodb.host" -}}
-{{- $serviceName := .Values.mongodb.serviceName | default (printf "%s-mongodb" .Release.Name) -}}
+{{- $serviceName := .Values.mongodb.serviceName | default "mongodb" -}}
 {{- $namespace := include "hapihub.namespace" . -}}
-{{- $architecture := .Values.mongodb.architecture | default "replication" -}}
-{{- if eq $architecture "replication" -}}
-{{- printf "%s-primary.%s.svc.cluster.local" $serviceName $namespace -}}
+{{- $architecture := .Values.mongodb.architecture | default "replicaset" -}}
+{{- if eq $architecture "replicaset" -}}
+{{- printf "%s-headless.%s.svc.cluster.local" $serviceName $namespace -}}
 {{- else -}}
 {{- printf "%s.%s.svc.cluster.local" $serviceName $namespace -}}
 {{- end -}}
