@@ -1,0 +1,52 @@
+# Default values for Mailpit chart
+# This is a YAML-formatted file with sensible defaults
+# Override these values in deployment-specific values files
+
+# Global configuration (shared across charts)
+global:
+  domain: example.com
+  namespace: example-prod
+  environment: production
+  gateway:
+    name: shared-gateway
+    namespace: gateway-system
+
+enabled: false  # Master enable/disable for both Mailpit and HTTPRoute
+
+nameOverride: ""
+fullnameOverride: ""
+
+# ===== Official Mailpit Chart Values (passed to subchart) =====
+# These values are passed through to the official Mailpit Helm chart dependency
+# See https://github.com/jouve/charts for all options
+
+resources:
+  requests:
+    cpu: 25m
+    memory: 32Mi
+  limits:
+    cpu: 100m
+    memory: 64Mi
+
+# ===== Custom Gateway API Configuration =====
+# HTTPRoute configuration for exposing Mailpit web UI via Envoy Gateway
+
+gateway:
+  enabled: true
+  hostname: ""  # Empty = uses mail.{global.domain}
+  parentRefs:
+    - name: shared-gateway
+      namespace: gateway-system
+  
+  # Optional: Rate limiting configuration for Mailpit web UI
+  # Mailpit is typically for internal/staging use, lighter limits than MinIO
+  rateLimit:
+    enabled: false
+    # Per-IP rate limit
+    perIP:
+      requests: 50
+      unit: Second
+    # Burst limit
+    burst:
+      requests: 200
+      unit: Minute

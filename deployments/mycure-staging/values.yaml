@@ -220,6 +220,11 @@ mailpit:
       cpu: 100m
       memory: 64Mi
 
+  # Gateway API HTTPRoute configuration
+  gateway:
+    enabled: true
+    hostname: ""  # Uses mail.stg.mycureapp.com
+
 # ===== External DNS =====
 # Automatic DNS record management from HTTPRoutes and Services
 externalDNS:

@@ -1,0 +1,23 @@
+apiVersion: v2
+name: mailpit
+description: Mailpit email testing tool with Gateway API integration
+type: application
+version: 1.0.0
+appVersion: "0.x.x"
+keywords:
+  - email
+  - smtp
+  - mailpit
+  - testing
+home: https://github.com/monobaselabs/monobase-infra
+sources:
+  - https://github.com/axllent/mailpit
+maintainers:
+  - name: Your Organization
+    email: devops@example.com
+
+dependencies:
+  - name: mailpit
+    version: "~0.28.0"
+    repository: https://jouve.github.io/charts/
+    condition: enabled

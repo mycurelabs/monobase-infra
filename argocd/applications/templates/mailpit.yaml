@@ -15,19 +15,15 @@ spec:
   project: default
 
   source:
-    chart: mailpit
-    repoURL: https://jouve.github.io/charts/
-    targetRevision: 0.x.x
+    repoURL: {{ .Values.global.repoURL | default "https://github.com/monobaselabs/monobase-infra.git" }}
+    targetRevision: {{ .Values.global.targetRevision | default "main" }}
+    path: charts/mailpit
     helm:
       releaseName: mailpit
       valuesObject:
-        resources:
-          requests:
-            cpu: {{ .Values.mailpit.resources.requests.cpu | default "50m" }}
-            memory: {{ .Values.mailpit.resources.requests.memory | default "50Mi" }}
-          limits:
-            cpu: {{ .Values.mailpit.resources.limits.cpu | default "200m" }}
-            memory: {{ .Values.mailpit.resources.limits.memory | default "200Mi" }}
+        global:
+          {{- toYaml .Values.global | nindent 10 }}
+        {{- toYaml .Values.mailpit | nindent 8 }}
 
   destination:
     server: https://kubernetes.default.svc
