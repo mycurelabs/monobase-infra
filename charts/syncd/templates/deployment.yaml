@@ -115,32 +115,6 @@ spec:
         - name: REDIS_URL
           value: {{ include "syncd.valkey.url" . | quote }}
         {{- end }}
-        {{- if .Values.minio.enabled }}
-        - name: STORAGE_PROVIDER
-          value: "minio"
-        - name: STORAGE_ENDPOINT
-          value: {{ include "syncd.minio.url" . | quote }}
-        - name: STORAGE_PUBLIC_ENDPOINT
-          value: {{ include "syncd.minio.url" . | quote }}
-        - name: STORAGE_BUCKET
-          value: {{ .Values.minio.defaultBuckets | default "syncd-files" | quote }}
-        - name: STORAGE_REGION
-          value: {{ .Values.minio.region | default "us-east-1" | quote }}
-        - name: STORAGE_ACCESS_KEY_ID
-          valueFrom:
-            secretKeyRef:
-              name: minio
-              key: rootUser
-        - name: STORAGE_SECRET_ACCESS_KEY
-          valueFrom:
-            secretKeyRef:
-              name: minio
-              key: rootPassword
-        - name: STORAGE_UPLOAD_URL_EXPIRY
-          value: "300"
-        - name: STORAGE_DOWNLOAD_URL_EXPIRY
-          value: "900"
-        {{- end }}
         {{- if .Values.mailpit.enabled }}
         - name: SMTP_HOST
           value: {{ include "syncd.mailpit.host" . | quote }}
