@@ -1,9 +1,9 @@
 apiVersion: v2
-name: minio
-description: MinIO object storage with Gateway API integration
+name: minio-wrapper
+description: MinIO object storage with Gateway API integration (Bitnami wrapper)
 type: application
 version: 1.0.0
-appVersion: "5.x.x"
+appVersion: "17.0.22"
 keywords:
   - storage
   - s3
