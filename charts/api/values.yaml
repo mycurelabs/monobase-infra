@@ -19,7 +19,7 @@ replicaCount: 2
 image:
   repository: ghcr.io/monobaselabs/api
   pullPolicy: IfNotPresent
-  tag: "0.1.0"
+  tag: "latest"
 
 imagePullSecrets: []
 nameOverride: ""
