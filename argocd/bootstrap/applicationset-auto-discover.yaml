@@ -65,7 +65,7 @@ spec:
 
       source:
         # Point to this Git repository
-        repoURL: https://github.com/monobaselabs/monobase-infra.git
+        repoURL: https://github.com/mycurelabs/monobase-infra.git
         targetRevision: HEAD
         path: argocd/applications
 
