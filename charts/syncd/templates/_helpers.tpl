@@ -61,13 +61,13 @@ Create the name of the service account to use
 {{- end }}
 
 {{/*
-Gateway hostname - defaults to syncd.{global.domain}
+Gateway hostname - defaults to sync.{global.domain}
 */}}
 {{- define "syncd.gateway.hostname" -}}
 {{- if .Values.gateway.hostname }}
 {{- .Values.gateway.hostname }}
 {{- else }}
-{{- printf "syncd.%s" .Values.global.domain }}
+{{- printf "sync.%s" .Values.global.domain }}
 {{- end }}
 {{- end }}
 
