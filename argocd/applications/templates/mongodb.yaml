@@ -22,7 +22,7 @@ spec:
       releaseName: mongodb
       valuesObject:
         image:
-          repository: {{ .Values.mongodb.image.repository | default "bitnami/mongodb" }}
+          repository: {{ .Values.mongodb.image.repository | default "bitnamilegacy/mongodb" }}
           tag: {{ .Values.mongodb.image.tag | default "8.0.4-debian-12-r0" }}
         auth:
           rootUser: {{ .Values.mongodb.auth.rootUser | default "root" }}

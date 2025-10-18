@@ -209,7 +209,7 @@ mongodb:
   replicaCount: 1  # Single node RS for staging
 
   image:
-    repository: bitnami/mongodb
+    repository: bitnamilegacy/mongodb
     tag: 7.0.15-debian-12-r0
 
   auth:
