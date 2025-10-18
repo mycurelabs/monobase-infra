@@ -60,6 +60,7 @@ spec:
       jsonPointers:
         - /status
         - /spec/parentRefs  # Ignore K8s auto-added group/kind fields
+        - /spec/rules/0/matches  # Ignore auto-added default matches
     # Certificate status is managed by cert-manager
     - group: cert-manager.io
       kind: Certificate
