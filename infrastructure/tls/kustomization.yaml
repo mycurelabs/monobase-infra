@@ -4,6 +4,11 @@ kind: Kustomization
 # Namespace where TLS secrets will be created
 namespace: cert-manager
 
+# Resources managed by this kustomization
+resources:
+  - clusterissuer-staging.yaml
+  - clusterissuer-prod.yaml
+
 # KSOPS Generator for SOPS-encrypted secrets
 generators:
   - ksops-config.yaml
