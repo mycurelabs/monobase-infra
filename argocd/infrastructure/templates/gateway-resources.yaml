@@ -59,6 +59,7 @@ spec:
       kind: HTTPRoute
       jsonPointers:
         - /status
+        - /spec/parentRefs  # Ignore K8s auto-added group/kind fields
     # Certificate status is managed by cert-manager
     - group: cert-manager.io
       kind: Certificate
