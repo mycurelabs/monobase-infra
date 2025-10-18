@@ -15,7 +15,7 @@ roleRef:
   name: {{ include "external-dns.fullname" $ }}
 subjects:
 - kind: ServiceAccount
-  name: {{ include "external-dns.serviceAccountName" $ }}-{{ .name }}
+  name: {{ include "external-dns.serviceAccountName" (dict "instance" . "root" $) }}
   namespace: {{ $.Release.Namespace }}
 {{- end }}
 {{- end }}
