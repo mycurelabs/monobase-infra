@@ -1,0 +1,22 @@
+{{- if .Values.enabled }}
+{{- if gt (len .Values.instances) 0 }}
+{{- range .Values.instances }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ include "external-dns.fullname" $ }}-{{ .name }}
+  labels:
+    {{- include "external-dns.labels" $ | nindent 4 }}
+    instance: {{ .name }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ include "external-dns.fullname" $ }}
+subjects:
+- kind: ServiceAccount
+  name: {{ include "external-dns.serviceAccountName" $ }}-{{ .name }}
+  namespace: {{ $.Release.Namespace }}
+{{- end }}
+{{- end }}
+{{- end }}

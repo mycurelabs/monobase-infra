@@ -1,0 +1,16 @@
+{{- if .Values.enabled }}
+{{- if gt (len .Values.instances) 0 }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "external-dns.fullname" . }}
+  labels:
+    {{- include "external-dns.labels" . | nindent 4 }}
+rules:
+# Read Gateway resources cluster-wide (needed for cross-namespace Gateway references)
+- apiGroups: ["gateway.networking.k8s.io"]
+  resources: ["gateways"]
+  verbs: ["get", "list", "watch"]
+{{- end }}
+{{- end }}
