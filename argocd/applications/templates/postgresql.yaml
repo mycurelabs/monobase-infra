@@ -28,7 +28,7 @@ spec:
           postgresql:
             auth:
               username: {{ .Values.postgresql.auth.username | default "postgres" }}
-              database: {{ .Values.postgresql.auth.database | default "monobase" }}
+              database: {{ .Values.postgresql.auth.database | default "postgres" }}
         architecture: {{ .Values.postgresql.architecture | default "standalone" }}
         persistence:
           enabled: {{ .Values.postgresql.persistence.enabled | default true }}
