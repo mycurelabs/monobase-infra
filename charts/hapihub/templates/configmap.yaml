@@ -7,8 +7,12 @@ metadata:
   labels:
     {{- include "hapihub.labels" . | nindent 4 }}
 data:
+  {{- if .Values.config.NODE_ENV }}
   NODE_ENV: {{ .Values.config.NODE_ENV | quote }}
+  {{- end }}
+  {{- if .Values.config.LOG_LEVEL }}
   LOG_LEVEL: {{ .Values.config.LOG_LEVEL | quote }}
+  {{- end }}
   PORT: {{ .Values.config.PORT | quote }}
   {{- range $key, $value := .Values.config }}
   {{- if not (has $key (list "NODE_ENV" "LOG_LEVEL" "PORT")) }}
