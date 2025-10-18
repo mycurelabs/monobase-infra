@@ -1,0 +1,21 @@
+apiVersion: v2
+name: hapihub
+description: HapiHub - Healthcare infrastructure service for compliance and interoperability
+type: application
+version: 1.0.0
+appVersion: "10.0.13"
+keywords:
+  - hapihub
+  - healthcare
+  - bun
+  - mongodb
+home: https://github.com/monobaselabs/monobase-infra
+sources:
+  - https://github.com/monobaselabs/monobase
+maintainers:
+  - name: Your Organization
+    email: devops@example.com
+
+# Dependencies managed via separate ArgoCD Applications
+# See: argocd/applications/ for MongoDB
+# This is a pure application chart with no sub-charts

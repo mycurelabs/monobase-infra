@@ -77,8 +77,84 @@ spec:
           port: 443
 
 ---
+# Allow HapiHub → MongoDB
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-hapihub-to-mongodb
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    security-policy: allow-egress
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: mongodb
+
+  policyTypes:
+    - Ingress
+
+  ingress:
+    # Allow from HapiHub
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: hapihub
+      ports:
+        - protocol: TCP
+          port: 27017
+
+---
+# Egress from HapiHub to MongoDB
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-hapihub-egress-to-mongodb
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    security-policy: allow-egress
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: hapihub
+
+  policyTypes:
+    - Egress
+
+  egress:
+    # To MongoDB
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: mongodb
+      ports:
+        - protocol: TCP
+          port: 27017
+
+    # To DNS (required for service discovery)
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+        - podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+
+    # To Kubernetes API (for service discovery)
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: TCP
+          port: 443
+
+---
 # Notes:
 # 1. Only API backend can access PostgreSQL
-# 2. Account (frontend) has NO database access (security!)
-# 3. DNS access required for service name resolution
-# 4. Kubernetes API access needed for service discovery
+# 2. Only HapiHub backend can access MongoDB
+# 3. Account and MyCure (frontends) have NO database access (security!)
+# 4. DNS access required for service name resolution
+# 5. Kubernetes API access needed for service discovery

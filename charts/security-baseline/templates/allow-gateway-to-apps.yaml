@@ -81,6 +81,58 @@ spec:
           port: 8080
 
 ---
+# Allow Gateway → HapiHub API
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-gateway-to-hapihub
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    security-policy: allow-ingress
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: hapihub
+
+  policyTypes:
+    - Ingress
+
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: envoy-gateway-system
+      ports:
+        - protocol: TCP
+          port: 7500
+
+---
+# Allow Gateway → MyCure App
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-gateway-to-mycure
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    security-policy: allow-ingress
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: mycure
+
+  policyTypes:
+    - Ingress
+
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: envoy-gateway-system
+      ports:
+        - protocol: TCP
+          port: 8080
+
+---
 # Allow Gateway → MinIO (if enabled)
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy

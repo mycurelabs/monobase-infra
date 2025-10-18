@@ -97,6 +97,78 @@ account:
   podDisruptionBudget:
     enabled: false
 
+# ===== HEALTHCARE: HapiHub API =====
+hapihub:
+  enabled: true
+
+  image:
+    repository: ghcr.io/mycurelabs/hapihub
+    tag: "10.0.13"
+    pullPolicy: IfNotPresent
+
+  replicaCount: 1  # Minimal for staging
+
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+  gateway:
+    hostname: ""  # Empty = uses hapihub.<global.domain>
+
+  livenessProbe:
+    enabled: true
+
+  readinessProbe:
+    enabled: true
+
+  podDisruptionBudget:
+    enabled: false
+
+  autoscaling:
+    enabled: false
+
+  externalSecrets:
+    enabled: false
+
+  mongodb:
+    serviceName: mongodb
+    database: hapihub
+    username: root
+    replicaSet: rs0
+
+# ===== HEALTHCARE: MyCure Frontend =====
+mycure:
+  enabled: true
+
+  image:
+    repository: ghcr.io/mycurelabs/mycureapp
+    tag: "10.0.22"
+    pullPolicy: IfNotPresent
+
+  replicaCount: 1
+
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 128Mi
+
+  gateway:
+    hostname: ""  # Empty = uses app.<global.domain>
+
+  config:
+    API_URL: "https://hapihub.stg.mycureapp.com"
+    HAPIHUB_URL: "https://hapihub.stg.mycureapp.com"
+
+  podDisruptionBudget:
+    enabled: false
+
 # ===== CORE: PostgreSQL Database =====
 postgresql:
   enabled: true
@@ -121,6 +193,39 @@ postgresql:
     requests:
       cpu: 100m  # Reduced for small cluster
       memory: 512Mi  # Reduced for small cluster
+    limits:
+      cpu: 500m
+      memory: 1Gi
+
+  podDisruptionBudget:
+    enabled: false
+
+# ===== CORE: MongoDB Database =====
+mongodb:
+  enabled: true
+
+  # Always use replicaset for HapiHub (requires change streams)
+  architecture: replicaset
+  replicaCount: 1  # Single node RS for staging
+
+  image:
+    repository: bitnami/mongodb
+    tag: 8.0.4-debian-12-r0
+
+  auth:
+    rootUser: root
+    databases:
+      - hapihub
+
+  persistence:
+    enabled: true
+    storageClass: ""  # Auto-detect (do-block-storage)
+    size: 20Gi
+
+  resources:
+    requests:
+      cpu: 100m
+      memory: 512Mi
     limits:
       cpu: 500m
       memory: 1Gi
