@@ -12,5 +12,12 @@ rules:
 - apiGroups: ["gateway.networking.k8s.io"]
   resources: ["gateways"]
   verbs: ["get", "list", "watch"]
+
+# Read Namespaces cluster-wide (needed for Gateway API sources in namespaced mode)
+# Required for External DNS to resolve namespace names when syncing HTTPRoutes
+# Reference: https://github.com/kubernetes-sigs/external-dns/blob/master/charts/external-dns/templates/clusterrole.yaml
+- apiGroups: [""]
+  resources: ["namespaces"]
+  verbs: ["get", "watch", "list"]
 {{- end }}
 {{- end }}
