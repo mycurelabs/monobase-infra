@@ -375,11 +375,34 @@ if [[ "$SKIP_ARGOCD" == "false" ]]; then
     else
         print_info "Installing ArgoCD via Helm..."
 
+        # Create namespace first
+        print_info "Creating argocd namespace..."
+        execute kubectl --kubeconfig="$KUBECONFIG" create namespace argocd --dry-run=client -o yaml | kubectl --kubeconfig="$KUBECONFIG" apply -f -
+        
+        # Create SOPS age key secret for KSOPS BEFORE Helm install (if age.agekey exists)
+        if [[ -f "${REPO_ROOT}/age.agekey" ]]; then
+            print_info "Creating SOPS age key secret for KSOPS..."
+            execute kubectl --kubeconfig="$KUBECONFIG" create secret generic sops-age-key \
+                --from-file=keys.txt="${REPO_ROOT}/age.agekey" \
+                --namespace=argocd \
+                --dry-run=client -o yaml | kubectl --kubeconfig="$KUBECONFIG" apply -f -
+            print_success "SOPS age key secret created in argocd namespace"
+        else
+            print_warning "age.agekey not found - KSOPS will not be able to decrypt secrets"
+            print_info "Run ./scripts/secrets.sh to set up SOPS encryption if needed"
+        fi
+        
+        # Create KSOPS CMP plugin ConfigMap BEFORE Helm install
+        print_info "Creating KSOPS Config Management Plugin ConfigMap..."
+        execute kubectl --kubeconfig="$KUBECONFIG" apply -f "${REPO_ROOT}/infrastructure/argocd/ksops-cmp-plugin.yaml"
+        print_success "KSOPS CMP plugin ConfigMap created"
+
         # Add Helm repo
         execute helm repo add argo https://argoproj.github.io/argo-helm
         execute helm repo update
 
         # Install or upgrade ArgoCD (idempotent)
+        # Now that sops-age-key and cmp-plugin exist, the repo-server pod can start successfully
         execute helm upgrade --install argocd argo/argo-cd \
             --namespace argocd \
             --create-namespace \
@@ -399,24 +422,6 @@ if [[ "$SKIP_ARGOCD" == "false" ]]; then
             --timeout=300s
     fi
     print_success "ArgoCD is ready"
-    
-    # Create SOPS age key secret for KSOPS (if age.agekey exists)
-    if [[ -f "${REPO_ROOT}/age.agekey" ]]; then
-        print_info "Creating SOPS age key secret for KSOPS..."
-        execute kubectl --kubeconfig="$KUBECONFIG" create secret generic sops-age-key \
-            --from-file=keys.txt="${REPO_ROOT}/age.agekey" \
-            --namespace=argocd \
-            --dry-run=client -o yaml | kubectl --kubeconfig="$KUBECONFIG" apply -f -
-        print_success "SOPS age key secret created in argocd namespace"
-    else
-        print_warning "age.agekey not found - KSOPS will not be able to decrypt secrets"
-        print_info "Run ./scripts/secrets.sh to set up SOPS encryption if needed"
-    fi
-    
-    # Create KSOPS CMP plugin ConfigMap
-    print_info "Creating KSOPS Config Management Plugin ConfigMap..."
-    execute kubectl --kubeconfig="$KUBECONFIG" apply -f "${REPO_ROOT}/infrastructure/argocd/ksops-cmp-plugin.yaml"
-    print_success "KSOPS CMP plugin ConfigMap created"
 else
     print_step "Step 2: Skip ArgoCD Installation"
     print_info "Assuming ArgoCD is already installed (--skip-argocd)"
