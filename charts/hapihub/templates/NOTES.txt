@@ -43,12 +43,12 @@ Namespace: {{ include "hapihub.namespace" . }}
 {{- end }}
 
 🛡️  Security:
-{{- if .Values.networkPolicy.enabled }}
+{{- if and .Values.networkPolicy (default false .Values.networkPolicy.enabled) }}
   ✅ NetworkPolicy enabled
 {{- else }}
   ⚠️  NetworkPolicy disabled - Enable for production
 {{- end }}
-{{- if .Values.podDisruptionBudget.enabled }}
+{{- if and .Values.podDisruptionBudget (default false .Values.podDisruptionBudget.enabled) }}
   ✅ PodDisruptionBudget enabled (minAvailable: {{ .Values.podDisruptionBudget.minAvailable }})
 {{- else }}
   ⚠️  PodDisruptionBudget disabled - Enable for HA
