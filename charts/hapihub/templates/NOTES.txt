@@ -3,22 +3,22 @@
 
 Chart: {{ .Chart.Name }}-{{ .Chart.Version }}
 Release: {{ .Release.Name }}
-Namespace: {{ include "api.namespace" . }}
+Namespace: {{ include "hapihub.namespace" . }}
 
 📋 Deployment Information:
   - Replicas: {{ .Values.replicaCount }}
   - Image: {{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}
-  - Service: {{ include "api.fullname" . }}:{{ .Values.service.port }}
+  - Service: {{ include "hapihub.fullname" . }}:{{ .Values.service.port }}
 
 🌐 Access Information:
 {{- if .Values.gateway.enabled }}
-  Monobase API: https://{{ include "api.gateway.hostname" . }}
+  Monobase API: https://{{ include "hapihub.gateway.hostname" . }}
 
   Test the API:
-  curl https://{{ include "api.gateway.hostname" . }}/health
+  curl https://{{ include "hapihub.gateway.hostname" . }}/health
 {{- else }}
   Gateway is disabled. Use port-forward to access:
-  kubectl port-forward -n {{ include "api.namespace" . }} svc/{{ include "api.fullname" . }} {{ .Values.service.port }}:{{ .Values.service.port }}
+  kubectl port-forward -n {{ include "hapihub.namespace" . }} svc/{{ include "hapihub.fullname" . }} {{ .Values.service.port }}:{{ .Values.service.port }}
 {{- end }}
 
 📊 Monitoring:
@@ -30,7 +30,7 @@ Namespace: {{ include "api.namespace" . }}
 
 🔐 Secrets:
 {{- if .Values.externalSecrets.enabled }}
-  ✅ External Secrets enabled - Syncing from {{ .Values.externalSecrets.secretStore | default (printf "%s-secretstore" (include "api.namespace" .)) }}
+  ✅ External Secrets enabled - Syncing from {{ .Values.externalSecrets.secretStore | default (printf "%s-secretstore" (include "hapihub.namespace" .)) }}
 {{- else }}
   ⚠️  External Secrets disabled - Ensure secrets are manually created
 {{- end }}
@@ -56,16 +56,16 @@ Namespace: {{ include "api.namespace" . }}
 
 🔍 Next Steps:
   1. Verify pods are running:
-     kubectl get pods -n {{ include "api.namespace" . }} -l app.kubernetes.io/name={{ include "api.name" . }}
+     kubectl get pods -n {{ include "hapihub.namespace" . }} -l app.kubernetes.io/name={{ include "hapihub.name" . }}
 
   2. Check logs:
-     kubectl logs -n {{ include "api.namespace" . }} -l app.kubernetes.io/name={{ include "api.name" . }} --tail=50
+     kubectl logs -n {{ include "hapihub.namespace" . }} -l app.kubernetes.io/name={{ include "hapihub.name" . }} --tail=50
 
   3. Verify HTTPRoute:
-     kubectl get httproute -n {{ include "api.namespace" . }}
+     kubectl get httproute -n {{ include "hapihub.namespace" . }}
 
   4. Test health endpoint:
-     curl https://{{ include "api.gateway.hostname" . }}/health
+     curl https://{{ include "hapihub.gateway.hostname" . }}/health
 
 📚 Documentation:
   - Values Reference: docs/VALUES-REFERENCE.md

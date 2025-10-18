@@ -2,14 +2,14 @@
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
-  name: {{ include "api.fullname" . }}
-  namespace: {{ include "api.namespace" . }}
+  name: {{ include "hapihub.fullname" . }}
+  namespace: {{ include "hapihub.namespace" . }}
   labels:
-    {{- include "api.labels" . | nindent 4 }}
+    {{- include "hapihub.labels" . | nindent 4 }}
 spec:
   selector:
     matchLabels:
-      {{- include "api.selectorLabels" . | nindent 6 }}
+      {{- include "hapihub.selectorLabels" . | nindent 6 }}
   endpoints:
     - port: http
       path: {{ .Values.serviceMonitor.path | default "/metrics" }}
