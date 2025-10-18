@@ -15,8 +15,8 @@ spec:
   project: default
 
   source:
-    repoURL: {{ .Values.global.repoURL | default "https://github.com/monobaselabs/monobase-infra.git" }}
-    targetRevision: {{ .Values.global.targetRevision | default "main" }}
+    repoURL: {{ .Values.argocd.repoURL }}
+    targetRevision: {{ .Values.argocd.targetRevision | default "main" }}
     path: charts/mailpit
     helm:
       releaseName: mailpit
