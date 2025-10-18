@@ -1,7 +1,6 @@
 {{- if .Values.minio.enabled }}
-# ArgoCD Application: MinIO Object Storage (Wrapper Chart)
+# ArgoCD Application: MinIO Object Storage
 # Sync Wave 2 - Deploy storage before applications
-# Uses local wrapper chart which includes Bitnami MinIO + HTTPRoute
 
 apiVersion: argoproj.io/v1alpha1
 kind: Application
@@ -16,24 +15,50 @@ spec:
   project: default
 
   source:
-    repoURL: {{ .Values.argocd.repoURL }}
-    path: charts/minio
-    targetRevision: {{ .Values.argocd.targetRevision | default "main" }}
+    chart: minio
+    repoURL: https://charts.bitnami.com/bitnami
+    targetRevision: 17.0.22
     helm:
       releaseName: minio
       valuesObject:
-        enabled: true
-        
-        # Global values for namespace and domain
-        global:
-          namespace: {{ .Values.global.namespace }}
-          domain: {{ .Values.global.domain }}
-          gateway:
-            name: {{ .Values.global.gateway.name }}
-            namespace: {{ .Values.global.gateway.namespace }}
-        
-        # Pass through all MinIO configuration from deployment values
-        {{- toYaml .Values.minio | nindent 8 }}
+        image:
+          repository: {{ .Values.minio.image.repository | default "bitnamilegacy/minio" }}
+          tag: {{ .Values.minio.image.tag | default "2025.7.23-debian-12-r3" }}
+        mode: {{ .Values.minio.mode | default "standalone" }}
+        statefulset:
+          replicaCount: {{ .Values.minio.statefulset.replicaCount | default 1 }}
+        auth:
+          rootUser: {{ .Values.minio.auth.rootUser | default "minioadmin" }}
+          rootPassword: {{ .Values.minio.auth.rootPassword | default "minioadmin" }}
+        persistence:
+          enabled: {{ .Values.minio.persistence.enabled | default true }}
+          storageClass: {{ .Values.minio.persistence.storageClass | default "" }}
+          size: {{ .Values.minio.persistence.size | default "10Gi" }}
+        resources:
+          requests:
+            cpu: {{ .Values.minio.resources.requests.cpu | default "100m" }}
+            memory: {{ .Values.minio.resources.requests.memory | default "256Mi" }}
+          limits:
+            cpu: {{ .Values.minio.resources.limits.cpu | default "500m" }}
+            memory: {{ .Values.minio.resources.limits.memory | default "512Mi" }}
+        defaultBuckets: {{ .Values.minio.defaultBuckets | default "monobase-files" }}
+        podSecurityContext:
+          enabled: true
+          fsGroup: 1001
+          fsGroupChangePolicy: "OnRootMismatch"
+        containerSecurityContext:
+          enabled: true
+          runAsUser: 1001
+          runAsGroup: 1001
+          runAsNonRoot: true
+          privileged: false
+          readOnlyRootFilesystem: true
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+              - ALL
+          seccompProfile:
+            type: RuntimeDefault
 
   destination:
     server: https://kubernetes.default.svc

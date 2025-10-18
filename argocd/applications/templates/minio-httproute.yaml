@@ -1,0 +1,46 @@
+{{- if and .Values.minio.enabled .Values.minio.gateway.enabled }}
+# ArgoCD Application: MinIO HTTPRoute
+# Sync Wave 3 - Deploy routing after MinIO service is ready
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ .Values.global.namespace }}-minio-httproute
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+
+  source:
+    repoURL: {{ .Values.argocd.repoURL }}
+    path: infrastructure/httproutes/minio
+    targetRevision: {{ .Values.argocd.targetRevision | default "main" }}
+    helm:
+      releaseName: minio-httproute
+      valuesObject:
+        hostname: {{ .Values.minio.gateway.hostname | default (printf "storage.%s" .Values.global.domain) }}
+        namespace: {{ .Values.global.namespace }}
+        gateway:
+          name: {{ .Values.global.gateway.name }}
+          namespace: {{ .Values.global.gateway.namespace }}
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: {{ .Values.global.namespace }}
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false
+    retry:
+      limit: 5
+      backoff:
+        duration: 10s
+        maxDuration: 5m
+        factor: 2
+{{- end }}
