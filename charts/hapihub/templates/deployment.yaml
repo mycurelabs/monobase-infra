@@ -87,6 +87,8 @@ spec:
         {{- end }}
         - name: PORT
           value: "7500"
+        - name: port
+          value: "7500"
         # MongoDB connection - individual components
         # Note: MongoDB may be deployed separately in GitOps
         - name: MONGODB_HOST
