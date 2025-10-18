@@ -33,6 +33,47 @@ usage() {
     exit 1
 }
 
+# Verify kubectl context
+verify_context() {
+    # Skip verification if namespace is explicitly provided
+    if [ -n "$2" ]; then
+        return 0
+    fi
+    
+    # Get current context
+    CURRENT_CONTEXT=$(kubectl config current-context 2>/dev/null)
+    
+    if [ -z "$CURRENT_CONTEXT" ]; then
+        echo -e "${RED}Error: No kubectl context is set${NC}"
+        echo "Please configure your kubectl context first."
+        exit 1
+    fi
+    
+    echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "${YELLOW}  Context Verification${NC}"
+    echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo ""
+    echo -e "Current context: ${GREEN}$CURRENT_CONTEXT${NC}"
+    echo ""
+    
+    # Prompt for confirmation
+    read -p "Continue with this context? (y/N): " -n 1 -r
+    echo ""
+    
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        echo ""
+        echo -e "${BLUE}Available contexts:${NC}"
+        kubectl config get-contexts
+        echo ""
+        echo -e "${YELLOW}To switch context, use:${NC}"
+        echo "  kubectl config use-context <context-name>"
+        echo ""
+        exit 0
+    fi
+    
+    echo ""
+}
+
 # Check arguments
 if [ $# -lt 1 ]; then
     usage
@@ -40,6 +81,9 @@ fi
 
 SERVICE=$1
 NAMESPACE=${2:-""}
+
+# Verify context before proceeding (skip if namespace is provided)
+verify_context "$SERVICE" "$NAMESPACE"
 
 # Service configurations
 case $SERVICE in
