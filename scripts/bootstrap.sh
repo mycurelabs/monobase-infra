@@ -412,6 +412,11 @@ if [[ "$SKIP_ARGOCD" == "false" ]]; then
         print_warning "age.agekey not found - KSOPS will not be able to decrypt secrets"
         print_info "Run ./scripts/secrets.sh to set up SOPS encryption if needed"
     fi
+    
+    # Create KSOPS CMP plugin ConfigMap
+    print_info "Creating KSOPS Config Management Plugin ConfigMap..."
+    execute kubectl --kubeconfig="$KUBECONFIG" apply -f "${REPO_ROOT}/infrastructure/argocd/ksops-cmp-plugin.yaml"
+    print_success "KSOPS CMP plugin ConfigMap created"
 else
     print_step "Step 2: Skip ArgoCD Installation"
     print_info "Assuming ArgoCD is already installed (--skip-argocd)"

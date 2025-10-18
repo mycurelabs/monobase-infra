@@ -1,0 +1,36 @@
+# KSOPS Config Management Plugin (CMP) Configuration
+# This ConfigMap defines the KSOPS plugin for ArgoCD to decrypt SOPS-encrypted secrets
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cmp-plugin
+  namespace: argocd
+data:
+  plugin.yaml: |
+    apiVersion: argoproj.io/v1alpha1
+    kind: ConfigManagementPlugin
+    metadata:
+      name: ksops
+    spec:
+      version: v1.0
+      init:
+        command: [sh, -c]
+        args:
+          - echo "KSOPS plugin initialized"
+      generate:
+        command: [sh, -c]
+        args:
+          - |
+            if [ -f kustomization.yaml ] || [ -f kustomization.yml ] || [ -f Kustomization ]; then
+              kustomize build --enable-alpha-plugins --enable-exec .
+            else
+              echo "Error: No kustomization file found"
+              exit 1
+            fi
+      discover:
+        find:
+          command: [sh, -c]
+          args:
+            - |
+              find . -maxdepth 1 \( -name kustomization.yaml -o -name kustomization.yml -o -name Kustomization \) -print -quit
