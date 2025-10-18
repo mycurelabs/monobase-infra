@@ -14,6 +14,18 @@ metadata:
 spec:
   project: default
 
+  # Ignore benign drift from Kubernetes auto-modifications
+  ignoreDifferences:
+  - group: ""
+    kind: ServiceAccount
+    jsonPointers:
+    - /secrets
+    - /imagePullSecrets
+  - group: ""
+    kind: ConfigMap
+    jqPathExpressions:
+    - .data
+
   source:
     chart: minio
     repoURL: https://charts.bitnami.com/bitnami
@@ -73,6 +85,7 @@ spec:
       selfHeal: true
     syncOptions:
       - CreateNamespace=false
+      - RespectIgnoreDifferences=true
     retry:
       limit: 5
       backoff:
