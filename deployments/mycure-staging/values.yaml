@@ -257,7 +257,7 @@ valkey:
 
 # ===== OPTIONAL: MinIO (Object Storage) =====
 minio:
-  enabled: false  # Disabled - dependency issue with ArgoCD
+  enabled: true  # ✅ Enable for staging
   mode: standalone
   replicas: 1
 
