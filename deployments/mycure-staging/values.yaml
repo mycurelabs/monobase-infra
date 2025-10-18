@@ -170,6 +170,50 @@ mycure:
     enabled: false
 
 # ===== CORE: PostgreSQL Database =====
+
+# ===== HEALTHCARE: SyncD Real-time Synchronization =====
+syncd:
+  enabled: true
+
+  image:
+    repository: ghcr.io/mycurelabs/syncd
+    tag: "5.130.18"
+    pullPolicy: IfNotPresent
+
+  replicaCount: 1  # Minimal for staging
+
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+  gateway:
+    hostname: ""  # Empty = uses syncd.<global.domain>
+
+  livenessProbe:
+    enabled: true
+
+  readinessProbe:
+    enabled: true
+
+  podDisruptionBudget:
+    enabled: false
+
+  autoscaling:
+    enabled: false
+
+  externalSecrets:
+    enabled: false
+
+  mongodb:
+    serviceName: mongodb
+    database: hapihub  # Shares database with HapiHub
+    username: root
+    replicaSet: rs0
+
 postgresql:
   enabled: true
 

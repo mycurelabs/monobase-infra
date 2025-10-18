@@ -1,0 +1,149 @@
+# Default values for SyncD chart
+# This is a YAML-formatted file with sensible defaults
+# Override these values in deployments/{env}/values.yaml
+
+# Global configuration (shared across charts)
+global:
+  domain: example.com
+  namespace: example-prod
+  environment: production
+  gateway:
+    name: shared-gateway
+    namespace: gateway-system
+
+# SyncD application configuration
+enabled: true
+
+replicaCount: 2
+
+image:
+  repository: ghcr.io/mycurelabs/syncd
+  pullPolicy: IfNotPresent
+  tag: "5.130.18"
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+podAnnotations: {}
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  fsGroup: 1000
+  seccompProfile:
+    type: RuntimeDefault
+
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+  readOnlyRootFilesystem: false
+
+service:
+  type: ClusterIP
+  port: 7800
+  targetPort: 7800
+  annotations: {}
+
+# Gateway API HTTPRoute configuration
+gateway:
+  enabled: true
+  hostname: ""  # Empty = uses syncd.{global.domain}
+  parentRefs:
+    - name: shared-gateway
+      namespace: gateway-system
+
+resources:
+  requests:
+    cpu: 500m
+    memory: 1Gi
+  limits:
+    cpu: "2"
+    memory: 4Gi
+
+livenessProbe:
+  enabled: true
+  httpGet:
+    path: /healthz
+    port: 7800
+  initialDelaySeconds: 30
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3
+
+readinessProbe:
+  enabled: true
+  httpGet:
+    path: /healthz
+    port: 7800
+  initialDelaySeconds: 10
+  periodSeconds: 5
+  timeoutSeconds: 3
+  failureThreshold: 2
+
+autoscaling:
+  enabled: false
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity:
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        podAffinityTerm:
+          labelSelector:
+            matchExpressions:
+              - key: app.kubernetes.io/name
+                operator: In
+                values:
+                  - syncd
+          topologyKey: kubernetes.io/hostname
+
+# Application configuration (ConfigMap)
+config:
+  SYNCD_PORT: "7800"  # Explicit port configuration
+  SYNCD_PATH: "/ws"   # WebSocket path
+  SYNCD_WORKERS: "true"
+  SYNCD_PULL_LIMIT: "1000"
+  SYNCD_PUSH_BATCH_SIZE: "10"
+
+# External Secrets configuration
+externalSecrets:
+  enabled: false
+  secretStore: ""
+  refreshInterval: 1h
+  secrets: []
+
+# MongoDB dependency configuration (deployed separately)
+mongodb:
+  enabled: true
+  # Service name - points to separate MongoDB release
+  serviceName: "mongodb"
+  database: "hapihub"  # Shares database with HapiHub
+  replicaSet: "rs0"
+  auth:
+    enabled: false
+    existingSecret: ""
+
+# Service Monitor for Prometheus (if monitoring enabled)
+serviceMonitor:
+  enabled: false
+  interval: 30s
+  path: /metrics

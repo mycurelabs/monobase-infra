@@ -1,0 +1,22 @@
+apiVersion: v2
+name: syncd
+description: SyncD - Real-time synchronization service for distributed data
+type: application
+version: 1.0.0
+appVersion: "5.130.18"
+keywords:
+  - syncd
+  - synchronization
+  - websocket
+  - bun
+  - mongodb
+home: https://github.com/monobaselabs/monobase-infra
+sources:
+  - https://github.com/monobaselabs/monobase
+maintainers:
+  - name: Your Organization
+    email: devops@example.com
+
+# Dependencies managed via separate ArgoCD Applications
+# See: argocd/applications/ for MongoDB
+# This is a pure application chart with no sub-charts
