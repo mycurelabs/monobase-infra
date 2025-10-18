@@ -6,16 +6,13 @@
 global:
   domain: argocd.example.com  # Set in client config
 
-# High Availability mode
+# Simplified configuration (non-HA)
 redis-ha:
-  enabled: true
-  haproxy:
-    enabled: true
-    replicas: 3
+  enabled: false  # Use standard Redis instead
 
 # Controller (reconciliation engine)
 controller:
-  replicas: 2  # HA
+  replicas: 1  # Single replica sufficient for simple deployments
 
   metrics:
     enabled: true
@@ -24,31 +21,15 @@ controller:
 
   resources:
     requests:
-      cpu: 500m
-      memory: 1Gi
+      cpu: 250m
+      memory: 512Mi
     limits:
-      cpu: 2
-      memory: 2Gi
-
-  affinity:
-    podAntiAffinity:
-      preferredDuringSchedulingIgnoredDuringExecution:
-        - weight: 100
-          podAffinityTerm:
-            labelSelector:
-              matchLabels:
-                app.kubernetes.io/component: application-controller
-            topologyKey: kubernetes.io/hostname
+      cpu: 1
+      memory: 1Gi
 
 # Server (API and UI)
 server:
-  replicas: 2  # HA
-
-  autoscaling:
-    enabled: true
-    minReplicas: 2
-    maxReplicas: 5
-    targetCPUUtilizationPercentage: 70
+  replicas: 1  # Single replica
 
   metrics:
     enabled: true
@@ -57,11 +38,11 @@ server:
 
   resources:
     requests:
-      cpu: 250m
-      memory: 512Mi
+      cpu: 100m
+      memory: 256Mi
     limits:
-      cpu: 1
-      memory: 1Gi
+      cpu: 500m
+      memory: 512Mi
 
   # Ingress via Gateway API (see ingress.yaml)
   ingress:
@@ -111,12 +92,7 @@ server:
 
 # Repo Server (Git repository interaction)
 repoServer:
-  replicas: 2  # HA
-
-  autoscaling:
-    enabled: true
-    minReplicas: 2
-    maxReplicas: 5
+  replicas: 1  # Single replica
 
   metrics:
     enabled: true
@@ -125,11 +101,11 @@ repoServer:
 
   resources:
     requests:
-      cpu: 250m
-      memory: 512Mi
+      cpu: 100m
+      memory: 256Mi
     limits:
-      cpu: 1
-      memory: 1Gi
+      cpu: 500m
+      memory: 512Mi
 
   # KSOPS Config Management Plugin (CMP) for SOPS secret decryption
   volumes:
@@ -165,20 +141,10 @@ repoServer:
         - name: XDG_CONFIG_HOME
           value: /.config
 
-  affinity:
-    podAntiAffinity:
-      preferredDuringSchedulingIgnoredDuringExecution:
-        - weight: 100
-          podAffinityTerm:
-            labelSelector:
-              matchLabels:
-                app.kubernetes.io/component: repo-server
-            topologyKey: kubernetes.io/hostname
-
 # ApplicationSet Controller (App-of-Apps)
 applicationSet:
   enabled: true
-  replicas: 2
+  replicas: 1  # Single replica
 
   metrics:
     enabled: true
@@ -187,11 +153,11 @@ applicationSet:
 
   resources:
     requests:
-      cpu: 100m
+      cpu: 50m
       memory: 128Mi
     limits:
-      cpu: 500m
-      memory: 512Mi
+      cpu: 250m
+      memory: 256Mi
 
 # Notifications Controller
 notifications:
@@ -271,17 +237,17 @@ configs:
     knownHosts: |
       github.com ssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAQEAq2A7hRGmdnm9tUDbO9IDSwBK6TbQa+PXYPCPy6rbTrTtw7PHkccKrpp0yVhp5HdEIcKr6pLlVDBfOLX9QUsyCOV0wzfjIJNlGEYsdlLJizHhbn2mUjvSAHQqZETYP81eFzLQNnPHt4EVVUh7VfDESU84KezmD5QlWpXLmvU31/yMf+Se8xhHTvKSCZIFImWwoG6mbUoWf9nzpIoaSjB+weqqUUmpaaasXVal72J+UX2B+2RPW3RcT0eOzQgqlJL3RKrTJvdsjE3JEAvGq3lGHSZXy28G3skua2SmVi/w4yCE6gbODqnTWlg7+wC604ydGXA8VJiS5ap43JXiUFFAaQ==
 
-# Redis (cache)
+# Redis (cache) - standard single instance
 redis:
   enabled: true
 
   resources:
     requests:
-      cpu: 100m
-      memory: 128Mi
+      cpu: 50m
+      memory: 64Mi
     limits:
-      cpu: 500m
-      memory: 512Mi
+      cpu: 250m
+      memory: 128Mi
 
 # Installation instructions:
 # helm repo add argo https://argoproj.github.io/argo-helm
