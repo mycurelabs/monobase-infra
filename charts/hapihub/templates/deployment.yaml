@@ -85,10 +85,8 @@ spec:
               name: {{ include "hapihub.fullname" . }}
               key: LOG_LEVEL
         {{- end }}
-        - name: PORT
-          value: "7500"
-        - name: port
-          value: "7500"
+        # NOTE: PORT env var causes known issue in HapiHub (port: NaN error)
+        # App will use default port 7500 automatically
         # MongoDB connection - individual components
         # Note: MongoDB may be deployed separately in GitOps
         - name: MONGODB_HOST

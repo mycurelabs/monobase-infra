@@ -118,7 +118,8 @@ affinity:
 
 # Application configuration (ConfigMap)
 config:
-  PORT: "7500"
+  # NOTE: PORT removed - causes known issue in HapiHub (port: NaN error)
+  # App automatically uses default port 7500
   CLUSTER_INSTANCES: "max"
   RUN_WORKERS: "true"
   STORAGE_TYPE: "gfs"  # or "s3" for MinIO

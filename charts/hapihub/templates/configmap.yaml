@@ -13,7 +13,8 @@ data:
   {{- if .Values.config.LOG_LEVEL }}
   LOG_LEVEL: {{ .Values.config.LOG_LEVEL | quote }}
   {{- end }}
-  PORT: {{ .Values.config.PORT | quote }}
+  # NOTE: PORT removed - causes known issue in HapiHub app (port: NaN)
+  # App uses default port 7500 automatically
   {{- range $key, $value := .Values.config }}
   {{- if not (has $key (list "NODE_ENV" "LOG_LEVEL" "PORT")) }}
   {{ $key }}: {{ $value | quote }}
