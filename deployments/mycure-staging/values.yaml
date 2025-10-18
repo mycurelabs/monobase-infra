@@ -335,6 +335,11 @@ minio:
 
   # Bucket configuration (Bitnami chart uses defaultBuckets as string)
   defaultBuckets: "monobase-files"
+  
+  # Bucket configuration for API chart template
+  buckets:
+    - name: "monobase-files"
+  region: "us-east-1"
 
   # Security contexts for restricted PodSecurity (Bitnami uses podSecurityContext)
   podSecurityContext:
