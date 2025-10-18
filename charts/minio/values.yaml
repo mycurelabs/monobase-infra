@@ -16,15 +16,26 @@ enabled: false  # Master enable/disable for both MinIO and HTTPRoute
 nameOverride: ""
 fullnameOverride: ""
 
-# ===== Official MinIO Chart Values (passed to subchart) =====
-# These values are passed through to the official MinIO Helm chart dependency
-# See https://github.com/minio/minio/tree/master/helm/minio for all options
+# ===== Bitnami MinIO Chart Values (passed to subchart) =====
+# These values are passed through to the Bitnami MinIO Helm chart dependency
+# See https://github.com/bitnami/charts/tree/main/bitnami/minio for all options
 
+# Image configuration
+image:
+  repository: bitnamilegacy/minio
+  tag: "2025.7.23-debian-12-r3"
+
+# Deployment mode
 mode: standalone
-replicas: 1
 
-rootUser: minioadmin
-rootPassword: minioadmin
+# StatefulSet configuration
+statefulset:
+  replicaCount: 1
+
+# Authentication
+auth:
+  rootUser: minioadmin
+  rootPassword: minioadmin
 
 persistence:
   enabled: true
@@ -39,35 +50,32 @@ resources:
     cpu: 500m
     memory: 512Mi
 
-# Bucket configuration for official MinIO chart
-buckets:
-  - name: monobase-files
-    policy: none
-    purge: false
-
-region: "us-east-1"
+# Bucket configuration for Bitnami MinIO chart
 defaultBuckets: "monobase-files"
 
 # Security contexts for restricted PodSecurity standards
-# These settings have been debugged and tested
-securityContext:
+# Bitnami chart uses podSecurityContext and containerSecurityContext
+podSecurityContext:
   enabled: true
-  runAsUser: 1000
-  runAsGroup: 1000
-  fsGroup: 1000
-  runAsNonRoot: true
-  seccompProfile:
-    type: RuntimeDefault
+  fsGroup: 1001
+  fsGroupChangePolicy: "OnRootMismatch"
+  supplementalGroups: []
+  sysctls: []
 
 containerSecurityContext:
   enabled: true
-  runAsUser: 1000
+  seLinuxOptions: {}
+  runAsUser: 1001
+  runAsGroup: 1001
   runAsNonRoot: true
+  privileged: false
+  readOnlyRootFilesystem: true
   allowPrivilegeEscalation: false
-  readOnlyRootFilesystem: false
   capabilities:
     drop:
       - ALL
+  seccompProfile:
+    type: RuntimeDefault
 
 # ===== Custom Gateway API Configuration =====
 # HTTPRoute configuration for exposing MinIO via Envoy Gateway

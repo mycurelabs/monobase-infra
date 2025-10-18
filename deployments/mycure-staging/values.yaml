@@ -258,12 +258,23 @@ valkey:
 # ===== OPTIONAL: MinIO (Object Storage) =====
 minio:
   enabled: true  # ✅ Enable for staging
+  
+  # Image configuration (use bitnamilegacy for consistency)
+  image:
+    repository: bitnamilegacy/minio
+    tag: "2025.7.23-debian-12-r3"
+  
+  # Deployment mode
   mode: standalone
-  replicas: 1
+  
+  # StatefulSet configuration (Bitnami chart uses statefulset.replicaCount)
+  statefulset:
+    replicaCount: 1
 
-  # Official MinIO chart uses rootUser/rootPassword directly
-  rootUser: minioadmin
-  rootPassword: minioadmin
+  # Authentication (Bitnami chart uses auth.rootUser/rootPassword)
+  auth:
+    rootUser: minioadmin
+    rootPassword: minioadmin
 
   persistence:
     enabled: true
@@ -278,31 +289,28 @@ minio:
       cpu: 500m
       memory: 512Mi
 
-  # Bucket configuration for official MinIO chart
-  buckets:
-    - name: monobase-files
-      policy: none
-      purge: false
+  # Bucket configuration (Bitnami chart uses defaultBuckets as string)
+  defaultBuckets: "monobase-files"
 
-  # Security contexts for restricted PodSecurity
-  securityContext:
+  # Security contexts for restricted PodSecurity (Bitnami uses podSecurityContext)
+  podSecurityContext:
     enabled: true
-    runAsUser: 1000
-    runAsGroup: 1000
-    fsGroup: 1000
-    runAsNonRoot: true
-    seccompProfile:
-      type: RuntimeDefault
+    fsGroup: 1001
+    fsGroupChangePolicy: "OnRootMismatch"
 
   containerSecurityContext:
     enabled: true
-    runAsUser: 1000
+    runAsUser: 1001
+    runAsGroup: 1001
     runAsNonRoot: true
+    privileged: false
+    readOnlyRootFilesystem: true
     allowPrivilegeEscalation: false
-    readOnlyRootFilesystem: false
     capabilities:
       drop:
         - ALL
+    seccompProfile:
+      type: RuntimeDefault
 
   # Gateway API HTTPRoute configuration
   gateway:

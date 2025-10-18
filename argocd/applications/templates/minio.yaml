@@ -1,7 +1,7 @@
 {{- if .Values.minio.enabled }}
-# ArgoCD Application: MinIO (Object Storage)
+# ArgoCD Application: MinIO Object Storage (Wrapper Chart)
 # Sync Wave 2 - Deploy storage before applications
-# Uses local wrapper chart that includes official MinIO chart + Gateway HTTPRoute
+# Uses local wrapper chart which includes Bitnami MinIO + HTTPRoute
 
 apiVersion: argoproj.io/v1alpha1
 kind: Application
@@ -17,13 +17,22 @@ spec:
 
   source:
     repoURL: {{ .Values.argocd.repoURL }}
-    targetRevision: {{ .Values.argocd.targetRevision | default "main" }}
     path: charts/minio
+    targetRevision: {{ .Values.argocd.targetRevision | default "main" }}
     helm:
       releaseName: minio
       valuesObject:
+        enabled: true
+        
+        # Global values for namespace and domain
         global:
-          {{- toYaml .Values.global | nindent 10 }}
+          namespace: {{ .Values.global.namespace }}
+          domain: {{ .Values.global.domain }}
+          gateway:
+            name: {{ .Values.global.gateway.name }}
+            namespace: {{ .Values.global.gateway.namespace }}
+        
+        # Pass through all MinIO configuration from deployment values
         {{- toYaml .Values.minio | nindent 8 }}
 
   destination:
@@ -41,4 +50,5 @@ spec:
       backoff:
         duration: 10s
         maxDuration: 5m
+        factor: 2
 {{- end }}
