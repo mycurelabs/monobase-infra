@@ -130,12 +130,12 @@ spec:
           valueFrom:
             secretKeyRef:
               name: minio
-              key: rootUser
+              key: root-user
         - name: STORAGE_SECRET_ACCESS_KEY
           valueFrom:
             secretKeyRef:
               name: minio
-              key: rootPassword
+              key: root-password
         - name: STORAGE_UPLOAD_URL_EXPIRY
           value: "300"
         - name: STORAGE_DOWNLOAD_URL_EXPIRY
