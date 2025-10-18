@@ -70,17 +70,21 @@ spec:
         # Set HOME to /tmp to avoid permission denied errors when running as non-root
         - name: HOME
           value: "/tmp"
-        # Load from ConfigMap
+        # Load from ConfigMap (conditionally)
+        {{- if .Values.config.NODE_ENV }}
         - name: NODE_ENV
           valueFrom:
             configMapKeyRef:
               name: {{ include "hapihub.fullname" . }}
               key: NODE_ENV
+        {{- end }}
+        {{- if .Values.config.LOG_LEVEL }}
         - name: LOG_LEVEL
           valueFrom:
             configMapKeyRef:
               name: {{ include "hapihub.fullname" . }}
               key: LOG_LEVEL
+        {{- end }}
         - name: PORT
           value: "7500"
         # MongoDB connection - individual components
