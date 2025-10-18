@@ -1,36 +1,36 @@
 {{- if .Values.enabled }}
-🎉 Account Frontend has been deployed!
+🎉 MyCure Frontend has been deployed!
 
 Chart: {{ .Chart.Name }}-{{ .Chart.Version }}
 Release: {{ .Release.Name }}
-Namespace: {{ include "account.namespace" . }}
+Namespace: {{ include "mycure.namespace" . }}
 
 📋 Deployment Information:
   - Replicas: {{ .Values.replicaCount }}
   - Image: {{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}
-  - Service: {{ include "account.fullname" . }}:{{ .Values.service.port }}
+  - Service: {{ include "mycure.fullname" . }}:{{ .Values.service.port }}
 
 🌐 Access Information:
 {{- if .Values.gateway.enabled }}
-  Account App: https://{{ include "account.gateway.hostname" . }}
+  MyCure App: https://{{ include "mycure.gateway.hostname" . }}
 
   Open in browser:
-  open https://{{ include "account.gateway.hostname" . }}
+  open https://{{ include "mycure.gateway.hostname" . }}
 {{- else }}
   Gateway is disabled. Use port-forward to access:
-  kubectl port-forward -n {{ include "account.namespace" . }} svc/{{ include "account.fullname" . }} 8080:{{ .Values.service.port }}
+  kubectl port-forward -n {{ include "mycure.namespace" . }} svc/{{ include "mycure.fullname" . }} 8080:{{ .Values.service.port }}
   # Open http://localhost:8080
 {{- end }}
 
 🔍 Next Steps:
   1. Verify pods are running:
-     kubectl get pods -n {{ include "account.namespace" . }} -l app.kubernetes.io/name={{ include "account.name" . }}
+     kubectl get pods -n {{ include "mycure.namespace" . }} -l app.kubernetes.io/name={{ include "mycure.name" . }}
 
   2. Check logs:
-     kubectl logs -n {{ include "account.namespace" . }} -l app.kubernetes.io/name={{ include "account.name" . }} --tail=50
+     kubectl logs -n {{ include "mycure.namespace" . }} -l app.kubernetes.io/name={{ include "mycure.name" . }} --tail=50
 
   3. Test frontend:
-     curl https://{{ include "account.gateway.hostname" . }}
+     curl https://{{ include "mycure.gateway.hostname" . }}
 
 📱 Frontend Features:
   - Static file serving (nginx)
@@ -39,5 +39,5 @@ Namespace: {{ include "account.namespace" . }}
   - Environment variable injection
 
 {{- else }}
-Account Frontend is disabled (enabled: false)
+MyCure Frontend is disabled (enabled: false)
 {{- end }}

@@ -1,4 +1,4 @@
-{{- if .Values.backup.enabled }}
+{{- if and .Values.backup (default false .Values.backup.enabled) }}
 ---
 # Velero Backup Storage Location (Per-Client)
 apiVersion: velero.io/v1
