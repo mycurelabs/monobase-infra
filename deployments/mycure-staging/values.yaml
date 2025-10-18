@@ -333,7 +333,7 @@ mailpit:
 # ===== External DNS =====
 # Automatic DNS record management from HTTPRoutes and Services
 externalDNS:
-  enabled: true
+  enabled: false
 
   instances:
     # Primary Cloudflare account for mycureapp.com
