@@ -121,3 +121,12 @@ MongoDB username
 {{- define "syncd.mongodb.username" -}}
 {{- .Values.mongodb.username | default "root" -}}
 {{- end }}
+
+{{/*
+Mailpit host - constructs hostname from Mailpit service
+*/}}
+{{- define "syncd.mailpit.host" -}}
+{{- $serviceName := .Values.mailpit.serviceName | default "mailpit" -}}
+{{- $namespace := include "syncd.namespace" . -}}
+{{- printf "%s.%s.svc.cluster.local" $serviceName $namespace -}}
+{{- end }}
