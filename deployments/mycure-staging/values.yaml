@@ -301,7 +301,7 @@ valkey:
 
 # ===== OPTIONAL: MinIO (Object Storage) =====
 minio:
-  enabled: true  # ✅ Enable for staging
+  enabled: false  # ✅ Enable for staging
   
   # Image configuration (use bitnamilegacy for consistency)
   image:
