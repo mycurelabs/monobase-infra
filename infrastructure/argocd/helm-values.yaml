@@ -167,6 +167,8 @@ repoServer:
       value: /.config
     - name: KUSTOMIZE_PLUGIN_HOME
       value: /usr/local/bin/kustomize/plugin
+    - name: KUSTOMIZE_ENABLE_ALPHA_PLUGINS
+      value: "true"
 
   affinity:
     podAntiAffinity:
