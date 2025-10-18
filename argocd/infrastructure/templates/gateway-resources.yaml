@@ -53,6 +53,7 @@ spec:
       kind: Gateway
       jsonPointers:
         - /status
+        - /spec/listeners/0/tls/certificateRefs  # Ignore K8s auto-added group field
     # HTTPRoute status is managed by controller
     - group: gateway.networking.k8s.io
       kind: HTTPRoute
