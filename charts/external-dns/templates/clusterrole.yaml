@@ -10,7 +10,7 @@ metadata:
 rules:
 # Read Gateway resources cluster-wide (needed for cross-namespace Gateway references)
 - apiGroups: ["gateway.networking.k8s.io"]
-  resources: ["gateways"]
+  resources: ["gateways", "httproutes", "tcproutes", "tlsroutes"]
   verbs: ["get", "list", "watch"]
 
 # Read Namespaces cluster-wide (needed for Gateway API sources in namespaced mode)
