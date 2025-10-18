@@ -123,7 +123,7 @@ spec:
         - name: STORAGE_PUBLIC_ENDPOINT
           value: {{ include "hapihub.minio.url" . | quote }}
         - name: STORAGE_BUCKET
-          value: {{ (index .Values.minio.buckets 0).name | default "hapihub-files" | quote }}
+          value: {{ .Values.minio.defaultBuckets | default "hapihub-files" | quote }}
         - name: STORAGE_REGION
           value: {{ .Values.minio.region | default "us-east-1" | quote }}
         - name: STORAGE_ACCESS_KEY_ID
