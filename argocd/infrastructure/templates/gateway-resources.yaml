@@ -38,6 +38,7 @@ spec:
     syncOptions:
       - CreateNamespace=true
       - ServerSideApply=true  # Better for CRDs
+      - RespectIgnoreDifferences=true  # Respect ignoreDifferences during sync
     retry:
       limit: 5
       backoff:
@@ -50,6 +51,11 @@ spec:
     # Gateway status is managed by controller
     - group: gateway.networking.k8s.io
       kind: Gateway
+      jsonPointers:
+        - /status
+    # HTTPRoute status is managed by controller
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
       jsonPointers:
         - /status
     # Certificate status is managed by cert-manager
