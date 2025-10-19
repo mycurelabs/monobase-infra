@@ -103,7 +103,7 @@ hapihub:
 
   image:
     repository: ghcr.io/mycurelabs/hapihub
-    tag: "10.0.17"
+    tag: "10.0.18"
     pullPolicy: IfNotPresent
 
   replicaCount: 1  # Minimal for staging
