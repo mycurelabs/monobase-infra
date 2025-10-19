@@ -384,6 +384,227 @@ setup_gcp() {
     fi
 
     # ===========================================================================
+    # Step 6.5: Database Credentials (MongoDB, PostgreSQL, MinIO)
+    # ===========================================================================
+    echo
+    log_info "Database Credentials Configuration"
+    echo "Configure database credentials for deployments (MongoDB, PostgreSQL, MinIO)."
+    echo
+    
+    # Determine if user wants to setup database credentials
+    SETUP_DATABASE_CREDENTIALS="${SETUP_DATABASE_CREDENTIALS:-}"
+    
+    if [ -z "$SETUP_DATABASE_CREDENTIALS" ]; then
+        if [ ! -t 0 ]; then
+            # Non-interactive mode - skip by default unless explicitly set
+            log_info "Non-interactive mode: Skipping database credentials (set SETUP_DATABASE_CREDENTIALS=true to enable)"
+            SETUP_DATABASE_CREDENTIALS="false"
+        else
+            # Interactive mode - ask user
+            read -rp "Do you want to configure database credentials? (y/N): " SETUP_DATABASE_CREDENTIALS
+        fi
+    fi
+    
+    if [[ "$SETUP_DATABASE_CREDENTIALS" =~ ^[Yy] ]] || [[ "$SETUP_DATABASE_CREDENTIALS" == "true" ]]; then
+        # ===========================================================================
+        # Select Deployments for Database Credentials
+        # ===========================================================================
+        
+        # Get list of deployment directories (exclude examples and hidden)
+        DEPLOYMENTS_LIST=$(find "${REPO_ROOT}/deployments" -mindepth 1 -maxdepth 1 -type d \
+            -not -name 'example*' -not -name '_*' \
+            -exec basename {} \; | sort)
+        
+        SELECTED_DB_DEPLOYMENTS=()
+        
+        if [ -n "${DATABASE_DEPLOYMENTS:-}" ]; then
+            # Use deployments from environment variable
+            IFS=',' read -ra SELECTED_DB_DEPLOYMENTS <<< "$DATABASE_DEPLOYMENTS"
+            log_info "Using deployments from DATABASE_DEPLOYMENTS: ${SELECTED_DB_DEPLOYMENTS[*]}"
+        elif [ ! -t 0 ]; then
+            # Non-interactive mode without DATABASE_DEPLOYMENTS
+            log_error "DATABASE_DEPLOYMENTS environment variable not set"
+            log_error "Example: export DATABASE_DEPLOYMENTS='mycure-staging,mycure-production'"
+            return 1
+        elif command -v fzf &>/dev/null; then
+            # Interactive mode with fzf - multi-select
+            local selected
+            selected=$(echo "$DEPLOYMENTS_LIST" | fzf \
+                --multi \
+                --height=15 \
+                --border \
+                --prompt="Select deployments for database credentials: " \
+                --header="TAB/Space to select | Enter to confirm | Esc to cancel")
+            
+            if [ -z "$selected" ]; then
+                log_info "No deployments selected, skipping database credentials setup"
+                SETUP_DATABASE_CREDENTIALS="false"
+            else
+                mapfile -t SELECTED_DB_DEPLOYMENTS <<< "$selected"
+            fi
+        else
+            # Fallback: numbered menu
+            log_warn "fzf not found. Using numbered menu."
+            echo
+            echo "Available deployments:"
+            echo "$DEPLOYMENTS_LIST" | nl
+            echo
+            read -rp "Enter deployment numbers (comma-separated, e.g., '1,3' or 'all'): " SELECTION
+            
+            if [ "$SELECTION" = "all" ]; then
+                mapfile -t SELECTED_DB_DEPLOYMENTS <<< "$DEPLOYMENTS_LIST"
+            else
+                IFS=',' read -ra INDICES <<< "$SELECTION"
+                for idx in "${INDICES[@]}"; do
+                    deployment=$(echo "$DEPLOYMENTS_LIST" | sed -n "${idx}p")
+                    if [ -n "$deployment" ]; then
+                        SELECTED_DB_DEPLOYMENTS+=("$deployment")
+                    fi
+                done
+            fi
+        fi
+        
+        # ===========================================================================
+        # Create Database Secrets
+        # ===========================================================================
+        
+        if [[ "$SETUP_DATABASE_CREDENTIALS" =~ ^[Yy] ]] || [[ "$SETUP_DATABASE_CREDENTIALS" == "true" ]]; then
+            if [ "${#SELECTED_DB_DEPLOYMENTS[@]}" -eq 0 ]; then
+                log_warning "No deployments selected, skipping database credentials setup"
+            else
+                echo
+                log_info "Creating database credential secrets for selected deployments..."
+                
+                for deployment in "${SELECTED_DB_DEPLOYMENTS[@]}"; do
+                    echo
+                    log_info "Configuring database credentials for: $deployment"
+                    
+                    # ===========================================================================
+                    # MongoDB Credentials
+                    # ===========================================================================
+                    
+                    # Collect MongoDB credentials
+                    MONGODB_ROOT_PASSWORD="${MONGODB_ROOT_PASSWORD:-}"
+                    MONGODB_REPLICA_SET_KEY="${MONGODB_REPLICA_SET_KEY:-}"
+                    
+                    if [ -z "$MONGODB_ROOT_PASSWORD" ] || [ -z "$MONGODB_REPLICA_SET_KEY" ]; then
+                        if [ ! -t 0 ]; then
+                            log_error "MONGODB_ROOT_PASSWORD and MONGODB_REPLICA_SET_KEY environment variables not set"
+                            return 1
+                        else
+                            echo
+                            log_info "MongoDB credentials:"
+                            read -rp "  MongoDB root password: " MONGODB_ROOT_PASSWORD
+                            read -rp "  MongoDB replica set key: " MONGODB_REPLICA_SET_KEY
+                        fi
+                    fi
+                    
+                    # Create MongoDB secrets
+                    MONGODB_ROOT_PASSWORD_SECRET="${deployment}-mongodb-root-password"
+                    MONGODB_REPLICA_SET_KEY_SECRET="${deployment}-mongodb-replica-set-key"
+                    
+                    if gcloud secrets describe "$MONGODB_ROOT_PASSWORD_SECRET" --project="$PROJECT_ID" &>/dev/null; then
+                        log_success "Secret already exists: $MONGODB_ROOT_PASSWORD_SECRET"
+                    else
+                        echo -n "$MONGODB_ROOT_PASSWORD" | gcloud secrets create "$MONGODB_ROOT_PASSWORD_SECRET" \
+                            --data-file=- \
+                            --replication-policy="automatic" \
+                            --project="$PROJECT_ID"
+                        log_success "Created secret: $MONGODB_ROOT_PASSWORD_SECRET"
+                    fi
+                    
+                    if gcloud secrets describe "$MONGODB_REPLICA_SET_KEY_SECRET" --project="$PROJECT_ID" &>/dev/null; then
+                        log_success "Secret already exists: $MONGODB_REPLICA_SET_KEY_SECRET"
+                    else
+                        echo -n "$MONGODB_REPLICA_SET_KEY" | gcloud secrets create "$MONGODB_REPLICA_SET_KEY_SECRET" \
+                            --data-file=- \
+                            --replication-policy="automatic" \
+                            --project="$PROJECT_ID"
+                        log_success "Created secret: $MONGODB_REPLICA_SET_KEY_SECRET"
+                    fi
+                    
+                    # ===========================================================================
+                    # PostgreSQL Credentials
+                    # ===========================================================================
+                    
+                    # Collect PostgreSQL credentials
+                    POSTGRESQL_PASSWORD="${POSTGRESQL_PASSWORD:-}"
+                    
+                    if [ -z "$POSTGRESQL_PASSWORD" ]; then
+                        if [ ! -t 0 ]; then
+                            log_error "POSTGRESQL_PASSWORD environment variable not set"
+                            return 1
+                        else
+                            echo
+                            log_info "PostgreSQL credentials:"
+                            read -rp "  PostgreSQL postgres password: " POSTGRESQL_PASSWORD
+                        fi
+                    fi
+                    
+                    # Create PostgreSQL secret
+                    POSTGRESQL_PASSWORD_SECRET="${deployment}-postgresql-postgres-password"
+                    
+                    if gcloud secrets describe "$POSTGRESQL_PASSWORD_SECRET" --project="$PROJECT_ID" &>/dev/null; then
+                        log_success "Secret already exists: $POSTGRESQL_PASSWORD_SECRET"
+                    else
+                        echo -n "$POSTGRESQL_PASSWORD" | gcloud secrets create "$POSTGRESQL_PASSWORD_SECRET" \
+                            --data-file=- \
+                            --replication-policy="automatic" \
+                            --project="$PROJECT_ID"
+                        log_success "Created secret: $POSTGRESQL_PASSWORD_SECRET"
+                    fi
+                    
+                    # ===========================================================================
+                    # MinIO Credentials
+                    # ===========================================================================
+                    
+                    # Collect MinIO credentials
+                    MINIO_ROOT_USER="${MINIO_ROOT_USER:-}"
+                    MINIO_ROOT_PASSWORD="${MINIO_ROOT_PASSWORD:-}"
+                    
+                    if [ -z "$MINIO_ROOT_USER" ] || [ -z "$MINIO_ROOT_PASSWORD" ]; then
+                        if [ ! -t 0 ]; then
+                            log_error "MINIO_ROOT_USER and MINIO_ROOT_PASSWORD environment variables not set"
+                            return 1
+                        else
+                            echo
+                            log_info "MinIO credentials:"
+                            read -rp "  MinIO root user: " MINIO_ROOT_USER
+                            read -rp "  MinIO root password: " MINIO_ROOT_PASSWORD
+                        fi
+                    fi
+                    
+                    # Create MinIO secrets
+                    MINIO_ROOT_USER_SECRET="${deployment}-minio-root-user"
+                    MINIO_ROOT_PASSWORD_SECRET="${deployment}-minio-root-password"
+                    
+                    if gcloud secrets describe "$MINIO_ROOT_USER_SECRET" --project="$PROJECT_ID" &>/dev/null; then
+                        log_success "Secret already exists: $MINIO_ROOT_USER_SECRET"
+                    else
+                        echo -n "$MINIO_ROOT_USER" | gcloud secrets create "$MINIO_ROOT_USER_SECRET" \
+                            --data-file=- \
+                            --replication-policy="automatic" \
+                            --project="$PROJECT_ID"
+                        log_success "Created secret: $MINIO_ROOT_USER_SECRET"
+                    fi
+                    
+                    if gcloud secrets describe "$MINIO_ROOT_PASSWORD_SECRET" --project="$PROJECT_ID" &>/dev/null; then
+                        log_success "Secret already exists: $MINIO_ROOT_PASSWORD_SECRET"
+                    else
+                        echo -n "$MINIO_ROOT_PASSWORD" | gcloud secrets create "$MINIO_ROOT_PASSWORD_SECRET" \
+                            --data-file=- \
+                            --replication-policy="automatic" \
+                            --project="$PROJECT_ID"
+                        log_success "Created secret: $MINIO_ROOT_PASSWORD_SECRET"
+                    fi
+                done
+            fi
+        fi
+    else
+        log_info "Skipping database credentials setup"
+    fi
+
+    # ===========================================================================
     # Step 7: Create GCP Service Account for External Secrets
     # ===========================================================================
     echo

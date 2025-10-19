@@ -245,6 +245,10 @@ postgresql:
   auth:
     enabled: true
     # Using default postgres user and database
+    # Use External Secrets Operator managed secret instead of auto-generating
+    existingSecret: postgresql
+    secretKeys:
+      adminPasswordKey: postgres-password
 
   persistence:
     enabled: true
@@ -276,6 +280,8 @@ mongodb:
 
   auth:
     rootUser: root
+    # Use External Secrets Operator managed secret instead of auto-generating
+    existingSecret: mongodb
 
   # Disable arbiter for single-node replica set
   arbiter:
@@ -339,8 +345,8 @@ minio:
 
   # Authentication (Bitnami chart uses auth.rootUser/rootPassword)
   auth:
-    rootUser: minioadmin
-    rootPassword: minioadmin
+    # Use External Secrets Operator managed secret instead of hardcoded credentials
+    existingSecret: minio
 
   persistence:
     enabled: true
