@@ -134,6 +134,7 @@ hapihub:
   externalSecrets:
     enabled: true
     secretStore: gcp-secretstore
+    secretStoreKind: ClusterSecretStore
     refreshInterval: 1h
     secrets:
       - secretKey: GOOGLE_CLIENT_ID
