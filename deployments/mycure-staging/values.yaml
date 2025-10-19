@@ -118,6 +118,10 @@ hapihub:
 
   gateway:
     hostname: ""  # Empty = uses hapihub.<global.domain>
+    backendTrafficPolicy:
+      enabled: true
+      timeout:
+        requestTimeout: "60s"
 
   livenessProbe:
     enabled: true
