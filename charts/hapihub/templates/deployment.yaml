@@ -197,6 +197,10 @@ spec:
           value: {{ $value | quote }}
         {{- end }}
         {{- end }}
+        # Custom environment variables
+        {{- with .Values.env }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
