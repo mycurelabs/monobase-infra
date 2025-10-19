@@ -21,6 +21,15 @@ spec:
         - path:
             type: PathPrefix
             value: /
+      {{- if .Values.gateway.timeouts }}
+      timeouts:
+        {{- if .Values.gateway.timeouts.request }}
+        request: {{ .Values.gateway.timeouts.request }}
+        {{- end }}
+        {{- if .Values.gateway.timeouts.backendRequest }}
+        backendRequest: {{ .Values.gateway.timeouts.backendRequest }}
+        {{- end }}
+      {{- end }}
       backendRefs:
         - name: {{ include "hapihub.fullname" . }}
           port: {{ .Values.service.port }}

@@ -60,13 +60,19 @@ gateway:
     - name: shared-gateway
       namespace: gateway-system
   
-  # BackendTrafficPolicy configuration for timeout settings
+  # HTTPRoute timeout configuration
+  timeouts:
+    # Request timeout - total time for client request/response
+    # Increase from default 15s to handle OAuth callbacks
+    request: "60s"
+    # Optional: Backend request timeout (must be <= request timeout)
+    # backendRequest: "30s"
+  
+  # BackendTrafficPolicy configuration for connection settings
   backendTrafficPolicy:
-    enabled: true
+    enabled: false  # Disabled - using HTTPRoute timeouts instead
     timeout:
-      # Request timeout - increase from default 15s to handle OAuth callbacks
-      requestTimeout: "60s"
-      # Optional: Connection idle timeout
+      # Connection idle timeout - how long to keep idle connections open
       # connectionIdleTimeout: "300s"
 
 resources:
