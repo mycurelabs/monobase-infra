@@ -266,6 +266,10 @@ mongodb:
   auth:
     rootUser: root
 
+  # Disable arbiter for single-node replica set
+  arbiter:
+    enabled: false
+
   persistence:
     enabled: true
     storageClass: ""  # Auto-detect (do-block-storage)
