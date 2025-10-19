@@ -144,10 +144,9 @@ spec:
         - protocol: TCP
           port: 53
 
-    # To Kubernetes API (for service discovery)
-    - to:
-        - namespaceSelector: {}
-      ports:
+    # To External HTTPS Services (OAuth, APIs, etc.)
+    # No 'to' selector = allows all destinations
+    - ports:
         - protocol: TCP
           port: 443
 
