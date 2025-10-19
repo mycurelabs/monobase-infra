@@ -28,6 +28,10 @@ spec:
           rootUser: {{ .Values.mongodb.auth.rootUser | default "root" }}
         architecture: replicaset
         replicaCount: {{ .Values.mongodb.replicaCount | default 1 }}
+        {{- if .Values.mongodb.arbiter }}
+        arbiter:
+          enabled: {{ .Values.mongodb.arbiter.enabled | default false }}
+        {{- end }}
         persistence:
           enabled: {{ .Values.mongodb.persistence.enabled | default true }}
           storageClass: {{ .Values.mongodb.persistence.storageClass | default "" }}
