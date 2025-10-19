@@ -110,6 +110,9 @@ spec:
         # MONGO_URI constructed from components using K8s variable expansion
         - name: MONGO_URI
           value: "mongodb://$(MONGODB_USER):$(MONGODB_PASSWORD)@$(MONGODB_HOST):$(MONGODB_PORT)/$(MONGODB_DATABASE)?replicaSet={{ .Values.mongodb.replicaSet }}&directConnection=true&authSource=admin"
+        # External URL - public HTTPS endpoint for callbacks, webhooks, etc.
+        - name: EXTERNAL_ADDRESS
+          value: {{ include "hapihub.externalUrl" . | quote }}
         # Service URLs from dependencies
         {{- if .Values.valkey.enabled }}
         - name: REDIS_URL

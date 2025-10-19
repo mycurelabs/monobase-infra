@@ -183,3 +183,11 @@ Mailpit SMTP Host - constructs hostname for Mailpit SMTP service
 {{ $release }}-mailpit-smtp.{{ $namespace }}.svc.cluster.local
 {{- end -}}
 {{- end }}
+
+{{/*
+External URL - constructs public HTTPS URL for HapiHub
+Used for OAuth callbacks, webhooks, email links, etc.
+*/}}
+{{- define "hapihub.externalUrl" -}}
+https://{{ include "hapihub.gateway.hostname" . }}
+{{- end }}
