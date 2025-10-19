@@ -8,10 +8,10 @@ metadata:
     {{- include "hapihub.labels" . | nindent 4 }}
 spec:
   # Target the HapiHub HTTPRoute
-  targetRefs:
-    - group: gateway.networking.k8s.io
-      kind: HTTPRoute
-      name: {{ include "hapihub.fullname" . }}
+  targetRef:
+    group: gateway.networking.k8s.io
+    kind: HTTPRoute
+    name: {{ include "hapihub.fullname" . }}
   
   # Configure timeout settings
   timeout:
