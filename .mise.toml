@@ -13,12 +13,11 @@ argocd = "latest"
 # Terraform
 terraform = "latest"
 
-# Secrets Management
-sops = "latest"       # Mozilla SOPS - Secrets encryption
-age = "latest"        # age - Simple encryption tool for SOPS
+# Shell Utilities
+fzf = "latest"        # Fuzzy finder for interactive selections
 
-# Cloud CLIs (optional - install only if using cloud providers)
-# Uncomment the providers you need:
-# aws-cli = "latest"    # AWS Secrets Manager
-# azure-cli = "latest"  # Azure Key Vault
-# gcloud = "latest"     # GCP Secret Manager
+# Cloud CLIs for Secret Management
+# Using cloud KMS providers (GCP by default, AWS/Azure optional)
+gcloud = "latest"     # GCP Secret Manager (default provider)
+# aws-cli = "latest"  # Uncomment for AWS Secrets Manager
+# azure-cli = "latest"  # Uncomment for Azure Key Vault

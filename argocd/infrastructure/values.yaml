@@ -59,7 +59,7 @@ gateway:
 externalSecrets:
   enabled: true
   version: 0.9.11
-  provider: sops  # Options: aws, azure, gcp, sops
+  provider: gcp  # Options: aws, azure, gcp
   
   # AWS Secrets Manager configuration
   aws:
@@ -99,7 +99,7 @@ kyverno:
 velero:
   enabled: false  # Enable for production clusters with backup requirements
   version: 7.1.4
-  provider: sops  # Options: aws, azure, gcp, digitalocean, minio
+  provider: gcp  # Options: aws, azure, gcp, digitalocean, minio
   
   # AWS S3 configuration
   aws:

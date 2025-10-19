@@ -1,236 +1,386 @@
 # Secrets Management Guide
 
-Complete guide to secrets management using External Secrets Operator and KMS.
+Complete guide to secrets management using External Secrets Operator and Cloud KMS.
 
 ## Overview
 
-**Never commit secrets to Git!** Use External Secrets Operator to sync from KMS.
+**Never commit secrets to Git!** Use External Secrets Operator to sync from cloud KMS providers.
+
+This repository uses cloud-based secret management exclusively. Secrets are stored in your cloud provider's KMS and automatically synced to Kubernetes via External Secrets Operator (ESO).
+
+## Quick Start
+
+The easiest way to get started is using our setup script:
+
+```bash
+# Run the secrets setup script
+bash scripts/secrets.sh
+
+# Follow the interactive prompts to:
+# 1. Select your cloud provider (GCP recommended)
+# 2. Automatically configure KMS and Workload Identity
+# 3. Create secrets interactively or from YAML files
+# 4. Generate ExternalSecret manifests for GitOps
+```
 
 ## Supported Providers
 
-1. **AWS Secrets Manager** (EKS recommended)
-2. **Azure Key Vault** (AKS recommended)
-3. **GCP Secret Manager** (GKE recommended)
-4. **SOPS** (Git-based encrypted files)
+1. **GCP Secret Manager** (Recommended - Free tier: 6 versions, 10k ops/month)
+2. **AWS Secrets Manager** (EKS) - Not yet implemented
+3. **Azure Key Vault** (AKS) - Not yet implemented
 
-## AWS Secrets Manager Setup
+## How It Works
 
-### 1. Create IAM Role (IRSA)
+### GitOps Workflow
 
-```bash
-# Create IAM policy
-aws iam create-policy --policy-name external-secrets-policy --policy-document '{
-  "Version": "2012-10-17",
-  "Statement": [{
-    "Effect": "Allow",
-    "Action": ["secretsmanager:GetSecretValue", "secretsmanager:DescribeSecret"],
-    "Resource": "arn:aws:secretsmanager:us-east-1:123456789012:secret:myclient/prod/*"
-  }]
-}'
-
-# Create IAM role with IRSA trust policy
-eksctl create iamserviceaccount \
-  --name external-secrets \
-  --namespace myclient-prod \
-  --cluster my-cluster \
-  --attach-policy-arn arn:aws:iam::123456789012:policy/external-secrets-policy \
-  --approve
+```
+┌─────────────────┐      ┌──────────────────┐      ┌─────────────────┐
+│  GCP Secret     │      │  ExternalSecret  │      │  Kubernetes     │
+│  Manager        │─────▶│  (in Git)        │─────▶│  Secret         │
+│  (Cloud KMS)    │      │                  │      │  (Runtime)      │
+└─────────────────┘      └──────────────────┘      └─────────────────┘
+   Manual/Script            GitOps (ArgoCD)          Auto-synced
+   One-time setup           Always in Git            Ephemeral
 ```
 
-### 2. Create Secrets in AWS
+### Manual vs GitOps Steps
+
+**Manual (One-time setup):**
+- Create secrets in cloud KMS
+- Configure Workload Identity/IRSA
+- Deploy ClusterSecretStore
+
+**GitOps (Automatic):**
+- ExternalSecret manifests in Git
+- ArgoCD applies manifests
+- ESO syncs secrets to Kubernetes
+
+## GCP Secret Manager Setup (Recommended)
+
+### Prerequisites
 
 ```bash
-# Create PostgreSQL password
-aws secretsmanager create-secret \
-  --name myclient/prod/postgresql/root-password \
-  --secret-string "$(openssl rand -base64 32)"
+# Install gcloud CLI via mise
+mise install gcloud
 
-# Create JWT secret
-aws secretsmanager create-secret \
-  --name myclient/prod/api/jwt-secret \
-  --secret-string "$(openssl rand -base64 64)"
-
-# Create all secrets from secrets-mapping.yaml
+# Authenticate
+gcloud auth login
+gcloud config set project YOUR_PROJECT_ID
 ```
 
-### 3. Deploy SecretStore
+### Option 1: Automated Setup (Recommended)
 
 ```bash
-# Applied automatically via ArgoCD or manually:
-cat infrastructure/external-secrets-operator/secretstore/aws-secretsmanager.yaml.template | \
-  sed 's/{{ .Values.global.namespace }}/myclient-prod/g' | \
-  kubectl apply -f -
+# Run the GCP secrets setup script
+bash scripts/secrets-gcp.sh
+
+# The script will:
+# 1. Auto-detect your GCP project
+# 2. Enable required APIs (Secret Manager, IAM)
+# 3. Prompt for namespace and secrets
+# 4. Create secrets in GCP Secret Manager
+# 5. Configure Workload Identity
+# 6. Generate ClusterSecretStore YAML
+# 7. Create ExternalSecret manifests for your secrets
 ```
 
-### 4. Verify Secrets Sync
+### Option 2: Manual Setup
 
-```bash
-# Check ExternalSecrets
-kubectl get externalsecrets -n myclient-prod
-
-# Check sync status
-kubectl describe externalsecret api-secrets -n myclient-prod
-
-# Verify Kubernetes secrets created
-kubectl get secrets -n myclient-prod
-```
-
-## Azure Key Vault Setup
-
-### 1. Enable Workload Identity
-
-```bash
-# Enable on AKS cluster
-az aks update \
-  --resource-group my-rg \
-  --name my-cluster \
-  --enable-workload-identity \
-  --enable-oidc-issuer
-```
-
-### 2. Create Key Vault and Secrets
-
-```bash
-# Create Key Vault
-az keyvault create \
-  --name myclient-prod-kv \
-  --resource-group my-rg \
-  --location eastus
-
-# Create secrets
-az keyvault secret set \
-  --vault-name myclient-prod-kv \
-  --name postgresql-root-password \
-  --value "$(openssl rand -base64 32)"
-```
-
-### 3. Configure Workload Identity
-
-```bash
-# Create managed identity
-az identity create \
-  --name external-secrets-identity \
-  --resource-group my-rg
-
-# Grant Key Vault access
-az keyvault set-policy \
-  --name myclient-prod-kv \
-  --object-id <identity-object-id> \
-  --secret-permissions get list
-```
-
-## GCP Secret Manager Setup
-
-### 1. Enable API
+#### 1. Enable Secret Manager API
 
 ```bash
 gcloud services enable secretmanager.googleapis.com
 ```
 
-### 2. Create Secrets
+#### 2. Create Secrets in GCP
 
 ```bash
-# Create secret
-echo -n "SecurePassword123" | gcloud secrets create postgresql-root-password \
+# Create PostgreSQL password
+echo -n "$(openssl rand -base64 32)" | gcloud secrets create postgresql-root-password \
   --data-file=- \
-  --project=my-project
+  --replication-policy="automatic"
+
+# Create JWT secret
+echo -n "$(openssl rand -base64 64)" | gcloud secrets create api-jwt-secret \
+  --data-file=- \
+  --replication-policy="automatic"
+
+# Create Cloudflare API token
+echo -n "YOUR_CLOUDFLARE_TOKEN" | gcloud secrets create cloudflare-api-token \
+  --data-file=- \
+  --replication-policy="automatic"
 ```
 
-### 3. Configure Workload Identity
+#### 3. Configure Workload Identity
 
 ```bash
+# Set variables
+PROJECT_ID="your-gcp-project"
+NAMESPACE="mycure-staging"
+KSA_NAME="external-secrets"
+GSA_NAME="external-secrets"
+
 # Create GCP service account
-gcloud iam service-accounts create external-secrets \
-  --project=my-project
+gcloud iam service-accounts create $GSA_NAME \
+  --display-name="External Secrets Operator"
 
 # Grant Secret Manager access
-gcloud projects add-iam-policy-binding my-project \
-  --member="serviceAccount:external-secrets@my-project.iam.gserviceaccount.com" \
+gcloud projects add-iam-policy-binding $PROJECT_ID \
+  --member="serviceAccount:${GSA_NAME}@${PROJECT_ID}.iam.gserviceaccount.com" \
   --role="roles/secretmanager.secretAccessor"
 
-# Bind to K8s service account
+# Bind to Kubernetes service account
 gcloud iam service-accounts add-iam-policy-binding \
-  external-secrets@my-project.iam.gserviceaccount.com \
-  --role roles/iam.workloadIdentityUser \
-  --member "serviceAccount:my-project.svc.id.goog[myclient-prod/external-secrets]"
+  ${GSA_NAME}@${PROJECT_ID}.iam.gserviceaccount.com \
+  --role="roles/iam.workloadIdentityUser" \
+  --member="serviceAccount:${PROJECT_ID}.svc.id.goog[${NAMESPACE}/${KSA_NAME}]"
 ```
 
-## SOPS Setup
-
-### 1. Install SOPS
+#### 4. Deploy ClusterSecretStore
 
 ```bash
-brew install sops
-```
-
-### 2. Create Encryption Key
-
-```bash
-# AWS KMS
-aws kms create-key --description "SOPS encryption key"
-
-# Or use age (no cloud dependency)
-age-keygen -o age.key
-```
-
-### 3. Create .sops.yaml
-
-```yaml
-# In repository root
-creation_rules:
-  - path_regex: deployments/.*/secrets\.enc\.yaml$
-    kms: 'arn:aws:kms:us-east-1:123456789012:key/key-id'
-```
-
-### 4. Encrypt Secrets File
-
-```bash
-# Create secrets file
-cat > deployments/myclient/secrets.yaml <<EOF
-postgresql:
-  root-password: SecurePassword123
-api:
-  jwt-secret: JwtSecret456
+# Create from template
+cat > infrastructure/external-secrets/gcp-secretstore.yaml <<EOF
+apiVersion: external-secrets.io/v1beta1
+kind: ClusterSecretStore
+metadata:
+  name: gcp-backend
+spec:
+  provider:
+    gcpsm:
+      projectID: "${PROJECT_ID}"
+      auth:
+        workloadIdentity:
+          clusterLocation: us-central1
+          clusterName: your-cluster
+          serviceAccountRef:
+            name: ${KSA_NAME}
+            namespace: ${NAMESPACE}
 EOF
 
-# Encrypt with SOPS
-sops -e deployments/myclient/secrets.yaml > deployments/myclient/secrets.enc.yaml
-
-# Commit encrypted file (safe!)
-git add deployments/myclient/secrets.enc.yaml
-git commit -m "Add encrypted secrets"
+# Apply via ArgoCD or manually
+kubectl apply -f infrastructure/external-secrets/gcp-secretstore.yaml
 ```
+
+#### 5. Create ExternalSecret Manifests
+
+```bash
+# Example: Cloudflare API token for cert-manager
+cat > infrastructure/tls/cloudflare-token-externalsecret.yaml <<EOF
+apiVersion: external-secrets.io/v1beta1
+kind: ExternalSecret
+metadata:
+  name: cloudflare-api-token
+  namespace: cert-manager
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    name: gcp-backend
+    kind: ClusterSecretStore
+  target:
+    name: cloudflare-api-token-secret
+    creationPolicy: Owner
+  data:
+    - secretKey: api-token
+      remoteRef:
+        key: cloudflare-api-token
+EOF
+
+# Commit to Git for GitOps
+git add infrastructure/tls/cloudflare-token-externalsecret.yaml
+git commit -m "feat: Add Cloudflare token ExternalSecret"
+```
+
+#### 6. Verify Secrets Sync
+
+```bash
+# Check ClusterSecretStore
+kubectl get clustersecretstore gcp-backend
+kubectl describe clustersecretstore gcp-backend
+
+# Check ExternalSecrets
+kubectl get externalsecrets -A
+
+# Check sync status
+kubectl describe externalsecret cloudflare-api-token -n cert-manager
+
+# Verify Kubernetes secrets created
+kubectl get secret cloudflare-api-token-secret -n cert-manager
+```
+
+## AWS Secrets Manager Setup
+
+**Status:** Not yet implemented
+
+To add AWS support:
+1. Implement `scripts/secrets-aws.sh` (use `scripts/secrets-gcp.sh` as template)
+2. Create `infrastructure/external-secrets/aws-secretstore.yaml.template`
+3. Update deployment values to use `provider: aws`
+
+For now, use GCP Secret Manager as the default provider.
+
+## Azure Key Vault Setup
+
+**Status:** Not yet implemented
+
+To add Azure support:
+1. Implement `scripts/secrets-azure.sh` (use `scripts/secrets-gcp.sh` as template)
+2. Create `infrastructure/external-secrets/azure-secretstore.yaml.template`
+3. Update deployment values to use `provider: azure`
+
+For now, use GCP Secret Manager as the default provider.
 
 ## Secret Rotation
 
-### Rotate JWT Secret
+### Rotate Any Secret
 
 ```bash
-# 1. Generate new secret
+# 1. Generate new secret value
 NEW_SECRET=$(openssl rand -base64 64)
 
-# 2. Update in KMS
-aws secretsmanager update-secret \
-  --secret-id myclient/prod/api/jwt-secret \
-  --secret-string "$NEW_SECRET"
+# 2. Update in GCP Secret Manager (creates new version)
+echo -n "$NEW_SECRET" | gcloud secrets versions add api-jwt-secret --data-file=-
 
-# 3. External Secrets syncs automatically (within 1h)
+# 3. External Secrets syncs automatically (within 1h based on refreshInterval)
 # Or force refresh:
 kubectl annotate externalsecret api-secrets \
   force-sync=$(date +%s) \
-  -n myclient-prod
+  -n mycure-staging
 
 # 4. Restart pods to use new secret
-kubectl rollout restart deployment api -n myclient-prod
+kubectl rollout restart deployment api -n mycure-staging
+```
+
+### Rotate Cloudflare API Token
+
+```bash
+# 1. Create new token in Cloudflare dashboard
+# https://dash.cloudflare.com/profile/api-tokens
+
+# 2. Update in GCP Secret Manager
+echo -n "NEW_CLOUDFLARE_TOKEN" | gcloud secrets versions add cloudflare-api-token --data-file=-
+
+# 3. Force sync (cert-manager will use new token)
+kubectl annotate externalsecret cloudflare-api-token \
+  force-sync=$(date +%s) \
+  -n cert-manager
+
+# 4. Verify cert-manager can access new token
+kubectl logs -n cert-manager deploy/cert-manager -f
+```
+
+## Using Secrets in Deployments
+
+### Reference ExternalSecret in Helm Values
+
+```yaml
+# In deployments/mycure-staging/values.yaml
+postgresql:
+  auth:
+    existingSecret: postgresql-secrets
+    secretKeys:
+      adminPasswordKey: root-password
+```
+
+### Create ExternalSecret for Deployment
+
+```yaml
+# In deployments/mycure-staging/external-secrets/postgresql.yaml
+apiVersion: external-secrets.io/v1beta1
+kind: ExternalSecret
+metadata:
+  name: postgresql-secrets
+  namespace: mycure-staging
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    name: gcp-backend
+    kind: ClusterSecretStore
+  target:
+    name: postgresql-secrets
+    creationPolicy: Owner
+  data:
+    - secretKey: root-password
+      remoteRef:
+        key: postgresql-root-password
 ```
 
 ## Security Best Practices
 
-1. **Never commit secrets** - Use .gitignore
-2. **Rotate regularly** - Every 90 days minimum
-3. **Use separate secrets** per environment
-4. **Enable audit logging** - Track secret access
-5. **Least privilege** - IAM policies restrict access
-6. **Monitor failures** - Alert on sync failures
+1. **Never commit secrets to Git** - Use `.gitignore` for local secret files
+2. **Use cloud KMS exclusively** - No encrypted files in Git
+3. **Rotate regularly** - Every 90 days minimum for credentials
+4. **Use separate secrets per environment** - Don't share secrets between staging/prod
+5. **Enable audit logging** - Track secret access in cloud provider
+6. **Least privilege** - IAM policies restrict access to specific secrets
+7. **Monitor failures** - Alert on ExternalSecret sync failures
+8. **Use Workload Identity** - No static credentials in clusters
 
-For complete secret mappings, see `deployments/example.com/secrets-mapping.yaml`.
+## Troubleshooting
+
+### ExternalSecret Not Syncing
+
+```bash
+# Check ExternalSecret status
+kubectl describe externalsecret <name> -n <namespace>
+
+# Check ESO logs
+kubectl logs -n external-secrets-operator deploy/external-secrets -f
+
+# Check ClusterSecretStore
+kubectl describe clustersecretstore gcp-backend
+
+# Verify Workload Identity binding
+gcloud iam service-accounts get-iam-policy \
+  external-secrets@PROJECT_ID.iam.gserviceaccount.com
+```
+
+### Secret Not Found in GCP
+
+```bash
+# List all secrets
+gcloud secrets list
+
+# Get secret details
+gcloud secrets describe <secret-name>
+
+# View secret versions
+gcloud secrets versions list <secret-name>
+
+# Test access
+gcloud secrets versions access latest --secret=<secret-name>
+```
+
+### Workload Identity Issues
+
+```bash
+# Verify GKE Workload Identity is enabled
+gcloud container clusters describe CLUSTER_NAME \
+  --format="value(workloadIdentityConfig.workloadPool)"
+
+# Check service account annotation
+kubectl get sa external-secrets -n <namespace> -o yaml
+
+# Should see: iam.gke.io/gcp-service-account: external-secrets@PROJECT_ID.iam.gserviceaccount.com
+```
+
+## Migration from SOPS (Legacy)
+
+If you have existing SOPS-encrypted secrets, migrate to cloud KMS:
+
+1. Decrypt existing secrets: `sops -d secrets.enc.yaml > secrets.yaml`
+2. Create secrets in GCP: `bash scripts/secrets-gcp.sh` (import from YAML)
+3. Generate ExternalSecret manifests
+4. Test in non-prod environment first
+5. Remove SOPS files: `git rm secrets.enc.yaml .sops.yaml`
+6. Update ArgoCD to remove KSOPS plugin
+
+SOPS support has been removed from this repository to focus on cloud-native secret management.
+
+## References
+
+- [External Secrets Operator Docs](https://external-secrets.io)
+- [GCP Secret Manager](https://cloud.google.com/secret-manager/docs)
+- [GKE Workload Identity](https://cloud.google.com/kubernetes-engine/docs/how-to/workload-identity)
+- [AWS Secrets Manager](https://docs.aws.amazon.com/secretsmanager/)
+- [Azure Key Vault](https://docs.microsoft.com/azure/key-vault/)

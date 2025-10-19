@@ -8,7 +8,4 @@ namespace: cert-manager
 resources:
   - clusterissuer-staging.yaml
   - clusterissuer-prod.yaml
-
-# KSOPS Generator for SOPS-encrypted secrets
-generators:
-  - ksops-config.yaml
+  - cloudflare-token-externalsecret.yaml

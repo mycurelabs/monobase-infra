@@ -11,16 +11,474 @@ set -euo pipefail
 # - collect_tls_config, template_clusterissuers, update_infrastructure_values
 
 setup_gcp() {
-    log_warn "GCP Secret Manager setup not yet implemented"
-    log_info "This will be implemented in a future update"
-    log_info "For now, use SOPS + age or Manual setup"
+    log_info "Setting up GCP Secret Manager..."
+
+    # Check required commands
+    check_command gcloud || {
+        log_error "gcloud CLI not found"
+        log_info "Install with: mise install gcloud"
+        return 1
+    }
+    check_command kubectl || return 1
+
+    # Select cluster
+    select_kubeconfig || return 1
+    check_kubeconfig || return 1
+
+    # ===========================================================================
+    # Step 1: Select GCP Project
+    # ===========================================================================
     echo
-    log_info "Planned features:"
-    echo "  • Auto-detect GCP project"
-    echo "  • Create secret in GCP Secret Manager"
-    echo "  • Configure Workload Identity"
-    echo "  • Deploy ExternalSecret with GCP provider"
+    log_info "Selecting GCP project..."
+    
+    # Try to auto-detect project ID from existing ClusterSecretStore (idempotent)
+    local SECRETSTORE_FILE="${REPO_ROOT}/infrastructure/external-secrets/gcp-secretstore.yaml"
+    local DETECTED_PROJECT=""
+    
+    if [ -f "$SECRETSTORE_FILE" ]; then
+        DETECTED_PROJECT=$(grep "projectID:" "$SECRETSTORE_FILE" | head -1 | sed 's/.*projectID: *"\?\([^"]*\)"\?.*/\1/' | tr -d ' ')
+        
+        # Check if value is real (not template like {{ PROJECT_ID }})
+        if [[ ! "$DETECTED_PROJECT" =~ "{{" ]] && [ -n "$DETECTED_PROJECT" ]; then
+            # If --project flag was provided, it takes precedence
+            if [ -n "$OPT_GCP_PROJECT" ]; then
+                if [ "$OPT_GCP_PROJECT" != "$DETECTED_PROJECT" ]; then
+                    log_warning "Flag --project='$OPT_GCP_PROJECT' overrides detected project '$DETECTED_PROJECT'"
+                fi
+                PROJECT_ID="$OPT_GCP_PROJECT"
+            else
+                PROJECT_ID="$DETECTED_PROJECT"
+                log_success "Using existing GCP project from ClusterSecretStore: $PROJECT_ID"
+            fi
+        fi
+    fi
+    
+    # If not auto-detected and project provided via flag, use it directly
+    if [ -z "${PROJECT_ID:-}" ] && [ -n "$OPT_GCP_PROJECT" ]; then
+        # Verify project exists and user has access
+        if ! gcloud projects describe "$OPT_GCP_PROJECT" &>/dev/null; then
+            log_error "GCP project not found or no access: $OPT_GCP_PROJECT"
+            log_info "Check project ID and your gcloud authentication"
+            return 1
+        fi
+        PROJECT_ID="$OPT_GCP_PROJECT"
+        log_info "Using GCP project: $PROJECT_ID"
+    fi
+    
+    # If still not set, do interactive selection
+    if [ -z "${PROJECT_ID:-}" ]; then
+        # Interactive project selection
+        # Get current default project
+        CURRENT_PROJECT=$(gcloud config get-value project 2>/dev/null || echo "")
+        
+        # Check if fzf is available
+        if command -v fzf &>/dev/null; then
+        # Fetch all GCP projects
+        log_info "Fetching available GCP projects..."
+        
+        # Build project list with formatting: "PROJECT_ID (NAME) [NUMBER]"
+        PROJECTS_RAW=$(gcloud projects list --format="value(projectId,name,projectNumber)" 2>/dev/null)
+        
+        if [ -z "$PROJECTS_RAW" ]; then
+            log_error "No GCP projects found. Check your gcloud authentication."
+            return 1
+        fi
+        
+        # Format projects for fzf display
+        PROJECTS_FORMATTED=$(echo "$PROJECTS_RAW" | awk -v current="$CURRENT_PROJECT" '{
+            project_id = $1
+            project_name = $2
+            project_number = $3
+            # Reconstruct name if it has spaces (everything between project_id and project_number)
+            for(i=2; i<NF; i++) {
+                if(i==2) project_name = $i
+                else project_name = project_name " " $i
+            }
+            project_number = $NF
+            
+            marker = (project_id == current) ? "* " : "  "
+            printf "%s%-25s  %-30s  [%s]\n", marker, project_id, project_name, project_number
+        }')
+        
+        # Use fzf for selection
+        SELECTED=$(echo "$PROJECTS_FORMATTED" | fzf \
+            --height=20 \
+            --border \
+            --prompt="Select GCP Project: " \
+            --header="* = current default | TAB to select | ESC to cancel" \
+            --preview='echo "Project Details:" && echo "" && echo "ID: {2}" && echo "Name: {3}" && echo "Number: {NF}" | sed "s/\[//g" | sed "s/\]//g"' \
+            --preview-window=right:40% \
+            --ansi)
+        
+        if [ -z "$SELECTED" ]; then
+            log_error "No project selected"
+            return 1
+        fi
+        
+        # Extract project ID (second field, after the marker)
+        PROJECT_ID=$(echo "$SELECTED" | awk '{print $2}')
+        
+    else
+        # Fallback to numbered menu if fzf not available
+        log_warn "fzf not found. Using numbered menu. Install with: mise install fzf"
+        echo
+        
+        # Fetch all projects
+        mapfile -t PROJECT_IDS < <(gcloud projects list --format="value(projectId)" 2>/dev/null)
+        mapfile -t PROJECT_NAMES < <(gcloud projects list --format="value(name)" 2>/dev/null)
+        
+        if [ ${#PROJECT_IDS[@]} -eq 0 ]; then
+            log_error "No GCP projects found. Check your gcloud authentication."
+            return 1
+        fi
+        
+        # Display numbered list
+        echo "Available GCP Projects:"
+        echo
+        for i in "${!PROJECT_IDS[@]}"; do
+            marker=""
+            if [ "${PROJECT_IDS[$i]}" = "$CURRENT_PROJECT" ]; then
+                marker=" (current)"
+            fi
+            echo "  $((i+1))) ${PROJECT_IDS[$i]} - ${PROJECT_NAMES[$i]}${marker}"
+        done
+        echo
+        
+        read -rp "Enter choice [1-${#PROJECT_IDS[@]}]: " choice
+        
+        if [ "$choice" -ge 1 ] 2>/dev/null && [ "$choice" -le "${#PROJECT_IDS[@]}" ]; then
+            PROJECT_ID="${PROJECT_IDS[$((choice-1))]}"
+        else
+            log_error "Invalid choice"
+            return 1
+        fi
+        fi
+    fi  # End of interactive project selection
+
+    # Set project
+    gcloud config set project "$PROJECT_ID" &>/dev/null
+    log_success "Project set to: $PROJECT_ID"
+
+    # ===========================================================================
+    # Step 2: Enable Secret Manager API
+    # ===========================================================================
     echo
-    read -rp "Press Enter to return to main menu..."
-    return 1
+    log_info "Enabling Secret Manager API..."
+    
+    if gcloud services list --enabled --filter="name:secretmanager.googleapis.com" --format="value(name)" 2>/dev/null | grep -q secretmanager; then
+        log_success "Secret Manager API already enabled"
+    else
+        gcloud services enable secretmanager.googleapis.com
+        log_success "Enabled Secret Manager API"
+    fi
+
+    # ===========================================================================
+    # Step 3: Collect TLS Configuration
+    # ===========================================================================
+    echo
+    collect_tls_config
+
+    # ===========================================================================
+    # Step 4: Collect Cloudflare API Token
+    # ===========================================================================
+    echo
+    log_info "Cloudflare API Token Configuration"
+    echo
+    
+    # Check if secret already exists in GCP (idempotent)
+    if gcloud secrets describe "infrastructure-cloudflare-api-token" --project="$PROJECT_ID" &>/dev/null; then
+        log_success "Cloudflare API token already exists in GCP Secret Manager"
+        log_info "Skipping token collection"
+    else
+        # Secret doesn't exist - need to collect it
+        if [ -n "${CLOUDFLARE_API_TOKEN:-}" ]; then
+            log_info "Using CLOUDFLARE_API_TOKEN from environment: ***masked***"
+        elif [ ! -t 0 ]; then
+            # Non-interactive mode without env var
+            log_error "Cloudflare API token not found in GCP Secret Manager"
+            log_error "CLOUDFLARE_API_TOKEN environment variable not set"
+            log_error ""
+            log_error "Please either:"
+            log_error "  1. Set environment variable: export CLOUDFLARE_API_TOKEN='your-token'"
+            log_error "  2. Run in interactive mode: bash scripts/secrets-gcp.sh"
+            return 1
+        else
+            # Interactive mode - prompt for token
+            read -rp "Enter your Cloudflare API token: " CLOUDFLARE_API_TOKEN
+            export CLOUDFLARE_API_TOKEN
+        fi
+    fi
+
+    # ===========================================================================
+    # Step 5: Create Secrets in GCP
+    # ===========================================================================
+    echo
+    log_info "Creating secrets in GCP Secret Manager..."
+
+    # Create Cloudflare API token secret
+    SECRET_NAME="infrastructure-cloudflare-api-token"
+    
+    # Check if secret exists in GCP Secret Manager (idempotent)
+    if gcloud secrets describe "$SECRET_NAME" --project="$PROJECT_ID" &>/dev/null; then
+        log_success "Secret '$SECRET_NAME' already exists in GCP Secret Manager, skipping"
+    else
+        # Secret doesn't exist - create it
+        if [ -n "${CLOUDFLARE_API_TOKEN:-}" ]; then
+            # Use environment variable or value from collect_tls_config
+            echo -n "$CLOUDFLARE_API_TOKEN" | gcloud secrets create "$SECRET_NAME" \
+                --data-file=- \
+                --replication-policy="automatic" \
+                --project="$PROJECT_ID"
+            log_success "Created secret: $SECRET_NAME"
+        elif [ ! -t 0 ]; then
+            # Non-interactive mode without CLOUDFLARE_API_TOKEN set
+            log_error "Secret not found in GCP and CLOUDFLARE_API_TOKEN environment variable not set"
+            log_error "Please set CLOUDFLARE_API_TOKEN or run in interactive mode"
+            return 1
+        else
+            # Interactive mode - CLOUDFLARE_API_TOKEN should be set from collect_tls_config
+            echo -n "$CLOUDFLARE_API_TOKEN" | gcloud secrets create "$SECRET_NAME" \
+                --data-file=- \
+                --replication-policy="automatic" \
+                --project="$PROJECT_ID"
+            log_success "Created secret: $SECRET_NAME"
+        fi
+    fi
+
+    # ===========================================================================
+    # Step 6: Create GCP Service Account for External Secrets
+    # ===========================================================================
+    echo
+    log_info "Setting up GCP Service Account..."
+
+    GSA_NAME="external-secrets"
+    GSA_EMAIL="${GSA_NAME}@${PROJECT_ID}.iam.gserviceaccount.com"
+
+    if gcloud iam service-accounts describe "$GSA_EMAIL" --project="$PROJECT_ID" &>/dev/null; then
+        log_success "Service account $GSA_NAME already exists"
+    else
+        gcloud iam service-accounts create "$GSA_NAME" \
+            --display-name="External Secrets Operator" \
+            --project="$PROJECT_ID"
+        log_success "Created service account: $GSA_NAME"
+        
+        # Wait for service account to propagate (GCP eventual consistency)
+        log_info "Waiting for service account to propagate..."
+        sleep 5
+    fi
+
+    # ===========================================================================
+    # Step 7: Grant Secret Manager Access
+    # ===========================================================================
+    echo
+    log_info "Granting Secret Manager access to service account..."
+
+    # Retry logic for GCP propagation delays
+    MAX_RETRIES=5
+    RETRY_COUNT=0
+    RETRY_DELAY=2
+    
+    while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+        if gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+            --member="serviceAccount:${GSA_EMAIL}" \
+            --role="roles/secretmanager.secretAccessor" \
+            --condition=None \
+            >/dev/null 2>&1; then
+            log_success "Granted secretAccessor role to $GSA_NAME"
+            break
+        else
+            RETRY_COUNT=$((RETRY_COUNT + 1))
+            if [ $RETRY_COUNT -lt $MAX_RETRIES ]; then
+                log_info "Service account not yet propagated, retrying in ${RETRY_DELAY}s (attempt $RETRY_COUNT/$MAX_RETRIES)..."
+                sleep $RETRY_DELAY
+                RETRY_DELAY=$((RETRY_DELAY * 2))  # Exponential backoff
+            else
+                log_error "Failed to grant IAM role after $MAX_RETRIES attempts"
+                log_error "Service account may still be propagating. Please run the script again in a few moments."
+                return 1
+            fi
+        fi
+    done
+
+    # ===========================================================================
+    # Step 8: Create Service Account Key (Idempotent)
+    # ===========================================================================
+    echo
+    log_info "Creating service account key for authentication..."
+
+    # Create directory for GCP keys
+    KEY_DIR="$HOME/.gcp"
+    KEY_FILE="${KEY_DIR}/external-secrets-${PROJECT_ID}.json"
+    
+    mkdir -p "$KEY_DIR"
+    chmod 700 "$KEY_DIR"
+    
+    # Check if key already exists
+    if [ -f "$KEY_FILE" ]; then
+        log_success "Service account key already exists at: $KEY_FILE"
+    else
+        log_info "Creating new service account key..."
+        gcloud iam service-accounts keys create "$KEY_FILE" \
+            --iam-account="${GSA_EMAIL}" \
+            --project="$PROJECT_ID"
+        
+        chmod 600 "$KEY_FILE"
+        log_success "Service account key created at: $KEY_FILE"
+    fi
+
+    # ===========================================================================
+    # Step 9: Create Kubernetes Secret (Idempotent)
+    # ===========================================================================
+    echo
+    log_info "Creating Kubernetes secret for External Secrets Operator..."
+
+    # Namespace and secret for External Secrets Operator
+    K8S_NAMESPACE="external-secrets-system"
+    K8S_SECRET="gcpsm-secret"
+    
+    # Ensure namespace exists
+    log_info "Ensuring namespace exists: $K8S_NAMESPACE"
+    kubectl create namespace "$K8S_NAMESPACE" --dry-run=client -o yaml | kubectl apply -f - >/dev/null 2>&1
+    
+    # Check if secret already exists
+    if kubectl get secret "$K8S_SECRET" -n "$K8S_NAMESPACE" &>/dev/null; then
+        log_success "Kubernetes secret '$K8S_SECRET' already exists in namespace '$K8S_NAMESPACE'"
+        log_info "To update the secret, delete it first:"
+        log_info "  kubectl delete secret $K8S_SECRET -n $K8S_NAMESPACE"
+    else
+        log_info "Creating Kubernetes secret from service account key..."
+        kubectl create secret generic "$K8S_SECRET" \
+            --from-file=secret-access-credentials="$KEY_FILE" \
+            -n "$K8S_NAMESPACE"
+        
+        log_success "Kubernetes secret '$K8S_SECRET' created in namespace '$K8S_NAMESPACE'"
+    fi
+
+    # ===========================================================================
+    # Step 10: Generate ClusterSecretStore YAML
+    # ===========================================================================
+    echo
+    log_info "Generating ClusterSecretStore manifest..."
+
+    SECRETSTORE_FILE="${REPO_ROOT}/infrastructure/external-secrets/gcp-secretstore.yaml"
+
+    cat > "$SECRETSTORE_FILE" <<EOF
+# GCP Secret Manager ClusterSecretStore
+# Provides access to secrets stored in Google Cloud Secret Manager
+# Authentication: Service Account Key (works with any Kubernetes cluster)
+
+apiVersion: external-secrets.io/v1beta1
+kind: ClusterSecretStore
+metadata:
+  name: gcp-secretstore
+  labels:
+    app.kubernetes.io/name: gcp-secretstore
+    app.kubernetes.io/component: external-secrets
+spec:
+  provider:
+    gcpsm:
+      projectID: "${PROJECT_ID}"
+      
+      # Authentication using Service Account Key
+      auth:
+        secretRef:
+          secretAccessKeySecretRef:
+            name: ${K8S_SECRET}
+            key: secret-access-credentials
+            namespace: ${K8S_NAMESPACE}
+EOF
+
+    log_success "Created ClusterSecretStore at: $SECRETSTORE_FILE"
+
+    # ===========================================================================
+    # Step 11: Create Cloudflare ExternalSecret
+    # ===========================================================================
+    echo
+    log_info "Creating Cloudflare ExternalSecret manifest..."
+
+    EXTERNALSECRET_FILE="${REPO_ROOT}/infrastructure/tls/cloudflare-token-externalsecret.yaml"
+
+    cat > "$EXTERNALSECRET_FILE" <<EOF
+# External Secret for Cloudflare API Token
+# Syncs from GCP Secret Manager to Kubernetes Secret
+
+apiVersion: external-secrets.io/v1beta1
+kind: ExternalSecret
+metadata:
+  name: cloudflare-api-token
+  namespace: cert-manager
+  labels:
+    app.kubernetes.io/name: cloudflare-token
+    app.kubernetes.io/component: tls
+spec:
+  # Refresh interval
+  refreshInterval: 1h
+  
+  # Reference to ClusterSecretStore
+  secretStoreRef:
+    name: gcp-secretstore
+    kind: ClusterSecretStore
+  
+  # Target Kubernetes secret
+  target:
+    name: cloudflare-api-token
+    creationPolicy: Owner
+  
+  # Data mapping
+  data:
+    - secretKey: api-token
+      remoteRef:
+        key: infrastructure-cloudflare-api-token
+EOF
+
+    log_success "Created ExternalSecret at: $EXTERNALSECRET_FILE"
+
+    # ===========================================================================
+    # Step 12: Update Infrastructure Configuration
+    # ===========================================================================
+    echo
+    update_infrastructure_values "gcp"
+
+    # Template ClusterIssuers
+    template_clusterissuers
+
+    # ===========================================================================
+    # Step 13: Show Next Steps
+    # ===========================================================================
+    show_next_steps_gcp
+}
+
+show_next_steps_gcp() {
+    echo
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo " Next Steps"
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo
+    log_success "GCP Secret Manager setup complete!"
+    echo
+    echo "1. Review generated files:"
+    echo "   - infrastructure/external-secrets/gcp-secretstore.yaml"
+    echo "   - infrastructure/tls/cloudflare-token-externalsecret.yaml"
+    echo
+    echo "2. Commit the configuration to Git:"
+    echo "   git add infrastructure/"
+    echo "   git commit -m \"feat: Add GCP Secret Manager integration\""
+    echo "   git push"
+    echo
+    echo "3. ArgoCD will automatically deploy External Secrets Operator"
+    echo
+    echo "4. Verify ClusterSecretStore is ready:"
+    echo "   kubectl get clustersecretstore gcp-secretstore"
+    echo
+    echo "5. Check ExternalSecret sync status:"
+    echo "   kubectl get externalsecret -n cert-manager"
+    echo
+    echo "6. Verify Kubernetes secret was created:"
+    echo "   kubectl get secret cloudflare-api-token -n cert-manager"
+    echo
+    echo "7. Check certificate provisioning:"
+    echo "   kubectl get certificate -n gateway-system"
+    echo
+    echo "Note: All secrets are now managed via GCP Secret Manager + GitOps!"
+    echo
 }

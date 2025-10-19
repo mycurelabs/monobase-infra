@@ -107,40 +107,6 @@ repoServer:
       cpu: 1
       memory: 1Gi
 
-  # KSOPS Config Management Plugin (CMP) for SOPS secret decryption
-  volumes:
-    - name: cmp-plugin
-      configMap:
-        name: cmp-plugin
-    - name: custom-tools
-      emptyDir: {}
-    - name: sops-age-key
-      secret:
-        secretName: sops-age-key
-
-  extraContainers:
-    - name: ksops
-      image: viaductoss/ksops:v4.3.1
-      command: [/var/run/argocd/argocd-cmp-server]
-      securityContext:
-        runAsNonRoot: true
-        runAsUser: 999
-      volumeMounts:
-        - mountPath: /var/run/argocd
-          name: var-files
-        - mountPath: /home/argocd/cmp-server/plugins
-          name: plugins
-        - mountPath: /home/argocd/cmp-server/config/plugin.yaml
-          subPath: plugin.yaml
-          name: cmp-plugin
-        - mountPath: /tmp
-          name: tmp
-        - mountPath: /.config/sops/age
-          name: sops-age-key
-      env:
-        - name: XDG_CONFIG_HOME
-          value: /.config
-
 # ApplicationSet Controller (App-of-Apps)
 applicationSet:
   enabled: true

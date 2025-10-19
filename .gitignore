@@ -14,6 +14,10 @@ secrets/
 .env.local
 credentials.json
 
+# GCP Service Account Keys (NEVER commit)
+.gcp/
+*.json  # GCP service account keys are typically JSON files
+
 # Age private keys (NEVER commit)
 age.agekey
 *.agekey

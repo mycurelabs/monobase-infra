@@ -12,14 +12,18 @@ set -euo pipefail
 
 setup_azure() {
     log_warn "Azure Key Vault setup not yet implemented"
-    log_info "This will be implemented in a future update"
-    log_info "For now, use SOPS + age or Manual setup"
+    log_info "This feature will be implemented in a future update"
+    log_info "For now, please use GCP Secret Manager (fully supported)"
     echo
-    log_info "Planned features:"
-    echo "  • Auto-detect Azure subscription"
-    echo "  • Create secret in Azure Key Vault"
-    echo "  • Configure Workload Identity"
-    echo "  • Deploy ExternalSecret with Azure provider"
+    log_info "Planned features for Azure:"
+    echo "  • Auto-detect Azure subscription and tenant"
+    echo "  • Create secrets in Azure Key Vault"
+    echo "  • Configure Workload Identity (AKS)"
+    echo "  • Generate ClusterSecretStore with Azure provider"
+    echo "  • Create ExternalSecret manifests"
+    echo
+    log_info "Implementation similar to GCP Secret Manager"
+    log_info "See scripts/secrets-gcp.sh for reference"
     echo
     read -rp "Press Enter to return to main menu..."
     return 1

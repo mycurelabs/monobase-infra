@@ -12,14 +12,18 @@ set -euo pipefail
 
 setup_aws() {
     log_warn "AWS Secrets Manager setup not yet implemented"
-    log_info "This will be implemented in a future update"
-    log_info "For now, use SOPS + age or Manual setup"
+    log_info "This feature will be implemented in a future update"
+    log_info "For now, please use GCP Secret Manager (fully supported)"
     echo
-    log_info "Planned features:"
-    echo "  • Auto-detect AWS region"
-    echo "  • Create secret in AWS Secrets Manager"
+    log_info "Planned features for AWS:"
+    echo "  • Auto-detect AWS region and account"
+    echo "  • Create secrets in AWS Secrets Manager"
     echo "  • Configure IRSA (IAM Roles for Service Accounts)"
-    echo "  • Deploy ExternalSecret with AWS provider"
+    echo "  • Generate ClusterSecretStore with AWS provider"
+    echo "  • Create ExternalSecret manifests"
+    echo
+    log_info "Implementation similar to GCP Secret Manager"
+    log_info "See scripts/secrets-gcp.sh for reference"
     echo
     read -rp "Press Enter to return to main menu..."
     return 1
