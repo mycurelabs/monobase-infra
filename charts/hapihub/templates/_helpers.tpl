@@ -175,12 +175,12 @@ http://minio.{{ $namespace }}.svc.cluster.local:9000
 
 {{/*
 Mailpit SMTP Host - constructs hostname for Mailpit SMTP service
+Note: Mailpit is deployed as a standalone chart with instance name "mailpit"
 */}}
 {{- define "hapihub.mailpit.host" -}}
 {{- if .Values.mailpit.enabled -}}
-{{- $release := .Release.Name -}}
 {{- $namespace := include "hapihub.namespace" . -}}
-{{ $release }}-mailpit-smtp.{{ $namespace }}.svc.cluster.local
+mailpit-smtp.{{ $namespace }}.svc.cluster.local
 {{- end -}}
 {{- end }}
 
