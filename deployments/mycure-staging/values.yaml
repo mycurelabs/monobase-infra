@@ -121,6 +121,14 @@ hapihub:
     timeouts:
       request: "60s"  # Extended timeout for OAuth callbacks
 
+  env:
+    - name: BETTER_AUTH_RATE_LIMIT_ENABLED
+      value: "true"
+    - name: BETTER_AUTH_RATE_LIMIT_WINDOW
+      value: "60"
+    - name: BETTER_AUTH_RATE_LIMIT_MAX
+      value: "300"
+
   livenessProbe:
     enabled: true
 
