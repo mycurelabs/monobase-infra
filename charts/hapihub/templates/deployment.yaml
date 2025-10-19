@@ -156,16 +156,31 @@ spec:
             secretKeyRef:
               name: {{ include "hapihub.fullname" . }}-secrets
               key: JWT_SECRET
+              optional: true
         - name: S3_ACCESS_KEY_ID
           valueFrom:
             secretKeyRef:
               name: {{ include "hapihub.fullname" . }}-secrets
               key: S3_ACCESS_KEY_ID
+              optional: true
         - name: S3_SECRET_ACCESS_KEY
           valueFrom:
             secretKeyRef:
               name: {{ include "hapihub.fullname" . }}-secrets
               key: S3_SECRET_ACCESS_KEY
+              optional: true
+        - name: GOOGLE_CLIENT_ID
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "hapihub.fullname" . }}-secrets
+              key: GOOGLE_CLIENT_ID
+              optional: true
+        - name: GOOGLE_CLIENT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "hapihub.fullname" . }}-secrets
+              key: GOOGLE_CLIENT_SECRET
+              optional: true
         {{- end }}
         # Additional environment variables from config
         {{- range $key, $value := .Values.config }}

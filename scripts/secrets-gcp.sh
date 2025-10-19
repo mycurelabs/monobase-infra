@@ -246,7 +246,145 @@ setup_gcp() {
     fi
 
     # ===========================================================================
-    # Step 6: Create GCP Service Account for External Secrets
+    # Step 6: Collect Google OAuth Credentials (Optional)
+    # ===========================================================================
+    echo
+    log_info "Google OAuth Configuration (Optional)"
+    echo "Google OAuth credentials enable SSO authentication in HapiHub."
+    echo
+    
+    # Determine if user wants to setup Google OAuth
+    SETUP_GOOGLE_OAUTH="${SETUP_GOOGLE_OAUTH:-}"
+    
+    if [ -z "$SETUP_GOOGLE_OAUTH" ]; then
+        if [ ! -t 0 ]; then
+            # Non-interactive mode - skip by default unless explicitly set
+            log_info "Non-interactive mode: Skipping Google OAuth (set SETUP_GOOGLE_OAUTH=true to enable)"
+            SETUP_GOOGLE_OAUTH="false"
+        else
+            # Interactive mode - ask user
+            read -rp "Do you want to configure Google OAuth credentials? (y/N): " SETUP_GOOGLE_OAUTH
+        fi
+    fi
+    
+    if [[ "$SETUP_GOOGLE_OAUTH" =~ ^[Yy] ]] || [[ "$SETUP_GOOGLE_OAUTH" == "true" ]]; then
+        # ===========================================================================
+        # Select Deployments for Google OAuth
+        # ===========================================================================
+        
+        # Get list of deployment directories (exclude examples and hidden)
+        DEPLOYMENTS_LIST=$(find "${REPO_ROOT}/deployments" -mindepth 1 -maxdepth 1 -type d \
+            -not -name 'example*' -not -name '_*' \
+            -exec basename {} \; | sort)
+        
+        SELECTED_DEPLOYMENTS=()
+        
+        if [ -n "${GOOGLE_OAUTH_DEPLOYMENTS:-}" ]; then
+            # Use deployments from environment variable
+            IFS=',' read -ra SELECTED_DEPLOYMENTS <<< "$GOOGLE_OAUTH_DEPLOYMENTS"
+            log_info "Using deployments from GOOGLE_OAUTH_DEPLOYMENTS: ${SELECTED_DEPLOYMENTS[*]}"
+        elif [ ! -t 0 ]; then
+            # Non-interactive mode without GOOGLE_OAUTH_DEPLOYMENTS
+            log_error "GOOGLE_OAUTH_DEPLOYMENTS environment variable not set"
+            log_error "Example: export GOOGLE_OAUTH_DEPLOYMENTS='mycure-staging,mycure-production'"
+            return 1
+        elif command -v fzf &>/dev/null; then
+            # Interactive mode with fzf - multi-select
+            local selected
+            selected=$(echo "$DEPLOYMENTS_LIST" | fzf \
+                --multi \
+                --height=15 \
+                --border \
+                --prompt="Select deployments for Google OAuth: " \
+                --header="TAB/Space to select | Enter to confirm | Esc to cancel")
+            
+            if [ -z "$selected" ]; then
+                log_info "No deployments selected, skipping Google OAuth setup"
+                SETUP_GOOGLE_OAUTH="false"
+            else
+                mapfile -t SELECTED_DEPLOYMENTS <<< "$selected"
+            fi
+        else
+            # Fallback: numbered menu
+            log_warn "fzf not found. Using numbered menu."
+            echo
+            echo "Available deployments:"
+            echo "$DEPLOYMENTS_LIST" | nl
+            echo
+            read -rp "Enter deployment numbers (comma-separated, e.g., '1,3' or 'all'): " SELECTION
+            
+            if [ "$SELECTION" = "all" ]; then
+                mapfile -t SELECTED_DEPLOYMENTS <<< "$DEPLOYMENTS_LIST"
+            else
+                IFS=',' read -ra INDICES <<< "$SELECTION"
+                for idx in "${INDICES[@]}"; do
+                    deployment=$(echo "$DEPLOYMENTS_LIST" | sed -n "${idx}p")
+                    if [ -n "$deployment" ]; then
+                        SELECTED_DEPLOYMENTS+=("$deployment")
+                    fi
+                done
+            fi
+        fi
+        
+        # ===========================================================================
+        # Collect Google OAuth Credentials
+        # ===========================================================================
+        
+        if [[ "$SETUP_GOOGLE_OAUTH" =~ ^[Yy] ]] || [[ "$SETUP_GOOGLE_OAUTH" == "true" ]]; then
+            if [ "${#SELECTED_DEPLOYMENTS[@]}" -eq 0 ]; then
+                log_warning "No deployments selected, skipping Google OAuth setup"
+            else
+                # Collect credentials (once for all deployments)
+                if [ -n "${GOOGLE_CLIENT_ID:-}" ] && [ -n "${GOOGLE_CLIENT_SECRET:-}" ]; then
+                    log_info "Using Google OAuth credentials from environment variables"
+                elif [ ! -t 0 ]; then
+                    log_error "GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET environment variables not set"
+                    return 1
+                else
+                    echo
+                    read -rp "Google Client ID: " GOOGLE_CLIENT_ID
+                    read -rp "Google Client Secret: " GOOGLE_CLIENT_SECRET
+                    export GOOGLE_CLIENT_ID GOOGLE_CLIENT_SECRET
+                fi
+                
+                # Create secrets for each selected deployment
+                echo
+                log_info "Creating Google OAuth secrets for selected deployments..."
+                
+                for deployment in "${SELECTED_DEPLOYMENTS[@]}"; do
+                    GOOGLE_CLIENT_ID_SECRET="${deployment}-google-oauth-client-id"
+                    GOOGLE_CLIENT_SECRET_SECRET="${deployment}-google-oauth-client-secret"
+                    
+                    # Create Client ID secret
+                    if gcloud secrets describe "$GOOGLE_CLIENT_ID_SECRET" --project="$PROJECT_ID" &>/dev/null; then
+                        log_success "Secret already exists: $GOOGLE_CLIENT_ID_SECRET"
+                    else
+                        echo -n "$GOOGLE_CLIENT_ID" | gcloud secrets create "$GOOGLE_CLIENT_ID_SECRET" \
+                            --data-file=- \
+                            --replication-policy="automatic" \
+                            --project="$PROJECT_ID"
+                        log_success "Created secret: $GOOGLE_CLIENT_ID_SECRET"
+                    fi
+                    
+                    # Create Client Secret secret
+                    if gcloud secrets describe "$GOOGLE_CLIENT_SECRET_SECRET" --project="$PROJECT_ID" &>/dev/null; then
+                        log_success "Secret already exists: $GOOGLE_CLIENT_SECRET_SECRET"
+                    else
+                        echo -n "$GOOGLE_CLIENT_SECRET" | gcloud secrets create "$GOOGLE_CLIENT_SECRET_SECRET" \
+                            --data-file=- \
+                            --replication-policy="automatic" \
+                            --project="$PROJECT_ID"
+                        log_success "Created secret: $GOOGLE_CLIENT_SECRET_SECRET"
+                    fi
+                done
+            fi
+        fi
+    else
+        log_info "Skipping Google OAuth setup"
+    fi
+
+    # ===========================================================================
+    # Step 7: Create GCP Service Account for External Secrets
     # ===========================================================================
     echo
     log_info "Setting up GCP Service Account..."
@@ -268,7 +406,7 @@ setup_gcp() {
     fi
 
     # ===========================================================================
-    # Step 7: Grant Secret Manager Access
+    # Step 8: Grant Secret Manager Access
     # ===========================================================================
     echo
     log_info "Granting Secret Manager access to service account..."
@@ -301,7 +439,7 @@ setup_gcp() {
     done
 
     # ===========================================================================
-    # Step 8: Create Service Account Key (Idempotent)
+    # Step 9: Create Service Account Key (Idempotent)
     # ===========================================================================
     echo
     log_info "Creating service account key for authentication..."
@@ -327,7 +465,7 @@ setup_gcp() {
     fi
 
     # ===========================================================================
-    # Step 9: Create Kubernetes Secret (Idempotent)
+    # Step 10: Create Kubernetes Secret (Idempotent)
     # ===========================================================================
     echo
     log_info "Creating Kubernetes secret for External Secrets Operator..."
@@ -355,7 +493,7 @@ setup_gcp() {
     fi
 
     # ===========================================================================
-    # Step 10: Generate ClusterSecretStore YAML
+    # Step 11: Generate ClusterSecretStore YAML
     # ===========================================================================
     echo
     log_info "Generating ClusterSecretStore manifest..."
@@ -391,7 +529,7 @@ EOF
     log_success "Created ClusterSecretStore at: $SECRETSTORE_FILE"
 
     # ===========================================================================
-    # Step 11: Create Cloudflare ExternalSecret
+    # Step 12: Create Cloudflare ExternalSecret
     # ===========================================================================
     echo
     log_info "Creating Cloudflare ExternalSecret manifest..."
@@ -434,7 +572,7 @@ EOF
     log_success "Created ExternalSecret at: $EXTERNALSECRET_FILE"
 
     # ===========================================================================
-    # Step 12: Update Infrastructure Configuration
+    # Step 13: Update Infrastructure Configuration
     # ===========================================================================
     echo
     update_infrastructure_values "gcp"
@@ -443,7 +581,7 @@ EOF
     template_clusterissuers
 
     # ===========================================================================
-    # Step 13: Show Next Steps
+    # Step 14: Show Next Steps
     # ===========================================================================
     show_next_steps_gcp
 }

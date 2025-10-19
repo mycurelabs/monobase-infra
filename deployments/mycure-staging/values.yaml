@@ -132,7 +132,14 @@ hapihub:
     enabled: false
 
   externalSecrets:
-    enabled: false
+    enabled: true
+    secretStore: gcp-secretstore
+    refreshInterval: 1h
+    secrets:
+      - secretKey: GOOGLE_CLIENT_ID
+        remoteKey: mycure-staging-google-oauth-client-id
+      - secretKey: GOOGLE_CLIENT_SECRET
+        remoteKey: mycure-staging-google-oauth-client-secret
 
   mongodb:
     serviceName: mongodb
