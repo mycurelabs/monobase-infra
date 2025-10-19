@@ -59,6 +59,15 @@ gateway:
   parentRefs:
     - name: shared-gateway
       namespace: gateway-system
+  
+  # BackendTrafficPolicy configuration for timeout settings
+  backendTrafficPolicy:
+    enabled: true
+    timeout:
+      # Request timeout - increase from default 15s to handle OAuth callbacks
+      requestTimeout: "60s"
+      # Optional: Connection idle timeout
+      # connectionIdleTimeout: "300s"
 
 resources:
   requests:
