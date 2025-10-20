@@ -43,8 +43,12 @@ spec:
         statefulset:
           replicaCount: {{ .Values.minio.statefulset.replicaCount | default 1 }}
         auth:
+          {{- if .Values.minio.auth.existingSecret }}
+          existingSecret: {{ .Values.minio.auth.existingSecret }}
+          {{- else }}
           rootUser: {{ .Values.minio.auth.rootUser | default "minioadmin" }}
           rootPassword: {{ .Values.minio.auth.rootPassword | default "minioadmin" }}
+          {{- end }}
         persistence:
           enabled: {{ .Values.minio.persistence.enabled | default true }}
           storageClass: {{ .Values.minio.persistence.storageClass | default "" }}

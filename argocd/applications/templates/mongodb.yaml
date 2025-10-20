@@ -26,6 +26,9 @@ spec:
           tag: {{ .Values.mongodb.image.tag | default "8.0.4-debian-12-r0" }}
         auth:
           rootUser: {{ .Values.mongodb.auth.rootUser | default "root" }}
+          {{- if .Values.mongodb.auth.existingSecret }}
+          existingSecret: {{ .Values.mongodb.auth.existingSecret }}
+          {{- end }}
         architecture: replicaset
         replicaCount: {{ .Values.mongodb.replicaCount | default 1 }}
         {{- if .Values.mongodb.arbiter }}

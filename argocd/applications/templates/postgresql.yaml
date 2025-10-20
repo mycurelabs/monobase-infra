@@ -29,6 +29,14 @@ spec:
             auth:
               username: {{ .Values.postgresql.auth.username | default "postgres" }}
               database: {{ .Values.postgresql.auth.database | default "postgres" }}
+              {{- if .Values.postgresql.auth.existingSecret }}
+              existingSecret: {{ .Values.postgresql.auth.existingSecret }}
+              {{- end }}
+        {{- if .Values.postgresql.auth.secretKeys }}
+        auth:
+          secretKeys:
+            adminPasswordKey: {{ .Values.postgresql.auth.secretKeys.adminPasswordKey | default "postgres-password" }}
+        {{- end }}
         architecture: {{ .Values.postgresql.architecture | default "standalone" }}
         persistence:
           enabled: {{ .Values.postgresql.persistence.enabled | default true }}
