@@ -202,11 +202,11 @@ syncd:
 
   resources:
     requests:
-      cpu: 100m
-      memory: 256Mi
+      cpu: 500m      # Increased from 100m - needed for worker threads
+      memory: 1Gi    # Increased from 256Mi - prevents OOMKilled
     limits:
-      cpu: 500m
-      memory: 512Mi
+      cpu: "2"       # Increased from 500m - handles stale step processing
+      memory: 4Gi    # Increased from 512Mi - prevents OOMKilled during push floods
 
   gateway:
     hostname: ""  # Empty = uses syncd.<global.domain>
