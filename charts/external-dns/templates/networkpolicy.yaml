@@ -18,42 +18,23 @@ spec:
   policyTypes:
     - Egress
   egress:
-    # Allow DNS resolution
+    # Allow DNS resolution (kube-dns in kube-system)
     - to:
         - namespaceSelector:
             matchLabels:
               kubernetes.io/metadata.name: kube-system
-        - podSelector:
-            matchLabels:
-              k8s-app: kube-dns
       ports:
         - protocol: UDP
           port: 53
-    
-    # Allow access to Kubernetes API server
-    - to:
-        - namespaceSelector: {}
-          podSelector:
-            matchLabels:
-              component: kube-apiserver
-      ports:
         - protocol: TCP
-          port: 443
+          port: 53
     
-    # Allow access to API server via service IP (CIDR-based fallback)
-    # This covers cases where API server is accessed via ClusterIP
-    - to:
-        - namespaceSelector:
-            matchLabels:
-              kubernetes.io/metadata.name: default
-      ports:
-        - protocol: TCP
-          port: 443
-    
-    # Allow HTTPS egress for DNS provider APIs (Cloudflare, Route53, etc.)
-    - to:
-        - namespaceSelector: {}
-      ports:
+    # Allow ALL HTTPS egress
+    # This covers:
+    # 1. Kubernetes API server (10.245.0.1:443)
+    # 2. DNS provider APIs (Cloudflare, AWS Route53, GCP DNS, Azure DNS)
+    # 3. Any HTTPS endpoints
+    - ports:
         - protocol: TCP
           port: 443
     
