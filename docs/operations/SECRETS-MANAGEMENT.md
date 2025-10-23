@@ -364,18 +364,93 @@ kubectl get sa external-secrets -n <namespace> -o yaml
 # Should see: iam.gke.io/gcp-service-account: external-secrets@PROJECT_ID.iam.gserviceaccount.com
 ```
 
-## Migration from SOPS (Legacy)
+## Declarative ExternalSecret Pattern
 
-If you have existing SOPS-encrypted secrets, migrate to cloud KMS:
+External Secrets Operator uses a **declarative, GitOps-first approach**:
 
-1. Decrypt existing secrets: `sops -d secrets.enc.yaml > secrets.yaml`
-2. Create secrets in GCP: `bash scripts/secrets-gcp.sh` (import from YAML)
-3. Generate ExternalSecret manifests
-4. Test in non-prod environment first
-5. Remove SOPS files: `git rm secrets.enc.yaml .sops.yaml`
-6. Update ArgoCD to remove KSOPS plugin
+### How It Works
 
-SOPS support has been removed from this repository to focus on cloud-native secret management.
+```
+┌─────────────────┐      ┌──────────────────┐      ┌─────────────────┐
+│  1. Create      │      │  2. Store in     │      │  3. ESO         │
+│  ExternalSecret │─────▶│  Cloud KMS       │─────▶│  Auto-Syncs     │
+│  (in Git)       │      │  (via script)    │      │  (continuous)   │
+└─────────────────┘      └──────────────────┘      └─────────────────┘
+   GitOps Resource         Manual Operation         Automatic Process
+```
+
+### Key Principles
+
+1. **ExternalSecrets are defined in Git first** - Declarative resources committed to repository
+2. **Secrets stored in cloud KMS** - Use scripts or cloud console to create actual secrets
+3. **ESO continuously syncs** - Operator watches ExternalSecrets and syncs from KMS
+4. **If KMS secret missing** - ExternalSecret shows `Ready: False` until secret exists
+
+### Example Workflow
+
+**Step 1: Create ExternalSecret in Git**
+
+```yaml
+# deployments/mycure-staging/cloudflare-externalsecret.yaml
+apiVersion: external-secrets.io/v1beta1
+kind: ExternalSecret
+metadata:
+  name: cloudflare-api-token
+  namespace: mycure-staging
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    name: gcp-secretstore
+    kind: ClusterSecretStore
+  target:
+    name: cloudflare-api-token
+    creationPolicy: Owner
+  data:
+    - secretKey: api-token
+      remoteRef:
+        key: infrastructure-cloudflare-api-token
+```
+
+**Step 2: Store Secret in GCP Secret Manager**
+
+```bash
+# Create secret in GCP (if not already exists)
+echo -n "YOUR_CLOUDFLARE_TOKEN" | gcloud secrets create infrastructure-cloudflare-api-token \
+  --data-file=- \
+  --replication-policy=automatic
+```
+
+**Step 3: ESO Automatically Syncs**
+
+```bash
+# Watch ExternalSecret status
+kubectl get externalsecret -n mycure-staging cloudflare-api-token -w
+
+# Verify synced Kubernetes Secret
+kubectl get secret -n mycure-staging cloudflare-api-token
+```
+
+### Common Patterns
+
+**External-DNS Credentials:**
+- ExternalSecret in namespace → References infrastructure Cloudflare token → DNS automation works
+
+**Application Secrets:**
+- ExternalSecret in namespace → References app-specific secrets → Pods consume via env/volume
+
+**Database Passwords:**
+- ExternalSecret in namespace → References DB password from KMS → StatefulSet uses secret
+
+### Troubleshooting
+
+**ExternalSecret shows `Ready: False`:**
+- Secret doesn't exist in cloud KMS
+- ClusterSecretStore not configured
+- Workload Identity permissions missing
+
+**Secret not updating:**
+- Check `refreshInterval` (default: 1h)
+- Force refresh: `kubectl annotate externalsecret NAME force-sync=$(date +%s)`
 
 ## References
 

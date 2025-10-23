@@ -165,7 +165,7 @@ mailpit:
 # ===== External Secrets =====
 externalSecrets:
   enabled: true
-  provider: aws  # Options: aws, azure, gcp, sops
+  provider: aws  # Options: aws, azure, gcp
 
 # ===== Monitoring =====
 monitoring:

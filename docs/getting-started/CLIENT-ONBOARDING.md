@@ -8,7 +8,7 @@ Step-by-step guide for onboarding a new client using the fork-based workflow.
 - Kubernetes cluster (EKS, AKS, GKE, or self-hosted)
 - kubectl configured for your cluster
 - Helm 3.x installed
-- Access to KMS (AWS Secrets Manager, Azure Key Vault, GCP Secret Manager, or SOPS)
+- Access to KMS (AWS Secrets Manager, Azure Key Vault, or GCP Secret Manager)
 
 ## Step 1: Fork the Template Repository
 

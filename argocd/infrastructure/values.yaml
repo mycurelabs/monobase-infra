@@ -78,10 +78,6 @@ externalSecrets:
     region: us-central1
     clusterName: ""  # Set to GKE cluster name
     serviceAccountEmail: ""  # Set to GCP service account email
-  
-  # SOPS configuration (for Git-encrypted secrets)
-  sops:
-    enabled: false  # Set true to use SOPS instead of cloud provider
 
 # Longhorn - Distributed block storage
 longhorn:

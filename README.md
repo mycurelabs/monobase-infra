@@ -260,7 +260,7 @@ See example READMEs for detailed configuration guides.
 | Database | PostgreSQL 16.x | Primary datastore with replication |
 | Storage | Cloud-native or Longhorn | Persistent storage for databases |
 | GitOps | ArgoCD | Declarative deployments with web UI |
-| Secrets | External Secrets Operator | KMS integration (AWS/Azure/GCP/SOPS) |
+| Secrets | External Secrets Operator | Cloud KMS sync (AWS/Azure/GCP) |
 
 ### Storage Provider Options
 

@@ -447,7 +447,7 @@ mailpit:
 # ===== External DNS =====
 # Automatic DNS record management from HTTPRoutes and Services
 externalDNS:
-  enabled: false
+  enabled: true
 
   instances:
     # Primary Cloudflare account for mycureapp.com

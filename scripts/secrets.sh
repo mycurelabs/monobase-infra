@@ -333,12 +333,6 @@ template_clusterissuers() {
     sed -i "s|{{ DNS_ZONE }}|${DNS_ZONE}|g" \
         "${REPO_ROOT}/infrastructure/tls/clusterissuer-prod.yaml"
 
-    # Update ExternalSecret
-    sed -i "s|{{ SECRET_STORE_NAME }}|sops-secretstore|g" \
-        "${REPO_ROOT}/infrastructure/tls/externalsecret-cloudflare.yaml" 2>/dev/null || true
-    sed -i "s|{{ SECRET_KEY }}|cloudflare-token|g" \
-        "${REPO_ROOT}/infrastructure/tls/externalsecret-cloudflare.yaml" 2>/dev/null || true
-
     log_success "Templated ClusterIssuer manifests"
 }
 

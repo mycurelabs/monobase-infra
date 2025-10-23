@@ -21,23 +21,20 @@ Unlike traditional cluster-wide External DNS deployments, this chart is designed
 ```
 deployments/
 ├── mycure-staging/
-│   ├── values.yaml          # External DNS config for staging
-│   └── secrets/
-│       └── cloudflare.yaml  # SOPS-encrypted credentials
+│   ├── values.yaml                    # External DNS config for staging
+│   └── cloudflare-externalsecret.yaml # External Secrets credentials
 ├── mycure-production/
-│   ├── values.yaml          # External DNS config for production
-│   └── secrets/
-│       └── cloudflare.yaml  # Different credentials
+│   ├── values.yaml                    # External DNS config for production
+│   └── cloudflare-externalsecret.yaml # Different credentials
 └── client-acme/
-    ├── values.yaml          # Client-specific DNS config
-    └── secrets/
-        ├── cloudflare.yaml  # Client's Cloudflare account
-        └── route53.yaml     # Client's AWS account
+    ├── values.yaml                    # Client-specific DNS config
+    ├── cloudflare-externalsecret.yaml # Client's Cloudflare account
+    └── route53-externalsecret.yaml    # Client's AWS account
 ```
 
 Each namespace:
 - Deploys its own External DNS instances
-- Manages its own DNS credentials (SOPS-encrypted)
+- Manages its own DNS credentials (External Secrets Operator)
 - Only watches resources in its namespace
 - Has namespace-scoped RBAC (Role, not ClusterRole)
 
@@ -92,18 +89,34 @@ Create a Cloudflare API token with **DNS Edit** permissions:
 3. Zone Resources: Include → Specific zone → `mycureapp.com`
 4. Create Token
 
-Store in Kubernetes secret:
+Store in GCP Secret Manager and sync with External Secrets Operator:
 
 ```bash
-# Create secret (will be encrypted with SOPS)
-kubectl create secret generic cloudflare-api-token \
-  --from-literal=api-token=YOUR_TOKEN_HERE \
-  --dry-run=client -o yaml > deployments/mycure-staging/secrets/cloudflare-external-dns.yaml
+# Store token in GCP Secret Manager
+echo -n "YOUR_CLOUDFLARE_TOKEN" | gcloud secrets create mycure-staging-cloudflare-token \
+  --data-file=- \
+  --replication-policy=automatic
 
-# Encrypt with SOPS
-sops --encrypt --input-type=yaml --output-type=yaml \
-  deployments/mycure-staging/secrets/cloudflare-external-dns.yaml > \
-  deployments/mycure-staging/secrets/cloudflare-external-dns.enc.yaml
+# Create ExternalSecret manifest
+cat > deployments/mycure-staging/cloudflare-externalsecret.yaml <<EOF
+apiVersion: external-secrets.io/v1beta1
+kind: ExternalSecret
+metadata:
+  name: cloudflare-api-token
+  namespace: mycure-staging
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    name: gcp-secretstore
+    kind: ClusterSecretStore
+  target:
+    name: cloudflare-api-token
+    creationPolicy: Owner
+  data:
+    - secretKey: api-token
+      remoteRef:
+        key: mycure-staging-cloudflare-token
+EOF
 ```
 
 #### AWS Route53 (IRSA)
@@ -686,24 +699,112 @@ Benefits:
 
 ### Credential Management
 
-**Always encrypt DNS provider credentials with SOPS:**
+**Use External Secrets Operator to sync credentials from cloud KMS:**
 
-```bash
-# Create secret
-kubectl create secret generic cloudflare-token \
-  --from-literal=api-token=YOUR_TOKEN \
-  --dry-run=client -o yaml > secret.yaml
+#### Cloudflare with GCP Secret Manager
 
-# Encrypt with SOPS
-sops --encrypt --input-type=yaml --output-type=yaml \
-  secret.yaml > secret.enc.yaml
-
-# Commit encrypted version
-git add secret.enc.yaml
-git commit -m "Add Cloudflare credentials (encrypted)"
+```yaml
+# deployments/mycure-staging/cloudflare-externalsecret.yaml
+apiVersion: external-secrets.io/v1beta1
+kind: ExternalSecret
+metadata:
+  name: cloudflare-api-token
+  namespace: mycure-staging
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    name: gcp-secretstore
+    kind: ClusterSecretStore
+  target:
+    name: cloudflare-api-token
+    creationPolicy: Owner
+  data:
+    - secretKey: api-token
+      remoteRef:
+        key: mycure-staging-cloudflare-token
 ```
 
-**Never commit plaintext secrets to Git!**
+#### AWS Route53 with AWS Secrets Manager
+
+```yaml
+# deployments/mycure-production/route53-externalsecret.yaml
+apiVersion: external-secrets.io/v1beta1
+kind: ExternalSecret
+metadata:
+  name: route53-credentials
+  namespace: mycure-production
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    name: aws-secretstore
+    kind: ClusterSecretStore
+  target:
+    name: route53-credentials
+    creationPolicy: Owner
+  data:
+    - secretKey: access-key-id
+      remoteRef:
+        key: mycure-production-route53-access-key-id
+    - secretKey: secret-access-key
+      remoteRef:
+        key: mycure-production-route53-secret-access-key
+```
+
+#### Google Cloud DNS with GCP Secret Manager
+
+```yaml
+# deployments/client-gcp/clouddns-externalsecret.yaml
+apiVersion: external-secrets.io/v1beta1
+kind: ExternalSecret
+metadata:
+  name: clouddns-sa-key
+  namespace: client-gcp
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    name: gcp-secretstore
+    kind: ClusterSecretStore
+  target:
+    name: clouddns-sa-key
+    creationPolicy: Owner
+  data:
+    - secretKey: credentials.json
+      remoteRef:
+        key: client-gcp-clouddns-sa-key
+```
+
+#### Azure DNS with Azure Key Vault
+
+```yaml
+# deployments/client-azure/azuredns-externalsecret.yaml
+apiVersion: external-secrets.io/v1beta1
+kind: ExternalSecret
+metadata:
+  name: azuredns-credentials
+  namespace: client-azure
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    name: azure-secretstore
+    kind: ClusterSecretStore
+  target:
+    name: azuredns-credentials
+    creationPolicy: Owner
+  data:
+    - secretKey: client-id
+      remoteRef:
+        key: client-azure-dns-client-id
+    - secretKey: client-secret
+      remoteRef:
+        key: client-azure-dns-client-secret
+    - secretKey: tenant-id
+      remoteRef:
+        key: client-azure-dns-tenant-id
+```
+
+**Pattern:** Create ExternalSecret → Store secret in cloud KMS → ESO auto-syncs
+
+See [docs/operations/EXTERNAL-DNS.md](../../docs/operations/EXTERNAL-DNS.md) for complete setup guide.
 
 ### API Token Least Privilege
 
@@ -785,13 +886,13 @@ git commit -m "Add Cloudflare credentials (encrypted)"
 Initial release with:
 - Multi-instance architecture
 - Namespace-scoped RBAC
-- Support for Cloudflare, AWS, Google, Azure, DigitalOcean
+- Support for Cloudflare, AWS, Google, Azure
 - Gateway API HTTPRoute source
-- SOPS secrets integration
+- External Secrets Operator integration
 
 ## Links
 
 - [External DNS GitHub](https://github.com/kubernetes-sigs/external-dns)
 - [External DNS Providers](https://github.com/kubernetes-sigs/external-dns#status-of-providers)
 - [Gateway API Docs](https://gateway-api.sigs.k8s.io/)
-- [SOPS Documentation](https://github.com/getsops/sops)
+- [External Secrets Operator](https://external-secrets.io)

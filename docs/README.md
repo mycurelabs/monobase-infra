@@ -31,6 +31,7 @@ Day-to-day operations, monitoring, and incident response.
 - **[STORAGE.md](operations/STORAGE.md)** - Storage provider selection, Longhorn/MinIO operations, expansion, troubleshooting
 - **[MONITORING.md](operations/MONITORING.md)** - Prometheus, Grafana, alerting
 - **[SECRETS-MANAGEMENT.md](operations/SECRETS-MANAGEMENT.md)** - External Secrets Operator, KMS integration
+- **[EXTERNAL-DNS.md](operations/EXTERNAL-DNS.md)** - Automatic DNS record management from HTTPRoutes
 - **[TROUBLESHOOTING.md](operations/TROUBLESHOOTING.md)** - Common issues and solutions
 
 ## 🔐 Security

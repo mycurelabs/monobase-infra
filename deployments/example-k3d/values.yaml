@@ -118,7 +118,6 @@ mailpit:
 # ===== External Secrets (Simplified for Local) =====
 externalSecrets:
   enabled: false  # Use plain Kubernetes Secrets for local testing
-  # Or use SOPS for encrypted local secrets
 
 # ===== Monitoring (Disabled - Too Heavy) =====
 monitoring:
