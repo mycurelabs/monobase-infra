@@ -261,8 +261,8 @@ case $SERVICE in
         NAMESPACE=${NAMESPACE:-"argocd"}
         SVC_NAME="argocd-server"
         LOCAL_PORT=8080
-        REMOTE_PORT=443
-        URL="https://localhost:${LOCAL_PORT}"
+        REMOTE_PORT=80
+        URL="http://localhost:${LOCAL_PORT}"
         
         echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
         echo -e "${BLUE}  ArgoCD Admin Access${NC}"
