@@ -99,7 +99,7 @@ global:
   txtPrefix: "external-dns-"
 
   # Log level: panic, debug, info, warning, error, fatal
-  logLevel: info
+  logLevel: debug
 
   # Log format: text or json
   logFormat: text
@@ -109,6 +109,11 @@ global:
 
   # Trigger loop on create (in addition to interval)
   triggerLoopOnEvent: true
+
+  # Kubernetes API client tuning
+  kubeAPIBurst: 100  # Increase from default 50
+  kubeAPIQPS: 50     # Increase from default 25
+  requestTimeout: 2m # Increase from default 30s
 
 # Pod-level security context (PodSecurity restricted compliant)
 securityContext:
