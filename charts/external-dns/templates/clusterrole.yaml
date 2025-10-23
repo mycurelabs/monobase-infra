@@ -13,9 +13,17 @@ rules:
   resources: ["gateways", "httproutes", "tcproutes", "tlsroutes"]
   verbs: ["get", "list", "watch"]
 
+# Read Services cluster-wide (needed to get LoadBalancer IPs from Gateway)
+- apiGroups: [""]
+  resources: ["services", "endpoints", "pods", "nodes"]
+  verbs: ["get", "list", "watch"]
+
+# Read EndpointSlices cluster-wide (needed for endpoint discovery)
+- apiGroups: ["discovery.k8s.io"]
+  resources: ["endpointslices"]
+  verbs: ["get", "list", "watch"]
+
 # Read Namespaces cluster-wide (needed for Gateway API sources in namespaced mode)
-# Required for External DNS to resolve namespace names when syncing HTTPRoutes
-# Reference: https://github.com/kubernetes-sigs/external-dns/blob/master/charts/external-dns/templates/clusterrole.yaml
 - apiGroups: [""]
   resources: ["namespaces"]
   verbs: ["get", "watch", "list"]
