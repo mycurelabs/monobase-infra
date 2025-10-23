@@ -445,32 +445,8 @@ mailpit:
     hostname: ""  # Uses mail.stg.mycureapp.com
 
 # ===== External DNS =====
-# Automatic DNS record management from HTTPRoutes and Services
-externalDNS:
-  enabled: true
-
-  instances:
-    # Primary Cloudflare account for mycureapp.com
-    - name: primary
-      enabled: true
-      provider: cloudflare
-
-      domainFilters:
-        - mycureapp.com
-
-      cloudflare:
-        proxied: false  # DNS only, no Cloudflare proxy
-        apiTokenSecretRef:
-          name: cloudflare-api-token
-          key: api-token
-
-      resources:
-        requests:
-          cpu: 10m
-          memory: 32Mi
-        limits:
-          cpu: 50m
-          memory: 64Mi
+# Managed at infrastructure level (infrastructure/external-dns/)
+# No per-deployment configuration needed
 
 # ===== External Secrets =====
 externalSecrets:

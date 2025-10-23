@@ -8,6 +8,7 @@ This repository provides production-ready, template-based Kubernetes infrastruct
 
 - **Fork-Based Workflow** - Clients fork this template and add their configuration
 - **100% Parameterized** - No hardcoded client-specific values in base template
+- **Multi-Domain Gateway** - Support for both platform subdomains and client-owned custom domains
 - **Security by Default** - NetworkPolicies, Pod Security Standards, encryption
 - **Compliance Ready** - Built-in security controls and compliance features
 - **Modern Stack** - Gateway API, ArgoCD GitOps, External Secrets, Velero backups
@@ -303,6 +304,8 @@ Internet → Envoy Gateway (shared, HA) → HTTPRoutes (per client/env) → Appl
 
 **Key Design Decisions:**
 - **Shared Gateway** - One Gateway in `gateway-system`, HTTPRoutes per client (zero-downtime)
+- **Multi-Domain Support** - Platform subdomains (`*.mycureapp.com`) + client custom domains (`app.client.com`)
+- **Centralized Certificates** - All TLS certificates in `gateway-system` namespace (security best practice)
 - **Namespace Isolation** - Each client/environment gets separate namespace (`{client}-{env}`)
 - **No Overengineering** - No service mesh, no self-hosted Vault (use cloud KMS)
 - **Security First** - NetworkPolicies, PSS, encryption, compliance features built-in
@@ -361,9 +364,11 @@ monobase-infra/                   # Base template repository
 - [System Architecture](docs/architecture/ARCHITECTURE.md) - Design decisions, components
 - [GitOps with ArgoCD](docs/architecture/GITOPS-ARGOCD.md) - App-of-Apps pattern
 - [Gateway API](docs/architecture/GATEWAY-API.md) - Envoy Gateway, HTTPRoutes
+- [Multi-Domain Gateway](docs/architecture/MULTI-DOMAIN-GATEWAY.md) - Client custom domains, certificate management
 - [Storage](docs/architecture/STORAGE.md) - Longhorn, cloud CSI drivers
 
 **⚙️ Operations:**
+- [Certificate Management](docs/operations/CERTIFICATE-MANAGEMENT.md) - TLS certificates, client domains
 - [Backup & DR](docs/operations/BACKUP_DR.md) - 3-tier backup, disaster recovery
 - [Scaling Guide](docs/operations/SCALING-GUIDE.md) - HPA, storage expansion
 - [Troubleshooting](docs/operations/TROUBLESHOOTING.md) - Common issues

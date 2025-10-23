@@ -195,6 +195,14 @@ echo "Gateway LoadBalancer IP: $GATEWAY_IP"
 
 **Time:** ~5-10 minutes
 
+**Certificate Management:**
+
+For client custom domains (not covered by wildcard), see:
+- [Certificate Management Operations Guide](../operations/CERTIFICATE-MANAGEMENT.md)
+- [Multi-Domain Gateway Architecture](../architecture/MULTI-DOMAIN-GATEWAY.md)
+
+Default wildcard certificate (`*.mycureapp.com`) is automatically provisioned via DNS-01 challenge.
+
 ### Step 5: Deploy External Secrets Operator
 
 ```bash

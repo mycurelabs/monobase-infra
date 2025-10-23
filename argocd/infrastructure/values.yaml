@@ -79,6 +79,10 @@ externalSecrets:
     clusterName: ""  # Set to GKE cluster name
     serviceAccountEmail: ""  # Set to GCP service account email
 
+# External DNS - Automatic DNS record management from HTTPRoutes
+externalDNS:
+  enabled: true
+
 # Longhorn - Distributed block storage
 longhorn:
   enabled: false  # Usually use cloud provider storage
