@@ -200,6 +200,120 @@ kubectl get svc -n gateway-system envoy-gateway
 # A storage.myclient.com → <LoadBalancer-IP>
 ```
 
+## Custom Domain Setup (Optional)
+
+If your client has their own domain (e.g., `app.client.com`) instead of using a subdomain under your platform domain, follow these additional steps.
+
+### Prerequisites
+
+- Client owns domain and has DNS access
+- LoadBalancer IP from Gateway (see Step 10 above)
+- Client willing to create DNS A record
+
+### Step 1: Get LoadBalancer IP
+
+```bash
+kubectl get gateway shared-gateway -n gateway-system \
+  -o jsonpath='{.status.addresses[0].value}'
+
+# Example output: 203.0.113.42
+```
+
+### Step 2: Client Configures DNS
+
+Client creates an A record in their DNS provider:
+
+```
+app.client.com    A    203.0.113.42
+```
+
+**Verify DNS propagation:**
+```bash
+dig app.client.com +short
+# Should return: 203.0.113.42
+```
+
+### Step 3: Add Certificate Configuration
+
+See detailed instructions in [Certificate Management Operations Guide](../operations/CERTIFICATE-MANAGEMENT.md).
+
+**Quick summary:**
+
+Edit `infrastructure/certificates.yaml`:
+```yaml
+certificates:
+  # Add new client certificate
+  - name: myclient-domain
+    domain: "app.client.com"
+    issuer: letsencrypt-http01-prod
+    challengeType: http01
+```
+
+Commit and deploy:
+```bash
+git add infrastructure/certificates.yaml
+git commit -m "feat: Add certificate for app.client.com"
+git push
+```
+
+**Wait for certificate provisioning (2-5 minutes):**
+```bash
+kubectl get certificate myclient-domain-tls -n gateway-system
+# Status should show: Ready=True
+```
+
+### Step 4: Update Deployment Configuration
+
+Update your client's `values.yaml` to use custom domain:
+
+```yaml
+# deployments/myclient-prod/values.yaml
+
+gateway:
+  hostname: "app.client.com"  # Custom domain instead of subdomain
+
+# Rest of configuration remains the same
+api:
+  enabled: true
+  replicas: 3
+```
+
+### Step 5: Verify Custom Domain
+
+```bash
+# Test TLS handshake
+openssl s_client -connect app.client.com:443 -servername app.client.com
+
+# Test HTTP routing
+curl -v https://app.client.com/health
+
+# Expected: 200 OK with valid TLS certificate
+```
+
+### Custom Domain vs Platform Subdomain
+
+| Feature | Platform Subdomain | Client Custom Domain |
+|---------|-------------------|---------------------|
+| **DNS** | Managed by platform | Client manages DNS |
+| **Certificate** | Wildcard (auto) | Per-domain (HTTP-01 or client-provided) |
+| **Setup Time** | Instant | 2-5 minutes (cert provisioning) |
+| **Client Control** | None | Full DNS control |
+| **Use Case** | Standard deployments | White-label, client branding |
+
+### Certificate Options
+
+**Option 1: Auto-Provisioned (HTTP-01) - Recommended**
+- Platform manages certificate via Let's Encrypt
+- Automatic renewal every 60 days
+- Client only needs to create DNS A record
+
+**Option 2: Client-Provided Certificate**
+- Client uploads their own certificate to GCP Secret Manager
+- Client manages certificate renewal
+- See [Certificate Management Guide](../operations/CERTIFICATE-MANAGEMENT.md) for details
+
+---
+
 ## Troubleshooting
 
 ### Secrets Not Syncing

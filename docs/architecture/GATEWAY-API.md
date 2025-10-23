@@ -279,6 +279,141 @@ kubectl get svc -n gateway-system
 # GCP: Check firewall rules
 ```
 
+## Multi-Domain Support
+
+The Gateway architecture supports **two types of domains**:
+
+### 1. Platform Subdomains (Wildcard Certificate)
+
+**Pattern:** `*.mycureapp.com`
+
+**Use Case:** Platform-managed services and standard deployments
+
+**Example:**
+- `api.mycureapp.com`
+- `app.mycureapp.com`
+- `hapihub.mycureapp.com`
+- `storage.mycureapp.com`
+
+**Configuration:**
+```yaml
+# Automatic - no additional configuration needed
+# Covered by wildcard certificate: *.mycureapp.com
+```
+
+**How it Works:**
+- Single wildcard certificate covers all subdomains
+- DNS-01 challenge (requires Cloudflare API access)
+- Automatic for all deployments
+- Zero additional configuration
+
+---
+
+### 2. Client Custom Domains (Per-Domain Certificates)
+
+**Pattern:** `app.client.com`, `portal.company.io`
+
+**Use Case:** White-label deployments, client branding, client-owned domains
+
+**Example:**
+- `app.client.com` → Client's application
+- `portal.enterprise.io` → Enterprise customer portal
+- `dashboard.startup.dev` → Startup's custom domain
+
+**Configuration:**
+```yaml
+# infrastructure/certificates.yaml
+certificates:
+  - name: client1-domain
+    domain: "app.client.com"
+    issuer: letsencrypt-http01-prod
+    challengeType: http01
+```
+
+**How it Works:**
+1. Client creates DNS: `app.client.com` → A → LoadBalancer IP
+2. Platform adds certificate declaration
+3. cert-manager provisions certificate via HTTP-01 challenge
+4. Gateway automatically includes certificate
+5. HTTPRoute routes traffic based on hostname
+
+**Certificate Options:**
+- **HTTP-01 Auto-Provisioned:** Platform manages via Let's Encrypt (recommended)
+- **Client-Provided:** Client uploads own certificate to GCP Secret Manager
+
+---
+
+### Centralized Certificate Management
+
+**Architecture:**
+
+All certificates stored in `gateway-system` namespace (centralized):
+
+```
+gateway-system/
+  ├── wildcard-mycureapp-tls (Secret)       # Platform wildcard
+  ├── client1-domain-tls (Secret)           # Client domain 1
+  ├── client2-domain-tls (Secret)           # Client domain 2
+  └── client3-domain-tls (Secret)           # Client domain 3
+```
+
+**Why Centralized?**
+- ✅ **Security:** No cross-namespace secret access needed
+- ✅ **Simplicity:** Single namespace to manage
+- ✅ **Industry Standard:** Matches Istio, NGINX Ingress, Kong patterns
+- ✅ **Operational:** Easier debugging and monitoring
+
+**Gateway Configuration:**
+```yaml
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: shared-gateway
+  namespace: gateway-system
+spec:
+  listeners:
+    - name: https
+      hostname: "*"  # Accept all domains (not just *.mycureapp.com)
+      tls:
+        certificateRefs:
+          - name: wildcard-mycureapp-tls   # Platform wildcard
+          - name: client1-domain-tls       # Client certificate 1
+          - name: client2-domain-tls       # Client certificate 2
+```
+
+**SNI-Based Certificate Selection:**
+- Client connects with SNI: `app.client.com`
+- Gateway matches SNI against available certificates
+- Gateway presents correct certificate
+- TLS handshake completes
+- HTTPRoute routes based on Host header
+
+---
+
+### Comparison: Subdomain vs Custom Domain
+
+| Feature | Platform Subdomain | Client Custom Domain |
+|---------|-------------------|---------------------|
+| **DNS Management** | Platform | Client |
+| **Certificate** | Wildcard (auto) | Per-domain (HTTP-01 or provided) |
+| **Setup Time** | Instant | 2-5 minutes (cert provisioning) |
+| **Renewal** | Automatic | Automatic (HTTP-01) or Client-managed |
+| **Client Control** | None | Full DNS control |
+| **Use Case** | Standard deployments | White-label, branding |
+| **Cost** | Included | Included (HTTP-01) |
+
+---
+
+### Documentation
+
+For detailed information on multi-domain support:
+
+- **Architecture:** [Multi-Domain Gateway Architecture](MULTI-DOMAIN-GATEWAY.md)
+- **Operations:** [Certificate Management Guide](../operations/CERTIFICATE-MANAGEMENT.md)
+- **Onboarding:** [Client Onboarding - Custom Domain Section](../getting-started/CLIENT-ONBOARDING.md#custom-domain-setup-optional)
+
+---
+
 ## Summary
 
 **Gateway API provides:**
