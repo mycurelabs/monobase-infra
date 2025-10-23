@@ -98,3 +98,4 @@ spec:
       # Unsupported provider
       {{- fail (printf "Unsupported provider '%s' for issuer %s. Supported: http01, cloudflare, route53, azuredns, clouddns, digitalocean" .provider .name) }}
       {{- end }}
+{{- end }}
