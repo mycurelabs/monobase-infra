@@ -207,7 +207,7 @@ mycurev8:
       memory: 128Mi
 
   gateway:
-    hostname: "mycurev8"  # Explicitly set to mycurev8.<global.domain>
+    hostname: "mycurev8.stg.mycureapp.com"  # Full FQDN required when not empty
 
   config:
     API_URL: "https://hapihub.stg.mycureapp.com"
