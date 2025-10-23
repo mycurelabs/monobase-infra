@@ -1,0 +1,66 @@
+# Default values for cert-manager-issuers
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+# ClusterIssuer configurations
+# Each issuer in this array will create a ClusterIssuer resource
+issuers: []
+  # Example HTTP-01 issuer (no DNS provider needed):
+  # - name: letsencrypt-prod
+  #   email: "admin@example.com"
+  #   server: production  # or "staging"
+  #   provider: http01
+  
+  # Example Cloudflare DNS-01 issuer:
+  # - name: letsencrypt-cloudflare-prod
+  #   email: "admin@example.com"
+  #   server: production
+  #   provider: cloudflare
+  #   cloudflare:
+  #     dnsZones:
+  #       - "example.com"
+  #     apiTokenSecretRef:
+  #       name: cloudflare-api-token
+  #       key: api-token
+  
+  # Example AWS Route53 DNS-01 issuer:
+  # - name: letsencrypt-route53-prod
+  #   email: "admin@example.com"
+  #   server: production
+  #   provider: route53
+  #   route53:
+  #     region: us-east-1
+  #     hostedZoneID: Z1234567890ABC
+  #     role: arn:aws:iam::123456789012:role/cert-manager
+  
+  # Example Azure DNS issuer:
+  # - name: letsencrypt-azure-prod
+  #   email: "admin@example.com"
+  #   server: production
+  #   provider: azuredns
+  #   azuredns:
+  #     subscriptionID: "12345678-1234-1234-1234-123456789012"
+  #     resourceGroupName: dns-rg
+  #     hostedZoneName: example.com
+  #     managedIdentityClientID: "87654321-4321-4321-4321-210987654321"
+  
+  # Example Google Cloud DNS issuer:
+  # - name: letsencrypt-clouddns-prod
+  #   email: "admin@example.com"
+  #   server: production
+  #   provider: clouddns
+  #   clouddns:
+  #     project: my-project-id
+  #     serviceAccountSecretRef:
+  #       name: clouddns-service-account
+  #       key: key.json
+  
+  # Example DigitalOcean DNS issuer:
+  # - name: letsencrypt-digitalocean-prod
+  #   email: "admin@example.com"
+  #   server: production
+  #   provider: digitalocean
+  #   digitalocean:
+  #     apiTokenSecretRef:
+  #       name: digitalocean-api-token
+  #       key: api-token

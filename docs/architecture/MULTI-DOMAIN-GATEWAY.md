@@ -154,7 +154,7 @@ Operations:
 - Certificate: `*.mycureapp.com`
 - Covers: `api.mycureapp.com`, `app.mycureapp.com`, `hapihub.mycureapp.com`, etc.
 - Type: DNS-01 challenge (requires DNS provider API access)
-- Issuer: `letsencrypt-prod` ClusterIssuer
+- Issuer: `letsencrypt-mycure-cloudflare-prod` ClusterIssuer
 
 **When to Use:**
 - Your own subdomains
@@ -167,7 +167,7 @@ Operations:
 certificates:
   - name: wildcard-mycureapp
     domain: "*.mycureapp.com"
-    issuer: letsencrypt-prod
+    issuer: letsencrypt-mycure-cloudflare-prod
     challengeType: dns01
 ```
 
@@ -181,7 +181,7 @@ certificates:
 - Domain: `app.client.com`
 - Certificate: Single domain (no wildcard support with HTTP-01)
 - Type: HTTP-01 challenge (no DNS API access needed)
-- Issuer: `letsencrypt-http01-prod` ClusterIssuer
+- Issuer: `letsencrypt-prod` ClusterIssuer
 
 **When to Use:**
 - Client owns domain
@@ -207,7 +207,7 @@ certificates:
 certificates:
   - name: client1-domain
     domain: "app.client.com"
-    issuer: letsencrypt-http01-prod
+    issuer: letsencrypt-prod
     challengeType: http01
 ```
 
@@ -611,11 +611,11 @@ certificates:
 ### 4. Testing
 
 **Before Production:**
-1. Use `letsencrypt-staging` ClusterIssuer
+1. Use `letsencrypt-staging` (HTTP-01) or `letsencrypt-mycure-cloudflare-staging` (DNS-01) ClusterIssuer
 2. Verify certificate issued successfully
 3. Test TLS handshake
 4. Verify HTTP routing works
-5. Switch to `letsencrypt-prod`
+5. Switch to production issuer: `letsencrypt-prod` (HTTP-01) or `letsencrypt-mycure-cloudflare-prod` (DNS-01)
 
 ---
 

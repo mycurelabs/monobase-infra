@@ -59,7 +59,7 @@ certificates:
 certificates:
   - name: wildcard-mycureapp
     domain: "*.mycureapp.com"
-    issuer: letsencrypt-prod
+    issuer: letsencrypt-mycure-cloudflare-prod
     challengeType: dns01
 ```
 
@@ -87,7 +87,7 @@ certificates:
 certificates:
   - name: client1-domain
     domain: "app.client.com"
-    issuer: letsencrypt-http01-prod
+    issuer: letsencrypt-prod
     challengeType: http01
 ```
 
@@ -208,7 +208,7 @@ certificates:
   # New client certificate
   - name: client1-domain
     domain: "app.client.com"
-    issuer: letsencrypt-http01-prod
+    issuer: letsencrypt-prod
     challengeType: http01
 ```
 
@@ -675,8 +675,14 @@ Always test with staging before production:
 certificates:
   - name: client1-domain-staging
     domain: "app.client.com"
-    issuer: letsencrypt-staging
+    issuer: letsencrypt-staging  # HTTP-01 staging
     challengeType: http01
+  
+  # Or for wildcard testing:
+  - name: wildcard-test
+    domain: "*.test.com"
+    issuer: letsencrypt-mycure-cloudflare-staging  # DNS-01 staging
+    challengeType: dns01
 ```
 
 **Verify:**
@@ -690,8 +696,14 @@ certificates:
 certificates:
   - name: client1-domain
     domain: "app.client.com"
-    issuer: letsencrypt-prod  # ← Production
+    issuer: letsencrypt-prod  # ← HTTP-01 production
     challengeType: http01
+  
+  # Or for wildcard:
+  - name: wildcard-prod
+    domain: "*.mycureapp.com"
+    issuer: letsencrypt-mycure-cloudflare-prod  # ← DNS-01 production
+    challengeType: dns01
 ```
 
 ### 2. Certificate Naming
@@ -724,7 +736,7 @@ certificates:
   # Renewal: Auto (HTTP-01)
   - name: client-acme-main
     domain: "app.acme.com"
-    issuer: letsencrypt-http01-prod
+    issuer: letsencrypt-prod
     challengeType: http01
 ```
 

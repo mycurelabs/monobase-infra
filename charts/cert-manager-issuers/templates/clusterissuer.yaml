@@ -1,0 +1,100 @@
+{{- range .Values.issuers }}
+---
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: {{ .name }}
+  labels:
+    {{- include "cert-manager-issuers.labels" $ | nindent 4 }}
+    app.kubernetes.io/component: clusterissuer
+    cert-manager.io/issuer-type: {{ .provider | default "http01" }}
+spec:
+  acme:
+    # ACME server URL (production or staging)
+    server: {{ include "cert-manager-issuers.acmeServer" (.server | default "production") }}
+    
+    # Email address for ACME account notifications
+    email: {{ .email | required (printf "email is required for issuer %s" .name) | quote }}
+    
+    # Secret to store ACME account private key
+    privateKeySecretRef:
+      name: {{ .name }}-account-key
+    
+    # Solvers configuration based on provider
+    solvers:
+      {{- if eq (.provider | default "http01") "http01" }}
+      # HTTP-01 Challenge (requires port 80 access, no DNS provider needed)
+      - http01:
+          ingress:
+            class: envoy-gateway
+      {{- else if eq .provider "cloudflare" }}
+      # Cloudflare DNS-01 Challenge
+      - dns01:
+          cloudflare:
+            apiTokenSecretRef:
+              name: {{ .cloudflare.apiTokenSecretRef.name | required (printf "cloudflare.apiTokenSecretRef.name is required for issuer %s" .name) }}
+              key: {{ .cloudflare.apiTokenSecretRef.key | default "api-token" }}
+        {{- if .cloudflare.dnsZones }}
+        selector:
+          dnsZones:
+            {{- range .cloudflare.dnsZones }}
+            - {{ . | quote }}
+            {{- end }}
+        {{- end }}
+      {{- else if eq .provider "route53" }}
+      # AWS Route53 DNS-01 Challenge
+      - dns01:
+          route53:
+            region: {{ .route53.region | required (printf "route53.region is required for issuer %s" .name) }}
+            {{- if .route53.hostedZoneID }}
+            hostedZoneID: {{ .route53.hostedZoneID }}
+            {{- end }}
+            {{- if .route53.role }}
+            role: {{ .route53.role }}
+            {{- end }}
+            {{- if .route53.accessKeyID }}
+            accessKeyID: {{ .route53.accessKeyID }}
+            {{- end }}
+            {{- if .route53.secretAccessKeySecretRef }}
+            secretAccessKeySecretRef:
+              name: {{ .route53.secretAccessKeySecretRef.name }}
+              key: {{ .route53.secretAccessKeySecretRef.key | default "secret-access-key" }}
+            {{- end }}
+      {{- else if eq .provider "azuredns" }}
+      # Azure DNS Challenge
+      - dns01:
+          azureDNS:
+            subscriptionID: {{ .azuredns.subscriptionID | required (printf "azuredns.subscriptionID is required for issuer %s" .name) }}
+            resourceGroupName: {{ .azuredns.resourceGroupName | required (printf "azuredns.resourceGroupName is required for issuer %s" .name) }}
+            hostedZoneName: {{ .azuredns.hostedZoneName | required (printf "azuredns.hostedZoneName is required for issuer %s" .name) }}
+            {{- if .azuredns.managedIdentityClientID }}
+            managedIdentity:
+              clientID: {{ .azuredns.managedIdentityClientID }}
+            {{- else if .azuredns.servicePrincipalSecretRef }}
+            clientID: {{ .azuredns.clientID | required (printf "azuredns.clientID is required when using service principal for issuer %s" .name) }}
+            clientSecretSecretRef:
+              name: {{ .azuredns.servicePrincipalSecretRef.name }}
+              key: {{ .azuredns.servicePrincipalSecretRef.key | default "client-secret" }}
+            tenantID: {{ .azuredns.tenantID | required (printf "azuredns.tenantID is required when using service principal for issuer %s" .name) }}
+            {{- end }}
+      {{- else if eq .provider "clouddns" }}
+      # Google Cloud DNS Challenge
+      - dns01:
+          cloudDNS:
+            project: {{ .clouddns.project | required (printf "clouddns.project is required for issuer %s" .name) }}
+            {{- if .clouddns.serviceAccountSecretRef }}
+            serviceAccountSecretRef:
+              name: {{ .clouddns.serviceAccountSecretRef.name }}
+              key: {{ .clouddns.serviceAccountSecretRef.key | default "key.json" }}
+            {{- end }}
+      {{- else if eq .provider "digitalocean" }}
+      # DigitalOcean DNS Challenge
+      - dns01:
+          digitalocean:
+            tokenSecretRef:
+              name: {{ .digitalocean.apiTokenSecretRef.name | required (printf "digitalocean.apiTokenSecretRef.name is required for issuer %s" .name) }}
+              key: {{ .digitalocean.apiTokenSecretRef.key | default "api-token" }}
+      {{- else }}
+      # Unsupported provider
+      {{- fail (printf "Unsupported provider '%s' for issuer %s. Supported: http01, cloudflare, route53, azuredns, clouddns, digitalocean" .provider .name) }}
+      {{- end }}

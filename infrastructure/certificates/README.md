@@ -23,16 +23,16 @@ All certificates declared in a single file for centralized management.
 
 ```yaml
 certificates:
-  # Platform wildcard certificate
+  # Platform wildcard certificate (DNS-01)
   - name: wildcard-mycureapp
     domain: "*.mycureapp.com"
-    issuer: letsencrypt-prod
+    issuer: letsencrypt-mycure-cloudflare-prod
     challengeType: dns01
   
   # Client domain certificates (HTTP-01 auto-provisioned)
   - name: client1-domain
     domain: "app.client.com"
-    issuer: letsencrypt-http01-prod
+    issuer: letsencrypt-prod
     challengeType: http01
   
   # Client-provided certificates
@@ -56,7 +56,7 @@ certificates:
    ```yaml
    - name: client-name-domain
      domain: "app.client.com"
-     issuer: letsencrypt-http01-prod
+     issuer: letsencrypt-prod
      challengeType: http01
    ```
 
@@ -114,13 +114,20 @@ infrastructure/
 │   └── certificates.yaml            # Certificate declarations (to be created)
 │
 ├── tls/
-│   ├── clusterissuer-prod.yaml      # Let's Encrypt production (DNS-01)
-│   ├── clusterissuer-staging.yaml   # Let's Encrypt staging (DNS-01)
-│   └── clusterissuer-http01-prod.yaml  # Let's Encrypt HTTP-01 (to be created)
+│   ├── README.md                    # TLS infrastructure documentation
+│   └── cloudflare-token-externalsecret.yaml  # Cloudflare API token for DNS-01
 │
 └── gateway/
     ├── shared-gateway.yaml          # Gateway resource with certificateRefs
     └── envoy-gatewayclass.yaml      # GatewayClass configuration
+
+charts/cert-manager-issuers/         # ClusterIssuer Helm chart
+├── Chart.yaml
+├── values.yaml
+├── templates/
+│   ├── clusterissuer.yaml           # Multi-provider ClusterIssuer template
+│   └── _helpers.tpl
+└── README.md
 ```
 
 ---
@@ -137,29 +144,35 @@ infrastructure/
 
 ## ClusterIssuers
 
-### letsencrypt-prod (DNS-01)
+ClusterIssuers are now managed via the `cert-manager-issuers` Helm chart.
 
-**File:** `infrastructure/tls/clusterissuer-prod.yaml`
+**Configuration:** `argocd/infrastructure/values.yaml` → `certManagerIssuers.issuers`  
+**Chart:** `charts/cert-manager-issuers/`
 
-- For wildcard certificates (`*.domain.com`)
-- Requires DNS provider API access (Cloudflare)
-- Used for platform subdomains
+### letsencrypt-prod (HTTP-01)
 
-### letsencrypt-http01-prod (HTTP-01)
-
-**File:** `infrastructure/tls/clusterissuer-http01-prod.yaml` *(to be created)*
-
+- **Default for client domains**
 - For single-domain certificates
 - No DNS API access needed
 - Client only needs to create A record
-- Used for client-owned domains
 
-### letsencrypt-staging (Testing)
+### letsencrypt-staging (HTTP-01)
 
-**File:** `infrastructure/tls/clusterissuer-staging.yaml`
-
-- For testing certificate provisioning
+- Testing HTTP-01 certificate provisioning
 - Avoids Let's Encrypt rate limits
+- Certificates NOT trusted by browsers
+
+### letsencrypt-mycure-cloudflare-prod (DNS-01)
+
+- **For MyCure platform wildcard certificates**
+- Supports wildcard domains (`*.mycureapp.com`)
+- Requires Cloudflare API access
+- Used for platform subdomains
+
+### letsencrypt-mycure-cloudflare-staging (DNS-01)
+
+- Testing DNS-01 certificate provisioning
+- For wildcard certificate testing
 - Certificates NOT trusted by browsers
 
 ---
@@ -201,9 +214,10 @@ spec:
   - `client-acme-main-tls`
 
 **ClusterIssuer Names:**
-- `letsencrypt-prod` - DNS-01 production
-- `letsencrypt-staging` - DNS-01 staging
-- `letsencrypt-http01-prod` - HTTP-01 production
+- `letsencrypt-prod` - HTTP-01 production (default for client domains)
+- `letsencrypt-staging` - HTTP-01 staging
+- `letsencrypt-mycure-cloudflare-prod` - DNS-01 production (MyCure platform wildcard)
+- `letsencrypt-mycure-cloudflare-staging` - DNS-01 staging
 
 ---
 

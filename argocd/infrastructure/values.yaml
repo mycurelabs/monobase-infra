@@ -13,8 +13,40 @@ certManager:
 # Cert Manager Resources - ClusterIssuers and certificate configuration
 certManagerIssuers:
   enabled: true
-  email: "caretheextramile@gmail.com"  # Email for Let's Encrypt notifications (set by scripts/secrets.sh)
-  dnsZone: "mycureapp.com"  # DNS zone for DNS-01 challenge (e.g., mycureapp.com)
+  issuers:
+    # HTTP-01 defaults (no DNS provider needed, client creates A record)
+    - name: letsencrypt-prod
+      email: "caretheextramile@gmail.com"
+      server: production
+      provider: http01
+    
+    - name: letsencrypt-staging
+      email: "caretheextramile@gmail.com"
+      server: staging
+      provider: http01
+    
+    # DNS-01 Cloudflare for MyCure platform wildcard certificates
+    - name: letsencrypt-mycure-cloudflare-prod
+      email: "caretheextramile@gmail.com"
+      server: production
+      provider: cloudflare
+      cloudflare:
+        dnsZones:
+          - "mycureapp.com"
+        apiTokenSecretRef:
+          name: mycure-cloudflare-api-token
+          key: api-token
+    
+    - name: letsencrypt-mycure-cloudflare-staging
+      email: "caretheextramile@gmail.com"
+      server: staging
+      provider: cloudflare
+      cloudflare:
+        dnsZones:
+          - "mycureapp.com"
+        apiTokenSecretRef:
+          name: mycure-cloudflare-api-token
+          key: api-token
 
 # Envoy Gateway - Gateway API implementation
 envoyGateway:
@@ -47,7 +79,7 @@ gateway:
     secretName: wildcard-tls
     certManager:
       enabled: true
-      clusterIssuer: letsencrypt-prod
+      clusterIssuer: letsencrypt-mycure-cloudflare-prod  # Use Cloudflare DNS-01 for wildcard
       includeApex: true
 
   # HTTP to HTTPS redirect

@@ -1,0 +1,42 @@
+{{- if .Values.certManagerIssuers.enabled }}
+# ArgoCD Application: cert-manager-issuers
+# Sync Wave 1 - Deploy ClusterIssuers after cert-manager
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: cert-manager-issuers
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  
+  source:
+    repoURL: {{ .Values.argocd.repoURL }}
+    targetRevision: {{ .Values.argocd.targetRevision }}
+    path: charts/cert-manager-issuers
+    helm:
+      releaseName: cert-manager-issuers
+      values: |
+        issuers:
+          {{- toYaml .Values.certManagerIssuers.issuers | nindent 10 }}
+  
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: cert-manager
+  
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        maxDuration: 3m
+{{- end }}

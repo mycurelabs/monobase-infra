@@ -1,0 +1,14 @@
+apiVersion: v2
+name: cert-manager-issuers
+description: Multi-provider ClusterIssuer management for cert-manager
+type: application
+version: 1.0.0
+appVersion: "1.0"
+keywords:
+  - cert-manager
+  - tls
+  - certificates
+  - letsencrypt
+  - acme
+maintainers:
+  - name: MyCure Infrastructure Team
