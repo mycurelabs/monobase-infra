@@ -264,6 +264,9 @@ syncd:
 postgresql:
   enabled: true
 
+  # Prevent ArgoCD PVC sync issues (industry best practice)
+  fullnameOverride: "postgresql"
+
   # Staging uses standalone (not replication)
   architecture: standalone
 
@@ -298,6 +301,9 @@ postgresql:
 # ===== CORE: MongoDB Database =====
 mongodb:
   enabled: true
+
+  # Prevent ArgoCD PVC sync issues (industry best practice)
+  fullnameOverride: "mongodb"
 
   # Always use replicaset for HapiHub (requires change streams)
   architecture: replicaset
@@ -359,12 +365,15 @@ valkey:
 # ===== OPTIONAL: MinIO (Object Storage) =====
 minio:
   enabled: true  # ✅ Enable for staging
-  
+
+  # Prevent ArgoCD PVC sync issues (industry best practice)
+  fullnameOverride: "minio"
+
   # Image configuration (use bitnamilegacy for consistency)
   image:
     repository: bitnamilegacy/minio
     tag: "2025.7.23-debian-12-r3"
-  
+
   # Deployment mode
   mode: standalone
   
