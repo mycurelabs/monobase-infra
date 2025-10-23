@@ -15,8 +15,8 @@ spec:
   project: default
   
   source:
-    repoURL: {{ .Values.repoURL }}
-    targetRevision: {{ .Values.targetRevision }}
+    repoURL: {{ .Values.argocd.repoURL }}
+    targetRevision: {{ .Values.argocd.targetRevision }}
     path: charts/external-dns
     helm:
       releaseName: external-dns
