@@ -8,3 +8,7 @@ gateway:
   # Staging: stg.mycureapp.com
   # Production deployments could use: mycureapp.com
   domain: stg.mycureapp.com
+
+# External DNS - Enable DNS automation for this cluster
+externalDNS:
+  enabled: true
