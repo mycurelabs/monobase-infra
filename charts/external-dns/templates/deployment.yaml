@@ -58,8 +58,10 @@ spec:
         - --source={{ . }}
         {{- end }}
 
-        # Namespace filter (watch only this namespace)
-        - --namespace={{ $root.Release.Namespace }}
+        # Namespace filter (optional: watch only specific namespace, omit for all namespaces)
+        {{- if $instance.namespace }}
+        - --namespace={{ $instance.namespace }}
+        {{- end }}
 
         # Domain filters
         {{- range $instance.domainFilters }}
