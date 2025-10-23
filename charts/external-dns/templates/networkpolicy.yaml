@@ -1,0 +1,65 @@
+{{- range .Values.instances }}
+{{- if .enabled }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: external-dns-{{ .name }}
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: external-dns
+    app.kubernetes.io/instance: {{ $.Release.Name }}
+    app.kubernetes.io/component: {{ .name }}
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: external-dns
+      app.kubernetes.io/component: {{ .name }}
+  policyTypes:
+    - Egress
+  egress:
+    # Allow DNS resolution
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+        - podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+    
+    # Allow access to Kubernetes API server
+    - to:
+        - namespaceSelector: {}
+          podSelector:
+            matchLabels:
+              component: kube-apiserver
+      ports:
+        - protocol: TCP
+          port: 443
+    
+    # Allow access to API server via service IP (CIDR-based fallback)
+    # This covers cases where API server is accessed via ClusterIP
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: default
+      ports:
+        - protocol: TCP
+          port: 443
+    
+    # Allow HTTPS egress for DNS provider APIs (Cloudflare, Route53, etc.)
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: TCP
+          port: 443
+    
+    # Allow HTTP egress for provider APIs that may use HTTP
+    - ports:
+        - protocol: TCP
+          port: 80
+{{- end }}
+{{- end }}
