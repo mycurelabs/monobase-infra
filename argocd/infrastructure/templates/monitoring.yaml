@@ -47,7 +47,7 @@ spec:
           resources:
             requests:
               cpu: "100m"
-              memory: "200Mi"
+              memory: "400Mi"  # Increased from 200Mi - prevent OOM (actual usage: 324Mi)
             limits:
               cpu: "500m"
               memory: "1Gi"
@@ -101,6 +101,13 @@ spec:
         kube-state-metrics:
           image:
             repository: bitnamilegacy/kube-state-metrics
+          resources:
+            requests:
+              cpu: "10m"      # Optimized from 250m (actual usage: 2m = 0.8%)
+              memory: "64Mi"  # Optimized from 256Mi (actual usage: 27Mi = 11%)
+            limits:
+              cpu: "100m"
+              memory: "128Mi"
   
   destination:
     server: https://kubernetes.default.svc

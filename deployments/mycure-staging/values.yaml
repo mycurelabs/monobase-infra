@@ -231,11 +231,11 @@ syncd:
 
   resources:
     requests:
-      cpu: 500m      # Increased from 100m - needed for worker threads
-      memory: 1Gi    # Increased from 256Mi - prevents OOMKilled
+      cpu: 250m      # Optimized from 500m (actual usage: 175m = 35%)
+      memory: 384Mi  # Optimized from 1Gi (actual usage: 285Mi = 28%)
     limits:
-      cpu: "2"       # Increased from 500m - handles stale step processing
-      memory: 4Gi    # Increased from 512Mi - prevents OOMKilled during push floods
+      cpu: "2"       # Keep high limit for burst processing
+      memory: 4Gi    # Keep high limit for push floods
 
   gateway:
     hostname: ""  # Empty = uses syncd.<global.domain>
@@ -289,8 +289,8 @@ postgresql:
 
   resources:
     requests:
-      cpu: 100m  # Reduced for small cluster
-      memory: 512Mi  # Reduced for small cluster
+      cpu: 50m       # Optimized from 100m (actual usage: 31m = 31%)
+      memory: 128Mi  # Optimized from 512Mi (actual usage: 48Mi = 9%)
     limits:
       cpu: 500m
       memory: 1Gi

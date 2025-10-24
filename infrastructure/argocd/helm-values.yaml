@@ -22,7 +22,7 @@ controller:
   resources:
     requests:
       cpu: 250m
-      memory: 512Mi
+      memory: 768Mi  # Increased from 512Mi - prevent OOM (actual usage: 607Mi)
     limits:
       cpu: 1
       memory: 1Gi
