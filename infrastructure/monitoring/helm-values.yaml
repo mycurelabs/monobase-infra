@@ -12,7 +12,6 @@ prometheus:
     storageSpec:
       volumeClaimTemplate:
         spec:
-          storageClassName: ""  # Use cluster default
           accessModes: ["ReadWriteOnce"]
           resources:
             requests:
@@ -51,7 +50,6 @@ grafana:
   # Persistence
   persistence:
     enabled: true
-    storageClassName: ""  # Use cluster default
     size: 10Gi
   
   # Resources
@@ -99,7 +97,6 @@ alertmanager:
     storage:
       volumeClaimTemplate:
         spec:
-          storageClassName: ""  # Use cluster default
           accessModes: ["ReadWriteOnce"]
           resources:
             requests:
