@@ -35,6 +35,11 @@ spec:
           user: {{ .Values.monitoring.grafana.admin.user | default "admin" }}
           password: {{ .Values.monitoring.grafana.admin.password | default "admin" }}
 
+        # Use bitnamilegacy image (consistency with monitoring stack)
+        image:
+          registry: docker.io
+          repository: bitnamilegacy/grafana
+
         resources:
           {{- toYaml .Values.monitoring.grafana.resources | nindent 10 }}
 
