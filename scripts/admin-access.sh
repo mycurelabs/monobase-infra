@@ -24,6 +24,7 @@ usage() {
     echo "  argocd      - ArgoCD UI (port 8080)"
     echo "  grafana     - Grafana UI (port 8080)"
     echo "  prometheus  - Prometheus UI (port 9090)"
+    echo "  alertmanager - Alertmanager UI (port 9093)"
     echo "  longhorn    - Longhorn UI (port 8080)"
     echo "  minio       - MinIO Console (port 9001)"
     echo "  mailpit     - Mailpit UI (port 8025)"
@@ -84,8 +85,8 @@ select_kubeconfig() {
         return 1
     fi
 
-    # Check if fzf is available
-    if command -v fzf &>/dev/null; then
+    # Check if fzf is available AND we have an interactive terminal
+    if command -v fzf &>/dev/null && [ -t 0 ]; then
         # Build display list with current KUBECONFIG marker
         local display_list=()
         local current_kubeconfig="${KUBECONFIG:-${HOME}/.kube/config}"
@@ -158,17 +159,25 @@ select_kubeconfig() {
         # Prompt for selection
         read -rp "Select cluster (1-$((${#kubeconfigs[@]} + 2))): " choice
         
-        if [ "$choice" -eq $((${#kubeconfigs[@]} + 2)) ]; then
+        # If no input (non-interactive mode), use current KUBECONFIG or first available
+        if [ -z "$choice" ]; then
+            if [ -n "${KUBECONFIG:-}" ]; then
+                echo -e "${YELLOW}Using current KUBECONFIG${NC}"
+            else
+                export KUBECONFIG="${kubeconfig_paths[0]}"
+                echo -e "${YELLOW}Non-interactive mode: Using ${kubeconfigs[0]}${NC}"
+            fi
+        elif [ "$choice" -eq $((${#kubeconfigs[@]} + 2)) ] 2>/dev/null; then
             exit 0
-        elif [ "$choice" -eq $((${#kubeconfigs[@]} + 1)) ]; then
+        elif [ "$choice" -eq $((${#kubeconfigs[@]} + 1)) ] 2>/dev/null; then
             if [ -z "${KUBECONFIG:-}" ]; then
                 echo -e "${YELLOW}KUBECONFIG not set, using kubectl default${NC}"
             fi
-        elif [ "$choice" -ge 1 ] && [ "$choice" -le ${#kubeconfigs[@]} ]; then
+        elif [ "$choice" -ge 1 ] 2>/dev/null && [ "$choice" -le ${#kubeconfigs[@]} ] 2>/dev/null; then
             export KUBECONFIG="${kubeconfig_paths[$((choice - 1))]}"
             echo -e "${GREEN}Using kubeconfig: ${KUBECONFIG}${NC}"
         else
-            echo -e "${RED}Invalid selection${NC}"
+            echo -e "${RED}Invalid selection${NC}" >&2
             return 1
         fi
     fi
@@ -182,6 +191,121 @@ select_kubeconfig() {
     
     echo -e "${GREEN}Connected to cluster: $(kubectl config current-context)${NC}"
     echo
+}
+
+# Select deployment namespace for per-deployment services
+select_deployment() {
+    local service_name=$1
+    local service_display_name=$2
+    
+    echo >&2
+    echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}" >&2
+    echo -e "${YELLOW}  Select Deployment for ${service_display_name}${NC}" >&2
+    echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}" >&2
+    echo >&2
+    
+    # Find namespaces with the service
+    local namespaces=()
+    local namespace_list
+    
+    # Get all namespaces and check each one
+    # Use mapfile to handle lines without trailing newline
+    local all_namespaces
+    mapfile -t all_namespaces < <(kubectl get namespaces -o jsonpath='{.items[*].metadata.name}' 2>/dev/null | tr ' ' '\n')
+    
+    for ns in "${all_namespaces[@]}"; do
+        if kubectl get svc -n "$ns" "$service_name" &>/dev/null; then
+            namespaces+=("$ns")
+        fi
+    done
+    
+    if [ ${#namespaces[@]} -eq 0 ]; then
+        echo -e "${RED}Error: No deployments found with ${service_display_name} service${NC}" >&2
+        echo -e "${BLUE}Service '${service_name}' not found in any namespace${NC}" >&2
+        return 1
+    fi
+    
+    # Get current context namespace
+    local current_ns
+    current_ns=$(kubectl config view --minify --output 'jsonpath={..namespace}' 2>/dev/null)
+    
+    # Check if fzf is available AND we have an interactive terminal
+    if command -v fzf &>/dev/null && [ -t 0 ]; then
+        # Build display list with current namespace marker
+        local display_list=()
+        
+        for ns in "${namespaces[@]}"; do
+            local marker="  "
+            if [ "$ns" = "$current_ns" ]; then
+                marker="* "
+            fi
+            display_list+=("${marker}${ns}")
+        done
+        
+        # Add Exit option
+        display_list+=("  Exit")
+        
+        # Use fzf for selection
+        local selected
+        selected=$(printf '%s\n' "${display_list[@]}" | fzf \
+            --height=15 \
+            --border \
+            --prompt="Select Deployment: " \
+            --header="* = current namespace | TAB to select | ESC to cancel" \
+            --ansi)
+        
+        if [ -z "$selected" ]; then
+            echo -e "${RED}No deployment selected${NC}" >&2
+            return 1
+        fi
+        
+        # Handle selection
+        if [[ "$selected" == *"Exit"* ]]; then
+            return 1
+        fi
+        
+        # Extract namespace (remove marker)
+        local selected_ns="${selected:2}"
+        echo "$selected_ns"
+        
+    else
+        # Fallback to numbered menu if fzf not available
+        echo -e "${YELLOW}fzf not found. Using numbered menu.${NC}" >&2
+        echo >&2
+        
+        # Display options
+        echo "Available deployments:" >&2
+        for i in "${!namespaces[@]}"; do
+            local marker="  "
+            if [ "${namespaces[$i]}" = "$current_ns" ]; then
+                marker="* "
+            fi
+            echo "  ${marker}$((i + 1)). ${namespaces[$i]}" >&2
+        done
+        echo "  $((${#namespaces[@]} + 1)). Exit" >&2
+        echo >&2
+        
+        # Prompt for selection
+        read -rp "Select deployment (1-$((${#namespaces[@]} + 1))): " choice
+        
+        # If no input (non-interactive mode), use first available namespace
+        if [ -z "$choice" ]; then
+            if [ ${#namespaces[@]} -eq 1 ]; then
+                echo -e "${YELLOW}Non-interactive mode: Using ${namespaces[0]}${NC}" >&2
+                echo "${namespaces[0]}"
+            else
+                echo -e "${YELLOW}Non-interactive mode: Multiple deployments found, using ${namespaces[0]}${NC}" >&2
+                echo "${namespaces[0]}"
+            fi
+        elif [ "$choice" -eq $((${#namespaces[@]} + 1)) ] 2>/dev/null; then
+            return 1
+        elif [ "$choice" -ge 1 ] 2>/dev/null && [ "$choice" -le ${#namespaces[@]} ] 2>/dev/null; then
+            echo "${namespaces[$((choice - 1))]}"
+        else
+            echo -e "${RED}Invalid selection${NC}" >&2
+            return 1
+        fi
+    fi
 }
 
 # Verify kubectl context
@@ -207,19 +331,23 @@ verify_context() {
     echo -e "Current context: ${GREEN}$CURRENT_CONTEXT${NC}"
     echo ""
     
-    # Prompt for confirmation
-    read -p "Continue with this context? (y/N): " -n 1 -r
-    echo ""
-    
-    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+    # Prompt for confirmation (skip in non-interactive mode)
+    if [ -t 0 ]; then
+        read -p "Continue with this context? (y/N): " -n 1 -r
         echo ""
-        echo -e "${BLUE}Available contexts:${NC}"
-        kubectl config get-contexts
-        echo ""
-        echo -e "${YELLOW}To switch context, use:${NC}"
-        echo "  kubectl config use-context <context-name>"
-        echo ""
-        exit 0
+        
+        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+            echo ""
+            echo -e "${BLUE}Available contexts:${NC}"
+            kubectl config get-contexts
+            echo ""
+            echo -e "${YELLOW}To switch context, use:${NC}"
+            echo "  kubectl config use-context <context-name>"
+            echo ""
+            exit 0
+        fi
+    else
+        echo -e "${YELLOW}Non-interactive mode: Continuing with current context${NC}"
     fi
     
     echo ""
@@ -279,7 +407,7 @@ case $SERVICE in
     
     grafana)
         NAMESPACE=${NAMESPACE:-"monitoring"}
-        SVC_NAME="monitoring-grafana"
+        SVC_NAME="monitoring-kube-prometheus-grafana"
         LOCAL_PORT=8080
         REMOTE_PORT=80
         URL="http://localhost:${LOCAL_PORT}"
@@ -289,7 +417,7 @@ case $SERVICE in
         echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
         echo ""
         echo -e "${YELLOW}Getting admin password...${NC}"
-        PASSWORD=$(kubectl -n "$NAMESPACE" get secret grafana-credentials \
+        PASSWORD=$(kubectl -n "$NAMESPACE" get secret monitoring-grafana \
             -o jsonpath="{.data.admin-password}" 2>/dev/null | base64 -d || echo "admin")
         
         echo -e "Username: ${GREEN}admin${NC}"
@@ -299,7 +427,7 @@ case $SERVICE in
     
     prometheus)
         NAMESPACE=${NAMESPACE:-"monitoring"}
-        SVC_NAME="monitoring-prometheus"
+        SVC_NAME="monitoring-kube-prometheus-prometheus"
         LOCAL_PORT=9090
         REMOTE_PORT=9090
         URL="http://localhost:${LOCAL_PORT}"
@@ -307,6 +435,21 @@ case $SERVICE in
         echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
         echo -e "${BLUE}  Prometheus Access${NC}"
         echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+        echo ""
+        ;;
+    
+    alertmanager)
+        NAMESPACE=${NAMESPACE:-"monitoring"}
+        SVC_NAME="monitoring-kube-prometheus-alertmanager"
+        LOCAL_PORT=9093
+        REMOTE_PORT=9093
+        URL="http://localhost:${LOCAL_PORT}"
+        
+        echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+        echo -e "${BLUE}  Alertmanager Access${NC}"
+        echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+        echo ""
+        echo -e "${YELLOW}Note: Alertmanager may be disabled in some environments${NC}"
         echo ""
         ;;
     
@@ -325,9 +468,10 @@ case $SERVICE in
     
     minio)
         if [ -z "$NAMESPACE" ]; then
-            echo -e "${RED}Error: Namespace required for MinIO${NC}"
-            echo "Usage: $0 minio <namespace>"
-            exit 1
+            NAMESPACE=$(select_deployment "minio" "MinIO")
+            if [ -z "$NAMESPACE" ]; then
+                exit 0
+            fi
         fi
         
         SVC_NAME="minio"
@@ -340,9 +484,9 @@ case $SERVICE in
         echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
         echo ""
         echo -e "${YELLOW}Getting credentials...${NC}"
-        MINIO_USER=$(kubectl get secret minio-credentials -n "$NAMESPACE" \
+        MINIO_USER=$(kubectl get secret minio -n "$NAMESPACE" \
             -o jsonpath='{.data.root-user}' 2>/dev/null | base64 -d || echo "admin")
-        MINIO_PASS=$(kubectl get secret minio-credentials -n "$NAMESPACE" \
+        MINIO_PASS=$(kubectl get secret minio -n "$NAMESPACE" \
             -o jsonpath='{.data.root-password}' 2>/dev/null | base64 -d || echo "Not found")
         
         echo -e "Username: ${GREEN}$MINIO_USER${NC}"
@@ -352,14 +496,15 @@ case $SERVICE in
     
     mailpit)
         if [ -z "$NAMESPACE" ]; then
-            echo -e "${RED}Error: Namespace required for Mailpit${NC}"
-            echo "Usage: $0 mailpit <namespace>"
-            exit 1
+            NAMESPACE=$(select_deployment "mailpit-http" "Mailpit")
+            if [ -z "$NAMESPACE" ]; then
+                exit 0
+            fi
         fi
         
-        SVC_NAME="mailpit"
+        SVC_NAME="mailpit-http"
         LOCAL_PORT=8025
-        REMOTE_PORT=8025
+        REMOTE_PORT=80
         URL="http://localhost:${LOCAL_PORT}"
         
         echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
