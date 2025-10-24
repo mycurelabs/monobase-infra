@@ -198,7 +198,7 @@ falco:
 
 # Monitoring - Prometheus + Grafana stack
 monitoring:
-  enabled: false  # Optional, enable for observability
+  enabled: true  # Optional, enable for observability
   version: 56.0.0
   
   # Prometheus configuration
