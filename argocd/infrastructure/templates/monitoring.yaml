@@ -14,17 +14,16 @@ metadata:
 spec:
   project: default
   
-  source:
-    chart: kube-prometheus-stack
-    repoURL: https://prometheus-community.github.io/helm-charts
-    targetRevision: {{ .Values.monitoring.version | default "56.0.0" }}
-    helm:
-      releaseName: monitoring
-      valueFiles:
-        - $values/infrastructure/monitoring/helm-values.yaml
-  
-  # Additional source for custom values
+  # Multi-source configuration
   sources:
+    - chart: kube-prometheus-stack
+      repoURL: https://prometheus-community.github.io/helm-charts
+      targetRevision: {{ .Values.monitoring.version | default "56.0.0" }}
+      helm:
+        releaseName: monitoring
+        valueFiles:
+          - $values/infrastructure/monitoring/helm-values.yaml
+    
     - repoURL: {{ .Values.argocd.repoURL }}
       targetRevision: {{ .Values.argocd.targetRevision }}
       ref: values
