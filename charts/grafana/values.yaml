@@ -34,7 +34,7 @@ grafana:
         - name: Prometheus
           type: prometheus
           access: proxy
-          url: http://prometheus-monitoring-kube-prometheus-prometheus.monitoring.svc:9090
+          url: http://monitoring-kube-prometheus-prometheus.monitoring.svc:9090
           isDefault: true
           editable: true
           jsonData:
