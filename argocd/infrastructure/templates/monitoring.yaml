@@ -82,24 +82,9 @@ spec:
               cpu: "500m"
               memory: "512Mi"
         
-        # Alertmanager configuration
+        # Alertmanager configuration (disabled for resource-constrained staging)
         alertmanager:
-          enabled: true
-          image:
-            repository: bitnamilegacy/alertmanager
-          
-          persistence:
-            enabled: true
-            storageClass: ""
-            size: "10Gi"
-          
-          resources:
-            requests:
-              cpu: "50m"
-              memory: "128Mi"
-            limits:
-              cpu: "200m"
-              memory: "256Mi"
+          enabled: false
         
         # Blackbox Exporter
         blackboxExporter:
