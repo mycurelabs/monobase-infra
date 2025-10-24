@@ -25,6 +25,23 @@ spec:
         global:
           defaultStorageClass: ""
         
+        # Use bitnamilegacy images (Bitnami deprecated non-hardened Debian images)
+        operator:
+          image:
+            repository: bitnamilegacy/prometheus-operator
+        
+        prometheus:
+          image:
+            repository: bitnamilegacy/prometheus
+        
+        alertmanager:
+          image:
+            repository: bitnamilegacy/alertmanager
+        
+        blackboxExporter:
+          image:
+            repository: bitnamilegacy/blackbox-exporter
+        
         # Prometheus configuration
         prometheus:
           enabled: true
@@ -54,6 +71,9 @@ spec:
         # Grafana configuration
         grafana:
           enabled: true
+          
+          image:
+            repository: bitnamilegacy/grafana
           
           admin:
             password: "admin"
@@ -91,10 +111,14 @@ spec:
         # Node Exporter
         nodeExporter:
           enabled: true
+          image:
+            repository: bitnamilegacy/node-exporter
         
         # Kube State Metrics
         kubeStateMetrics:
           enabled: true
+          image:
+            repository: bitnamilegacy/kube-state-metrics
         
         # Prometheus Operator
         operator:
