@@ -235,6 +235,25 @@ monitoring:
         size: 10Gi
         storageClass: ""  # Auto-detect from cluster default
 
+      # Dashboard provider configuration
+      dashboardsProvider:
+        enabled: true
+
+      # Dashboard ConfigMaps to load
+      dashboardsConfigMaps:
+        - configMapName: grafana-dashboard-global
+          fileName: global.json
+        - configMapName: grafana-dashboard-nodes
+          fileName: nodes.json
+        - configMapName: grafana-dashboard-namespaces
+          fileName: namespaces.json
+        - configMapName: grafana-dashboard-pods
+          fileName: pods.json
+        - configMapName: grafana-dashboard-apiserver
+          fileName: api-server.json
+        - configMapName: grafana-dashboard-prometheus
+          fileName: prometheus.json
+
     # Wrapper chart gateway configuration (not nested)
     gateway:
       enabled: true
