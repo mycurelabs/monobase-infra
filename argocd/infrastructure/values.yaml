@@ -215,6 +215,11 @@ monitoring:
       user: admin
       password: admin  # Override via External Secrets in production
 
+    # Use bitnamilegacy image (consistency with monitoring stack)
+    image:
+      registry: docker.io
+      repository: bitnamilegacy/grafana
+
     resources:
       requests:
         cpu: "50m"

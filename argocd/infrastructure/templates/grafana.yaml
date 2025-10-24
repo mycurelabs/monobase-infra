@@ -21,36 +21,13 @@ spec:
     helm:
       releaseName: grafana
       valuesObject:
-        enabled: true
-
         global:
           domain: {{ .Values.gateway.domain }}
           namespace: monitoring
           gateway:
             name: {{ .Values.gateway.gateway.name }}
             namespace: {{ .Values.gateway.gateway.namespace }}
-
-        # Pass through grafana-specific configuration
-        admin:
-          user: {{ .Values.monitoring.grafana.admin.user | default "admin" }}
-          password: {{ .Values.monitoring.grafana.admin.password | default "admin" }}
-
-        # Use bitnamilegacy image (consistency with monitoring stack)
-        image:
-          registry: docker.io
-          repository: bitnamilegacy/grafana
-
-        resources:
-          {{- toYaml .Values.monitoring.grafana.resources | nindent 10 }}
-
-        persistence:
-          enabled: {{ .Values.monitoring.grafana.persistence.enabled | default true }}
-          size: {{ .Values.monitoring.grafana.persistence.size | default "10Gi" }}
-          storageClass: {{ .Values.monitoring.grafana.persistence.storageClass | default "" | quote }}
-
-        gateway:
-          enabled: {{ .Values.monitoring.grafana.gateway.enabled | default true }}
-          hostname: {{ .Values.monitoring.grafana.gateway.hostname | default "" | quote }}
+        {{- toYaml .Values.monitoring.grafana | nindent 8 }}
 
   destination:
     server: https://kubernetes.default.svc
