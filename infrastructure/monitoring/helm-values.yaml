@@ -12,6 +12,7 @@ prometheus:
     storageSpec:
       volumeClaimTemplate:
         spec:
+          storageClassName: do-block-storage
           accessModes: ["ReadWriteOnce"]
           resources:
             requests:
@@ -50,6 +51,7 @@ grafana:
   # Persistence
   persistence:
     enabled: true
+    storageClassName: do-block-storage
     size: 10Gi
   
   # Resources
@@ -97,6 +99,7 @@ alertmanager:
     storage:
       volumeClaimTemplate:
         spec:
+          storageClassName: do-block-storage
           accessModes: ["ReadWriteOnce"]
           resources:
             requests:
