@@ -1,5 +1,5 @@
 {{- if .Values.monitoring.enabled }}
-# ArgoCD Application: Monitoring Stack
+# ArgoCD Application: Monitoring Stack (Prometheus + Grafana)
 # Sync Wave 0 - Deploy monitoring (cluster-wide, optional)
 
 apiVersion: argoproj.io/v1alpha1
@@ -14,19 +14,91 @@ metadata:
 spec:
   project: default
   
-  # Multi-source configuration
-  sources:
-    - chart: kube-prometheus-stack
-      repoURL: https://prometheus-community.github.io/helm-charts
-      targetRevision: {{ .Values.monitoring.version | default "56.0.0" }}
-      helm:
-        releaseName: monitoring
-        valueFiles:
-          - $values/infrastructure/monitoring/helm-values.yaml
-    
-    - repoURL: {{ .Values.argocd.repoURL }}
-      targetRevision: {{ .Values.argocd.targetRevision }}
-      ref: values
+  source:
+    chart: kube-prometheus
+    repoURL: https://charts.bitnami.com/bitnami
+    targetRevision: {{ .Values.monitoring.version | default "11.x.x" }}
+    helm:
+      releaseName: monitoring
+      valuesObject:
+        # Global storage configuration
+        global:
+          defaultStorageClass: {{ .Values.monitoring.storageClass | default "" }}
+        
+        # Prometheus configuration
+        prometheus:
+          enabled: true
+          retention: {{ .Values.monitoring.prometheus.retention | default "30d" }}
+          retentionSize: {{ .Values.monitoring.prometheus.retentionSize | default "45GB" }}
+          
+          persistence:
+            enabled: {{ .Values.monitoring.prometheus.persistence.enabled | default true }}
+            storageClass: {{ .Values.monitoring.prometheus.storageClass | default "" }}
+            size: {{ .Values.monitoring.prometheus.storageSize | default "50Gi" }}
+          
+          resources:
+            requests:
+              cpu: {{ .Values.monitoring.prometheus.resources.requests.cpu | default "500m" }}
+              memory: {{ .Values.monitoring.prometheus.resources.requests.memory | default "2Gi" }}
+            limits:
+              cpu: {{ .Values.monitoring.prometheus.resources.limits.cpu | default "2" }}
+              memory: {{ .Values.monitoring.prometheus.resources.limits.memory | default "4Gi" }}
+          
+          # Security context
+          securityContext:
+            enabled: true
+            runAsNonRoot: true
+            runAsUser: 1000
+            fsGroup: 2000
+        
+        # Grafana configuration
+        grafana:
+          enabled: {{ .Values.monitoring.grafana.enabled | default true }}
+          
+          admin:
+            password: {{ .Values.monitoring.grafana.adminPassword | default "admin" }}
+          
+          persistence:
+            enabled: {{ .Values.monitoring.grafana.persistence.enabled | default true }}
+            storageClass: {{ .Values.monitoring.grafana.storageClass | default "" }}
+            size: {{ .Values.monitoring.grafana.storageSize | default "10Gi" }}
+          
+          resources:
+            requests:
+              cpu: {{ .Values.monitoring.grafana.resources.requests.cpu | default "100m" }}
+              memory: {{ .Values.monitoring.grafana.resources.requests.memory | default "256Mi" }}
+            limits:
+              cpu: {{ .Values.monitoring.grafana.resources.limits.cpu | default "500m" }}
+              memory: {{ .Values.monitoring.grafana.resources.limits.memory | default "512Mi" }}
+        
+        # Alertmanager configuration
+        alertmanager:
+          enabled: {{ .Values.monitoring.alertmanager.enabled | default true }}
+          
+          persistence:
+            enabled: {{ .Values.monitoring.alertmanager.persistence.enabled | default true }}
+            storageClass: {{ .Values.monitoring.alertmanager.storageClass | default "" }}
+            size: {{ .Values.monitoring.alertmanager.storageSize | default "10Gi" }}
+          
+          resources:
+            requests:
+              cpu: {{ .Values.monitoring.alertmanager.resources.requests.cpu | default "50m" }}
+              memory: {{ .Values.monitoring.alertmanager.resources.requests.memory | default "128Mi" }}
+            limits:
+              cpu: {{ .Values.monitoring.alertmanager.resources.limits.cpu | default "200m" }}
+              memory: {{ .Values.monitoring.alertmanager.resources.limits.memory | default "256Mi" }}
+        
+        # Node Exporter
+        nodeExporter:
+          enabled: true
+        
+        # Kube State Metrics
+        kubeStateMetrics:
+          enabled: true
+        
+        # Prometheus Operator
+        operator:
+          enabled: true
   
   destination:
     server: https://kubernetes.default.svc
