@@ -65,3 +65,4 @@ temp/
 *.log
 
 **/charts/*.tgz
+.playwright-mcp/
