@@ -107,15 +107,13 @@ spec:
           image:
             repository: bitnamilegacy/blackbox-exporter
         
-        # Node Exporter
-        nodeExporter:
-          enabled: true
+        # Node Exporter (subchart)
+        node-exporter:
           image:
             repository: bitnamilegacy/node-exporter
         
-        # Kube State Metrics
-        kubeStateMetrics:
-          enabled: true
+        # Kube State Metrics (subchart)
+        kube-state-metrics:
           image:
             repository: bitnamilegacy/kube-state-metrics
   
