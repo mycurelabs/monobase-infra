@@ -5,18 +5,18 @@
 prometheus:
   prometheusSpec:
     # Retention
-    retention: {{ .Values.monitoring.prometheus.retention | default "30d" }}
+    retention: 30d
     retentionSize: "45GB"
     
     # Storage
     storageSpec:
       volumeClaimTemplate:
         spec:
-          storageClassName: {{ .Values.monitoring.prometheus.storageClass | default "" | quote }}
+          storageClassName: ""  # Use cluster default
           accessModes: ["ReadWriteOnce"]
           resources:
             requests:
-              storage: {{ .Values.monitoring.prometheus.storageSize | default "50Gi" }}
+              storage: 50Gi
     
     # Resources
     resources:
@@ -46,13 +46,13 @@ grafana:
   enabled: true
   
   # Admin credentials
-  adminPassword: {{ .Values.monitoring.grafana.adminPassword | default "admin" | quote }}
+  adminPassword: "admin"
   
   # Persistence
   persistence:
     enabled: true
-    storageClassName: {{ .Values.monitoring.grafana.storageClass | default "" | quote }}
-    size: {{ .Values.monitoring.grafana.storageSize | default "10Gi" }}
+    storageClassName: ""  # Use cluster default
+    size: 10Gi
   
   # Resources
   resources:
@@ -92,14 +92,14 @@ grafana:
 
 # Alertmanager Configuration
 alertmanager:
-  enabled: {{ .Values.monitoring.alertmanager.enabled | default true }}
+  enabled: true
   
   alertmanagerSpec:
     # Storage
     storage:
       volumeClaimTemplate:
         spec:
-          storageClassName: {{ .Values.monitoring.alertmanager.storageClass | default "" | quote }}
+          storageClassName: ""  # Use cluster default
           accessModes: ["ReadWriteOnce"]
           resources:
             requests:
@@ -139,22 +139,10 @@ alertmanager:
         # Default receiver (no-op or email)
       
       - name: 'critical'
-        {{- if .Values.monitoring.alertmanager.slack.webhookUrl }}
-        slack_configs:
-          - api_url: {{ .Values.monitoring.alertmanager.slack.webhookUrl | quote }}
-            channel: '#alerts-critical'
-            title: 'Critical Alert'
-            text: '{{ "{{" }} range .Alerts {{ "}}" }}{{ "{{" }} .Annotations.summary {{ "}}" }}{{ "{{" }} end {{ "}}" }}'
-        {{- end }}
+        # Configure Slack webhook URL for critical alerts
       
       - name: 'warning'
-        {{- if .Values.monitoring.alertmanager.slack.webhookUrl }}
-        slack_configs:
-          - api_url: {{ .Values.monitoring.alertmanager.slack.webhookUrl | quote }}
-            channel: '#alerts-warning'
-            title: 'Warning Alert'
-            text: '{{ "{{" }} range .Alerts {{ "}}" }}{{ "{{" }} .Annotations.summary {{ "}}" }}{{ "{{" }} end {{ "}}" }}'
-        {{- end }}
+        # Configure Slack webhook URL for warning alerts
 
 # Node Exporter
 nodeExporter:
