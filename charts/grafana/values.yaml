@@ -1,0 +1,83 @@
+# Default values for Grafana chart wrapper
+# Override these values in deployment-specific values files
+
+# Global configuration (shared across charts)
+global:
+  domain: example.com
+  namespace: monitoring
+  environment: production
+  gateway:
+    name: shared-gateway
+    namespace: gateway-system
+
+enabled: false  # Master enable/disable for both Grafana and HTTPRoute
+
+nameOverride: ""
+fullnameOverride: ""
+
+# ===== Official Bitnami Grafana Chart Values =====
+# Passed through to Bitnami grafana subchart
+# See https://github.com/bitnami/charts/tree/main/bitnami/grafana
+
+# Admin credentials
+admin:
+  user: admin
+  password: admin  # Change via External Secrets in production
+
+# Prometheus datasource auto-configuration
+datasources:
+  secretDefinition:
+    apiVersion: 1
+    datasources:
+      - name: Prometheus
+        type: prometheus
+        access: proxy
+        url: http://prometheus-monitoring-kube-prometheus-prometheus.monitoring.svc:9090
+        isDefault: true
+        editable: true
+        jsonData:
+          timeInterval: 30s
+
+# Resource configuration (minimal for staging)
+resources:
+  requests:
+    cpu: "50m"
+    memory: "150Mi"
+  limits:
+    cpu: "500m"
+    memory: "512Mi"
+
+# Persistence
+persistence:
+  enabled: true
+  storageClass: ""  # Use cluster default
+  size: "10Gi"
+
+# Security context
+securityContext:
+  enabled: true
+  runAsNonRoot: true
+  runAsUser: 1001
+  fsGroup: 1001
+
+# Use bitnamilegacy image (consistency with monitoring stack)
+image:
+  repository: bitnamilegacy/grafana
+
+# ===== Custom Gateway API Configuration =====
+gateway:
+  enabled: true
+  hostname: ""  # Empty = uses grafana.{global.domain}
+  parentRefs:
+    - name: shared-gateway
+      namespace: gateway-system
+
+  # Optional: Rate limiting for Grafana web UI
+  rateLimit:
+    enabled: false
+    perIP:
+      requests: 100
+      unit: Minute
+    burst:
+      requests: 500
+      unit: Hour

@@ -1,0 +1,23 @@
+apiVersion: v2
+name: grafana
+description: Grafana monitoring visualization with Gateway API integration
+type: application
+version: 1.0.0
+appVersion: "11.x.x"
+keywords:
+  - monitoring
+  - grafana
+  - prometheus
+  - visualization
+home: https://github.com/mycurelabs/monobase-infra
+sources:
+  - https://github.com/grafana/grafana
+maintainers:
+  - name: MyCure Labs
+    email: devops@mycure.md
+
+dependencies:
+  - name: grafana
+    version: "~11.3.0"
+    repository: https://charts.bitnami.com/bitnami
+    condition: enabled

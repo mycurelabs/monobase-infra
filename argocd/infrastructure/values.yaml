@@ -207,11 +207,30 @@ monitoring:
     storageSize: 50Gi  # Prometheus data storage
     storageClass: ""  # Auto-detect from cluster default
   
-  # Grafana configuration
+  # Grafana configuration (deployed as separate wrapper chart)
   grafana:
-    adminPassword: ""  # Set via secret or leave empty for default
-    storageSize: 10Gi  # Grafana dashboard/config storage
-    storageClass: ""  # Auto-detect
+    enabled: true  # Enable Grafana deployment
+
+    admin:
+      user: admin
+      password: admin  # Override via External Secrets in production
+
+    resources:
+      requests:
+        cpu: "50m"
+        memory: "150Mi"
+      limits:
+        cpu: "500m"
+        memory: "512Mi"
+
+    persistence:
+      enabled: true
+      size: 10Gi
+      storageClass: ""  # Auto-detect from cluster default
+
+    gateway:
+      enabled: true
+      hostname: ""  # Uses grafana.{domain}
   
   # Alertmanager configuration
   alertmanager:

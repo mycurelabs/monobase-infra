@@ -58,30 +58,7 @@ spec:
             runAsNonRoot: true
             runAsUser: 1000
             fsGroup: 2000
-        
-        # Grafana configuration
-        grafana:
-          enabled: true
-          
-          image:
-            repository: bitnamilegacy/grafana
-          
-          admin:
-            password: "admin"
-          
-          persistence:
-            enabled: true
-            storageClass: ""
-            size: "10Gi"
-          
-          resources:
-            requests:
-              cpu: "50m"
-              memory: "150Mi"
-            limits:
-              cpu: "500m"
-              memory: "512Mi"
-        
+
         # Alertmanager configuration (disabled for resource-constrained staging)
         alertmanager:
           enabled: false
