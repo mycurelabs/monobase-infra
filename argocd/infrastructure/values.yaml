@@ -211,28 +211,31 @@ monitoring:
   grafana:
     enabled: true  # Enable Grafana deployment
 
-    admin:
-      user: admin
-      password: admin  # Override via External Secrets in production
+    # Bitnami grafana subchart values (nested under 'grafana:')
+    grafana:
+      admin:
+        user: admin
+        password: admin  # Override via External Secrets in production
 
-    # Use bitnamilegacy image (consistency with monitoring stack)
-    image:
-      registry: docker.io
-      repository: bitnamilegacy/grafana
+      # Use bitnamilegacy image (consistency with monitoring stack)
+      image:
+        registry: docker.io
+        repository: bitnamilegacy/grafana
 
-    resources:
-      requests:
-        cpu: "50m"
-        memory: "150Mi"
-      limits:
-        cpu: "500m"
-        memory: "512Mi"
+      resources:
+        requests:
+          cpu: "50m"
+          memory: "150Mi"
+        limits:
+          cpu: "500m"
+          memory: "512Mi"
 
-    persistence:
-      enabled: true
-      size: 10Gi
-      storageClass: ""  # Auto-detect from cluster default
+      persistence:
+        enabled: true
+        size: 10Gi
+        storageClass: ""  # Auto-detect from cluster default
 
+    # Wrapper chart gateway configuration (not nested)
     gateway:
       enabled: true
       hostname: ""  # Uses grafana.{domain}
