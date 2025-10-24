@@ -62,6 +62,7 @@ securityContext:
 
 # Use bitnamilegacy image (consistency with monitoring stack)
 image:
+  registry: docker.io
   repository: bitnamilegacy/grafana
 
 # ===== Custom Gateway API Configuration =====
