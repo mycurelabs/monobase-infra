@@ -12,3 +12,7 @@ gateway:
 # External DNS - Enable DNS automation for this cluster
 externalDNS:
   enabled: true
+
+# Monitoring - Enable Prometheus + Grafana stack
+monitoring:
+  enabled: true
