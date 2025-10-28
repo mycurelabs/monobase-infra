@@ -151,6 +151,8 @@ hapihub:
         remoteKey: mycure-staging-google-oauth-client-id
       - secretKey: GOOGLE_CLIENT_SECRET
         remoteKey: mycure-staging-google-oauth-client-secret
+      - secretKey: STRIPE_KEY
+        remoteKey: mycure-staging-stripe-key
 
   mongodb:
     serviceName: mongodb

@@ -189,6 +189,12 @@ spec:
               name: {{ include "hapihub.fullname" . }}-secrets
               key: GOOGLE_CLIENT_SECRET
               optional: true
+        - name: STRIPE_KEY
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "hapihub.fullname" . }}-secrets
+              key: STRIPE_KEY
+              optional: true
         {{- end }}
         # Additional environment variables from config
         {{- range $key, $value := .Values.config }}

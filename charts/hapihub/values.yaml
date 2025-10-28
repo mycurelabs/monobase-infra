@@ -147,6 +147,14 @@ externalSecrets:
   secretStore: ""
   refreshInterval: 1h
   secrets: []
+  # Example secrets configuration:
+  # secrets:
+  #   - secretKey: GOOGLE_CLIENT_ID
+  #     remoteKey: mycure-staging-google-oauth-client-id
+  #   - secretKey: GOOGLE_CLIENT_SECRET
+  #     remoteKey: mycure-staging-google-oauth-client-secret
+  #   - secretKey: STRIPE_KEY
+  #     remoteKey: mycure-staging-stripe-key
 
 # MongoDB dependency configuration (deployed separately)
 mongodb:

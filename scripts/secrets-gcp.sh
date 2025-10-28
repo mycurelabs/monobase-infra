@@ -597,6 +597,37 @@ setup_gcp() {
                             --project="$PROJECT_ID"
                         log_success "Created secret: $MINIO_ROOT_PASSWORD_SECRET"
                     fi
+                    
+                    # ===========================================================================
+                    # Stripe API Key
+                    # ===========================================================================
+                    
+                    # Collect Stripe API key
+                    STRIPE_KEY="${STRIPE_KEY:-}"
+                    
+                    if [ -z "$STRIPE_KEY" ]; then
+                        if [ ! -t 0 ]; then
+                            log_error "STRIPE_KEY environment variable not set"
+                            return 1
+                        else
+                            echo
+                            log_info "Stripe API key:"
+                            read -rp "  Stripe secret key (sk_...): " STRIPE_KEY
+                        fi
+                    fi
+                    
+                    # Create Stripe secret
+                    STRIPE_KEY_SECRET="${deployment}-stripe-key"
+                    
+                    if gcloud secrets describe "$STRIPE_KEY_SECRET" --project="$PROJECT_ID" &>/dev/null; then
+                        log_success "Secret already exists: $STRIPE_KEY_SECRET"
+                    else
+                        echo -n "$STRIPE_KEY" | gcloud secrets create "$STRIPE_KEY_SECRET" \
+                            --data-file=- \
+                            --replication-policy="automatic" \
+                            --project="$PROJECT_ID"
+                        log_success "Created secret: $STRIPE_KEY_SECRET"
+                    fi
                 done
             fi
         fi
