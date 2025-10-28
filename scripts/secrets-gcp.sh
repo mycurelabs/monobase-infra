@@ -173,10 +173,32 @@ setup_gcp() {
     fi
 
     # ===========================================================================
-    # Step 3: Collect TLS Configuration
+    # Step 3: Collect TLS Configuration (Optional)
     # ===========================================================================
     echo
-    collect_tls_config
+    log_info "TLS Certificate Configuration (Optional)"
+    echo "Configure Let's Encrypt certificates for HTTPS."
+    echo
+    
+    # Determine if user wants to setup TLS config
+    SETUP_TLS_CONFIG="${SETUP_TLS_CONFIG:-}"
+    
+    if [ -z "$SETUP_TLS_CONFIG" ]; then
+        if [ ! -t 0 ]; then
+            # Non-interactive mode - skip by default unless explicitly set
+            log_info "Non-interactive mode: Skipping TLS config (set SETUP_TLS_CONFIG=true to enable)"
+            SETUP_TLS_CONFIG="false"
+        else
+            # Interactive mode - ask user
+            read -rp "Do you want to configure TLS certificates? (y/N): " SETUP_TLS_CONFIG
+        fi
+    fi
+    
+    if [[ "$SETUP_TLS_CONFIG" =~ ^[Yy] ]] || [[ "$SETUP_TLS_CONFIG" == "true" ]]; then
+        collect_tls_config
+    else
+        log_info "Skipping TLS configuration"
+    fi
 
     # ===========================================================================
     # Step 4: Collect Cloudflare API Token
@@ -599,34 +621,56 @@ setup_gcp() {
                     fi
                     
                     # ===========================================================================
-                    # Stripe API Key
+                    # Stripe API Key (Optional)
                     # ===========================================================================
                     
-                    # Collect Stripe API key
-                    STRIPE_KEY="${STRIPE_KEY:-}"
+                    # Determine if user wants to setup Stripe key
+                    SETUP_STRIPE_KEY="${SETUP_STRIPE_KEY:-}"
                     
-                    if [ -z "$STRIPE_KEY" ]; then
+                    if [ -z "$SETUP_STRIPE_KEY" ]; then
                         if [ ! -t 0 ]; then
-                            log_error "STRIPE_KEY environment variable not set"
-                            return 1
+                            # Non-interactive mode - skip by default unless explicitly set
+                            log_info "Non-interactive mode: Skipping Stripe key (set SETUP_STRIPE_KEY=true to enable)"
+                            SETUP_STRIPE_KEY="false"
                         else
+                            # Interactive mode - ask user
                             echo
-                            log_info "Stripe API key:"
-                            read -rp "  Stripe secret key (sk_...): " STRIPE_KEY
+                            log_info "Stripe API Key Configuration (Optional)"
+                            echo "Stripe API key enables payment processing in HapiHub."
+                            echo
+                            read -rp "Do you want to configure Stripe API key? (y/N): " SETUP_STRIPE_KEY
                         fi
                     fi
                     
-                    # Create Stripe secret
-                    STRIPE_KEY_SECRET="${deployment}-stripe-key"
-                    
-                    if gcloud secrets describe "$STRIPE_KEY_SECRET" --project="$PROJECT_ID" &>/dev/null; then
-                        log_success "Secret already exists: $STRIPE_KEY_SECRET"
+                    if [[ "$SETUP_STRIPE_KEY" =~ ^[Yy] ]] || [[ "$SETUP_STRIPE_KEY" == "true" ]]; then
+                        # Collect Stripe API key
+                        STRIPE_KEY="${STRIPE_KEY:-}"
+                        
+                        if [ -z "$STRIPE_KEY" ]; then
+                            if [ ! -t 0 ]; then
+                                log_error "STRIPE_KEY environment variable not set"
+                                return 1
+                            else
+                                echo
+                                log_info "Stripe API key:"
+                                read -rp "  Stripe secret key (sk_...): " STRIPE_KEY
+                            fi
+                        fi
+                        
+                        # Create Stripe secret
+                        STRIPE_KEY_SECRET="${deployment}-stripe-key"
+                        
+                        if gcloud secrets describe "$STRIPE_KEY_SECRET" --project="$PROJECT_ID" &>/dev/null; then
+                            log_success "Secret already exists: $STRIPE_KEY_SECRET"
+                        else
+                            echo -n "$STRIPE_KEY" | gcloud secrets create "$STRIPE_KEY_SECRET" \
+                                --data-file=- \
+                                --replication-policy="automatic" \
+                                --project="$PROJECT_ID"
+                            log_success "Created secret: $STRIPE_KEY_SECRET"
+                        fi
                     else
-                        echo -n "$STRIPE_KEY" | gcloud secrets create "$STRIPE_KEY_SECRET" \
-                            --data-file=- \
-                            --replication-policy="automatic" \
-                            --project="$PROJECT_ID"
-                        log_success "Created secret: $STRIPE_KEY_SECRET"
+                        log_info "Skipping Stripe key setup"
                     fi
                 done
             fi
