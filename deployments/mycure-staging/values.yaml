@@ -224,7 +224,7 @@ syncd:
 
   image:
     repository: ghcr.io/mycurelabs/syncd
-    tag: "5.130.25"
+    tag: "5.130.24"
     pullPolicy: IfNotPresent
 
   replicaCount: 1  # Minimal for staging
