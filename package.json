@@ -12,6 +12,7 @@
     "@google-cloud/secret-manager": "^5.7.0",
     "@kubernetes/client-node": "^0.22.0",
     "@clack/prompts": "^0.8.2",
+    "glob": "^11.0.0",
     "yaml": "^2.6.1",
     "zod": "^3.24.1"
   },

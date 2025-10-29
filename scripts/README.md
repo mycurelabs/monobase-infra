@@ -34,19 +34,19 @@ bun install
 
 ### Secrets Management
 
-**Status:** ⚠️ Partial implementation - Phase 1 complete
+**Status:** ✅ Complete
 
 Provider-agnostic secrets management with centralized `secrets.yaml` configuration.
 
 **Files:**
-- `scripts/secrets.ts` - Main CLI (stub)
+- `scripts/secrets.ts` - Main CLI ✅
 - `scripts/secrets/` - Secrets-specific modules
   - `types.ts` - Provider-agnostic schema ✅
   - `parser.ts` - Parse secrets.yaml ✅
   - `providers/base.ts` - Provider interface ✅
-  - `providers/gcp.ts` - GCP implementation 🚧
-  - `generators/clustersecretstore.ts` - Generate ClusterSecretStore 🚧
-  - `generators/externalsecret.ts` - Generate ExternalSecret 🚧
+  - `providers/gcp.ts` - GCP implementation ✅
+  - `generators/clustersecretstore.ts` - Generate ClusterSecretStore ✅
+  - `generators/externalsecret.ts` - Generate ExternalSecret ✅
 
 **Configuration:**
 - `infrastructure/secrets.yaml` - Infrastructure-level secrets ✅
@@ -55,14 +55,22 @@ Provider-agnostic secrets management with centralized `secrets.yaml` configurati
 
 **Usage:**
 ```bash
-# Full setup (not yet implemented)
-bun scripts/secrets.ts setup
+# Full setup (GCP secrets + manifests)
+bun scripts/secrets.ts setup --project mc-v4-prod
 
-# Generate manifests only (not yet implemented)
-bun scripts/secrets.ts generate
+# Generate manifests only
+bun scripts/secrets.ts generate --project mc-v4-prod
 
-# Validate secrets.yaml (not yet implemented)
+# Validate secrets.yaml files
 bun scripts/secrets.ts validate
+
+# Dry-run mode
+bun scripts/secrets.ts generate --dry-run
+
+# Via mise tasks
+mise run secrets setup --project mc-v4-prod
+mise run secrets:generate
+mise run secrets:validate
 ```
 
 **Schema Example:**
@@ -77,29 +85,18 @@ secrets:
         generate: true            # Auto-generate value
 ```
 
-**Phase 1 Complete:**
+**Implementation Complete:**
 - ✅ package.json, tsconfig.json setup
 - ✅ mise.toml updated (bun added)
 - ✅ Provider-agnostic secrets.yaml files created
 - ✅ Shared library (scripts/lib/) implemented
 - ✅ Types and parser implemented
-
-**Phase 2 (Next):**
-- 🚧 GCP provider implementation
-- 🚧 Manifest generators
-- 🚧 CLI implementation (setup, generate, validate commands)
-- 🚧 Testing and validation
+- ✅ GCP provider implementation
+- ✅ Manifest generators
+- ✅ CLI implementation (setup, generate, validate commands)
+- ✅ Bash scripts removed
 
 ## Bash Scripts (Legacy)
-
-### Secrets Management (To Be Removed)
-
-These bash scripts will be removed once TypeScript implementation is complete:
-- `scripts/secrets.sh` - Main entry point ❌
-- `scripts/secrets-gcp.sh` - GCP provider ❌
-- `scripts/secrets-aws.sh` - AWS placeholder ❌
-- `scripts/secrets-azure.sh` - Azure placeholder ❌
-- `scripts/validate-secrets.sh` - Validation ❌
 
 ### Other Scripts (To Be Migrated Later)
 
@@ -155,7 +152,9 @@ Configured in `tsconfig.json`:
 
 | Script | Status | Notes |
 |--------|--------|-------|
-| secrets.sh | 🚧 In Progress | Phase 1 complete, Phase 2 pending |
+| secrets.sh | ✅ Complete | Migrated to TypeScript |
+| secrets-gcp.sh | ✅ Complete | Migrated to TypeScript |
+| validate-secrets.sh | ✅ Complete | Migrated to TypeScript |
 | bootstrap.sh | ⏳ Pending | Future migration |
 | provision.sh | ⏳ Pending | Future migration |
 | admin-access.sh | ⏳ Pending | Future migration |
