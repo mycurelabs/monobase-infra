@@ -67,5 +67,8 @@ temp/
 # Logs
 *.log
 
+# Node.js dependencies
+node_modules/
+
 **/charts/*.tgz
 .playwright-mcp/
