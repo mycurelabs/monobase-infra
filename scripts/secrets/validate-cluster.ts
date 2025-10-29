@@ -132,12 +132,16 @@ async function validateKubernetesSecret(
 async function listAllExternalSecrets(
   kubeconfigPath?: string
 ): Promise<Array<{ name: string; namespace: string }>> {
-  const customApi = getCustomObjectsApi(kubeconfigPath);
+  const k8s = require("@kubernetes/client-node");
+  const kc = loadKubeConfig(kubeconfigPath);
+  const customApi = kc.makeApiClient(k8s.CustomObjectsApi);
 
   try {
-    const response: any = await customApi.listClusterCustomObject(
+    // List ExternalSecrets across all namespaces (empty string = all namespaces)
+    const response = await customApi.listNamespacedCustomObject(
       "external-secrets.io",
       "v1beta1",
+      "",  // Empty namespace = all namespaces
       "externalsecrets"
     );
 

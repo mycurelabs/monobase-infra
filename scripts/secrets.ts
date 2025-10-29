@@ -238,8 +238,8 @@ async function setupCommand() {
 
   const kubeconfigPath = getKubeconfigPath();
 
-  // Phase 1: GCP Infrastructure Setup (if --full)
-  if (values.full) {
+  // Phase 1: GCP Infrastructure Setup (if --full and not dry-run)
+  if (values.full && !values["dry-run"]) {
     logInfo("\n📦 Phase 1: GCP Infrastructure Setup");
     try {
       const gcpResult = await setupGCPInfrastructure(projectId);
@@ -257,6 +257,14 @@ async function setupCommand() {
       logError(error.message);
       process.exit(1);
     }
+  } else if (values.full && values["dry-run"]) {
+    logWarning("\n⚠️  Skipping infrastructure setup in dry-run mode");
+    logInfo("Infrastructure setup would include:");
+    logInfo("  - GCP service account creation");
+    logInfo("  - IAM permissions");
+    logInfo("  - Service account key generation");
+    logInfo("  - Kubernetes namespace and secrets");
+    logInfo("  - TLS ClusterIssuer manifests");
   }
 
   // Phase 4: Secrets Setup
@@ -264,16 +272,20 @@ async function setupCommand() {
 
   const provider = new GCPProvider(projectId);
 
-  // Initialize provider
-  const spinner = clack.spinner();
-  spinner.start("Initializing GCP provider");
-  try {
-    await provider.initialize();
-    spinner.stop("GCP provider initialized");
-  } catch (error: any) {
-    spinner.stop("Failed to initialize GCP provider");
-    logError(error.message);
-    process.exit(1);
+  // Initialize provider (skip in dry-run mode)
+  if (!values["dry-run"]) {
+    const spinner = clack.spinner();
+    spinner.start("Initializing GCP provider");
+    try {
+      await provider.initialize();
+      spinner.stop("GCP provider initialized");
+    } catch (error: any) {
+      spinner.stop("Failed to initialize GCP provider");
+      logError(error.message);
+      process.exit(1);
+    }
+  } else {
+    logInfo("Skipping GCP provider initialization (dry-run mode)");
   }
 
   // Find and parse secrets files
@@ -286,6 +298,17 @@ async function setupCommand() {
   logInfo(`Found ${files.length} secrets.yaml files`);
 
   const parsed = files.map((f) => parseSecretsFile(f));
+
+  // In dry-run mode, skip secret checking and creation
+  if (values["dry-run"]) {
+    logInfo("\n⚠️  Skipping secret checking and creation in dry-run mode");
+    
+    // Still generate manifests in dry-run
+    logInfo("\n📝 Generating manifests");
+    await generateCommand();
+    outro("🎯 Dry run complete");
+    return;
+  }
 
   // Collect all secret keys that need values
   const secretsToCreate: Array<{ remoteKey: string; value: string }> = [];
