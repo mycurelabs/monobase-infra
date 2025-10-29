@@ -24,6 +24,17 @@ spec:
         global:
           {{- toYaml .Values.global | nindent 10 }}
         {{- toYaml .Values.mailpit | nindent 8 }}
+        {{- if .Values.global.nodePool }}
+        # Pass node pool scheduling to mailpit subchart
+        mailpit:
+          nodeSelector:
+            node-pool: {{ .Values.global.nodePool }}
+          tolerations:
+            - key: "node-pool"
+              operator: "Equal"
+              value: {{ .Values.global.nodePool | quote }}
+              effect: "NoSchedule"
+        {{- end }}
 
   destination:
     server: https://kubernetes.default.svc
