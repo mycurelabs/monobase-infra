@@ -34,9 +34,9 @@ bun install
 
 ### Secrets Management
 
-**Status:** ✅ Complete
+**Status:** ✅ Complete (Phase 3: Infrastructure Bootstrapping)
 
-Provider-agnostic secrets management with centralized `secrets.yaml` configuration.
+Provider-agnostic secrets management with centralized `secrets.yaml` configuration and full infrastructure bootstrapping.
 
 **Files:**
 - `scripts/secrets.ts` - Main CLI ✅
@@ -47,6 +47,10 @@ Provider-agnostic secrets management with centralized `secrets.yaml` configurati
   - `providers/gcp.ts` - GCP implementation ✅
   - `generators/clustersecretstore.ts` - Generate ClusterSecretStore ✅
   - `generators/externalsecret.ts` - Generate ExternalSecret ✅
+  - `gcp-setup.ts` - GCP service account, IAM, API setup ✅
+  - `k8s-setup.ts` - Kubernetes namespace, gcpsm-secret setup ✅
+  - `tls-setup.ts` - TLS ClusterIssuer generation ✅
+  - `validate-cluster.ts` - Cluster state validation ✅
 
 **Configuration:**
 - `infrastructure/secrets.yaml` - Infrastructure-level secrets ✅
@@ -55,8 +59,11 @@ Provider-agnostic secrets management with centralized `secrets.yaml` configurati
 
 **Usage:**
 ```bash
-# Full setup (GCP secrets + manifests)
+# Quick setup (secrets only, assumes infrastructure exists)
 bun scripts/secrets.ts setup --project mc-v4-prod
+
+# Full infrastructure setup (GCP SA + K8s + TLS + secrets)
+bun scripts/secrets.ts setup --full --project mc-v4-prod
 
 # Generate manifests only
 bun scripts/secrets.ts generate --project mc-v4-prod
@@ -64,14 +71,41 @@ bun scripts/secrets.ts generate --project mc-v4-prod
 # Validate secrets.yaml files
 bun scripts/secrets.ts validate
 
+# Validate cluster state (ExternalSecrets synced)
+bun scripts/secrets.ts validate-cluster
+
 # Dry-run mode
 bun scripts/secrets.ts generate --dry-run
+
+# Using environment variables
+export GCP_PROJECT_ID=mc-v4-prod
+export KUBECONFIG=/path/to/kubeconfig
+bun scripts/secrets.ts setup
 
 # Via mise tasks
 mise run secrets setup --project mc-v4-prod
 mise run secrets:generate
 mise run secrets:validate
 ```
+
+**Full Setup (`--full` flag) includes:**
+1. **GCP Infrastructure:**
+   - Enable Secret Manager API
+   - Create `external-secrets` service account
+   - Grant `roles/secretmanager.secretAccessor` IAM role
+   - Generate service account key to `~/.gcp/external-secrets-{PROJECT}.json`
+
+2. **Kubernetes Infrastructure:**
+   - Create `external-secrets-system` namespace
+   - Create `gcpsm-secret` with service account credentials
+
+3. **TLS Setup:**
+   - Generate Let's Encrypt ClusterIssuer manifests (staging + production)
+   - Cloudflare DNS-01 challenge configuration
+
+4. **Secrets Setup:**
+   - Create/update GCP Secret Manager secrets
+   - Generate ExternalSecret manifests
 
 **Schema Example:**
 ```yaml
@@ -86,6 +120,8 @@ secrets:
 ```
 
 **Implementation Complete:**
+
+**Phase 1 & 2:**
 - ✅ package.json, tsconfig.json setup
 - ✅ mise.toml updated (bun added)
 - ✅ Provider-agnostic secrets.yaml files created
@@ -95,6 +131,18 @@ secrets:
 - ✅ Manifest generators
 - ✅ CLI implementation (setup, generate, validate commands)
 - ✅ Bash scripts removed
+
+**Phase 3 (Infrastructure Bootstrapping):**
+- ✅ GCP service account creation with idempotency
+- ✅ IAM permission granting with retry logic
+- ✅ Service account key generation
+- ✅ Secret Manager API enablement
+- ✅ Kubernetes namespace creation
+- ✅ K8s gcpsm-secret creation
+- ✅ TLS ClusterIssuer generation (Let's Encrypt + Cloudflare)
+- ✅ Environment variable support (GCP_PROJECT_ID, KUBECONFIG)
+- ✅ Cluster state validation (validate-cluster command)
+- ✅ Full infrastructure setup mode (--full flag)
 
 ## Bash Scripts (Legacy)
 

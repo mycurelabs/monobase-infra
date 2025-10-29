@@ -27,6 +27,10 @@ import { parseSecretsFile, resolveTargetNamespace } from "@/secrets/parser";
 import { GCPProvider } from "@/secrets/providers/gcp";
 import { generateClusterSecretStoreFile } from "@/secrets/generators/clustersecretstore";
 import { generateExternalSecretFiles } from "@/secrets/generators/externalsecret";
+import { setupGCPInfrastructure } from "@/secrets/gcp-setup";
+import { setupKubernetesInfrastructure } from "@/secrets/k8s-setup";
+import { setupTLSInfrastructure } from "@/secrets/tls-setup";
+import { validateCluster } from "@/secrets/validate-cluster";
 import type { ParsedSecretsFile, SecretKey } from "@/secrets/types";
 
 // Parse command-line arguments
@@ -35,7 +39,9 @@ const { values, positionals } = parseArgs({
   options: {
     provider: { type: "string", short: "p", default: "gcp" },
     project: { type: "string" },
+    kubeconfig: { type: "string" },
     "dry-run": { type: "boolean", default: false },
+    full: { type: "boolean", default: false },
     help: { type: "boolean", short: "h" },
   },
   allowPositionals: true,
@@ -51,22 +57,47 @@ Secrets Management CLI
 Usage: bun scripts/secrets.ts <command> [options]
 
 Commands:
-  setup      Complete secrets setup (GCP + K8s + manifests)
-  generate   Generate ExternalSecret manifests only
-  validate   Validate secrets.yaml files
+  setup           Complete secrets setup (GCP + K8s + manifests)
+  setup --full    Full infrastructure setup (GCP SA + K8s + TLS + manifests)
+  generate        Generate ExternalSecret manifests only
+  validate        Validate secrets.yaml files
+  validate-cluster  Validate cluster state (ExternalSecrets synced)
 
 Options:
   -p, --provider <name>   Provider name (default: gcp)
-  --project <id>          GCP project ID
+  --project <id>          GCP project ID (env: GCP_PROJECT_ID)
+  --kubeconfig <path>     Path to kubeconfig (env: KUBECONFIG)
+  --full                  Full setup including infrastructure bootstrapping
   --dry-run               Show what would be done without making changes
   -h, --help              Show this help message
 
+Environment Variables:
+  GCP_PROJECT_ID          Default GCP project ID
+  KUBECONFIG              Default kubeconfig path
+
 Examples:
   bun scripts/secrets.ts setup --provider gcp --project mc-v4-prod
+  bun scripts/secrets.ts setup --full --project mc-v4-prod
   bun scripts/secrets.ts generate --dry-run
   bun scripts/secrets.ts validate
+  bun scripts/secrets.ts validate-cluster
+  
+  # Using environment variables
+  export GCP_PROJECT_ID=mc-v4-prod
+  bun scripts/secrets.ts setup
 `);
   process.exit(0);
+}
+
+/**
+ * Get configuration from CLI args or environment variables
+ */
+function getProjectId(): string | undefined {
+  return (values.project as string | undefined) || process.env.GCP_PROJECT_ID;
+}
+
+function getKubeconfigPath(): string | undefined {
+  return (values.kubeconfig as string | undefined) || process.env.KUBECONFIG;
 }
 
 /**
@@ -128,8 +159,8 @@ async function validateCommand() {
 async function generateCommand() {
   intro("📝 Generating ExternalSecret manifests");
 
-  // Get GCP project ID
-  let projectId = values.project as string | undefined;
+  // Get GCP project ID from CLI args, env vars, or prompt
+  let projectId = getProjectId();
   if (!projectId) {
     projectId = await promptText({
       message: "GCP Project ID:",
@@ -193,10 +224,10 @@ async function generateCommand() {
  * Setup command - full secrets setup
  */
 async function setupCommand() {
-  intro("🔐 Secrets Setup");
+  intro(values.full ? "🔐 Full Infrastructure Setup" : "🔐 Secrets Setup");
 
-  // Get GCP project ID
-  let projectId = values.project as string | undefined;
+  // Get GCP project ID from CLI args, env vars, or prompt
+  let projectId = getProjectId();
   if (!projectId) {
     projectId = await promptText({
       message: "GCP Project ID:",
@@ -204,6 +235,32 @@ async function setupCommand() {
       validate: (value) => (value ? undefined : "Project ID is required"),
     });
   }
+
+  const kubeconfigPath = getKubeconfigPath();
+
+  // Phase 1: GCP Infrastructure Setup (if --full)
+  if (values.full) {
+    logInfo("\n📦 Phase 1: GCP Infrastructure Setup");
+    try {
+      const gcpResult = await setupGCPInfrastructure(projectId);
+      logSuccess("GCP infrastructure configured");
+
+      // Phase 2: Kubernetes Infrastructure Setup
+      logInfo("\n☸️  Phase 2: Kubernetes Infrastructure Setup");
+      await setupKubernetesInfrastructure(gcpResult.keyFilePath, kubeconfigPath);
+      logSuccess("Kubernetes infrastructure configured");
+
+      // Phase 3: TLS Setup
+      logInfo("\n🔒 Phase 3: TLS Setup");
+      await setupTLSInfrastructure();
+    } catch (error: any) {
+      logError(error.message);
+      process.exit(1);
+    }
+  }
+
+  // Phase 4: Secrets Setup
+  logInfo(values.full ? "\n🔑 Phase 4: Secrets Setup" : "\n🔑 Secrets Setup");
 
   const provider = new GCPProvider(projectId);
 
@@ -299,12 +356,33 @@ async function setupCommand() {
   outro("✅ Setup complete");
 }
 
+/**
+ * Validate cluster command - check ExternalSecrets sync status
+ */
+async function validateClusterCommand() {
+  intro("☸️  Validating cluster state");
+
+  const kubeconfigPath = getKubeconfigPath();
+  
+  const { success, results } = await validateCluster(kubeconfigPath);
+
+  if (success) {
+    outro("✅ All ExternalSecrets are synced");
+  } else {
+    outro("❌ Some ExternalSecrets are not synced");
+    process.exit(1);
+  }
+}
+
 // Run command
 async function main() {
   try {
     switch (command) {
       case "validate":
         await validateCommand();
+        break;
+      case "validate-cluster":
+        await validateClusterCommand();
         break;
       case "generate":
         await generateCommand();
