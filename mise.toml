@@ -18,6 +18,9 @@ k3d = "5.8.3"
 doctl = "latest"
 yq = "latest"
 
+# Runtime
+bun = "latest"
+
 # Linters and Formatters
 tflint = "0.54.0"
 yamllint = "1.35.1"
@@ -177,7 +180,7 @@ echo "✓ Cleanup complete"
 
 [tasks.secrets]
 description = "Configure infrastructure secrets (TLS certificates, External Secrets)"
-run = 'bash scripts/secrets.sh "$@"'
+run = 'bun scripts/secrets.ts "$@"'
 
 [tasks.bootstrap]
 description = "Bootstrap empty cluster with GitOps (ArgoCD auto-discovery)"
@@ -197,7 +200,7 @@ run = 'bash scripts/validate.sh "$@"'
 
 [tasks.validate-secrets]
 description = "Validate secrets configuration and connectivity"
-run = 'bash scripts/validate-secrets.sh "$@"'
+run = 'bun scripts/secrets.ts validate "$@"'
 
 [tasks.resize-storage]
 description = "Resize StatefulSet PVCs without downtime"
