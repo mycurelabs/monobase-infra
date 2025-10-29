@@ -45,3 +45,36 @@ module "doks_cluster" {
 
   tags = var.tags
 }
+
+
+# Production node pool (separate resource for flexibility)
+resource "digitalocean_kubernetes_node_pool" "production" {
+  cluster_id = module.doks_cluster.cluster_id
+
+  name       = "production"
+  size       = var.production_node_size
+  node_count = var.production_node_count
+
+  # Autoscaling
+  auto_scale = true
+  min_nodes  = var.production_min_nodes
+  max_nodes  = var.production_max_nodes
+
+  tags = concat(
+    [var.cluster_name, "production", "monobase-infrastructure"],
+    var.tags
+  )
+
+  labels = {
+    "workload-type" = "production"
+    "node-pool"     = "production"
+    "managed-by"    = "opentofu"
+  }
+
+  # Taint to ensure only production workloads schedule here
+  taint {
+    key    = "node-pool"
+    value  = "production"
+    effect = "NoSchedule"
+  }
+}

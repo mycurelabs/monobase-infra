@@ -83,3 +83,29 @@ variable "tags" {
   type        = list(string)
   default     = ["mycure", "staging", "monobase-infrastructure"]
 }
+
+
+# Production node pool configuration
+variable "production_node_size" {
+  description = "Droplet size for production nodes"
+  type        = string
+  default     = "s-4vcpu-8gb"
+}
+
+variable "production_node_count" {
+  description = "Initial number of production nodes"
+  type        = number
+  default     = 1
+}
+
+variable "production_min_nodes" {
+  description = "Minimum production nodes for autoscaling"
+  type        = number
+  default     = 1
+}
+
+variable "production_max_nodes" {
+  description = "Maximum production nodes for autoscaling"
+  type        = number
+  default     = 3
+}

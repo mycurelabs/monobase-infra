@@ -5,11 +5,11 @@ cluster_name       = "mycure-doks-main"
 region             = "sgp1"  # Singapore - nearest to Manila/Philippines
 kubernetes_version = "1.33.1-do.5"  # Latest stable version
 
-# Node pool configuration (autoscaling enabled)
+# Node pool configuration (staging - fixed size)
 node_size  = "s-2vcpu-4gb"  # 2 vCPU, 4GB RAM
 node_count = 3
 min_nodes  = 3
-max_nodes  = 5  # Autoscaling enabled: 3-5 nodes
+max_nodes  = 3  # Fixed size for staging
 
 # High availability (disabled for minimal cost)
 ha_control_plane = false  # Single master node
@@ -27,3 +27,9 @@ maintenance_window_hour = "04:00"
 
 # Tags
 tags = ["mycure", "staging", "monobase-infrastructure"]
+
+# Production node pool configuration
+production_node_size  = "s-4vcpu-8gb"  # 4 vCPU, 8GB RAM
+production_node_count = 1              # Start with 1 node
+production_min_nodes  = 1              # Minimum for cost efficiency
+production_max_nodes  = 3              # Can scale to 3 nodes

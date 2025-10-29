@@ -69,3 +69,26 @@ output "next_steps" {
 
   EOT
 }
+
+
+# Production node pool outputs
+output "production_node_pool_id" {
+  description = "Production node pool ID"
+  value       = digitalocean_kubernetes_node_pool.production.id
+}
+
+output "production_node_pool_nodes" {
+  description = "List of production node pool nodes"
+  value       = digitalocean_kubernetes_node_pool.production.nodes
+}
+
+output "production_node_pool_status" {
+  description = "Production node pool status"
+  value = {
+    name       = digitalocean_kubernetes_node_pool.production.name
+    size       = digitalocean_kubernetes_node_pool.production.size
+    node_count = digitalocean_kubernetes_node_pool.production.actual_node_count
+    min_nodes  = digitalocean_kubernetes_node_pool.production.min_nodes
+    max_nodes  = digitalocean_kubernetes_node_pool.production.max_nodes
+  }
+}
