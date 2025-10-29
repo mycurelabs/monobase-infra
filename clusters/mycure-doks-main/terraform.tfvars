@@ -5,11 +5,11 @@ cluster_name       = "mycure-doks-main"
 region             = "sgp1"  # Singapore - nearest to Manila/Philippines
 kubernetes_version = "1.33.1-do.5"  # Latest stable version
 
-# Node pool configuration (minimal, no autoscaling)
+# Node pool configuration (autoscaling enabled)
 node_size  = "s-2vcpu-4gb"  # 2 vCPU, 4GB RAM
 node_count = 3
 min_nodes  = 3
-max_nodes  = 3  # Same as node_count = no autoscaling
+max_nodes  = 5  # Autoscaling enabled: 3-5 nodes
 
 # High availability (disabled for minimal cost)
 ha_control_plane = false  # Single master node
