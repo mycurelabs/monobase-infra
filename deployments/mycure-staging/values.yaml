@@ -6,6 +6,9 @@ global:
   namespace: mycure-staging
   environment: staging
 
+  # Node pool assignment - confine staging apps to staging node pool
+  nodePool: staging
+
   gateway:
     name: shared-gateway
     namespace: gateway-system

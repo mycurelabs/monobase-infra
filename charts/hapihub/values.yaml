@@ -114,6 +114,12 @@ podDisruptionBudget:
   enabled: true
   minAvailable: 1
 
+# Node pool scheduling (optional, disabled by default)
+# Inherits from global.nodePool if configured
+# nodePool:
+#   enabled: false     # Set to false to explicitly disable (overrides global)
+#   name: "staging"    # Override global node pool name
+
 nodeSelector: {}
 
 tolerations: []

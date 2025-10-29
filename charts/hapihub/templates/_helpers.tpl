@@ -191,3 +191,21 @@ Used for OAuth callbacks, webhooks, email links, etc.
 {{- define "hapihub.externalUrl" -}}
 https://{{ include "hapihub.gateway.hostname" . }}
 {{- end }}
+
+{{/*
+Node Pool - returns the effective node pool name (component-level or global)
+Returns empty string if disabled or not configured
+*/}}
+{{- define "hapihub.nodePool" -}}
+{{- if hasKey .Values "nodePool" -}}
+  {{- if and .Values.nodePool (hasKey .Values.nodePool "enabled") (not .Values.nodePool.enabled) -}}
+    {{- /* Component explicitly disabled node pool */ -}}
+  {{- else if and .Values.nodePool .Values.nodePool.name -}}
+    {{- .Values.nodePool.name -}}
+  {{- else if and .Values.global .Values.global.nodePool -}}
+    {{- .Values.global.nodePool -}}
+  {{- end -}}
+{{- else if and .Values.global .Values.global.nodePool -}}
+  {{- .Values.global.nodePool -}}
+{{- end -}}
+{{- end -}}

@@ -148,16 +148,30 @@ spec:
           value: {{ $value | quote }}
         {{- end }}
         {{- end }}
-      {{- with .Values.nodeSelector }}
+      {{- $nodePool := include "syncd.nodePool" . -}}
+      {{- if or $nodePool .Values.nodeSelector }}
       nodeSelector:
+        {{- if $nodePool }}
+        node-pool: {{ $nodePool }}
+        {{- end }}
+        {{- with .Values.nodeSelector }}
         {{- toYaml . | nindent 8 }}
+        {{- end }}
       {{- end }}
       {{- with .Values.affinity }}
       affinity:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- with .Values.tolerations }}
+      {{- if or $nodePool .Values.tolerations }}
       tolerations:
+        {{- if $nodePool }}
+        - key: "node-pool"
+          operator: "Equal"
+          value: {{ $nodePool | quote }}
+          effect: "NoSchedule"
+        {{- end }}
+        {{- with .Values.tolerations }}
         {{- toYaml . | nindent 8 }}
+        {{- end }}
       {{- end }}
 {{- end }}
