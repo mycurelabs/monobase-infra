@@ -57,21 +57,39 @@ Provider-agnostic secrets management with centralized `secrets.yaml` configurati
 - `deployments/mycure-staging/secrets.yaml` - Staging secrets ✅
 - `deployments/mycure-production/secrets.yaml` - Production secrets ✅
 
+**Auto-Detection Features:**
+- **GCP Project**: Detects from existing `gcp-secretstore.yaml` → `gcloud config` → prompts
+- **Provider**: Detects from existing `*-secretstore.yaml` files → defaults to `gcp`
+- **Kubeconfig**: Discovers all files in `~/.kube/` → shows interactive selection menu
+- **Context Display**: Shows current `kubectl context` when kubeconfig is configured
+
+**Priority Order:**
+```
+Project ID:   CLI flag > env var > gcp-secretstore.yaml > gcloud config > prompt
+Provider:     CLI flag > existing *-secretstore.yaml > default (gcp)
+Kubeconfig:   CLI flag > env var > ~/.kube/ discovery + selection > prompt
+```
+
 **Usage:**
 ```bash
-# Quick setup (secrets only, assumes infrastructure exists)
+# Auto-detect everything (idempotent, no flags needed!)
+bun scripts/secrets.ts generate
+bun scripts/secrets.ts validate-cluster
+
+# Quick setup (secrets only, auto-detects project)
+bun scripts/secrets.ts setup
+
+# Full infrastructure setup (auto-detects project + kubeconfig)
+bun scripts/secrets.ts setup --full
+
+# Explicit values (overrides auto-detection)
 bun scripts/secrets.ts setup --project mc-v4-prod
-
-# Full infrastructure setup (GCP SA + K8s + TLS + secrets)
-bun scripts/secrets.ts setup --full --project mc-v4-prod
-
-# Generate manifests only
-bun scripts/secrets.ts generate --project mc-v4-prod
+bun scripts/secrets.ts setup --full --project mc-v4-prod --kubeconfig ~/.kube/mycure-doks-main
 
 # Validate secrets.yaml files
 bun scripts/secrets.ts validate
 
-# Validate cluster state (ExternalSecrets synced)
+# Validate cluster state (auto-discovers kubeconfig, shows context)
 bun scripts/secrets.ts validate-cluster
 
 # Dry-run mode
@@ -143,6 +161,16 @@ secrets:
 - ✅ Environment variable support (GCP_PROJECT_ID, KUBECONFIG)
 - ✅ Cluster state validation (validate-cluster command)
 - ✅ Full infrastructure setup mode (--full flag)
+
+**Phase 4 (Auto-Detection & Idempotency):**
+- ✅ GCP project auto-detection from existing gcp-secretstore.yaml
+- ✅ GCP project fallback to gcloud config
+- ✅ Provider auto-detection from existing *-secretstore.yaml files
+- ✅ Kubeconfig auto-discovery from ~/.kube/ directory
+- ✅ Interactive kubeconfig selection menu
+- ✅ Current kubectl context display
+- ✅ Priority-based configuration resolution
+- ✅ Fully idempotent re-runs (no manual re-entry needed)
 
 ## Bash Scripts (Legacy)
 

@@ -64,9 +64,9 @@ Commands:
   validate-cluster  Validate cluster state (ExternalSecrets synced)
 
 Options:
-  -p, --provider <name>   Provider name (default: gcp)
-  --project <id>          GCP project ID (env: GCP_PROJECT_ID)
-  --kubeconfig <path>     Path to kubeconfig (env: KUBECONFIG)
+  -p, --provider <name>   Provider name (default: gcp, auto-detects from existing files)
+  --project <id>          GCP project ID (auto-detects from gcp-secretstore.yaml or gcloud config)
+  --kubeconfig <path>     Path to kubeconfig (auto-discovers from ~/.kube/, shows selection menu)
   --full                  Full setup including infrastructure bootstrapping
   --dry-run               Show what would be done without making changes
   -h, --help              Show this help message
@@ -75,7 +75,17 @@ Environment Variables:
   GCP_PROJECT_ID          Default GCP project ID
   KUBECONFIG              Default kubeconfig path
 
+Auto-Detection Features:
+  Project ID Priority:    CLI flag > env var > gcp-secretstore.yaml > gcloud config > prompt
+  Provider Priority:      CLI flag > existing *-secretstore.yaml > default (gcp)
+  Kubeconfig Priority:    CLI flag > env var > ~/.kube/ discovery > prompt
+  Context Display:        Shows current kubectl context when kubeconfig is set
+
 Examples:
+  # Auto-detect everything (idempotent re-runs)
+  bun scripts/secrets.ts generate
+  
+  # With explicit values
   bun scripts/secrets.ts setup --provider gcp --project mc-v4-prod
   bun scripts/secrets.ts setup --full --project mc-v4-prod
   bun scripts/secrets.ts generate --dry-run
@@ -90,14 +100,234 @@ Examples:
 }
 
 /**
- * Get configuration from CLI args or environment variables
+ * Auto-detect GCP project from existing gcp-secretstore.yaml
+ */
+function detectProjectFromClusterSecretStore(): string | undefined {
+  const secretStorePath = "infrastructure/external-secrets/gcp-secretstore.yaml";
+  
+  if (!existsSync(secretStorePath)) {
+    return undefined;
+  }
+
+  try {
+    const content = require("fs").readFileSync(secretStorePath, "utf-8");
+    const yaml = require("yaml");
+    const parsed = yaml.parse(content);
+    
+    const projectId = parsed?.spec?.provider?.gcpsm?.projectID;
+    
+    // Check if it's a real value (not a template like {{ .Values.projectID }})
+    if (projectId && typeof projectId === "string" && !projectId.includes("{{")) {
+      return projectId;
+    }
+  } catch (error) {
+    // Ignore parsing errors
+  }
+  
+  return undefined;
+}
+
+/**
+ * Auto-detect GCP project from gcloud config
+ */
+function detectProjectFromGcloud(): string | undefined {
+  try {
+    const { execSync } = require("child_process");
+    const projectId = execSync("gcloud config get-value project 2>/dev/null", {
+      encoding: "utf-8",
+      stdio: ["pipe", "pipe", "ignore"],
+    }).trim();
+    
+    return projectId || undefined;
+  } catch (error) {
+    return undefined;
+  }
+}
+
+/**
+ * Get GCP project ID with auto-detection
+ * Priority: CLI flag > env var > existing file > gcloud config
  */
 function getProjectId(): string | undefined {
-  return (values.project as string | undefined) || process.env.GCP_PROJECT_ID;
+  // 1. CLI flag (highest priority)
+  if (values.project) {
+    return values.project as string;
+  }
+  
+  // 2. Environment variable
+  if (process.env.GCP_PROJECT_ID) {
+    return process.env.GCP_PROJECT_ID;
+  }
+  
+  // 3. Auto-detect from existing gcp-secretstore.yaml
+  const detectedFromFile = detectProjectFromClusterSecretStore();
+  if (detectedFromFile) {
+    logInfo(`Auto-detected GCP project from existing ClusterSecretStore: ${detectedFromFile}`);
+    return detectedFromFile;
+  }
+  
+  // 4. Auto-detect from gcloud config
+  const detectedFromGcloud = detectProjectFromGcloud();
+  if (detectedFromGcloud) {
+    logInfo(`Auto-detected GCP project from gcloud config: ${detectedFromGcloud}`);
+    return detectedFromGcloud;
+  }
+  
+  return undefined;
+}
+
+/**
+ * Discover all kubeconfig files in ~/.kube/
+ */
+function discoverKubeconfigs(): Array<{ label: string; value: string; description?: string }> {
+  const { readdirSync, statSync } = require("fs");
+  const { homedir } = require("os");
+  const { join, basename } = require("path");
+  
+  const kubeDir = join(homedir(), ".kube");
+  const configs: Array<{ label: string; value: string; description?: string }> = [];
+  
+  if (!existsSync(kubeDir)) {
+    return configs;
+  }
+  
+  try {
+    const files = readdirSync(kubeDir);
+    
+    for (const file of files) {
+      const fullPath = join(kubeDir, file);
+      
+      // Skip directories and backup files
+      if (!statSync(fullPath).isFile() || file.endsWith('.bak') || file.endsWith('~')) {
+        continue;
+      }
+      
+      const isCurrent = fullPath === process.env.KUBECONFIG || 
+                        (file === 'config' && !process.env.KUBECONFIG);
+      
+      configs.push({
+        label: isCurrent ? `${file} *` : file,
+        value: fullPath,
+        description: isCurrent ? "Current" : undefined,
+      });
+    }
+  } catch (error) {
+    // Ignore errors
+  }
+  
+  // Sort with current config first
+  configs.sort((a, b) => {
+    if (a.description === "Current") return -1;
+    if (b.description === "Current") return 1;
+    return a.label.localeCompare(b.label);
+  });
+  
+  return configs;
+}
+
+/**
+ * Get kubeconfig path with auto-discovery
+ * Priority: CLI flag > env var > interactive selection
+ */
+async function getKubeconfigPathWithDiscovery(): Promise<string | undefined> {
+  // 1. CLI flag (highest priority)
+  if (values.kubeconfig) {
+    return values.kubeconfig as string;
+  }
+  
+  // 2. Environment variable
+  if (process.env.KUBECONFIG) {
+    return process.env.KUBECONFIG;
+  }
+  
+  // 3. Interactive selection from discovered configs
+  const discovered = discoverKubeconfigs();
+  
+  if (discovered.length === 0) {
+    logWarning("No kubeconfig files found in ~/.kube/");
+    return undefined;
+  }
+  
+  if (discovered.length === 1) {
+    logInfo(`Using kubeconfig: ${discovered[0].label}`);
+    return discovered[0].value;
+  }
+  
+  // Multiple configs found - offer selection
+  const selected = await promptSelect({
+    message: "Select kubeconfig file:",
+    options: discovered.map(c => ({
+      label: c.label,
+      value: c.value,
+      hint: c.description,
+    })),
+  });
+  
+  return selected as string;
 }
 
 function getKubeconfigPath(): string | undefined {
   return (values.kubeconfig as string | undefined) || process.env.KUBECONFIG;
+}
+
+/**
+ * Auto-detect provider from existing ClusterSecretStore files
+ */
+function detectProviderFromClusterSecretStore(): string | undefined {
+  const providers = [
+    { name: "gcp", file: "infrastructure/external-secrets/gcp-secretstore.yaml" },
+    { name: "aws", file: "infrastructure/external-secrets/aws-secretstore.yaml" },
+    { name: "azure", file: "infrastructure/external-secrets/azure-secretstore.yaml" },
+  ];
+  
+  for (const provider of providers) {
+    if (existsSync(provider.file)) {
+      logInfo(`Auto-detected provider from existing ClusterSecretStore: ${provider.name}`);
+      return provider.name;
+    }
+  }
+  
+  return undefined;
+}
+
+/**
+ * Get provider with auto-detection
+ * Priority: CLI flag > detected from file > default (gcp)
+ */
+function getProvider(): string {
+  // 1. CLI flag (highest priority)
+  if (values.provider && values.provider !== "gcp") {
+    return values.provider as string;
+  }
+  
+  // 2. Auto-detect from existing files
+  const detected = detectProviderFromClusterSecretStore();
+  if (detected) {
+    return detected;
+  }
+  
+  // 3. Default to gcp
+  return "gcp";
+}
+
+/**
+ * Display current kubectl context
+ */
+function displayCurrentContext(kubeconfigPath?: string): void {
+  try {
+    const { execSync } = require("child_process");
+    const env = kubeconfigPath ? { ...process.env, KUBECONFIG: kubeconfigPath } : process.env;
+    
+    const context = execSync("kubectl config current-context", {
+      encoding: "utf-8",
+      env,
+      stdio: ["pipe", "pipe", "ignore"],
+    }).trim();
+    
+    logSuccess(`Connected to cluster: ${context}`);
+  } catch (error) {
+    logWarning("Could not determine current kubectl context");
+  }
 }
 
 /**
@@ -226,7 +456,7 @@ async function generateCommand() {
 async function setupCommand() {
   intro(values.full ? "🔐 Full Infrastructure Setup" : "🔐 Secrets Setup");
 
-  // Get GCP project ID from CLI args, env vars, or prompt
+  // Get GCP project ID with auto-detection
   let projectId = getProjectId();
   if (!projectId) {
     projectId = await promptText({
@@ -236,7 +466,16 @@ async function setupCommand() {
     });
   }
 
-  const kubeconfigPath = getKubeconfigPath();
+  // Get kubeconfig path with auto-discovery (only if needed for full setup)
+  let kubeconfigPath: string | undefined;
+  if (values.full && !values["dry-run"]) {
+    kubeconfigPath = await getKubeconfigPathWithDiscovery();
+    if (kubeconfigPath) {
+      displayCurrentContext(kubeconfigPath);
+    }
+  } else {
+    kubeconfigPath = getKubeconfigPath();
+  }
 
   // Phase 1: GCP Infrastructure Setup (if --full and not dry-run)
   if (values.full && !values["dry-run"]) {
@@ -385,7 +624,11 @@ async function setupCommand() {
 async function validateClusterCommand() {
   intro("☸️  Validating cluster state");
 
-  const kubeconfigPath = getKubeconfigPath();
+  const kubeconfigPath = await getKubeconfigPathWithDiscovery();
+  
+  if (kubeconfigPath) {
+    displayCurrentContext(kubeconfigPath);
+  }
   
   const { success, results } = await validateCluster(kubeconfigPath);
 
