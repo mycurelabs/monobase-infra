@@ -17,11 +17,6 @@ global:
     provider: cloud-default  # Use DigitalOcean Block Storage
     className: ""  # Auto-detect (do-block-storage)
 
-# ===== INFRASTRUCTURE: Gateway Configuration =====
-gateway:
-  # Production domain
-  domain: mycureapp.com
-
 # ===== CORE: Monobase API =====
 api:
   enabled: false
@@ -461,35 +456,14 @@ mailpit:
 # Managed at infrastructure level (infrastructure/external-dns/)
 # No per-deployment configuration needed
 
-# ===== External Secrets =====
-externalSecrets:
-  enabled: false  # TODO: Enable when secrets are configured
-  provider: sops  # Or aws/azure/gcp
-
-# ===== Monitoring =====
-monitoring:
-  enabled: false  # Disable for minimal staging
-
 # ===== Backup (Velero) =====
 backup:
   enabled: false  # Disable for staging
 
 # ===== Security =====
-networkPolicies:
-  enabled: true
-  defaultDeny: true
-
 podSecurityStandards:
   enabled: true
   level: restricted
-
-# Security tools (disabled for staging)
-security:
-  kyverno:
-    enabled: false
-
-  falco:
-    enabled: false
 
 # ===== Resource Quotas =====
 resourceQuotas:
