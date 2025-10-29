@@ -122,10 +122,10 @@ repoServer:
   resources:
     requests:
       cpu: 100m
-      memory: 512Mi
+      memory: 1Gi  # Increased from 512Mi to prevent OOM
     limits:
       cpu: 1
-      memory: 1Gi
+      memory: 2Gi  # Increased from 1Gi to prevent OOM
 
   # Schedule on infrastructure node pool
   nodeSelector:
