@@ -21,7 +21,7 @@ gateway:
 
 # ===== CORE: Monobase API =====
 api:
-  enabled: true
+  enabled: false
 
   image:
     repository: ghcr.io/monobaselabs/api
@@ -71,7 +71,7 @@ api:
 
 # ===== CORE: Monobase Account Frontend =====
 account:
-  enabled: true
+  enabled: false
 
   image:
     repository: ghcr.io/monobaselabs/accountapp
