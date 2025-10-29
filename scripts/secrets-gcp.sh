@@ -658,7 +658,7 @@ setup_gcp() {
                         fi
                         
                         # Create Stripe secret
-                        STRIPE_KEY_SECRET="${deployment}-stripe-key"
+                        STRIPE_KEY_SECRET="${deployment}-stripe-secret-key"
                         
                         if gcloud secrets describe "$STRIPE_KEY_SECRET" --project="$PROJECT_ID" &>/dev/null; then
                             log_success "Secret already exists: $STRIPE_KEY_SECRET"

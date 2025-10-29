@@ -153,8 +153,8 @@ externalSecrets:
   #     remoteKey: mycure-staging-google-oauth-client-id
   #   - secretKey: GOOGLE_CLIENT_SECRET
   #     remoteKey: mycure-staging-google-oauth-client-secret
-  #   - secretKey: STRIPE_KEY
-  #     remoteKey: mycure-staging-stripe-key
+  #   - secretKey: STRIPE_SECRET_KEY
+  #     remoteKey: mycure-staging-stripe-secret-key
 
 # MongoDB dependency configuration (deployed separately)
 mongodb:
