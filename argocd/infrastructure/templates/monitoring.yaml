@@ -50,7 +50,7 @@ spec:
               memory: "400Mi"  # Increased from 200Mi - prevent OOM (actual usage: 324Mi)
             limits:
               cpu: "500m"
-              memory: "1Gi"
+              memory: "768Mi"  # Optimized from 1Gi (actual usage: 533Mi = 69%)
           
           # Security context
           securityContext:
@@ -69,10 +69,17 @@ spec:
           image:
             repository: bitnamilegacy/blackbox-exporter
         
-        # Node Exporter (subchart)
+        # Node Exporter (subchart - DaemonSet runs on all nodes)
         node-exporter:
           image:
             repository: bitnamilegacy/node-exporter
+          resources:
+            requests:
+              cpu: "10m"       # Optimized from 100m (actual usage: ~2m = 2%)
+              memory: "64Mi"   # Optimized from 128Mi (actual usage: ~16Mi = 12%)
+            limits:
+              cpu: "100m"      # Reduced from 150m
+              memory: "128Mi"  # Reduced from 192Mi
         
         # Kube State Metrics (subchart)
         kube-state-metrics:
@@ -80,8 +87,8 @@ spec:
             repository: bitnamilegacy/kube-state-metrics
           resources:
             requests:
-              cpu: "10m"      # Optimized from 250m (actual usage: 2m = 0.8%)
-              memory: "64Mi"  # Optimized from 256Mi (actual usage: 27Mi = 11%)
+              cpu: "10m"      # Optimized from 250m (actual usage: 3m = 30%)
+              memory: "64Mi"  # Optimized from 256Mi (actual usage: 32Mi = 50%)
             limits:
               cpu: "100m"
               memory: "128Mi"

@@ -20,11 +20,39 @@ spec:
     targetRevision: {{ .Values.certManager.version | default "v1.14.2" }}
     helm:
       releaseName: cert-manager
-      parameters:
-        - name: installCRDs
-          value: "true"
-        - name: global.leaderElection.namespace
-          value: cert-manager
+      valuesObject:
+        installCRDs: true
+        global:
+          leaderElection:
+            namespace: cert-manager
+        
+        # Resource limits for cert-manager components
+        # Actual usage: controller=39Mi, cainjector=89Mi, webhook=18Mi
+        resources:
+          requests:
+            cpu: 10m
+            memory: 64Mi
+          limits:
+            cpu: 100m
+            memory: 128Mi
+        
+        cainjector:
+          resources:
+            requests:
+              cpu: 10m
+              memory: 128Mi
+            limits:
+              cpu: 100m
+              memory: 256Mi
+        
+        webhook:
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
   
   destination:
     server: https://kubernetes.default.svc

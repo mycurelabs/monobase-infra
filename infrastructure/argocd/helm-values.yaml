@@ -25,7 +25,7 @@ controller:
       memory: 768Mi  # Increased from 512Mi - prevent OOM (actual usage: 607Mi)
     limits:
       cpu: 1
-      memory: 1Gi
+      memory: 896Mi  # Optimized from 1Gi (actual usage: 608Mi = 68%)
 
   # Schedule on infrastructure node pool
   nodeSelector:
@@ -49,10 +49,10 @@ server:
   resources:
     requests:
       cpu: 100m
-      memory: 256Mi
+      memory: 192Mi  # Optimized from 256Mi (actual usage: 31Mi = 16%)
     limits:
       cpu: 500m
-      memory: 512Mi
+      memory: 384Mi  # Optimized from 512Mi (actual usage: 31Mi = 8%)
 
   # Schedule on infrastructure node pool
   nodeSelector:
@@ -125,7 +125,7 @@ repoServer:
       memory: 1Gi  # Increased from 512Mi to prevent OOM
     limits:
       cpu: 1
-      memory: 2Gi  # Increased from 1Gi to prevent OOM
+      memory: 1536Mi  # Optimized from 2Gi (actual usage: 578Mi = 38%)
 
   # Schedule on infrastructure node pool
   nodeSelector:
