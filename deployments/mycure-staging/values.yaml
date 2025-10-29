@@ -462,15 +462,6 @@ mailpit:
 # Managed at infrastructure level (infrastructure/external-dns/)
 # No per-deployment configuration needed
 
-# ===== External Secrets =====
-externalSecrets:
-  enabled: false  # TODO: Enable when secrets are configured
-  provider: sops  # Or aws/azure/gcp
-
-# ===== Monitoring =====
-monitoring:
-  enabled: false  # Disable for minimal staging
-
 # ===== Backup (Velero) =====
 backup:
   enabled: false  # Disable for staging
