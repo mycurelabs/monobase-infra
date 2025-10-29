@@ -42,6 +42,17 @@ spec:
           enabled: {{ .Values.postgresql.persistence.enabled | default true }}
           storageClass: {{ .Values.postgresql.persistence.storageClass | default "" }}
           size: {{ .Values.postgresql.persistence.size | default "20Gi" }}
+        {{- if .Values.global.nodePool }}
+        # Node pool scheduling - inherited from global.nodePool
+        primary:
+          nodeSelector:
+            node-pool: {{ .Values.global.nodePool }}
+          tolerations:
+            - key: "node-pool"
+              operator: "Equal"
+              value: {{ .Values.global.nodePool | quote }}
+              effect: "NoSchedule"
+        {{- end }}
 
   destination:
     server: https://kubernetes.default.svc

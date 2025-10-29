@@ -28,6 +28,16 @@ resources:
     cpu: 100m
     memory: 64Mi
 
+# Node pool scheduling (optional, disabled by default)
+# Inherits from global.nodePool if configured
+# nodePool:
+#   enabled: false     # Set to false to explicitly disable (overrides global)
+#   name: "staging"    # Override global node pool name
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
 # ===== Custom Gateway API Configuration =====
 # HTTPRoute configuration for exposing Mailpit web UI via Envoy Gateway
 

@@ -39,6 +39,16 @@ spec:
           enabled: {{ .Values.mongodb.persistence.enabled | default true }}
           storageClass: {{ .Values.mongodb.persistence.storageClass | default "" }}
           size: {{ .Values.mongodb.persistence.size | default "20Gi" }}
+        {{- if .Values.global.nodePool }}
+        # Node pool scheduling - inherited from global.nodePool
+        nodeSelector:
+          node-pool: {{ .Values.global.nodePool }}
+        tolerations:
+          - key: "node-pool"
+            operator: "Equal"
+            value: {{ .Values.global.nodePool | quote }}
+            effect: "NoSchedule"
+        {{- end }}
 
   destination:
     server: https://kubernetes.default.svc
