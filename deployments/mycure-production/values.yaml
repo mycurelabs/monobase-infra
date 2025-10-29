@@ -102,7 +102,7 @@ account:
 
 # ===== HEALTHCARE: HapiHub API =====
 hapihub:
-  enabled: true
+  enabled: false  # TODO: Enable after secrets are configured in GCP
 
   image:
     repository: ghcr.io/mycurelabs/hapihub
@@ -165,7 +165,7 @@ hapihub:
 
 # ===== HEALTHCARE: MyCure Frontend =====
 mycure:
-  enabled: true
+  enabled: false  # TODO: Enable after secrets are configured in GCP
 
   image:
     repository: ghcr.io/mycurelabs/mycureapp
@@ -194,7 +194,7 @@ mycure:
 
 # ===== HEALTHCARE: MyCure Frontend v8 (Legacy) =====
 mycurev8:
-  enabled: true
+  enabled: false  # TODO: Enable after secrets are configured in GCP
 
   image:
     repository: ghcr.io/mycurelabs/mycureapp
@@ -225,7 +225,7 @@ mycurev8:
 
 # ===== HEALTHCARE: SyncD Real-time Synchronization =====
 syncd:
-  enabled: true
+  enabled: false  # TODO: Enable after secrets are configured in GCP
 
   image:
     repository: ghcr.io/mycurelabs/syncd
@@ -267,7 +267,7 @@ syncd:
     replicaSet: rs0
 
 postgresql:
-  enabled: true
+  enabled: false  # TODO: Enable after postgresql secret is created
 
   # Prevent ArgoCD PVC sync issues (industry best practice)
   fullnameOverride: "postgresql"
@@ -305,7 +305,7 @@ postgresql:
 
 # ===== CORE: MongoDB Database =====
 mongodb:
-  enabled: true
+  enabled: false  # TODO: Enable after mongodb secret is created
 
   # Prevent ArgoCD PVC sync issues (industry best practice)
   fullnameOverride: "mongodb"
@@ -369,7 +369,7 @@ valkey:
 
 # ===== OPTIONAL: MinIO (Object Storage) =====
 minio:
-  enabled: true  # ✅ Enable for staging
+  enabled: false  # TODO: Enable after minio secret is created
 
   # Prevent ArgoCD PVC sync issues (industry best practice)
   fullnameOverride: "minio"
@@ -439,11 +439,10 @@ minio:
     rateLimit:
       enabled: false  # Disable - BackendTrafficPolicy not supported by gateway
 
-# ===== STAGING: Mailpit (Email Testing) =====
-# Note: Mailpit is deployed as separate ArgoCD app (Wave 2)
-# SMTP config is passed to API via api.mailpit.enabled above
+# ===== PRODUCTION: Mailpit (Email Testing) =====
+# Note: Mailpit is not needed in production (use real SMTP)
 mailpit:
-  enabled: true  # ✅ Enable for staging email testing
+  enabled: false  # Not needed in production
 
   resources:
     requests:
