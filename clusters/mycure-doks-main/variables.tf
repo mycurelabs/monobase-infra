@@ -85,6 +85,31 @@ variable "tags" {
 }
 
 
+# Staging node pool configuration
+variable "staging_node_size" {
+  description = "Droplet size for staging nodes"
+  type        = string
+  default     = "s-2vcpu-4gb"
+}
+
+variable "staging_node_count" {
+  description = "Initial number of staging nodes"
+  type        = number
+  default     = 1
+}
+
+variable "staging_min_nodes" {
+  description = "Minimum staging nodes for autoscaling"
+  type        = number
+  default     = 1
+}
+
+variable "staging_max_nodes" {
+  description = "Maximum staging nodes for autoscaling"
+  type        = number
+  default     = 3
+}
+
 # Production node pool configuration
 variable "production_node_size" {
   description = "Droplet size for production nodes"

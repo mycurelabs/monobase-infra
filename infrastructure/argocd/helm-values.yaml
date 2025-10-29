@@ -27,6 +27,16 @@ controller:
       cpu: 1
       memory: 1Gi
 
+  # Schedule on infrastructure node pool
+  nodeSelector:
+    workload-type: general
+
+  tolerations:
+    - key: "workload-type"
+      operator: "Equal"
+      value: "infrastructure"
+      effect: "NoSchedule"
+
 # Server (API and UI)
 server:
   replicas: 1  # Single replica
@@ -43,6 +53,16 @@ server:
     limits:
       cpu: 500m
       memory: 512Mi
+
+  # Schedule on infrastructure node pool
+  nodeSelector:
+    workload-type: general
+
+  tolerations:
+    - key: "workload-type"
+      operator: "Equal"
+      value: "infrastructure"
+      effect: "NoSchedule"
 
   # Ingress via Gateway API (see ingress.yaml)
   ingress:
@@ -107,6 +127,16 @@ repoServer:
       cpu: 1
       memory: 1Gi
 
+  # Schedule on infrastructure node pool
+  nodeSelector:
+    workload-type: general
+
+  tolerations:
+    - key: "workload-type"
+      operator: "Equal"
+      value: "infrastructure"
+      effect: "NoSchedule"
+
 # ApplicationSet Controller (App-of-Apps)
 applicationSet:
   enabled: true
@@ -125,11 +155,31 @@ applicationSet:
       cpu: 250m
       memory: 256Mi
 
+  # Schedule on infrastructure node pool
+  nodeSelector:
+    workload-type: general
+
+  tolerations:
+    - key: "workload-type"
+      operator: "Equal"
+      value: "infrastructure"
+      effect: "NoSchedule"
+
 # Notifications Controller
 notifications:
   enabled: true
 
   argocdUrl: https://argocd.example.com
+
+  # Schedule on infrastructure node pool
+  nodeSelector:
+    workload-type: general
+
+  tolerations:
+    - key: "workload-type"
+      operator: "Equal"
+      value: "infrastructure"
+      effect: "NoSchedule"
 
   notifiers:
     # Slack notifications
@@ -214,6 +264,16 @@ redis:
     limits:
       cpu: 250m
       memory: 128Mi
+
+  # Schedule on infrastructure node pool
+  nodeSelector:
+    workload-type: general
+
+  tolerations:
+    - key: "workload-type"
+      operator: "Equal"
+      value: "infrastructure"
+      effect: "NoSchedule"
 
 # Installation instructions:
 # helm repo add argo https://argoproj.github.io/argo-helm

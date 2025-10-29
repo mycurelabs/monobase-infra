@@ -92,3 +92,13 @@ securityContext:
   fsGroup: 65534
   seccompProfile:
     type: RuntimeDefault
+
+# Schedule on infrastructure node pool
+nodeSelector:
+  workload-type: general
+
+tolerations:
+  - key: "workload-type"
+    operator: "Equal"
+    value: "infrastructure"
+    effect: "NoSchedule"

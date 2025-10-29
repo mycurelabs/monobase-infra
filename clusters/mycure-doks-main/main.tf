@@ -47,6 +47,38 @@ module "doks_cluster" {
 }
 
 
+# Staging node pool (separate resource for flexibility)
+resource "digitalocean_kubernetes_node_pool" "staging" {
+  cluster_id = module.doks_cluster.cluster_id
+
+  name       = "staging"
+  size       = var.staging_node_size
+  node_count = var.staging_node_count
+
+  # Autoscaling
+  auto_scale = true
+  min_nodes  = var.staging_min_nodes
+  max_nodes  = var.staging_max_nodes
+
+  tags = concat(
+    [var.cluster_name, "staging", "monobase-infrastructure"],
+    var.tags
+  )
+
+  labels = {
+    "workload-type" = "staging"
+    "node-pool"     = "staging"
+    "managed-by"    = "opentofu"
+  }
+
+  # Taint to ensure only staging workloads schedule here
+  taint {
+    key    = "node-pool"
+    value  = "staging"
+    effect = "NoSchedule"
+  }
+}
+
 # Production node pool (separate resource for flexibility)
 resource "digitalocean_kubernetes_node_pool" "production" {
   cluster_id = module.doks_cluster.cluster_id
