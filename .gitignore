@@ -9,6 +9,9 @@ rendered/
 # Secrets (NEVER commit secrets)
 *.secret.yaml
 *-secret.yaml  # Match files like my-secret.yaml, but not external-secrets.yaml
+!scripts/secrets/  # ALLOW: scripts/secrets/ is code, not secrets (must be before secrets/)
+!infrastructure/secrets.yaml  # ALLOW: secrets.yaml schema files (no actual secrets)
+!deployments/*/secrets.yaml   # ALLOW: secrets.yaml schema files (no actual secrets)
 secrets/
 .env
 .env.local
