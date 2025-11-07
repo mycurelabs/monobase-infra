@@ -39,6 +39,10 @@ spec:
           enabled: {{ .Values.mongodb.persistence.enabled | default true }}
           storageClass: {{ .Values.mongodb.persistence.storageClass | default "" }}
           size: {{ .Values.mongodb.persistence.size | default "20Gi" }}
+        {{- if .Values.mongodb.resources }}
+        resources:
+          {{- toYaml .Values.mongodb.resources | nindent 10 }}
+        {{- end }}
         {{- if .Values.global.nodePool }}
         # Node pool scheduling - inherited from global.nodePool
         nodeSelector:
