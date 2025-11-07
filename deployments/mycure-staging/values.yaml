@@ -120,6 +120,8 @@ hapihub:
       request: "60s"  # Extended timeout for OAuth callbacks
 
   env:
+    - name: CLUSTER_INSTANCES
+      value: "1"
     - name: BETTER_AUTH_RATE_LIMIT_ENABLED
       value: "true"
     - name: BETTER_AUTH_RATE_LIMIT_WINDOW
