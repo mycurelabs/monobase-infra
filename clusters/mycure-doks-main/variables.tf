@@ -89,7 +89,7 @@ variable "tags" {
 variable "staging_node_size" {
   description = "Droplet size for staging nodes"
   type        = string
-  default     = "s-2vcpu-4gb"
+  default     = "s-4vcpu-8gb"
 }
 
 variable "staging_node_count" {

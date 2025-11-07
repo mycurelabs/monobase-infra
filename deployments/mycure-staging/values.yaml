@@ -108,7 +108,7 @@ hapihub:
 
   resources:
     requests:
-      cpu: 100m
+      cpu: 500m
       memory: 256Mi
     limits:
       cpu: 500m
@@ -330,7 +330,7 @@ mongodb:
   resources:
     requests:
       cpu: 100m
-      memory: 512Mi
+      memory: 640Mi
     limits:
       cpu: 500m
       memory: 1Gi
