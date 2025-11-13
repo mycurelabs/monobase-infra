@@ -28,14 +28,14 @@ controller:
       memory: 896Mi  # Optimized from 1Gi (actual usage: 608Mi = 68%)
 
   # Schedule on infrastructure node pool
-  nodeSelector:
-    workload-type: general
+  # nodeSelector:
+  #   workload-type: general
 
-  tolerations:
-    - key: "workload-type"
-      operator: "Equal"
-      value: "infrastructure"
-      effect: "NoSchedule"
+  # tolerations:
+  #   - key: "workload-type"
+  #     operator: "Equal"
+  #     value: "infrastructure"
+  #     effect: "NoSchedule"
 
 # Server (API and UI)
 server:
@@ -55,14 +55,14 @@ server:
       memory: 384Mi  # Optimized from 512Mi (actual usage: 31Mi = 8%)
 
   # Schedule on infrastructure node pool
-  nodeSelector:
-    workload-type: general
+  # nodeSelector:
+  #   workload-type: general
 
-  tolerations:
-    - key: "workload-type"
-      operator: "Equal"
-      value: "infrastructure"
-      effect: "NoSchedule"
+  # tolerations:
+  #   - key: "workload-type"
+  #     operator: "Equal"
+  #     value: "infrastructure"
+  #     effect: "NoSchedule"
 
   # Ingress via Gateway API (see ingress.yaml)
   ingress:
@@ -127,14 +127,14 @@ repoServer:
       memory: 1536Mi  # Optimized from 2Gi (actual usage: 578Mi = 38%)
 
   # Schedule on infrastructure node pool
-  nodeSelector:
-    workload-type: general
+  # nodeSelector:
+  #   workload-type: general
 
-  tolerations:
-    - key: "workload-type"
-      operator: "Equal"
-      value: "infrastructure"
-      effect: "NoSchedule"
+  # tolerations:
+  #   - key: "workload-type"
+  #     operator: "Equal"
+  #     value: "infrastructure"
+  #     effect: "NoSchedule"
 
 # ApplicationSet Controller (App-of-Apps)
 applicationSet:
@@ -155,14 +155,14 @@ applicationSet:
       memory: 256Mi
 
   # Schedule on infrastructure node pool
-  nodeSelector:
-    workload-type: general
+  # nodeSelector:
+  #   workload-type: general
 
-  tolerations:
-    - key: "workload-type"
-      operator: "Equal"
-      value: "infrastructure"
-      effect: "NoSchedule"
+  # tolerations:
+  #   - key: "workload-type"
+  #     operator: "Equal"
+  #     value: "infrastructure"
+  #     effect: "NoSchedule"
 
 # Notifications Controller
 notifications:
@@ -171,14 +171,14 @@ notifications:
   argocdUrl: https://argocd.example.com
 
   # Schedule on infrastructure node pool
-  nodeSelector:
-    workload-type: general
+  # nodeSelector:
+  #   workload-type: general
 
-  tolerations:
-    - key: "workload-type"
-      operator: "Equal"
-      value: "infrastructure"
-      effect: "NoSchedule"
+  # tolerations:
+  #   - key: "workload-type"
+  #     operator: "Equal"
+  #     value: "infrastructure"
+  #     effect: "NoSchedule"
 
   notifiers:
     # Slack notifications
@@ -265,14 +265,14 @@ redis:
       memory: 128Mi
 
   # Schedule on infrastructure node pool
-  nodeSelector:
-    workload-type: general
+  # nodeSelector:
+  #   workload-type: general
 
-  tolerations:
-    - key: "workload-type"
-      operator: "Equal"
-      value: "infrastructure"
-      effect: "NoSchedule"
+  # tolerations:
+  #   - key: "workload-type"
+  #     operator: "Equal"
+  #     value: "infrastructure"
+  #     effect: "NoSchedule"
 
 # Installation instructions:
 # helm repo add argo https://argoproj.github.io/argo-helm
