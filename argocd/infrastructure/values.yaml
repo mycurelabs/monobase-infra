@@ -92,7 +92,7 @@ gateway:
 externalSecrets:
   enabled: true
   version: 0.9.11
-  provider: azure
+  provider: gcp
   
   # AWS Secrets Manager configuration
   aws:

@@ -140,7 +140,7 @@ hapihub:
 
   externalSecrets:
     enabled: true
-    secretStore: azure-keyvault-secretstore
+    secretStore: gcp-secretstore
     secretStoreKind: ClusterSecretStore
     refreshInterval: 1h
     secrets:
