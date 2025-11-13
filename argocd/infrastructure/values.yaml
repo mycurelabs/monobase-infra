@@ -57,7 +57,7 @@ envoyGateway:
 # Gateway Resources - Shared Gateway configuration
 gateway:
   # Base domain for gateway (override per deployment)
-  domain: example.com
+  domain: stitchtechsolutions.com
 
   # Gateway configuration
   gateway:
