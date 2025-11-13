@@ -14,7 +14,7 @@ certManager:
 certManagerIssuers:
   enabled: true
   issuers:
-    # HTTP-01 defaults (no DNS provider needed, client creates A record)
+    # HTTP-01 challenge type (no DNS provider needed)
     - name: letsencrypt-prod
       email: "caretheextramile@gmail.com"
       server: production
@@ -25,28 +25,29 @@ certManagerIssuers:
       server: staging
       provider: http01
     
-    # DNS-01 Cloudflare for MyCure platform wildcard certificates
-    - name: letsencrypt-mycure-cloudflare-prod
-      email: "caretheextramile@gmail.com"
-      server: production
-      provider: cloudflare
-      cloudflare:
-        dnsZones:
-          - "mycureapp.com"
-        apiTokenSecretRef:
-          name: mycure-cloudflare-api-token
-          key: api-token
-    
-    - name: letsencrypt-mycure-cloudflare-staging
-      email: "caretheextramile@gmail.com"
-      server: staging
-      provider: cloudflare
-      cloudflare:
-        dnsZones:
-          - "mycureapp.com"
-        apiTokenSecretRef:
-          name: mycure-cloudflare-api-token
-          key: api-token
+    # DNS-01 Cloudflare challenge (for wildcard certificates)
+    # Uncomment and configure for your domain if needed
+    # - name: letsencrypt-cloudflare-prod
+    #   email: "your-email@example.com"
+    #   server: production
+    #   provider: cloudflare
+    #   cloudflare:
+    #     dnsZones:
+    #       - "example.com"
+    #     apiTokenSecretRef:
+    #       name: cloudflare-api-token
+    #       key: api-token
+    # 
+    # - name: letsencrypt-cloudflare-staging
+    #   email: "your-email@example.com"
+    #   server: staging
+    #   provider: cloudflare
+    #   cloudflare:
+    #     dnsZones:
+    #       - "example.com"
+    #     apiTokenSecretRef:
+    #       name: cloudflare-api-token
+    #       key: api-token
 
 # Envoy Gateway - Gateway API implementation
 envoyGateway:
@@ -79,7 +80,7 @@ gateway:
     secretName: wildcard-tls
     certManager:
       enabled: true
-      clusterIssuer: letsencrypt-mycure-cloudflare-prod  # Use Cloudflare DNS-01 for wildcard
+      clusterIssuer: letsencrypt-prod
       includeApex: true
 
   # HTTP to HTTPS redirect
@@ -91,25 +92,26 @@ gateway:
 externalSecrets:
   enabled: true
   version: 0.9.11
-  provider: gcp  # Options: aws, azure, gcp
+  provider: azure
   
   # AWS Secrets Manager configuration
   aws:
     region: us-east-1
-    roleArn: ""  # Set to IRSA role ARN (e.g., arn:aws:iam::123456789012:role/external-secrets-role)
+    roleArn: ""
     serviceAccountName: external-secrets-sa
   
   # Azure Key Vault configuration
   azure:
-    vaultUrl: ""  # Set to Key Vault URL (e.g., https://myvault.vault.azure.net/)
-    identityId: ""  # Set to Managed Identity client ID
+    vaultUrl: ""
+    identityId: ""
+    tenantId: ""
   
   # GCP Secret Manager configuration
   gcp:
-    projectId: ""  # Set to GCP project ID
+    projectId: ""
     region: us-central1
-    clusterName: ""  # Set to GKE cluster name
-    serviceAccountEmail: ""  # Set to GCP service account email
+    clusterName: ""
+    serviceAccountEmail: ""
 
 # External DNS - Automatic DNS record management from HTTPRoutes
 externalDNS:
