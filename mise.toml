@@ -192,7 +192,7 @@ run = 'bun scripts/provision.ts "$@"'
 
 [tasks.admin]
 description = "Port-forward to admin UIs (argocd, grafana, prometheus, etc.)"
-run = 'bash scripts/admin-access.sh "$@"'
+run = 'bun scripts/admin.ts "$@"'
 
 [tasks.validate-template]
 description = "Validate infrastructure template (check for hardcoded values)"
