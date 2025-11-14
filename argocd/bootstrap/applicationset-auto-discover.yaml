@@ -75,6 +75,11 @@ spec:
           # Pattern: values/deployments/{client-env}.yaml
           valueFiles:
             - '../../values/deployments/{{path.basename}}.yaml'
+          # Inject repoURL from bootstrap (single source of truth)
+          values: |
+            argocd:
+              repoURL: https://github.com/mycurelabs/monobase-infra-philcare.git
+              targetRevision: HEAD
 
       destination:
         # Deploy to the same cluster

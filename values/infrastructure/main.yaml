@@ -1,9 +1,6 @@
 # Default values for monobase-infrastructure Helm chart
 # These control cluster-wide infrastructure components
-
-argocd:
-  repoURL: https://github.com/mycurelabs/monobase-infra-philcare.git
-  targetRevision: main
+# Note: argocd.repoURL is injected from infrastructure-root.yaml bootstrap file
 
 # Cert Manager - TLS certificate automation
 certManager:

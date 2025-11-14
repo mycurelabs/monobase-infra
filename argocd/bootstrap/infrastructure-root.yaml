@@ -35,6 +35,11 @@ spec:
       # Infrastructure values are in values/infrastructure/main.yaml
       valueFiles:
         - ../../values/infrastructure/main.yaml
+      # Inject repoURL from bootstrap (single source of truth)
+      values: |
+        argocd:
+          repoURL: https://github.com/mycurelabs/monobase-infra-philcare.git
+          targetRevision: HEAD
 
   destination:
     server: https://kubernetes.default.svc
