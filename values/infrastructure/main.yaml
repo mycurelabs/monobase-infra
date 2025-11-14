@@ -1,0 +1,282 @@
+# Default values for monobase-infrastructure Helm chart
+# These control cluster-wide infrastructure components
+
+argocd:
+  repoURL: https://github.com/mycurelabs/monobase-infra-philcare.git
+  targetRevision: main
+
+# Cert Manager - TLS certificate automation
+certManager:
+  enabled: true
+  version: v1.14.2
+
+# Cert Manager Resources - ClusterIssuers and certificate configuration
+certManagerIssuers:
+  enabled: true
+  issuers:
+    # HTTP-01 challenge type (no DNS provider needed)
+    - name: letsencrypt-prod
+      email: "caretheextramile@gmail.com"
+      server: production
+      provider: http01
+    
+    - name: letsencrypt-staging
+      email: "caretheextramile@gmail.com"
+      server: staging
+      provider: http01
+    
+    # DNS-01 Cloudflare challenge (for wildcard certificates)
+    # Uncomment and configure for your domain if needed
+    # - name: letsencrypt-cloudflare-prod
+    #   email: "your-email@example.com"
+    #   server: production
+    #   provider: cloudflare
+    #   cloudflare:
+    #     dnsZones:
+    #       - "example.com"
+    #     apiTokenSecretRef:
+    #       name: cloudflare-api-token
+    #       key: api-token
+    # 
+    # - name: letsencrypt-cloudflare-staging
+    #   email: "your-email@example.com"
+    #   server: staging
+    #   provider: cloudflare
+    #   cloudflare:
+    #     dnsZones:
+    #       - "example.com"
+    #     apiTokenSecretRef:
+    #       name: cloudflare-api-token
+    #       key: api-token
+
+# Envoy Gateway - Gateway API implementation
+envoyGateway:
+  enabled: true
+  version: v1.2.0
+
+# Gateway Resources - Shared Gateway configuration
+gateway:
+  # Base domain for gateway (override per deployment)
+  domain: stitchtechsolutions.com
+
+  # Gateway configuration
+  gateway:
+    name: shared-gateway
+    namespace: gateway-system
+    gatewayClassName: envoy-gateway
+    listeners:
+      https:
+        enabled: true
+        port: 443
+        protocol: HTTPS
+      http:
+        enabled: true
+        port: 80
+        protocol: HTTP
+
+  # TLS/Certificate configuration
+  tls:
+    enabled: true
+    secretName: wildcard-tls
+    certManager:
+      enabled: true
+      clusterIssuer: letsencrypt-prod
+      includeApex: true
+      # PhilCare: Use specific subdomains with HTTP-01 (not wildcard/DNS-01)
+      useWildcard: false
+      subdomains:
+        - mycure
+        - stg.mycure
+
+  # HTTP to HTTPS redirect
+  httpRedirect:
+    enabled: true
+    statusCode: 301
+
+# External Secrets - Secret management
+externalSecrets:
+  enabled: true
+  version: 0.9.11
+  provider: gcp
+  
+  # AWS Secrets Manager configuration
+  aws:
+    region: us-east-1
+    roleArn: ""
+    serviceAccountName: external-secrets-sa
+  
+  # Azure Key Vault configuration
+  azure:
+    vaultUrl: ""
+    identityId: ""
+    tenantId: ""
+  
+  # GCP Secret Manager configuration
+  gcp:
+    projectId: ""
+    region: us-central1
+    clusterName: ""
+    serviceAccountEmail: ""
+
+# External DNS - Automatic DNS record management from HTTPRoutes
+externalDNS:
+  enabled: false  # Manual DNS configuration for PhilCare
+
+# Longhorn - Distributed block storage
+longhorn:
+  enabled: false  # Usually use cloud provider storage
+  version: 1.6.0
+
+# Kyverno - Policy engine
+kyverno:
+  enabled: false  # Optional, enable for policy enforcement
+  version: 3.2.0
+  policies:
+    enabled: false  # Only if kyverno.enabled=true
+
+# Velero - Backup and disaster recovery
+velero:
+  enabled: false  # Enable for production clusters with backup requirements
+  version: 7.1.4
+  provider: gcp  # Options: aws, azure, gcp, digitalocean, minio
+  
+  # AWS S3 configuration
+  aws:
+    region: us-east-1
+    bucket: ""  # Set to S3 bucket name (e.g., my-cluster-velero-backups)
+    roleArn: ""  # Auto-populated from terraform output (IRSA)
+  
+  # Azure Blob Storage configuration
+  azure:
+    resourceGroup: ""  # Set to Azure resource group
+    storageAccount: ""  # Set to storage account name
+    blobContainer: ""  # Set to blob container name (e.g., velero-backups)
+    subscriptionId: ""  # Optional, auto-detected if not set
+    identityClientId: ""  # Auto-populated from terraform output (Workload Identity)
+  
+  # GCP Cloud Storage configuration
+  gcp:
+    bucket: ""  # Set to GCS bucket name (e.g., my-cluster-velero-backups)
+    projectId: ""  # Set to GCP project ID
+    region: us-central1
+    serviceAccount: ""  # Auto-populated from terraform output (Workload Identity)
+  
+  # DigitalOcean Spaces configuration
+  digitalocean:
+    bucket: ""  # Set to Spaces bucket name
+    region: nyc3  # Spaces region: nyc3, sfo3, sgp1, fra1, ams3
+    accessKey: ""  # Via External Secrets or manual secret
+    secretKey: ""  # Via External Secrets or manual secret
+  
+  # MinIO configuration (for K3D/local development)
+  minio:
+    bucket: velero-backups
+    url: http://minio.velero.svc:9000
+    publicUrl: http://localhost:9000
+    accessKey: minio
+    secretKey: minio123
+  
+  # Backup schedules configuration
+  schedules:
+    # Infrastructure namespace backups
+    infrastructure:
+      daily:
+        enabled: true
+        schedule: "0 3 * * *"  # 3 AM daily
+        retention: 720h  # 30 days
+      hourly:
+        enabled: false  # Optional, for critical infrastructure
+        schedule: "0 * * * *"  # Every hour
+        retention: 72h  # 3 days
+    
+    # Cluster-wide resource backups
+    cluster:
+      weekly:
+        enabled: true
+        schedule: "0 4 * * 0"  # 4 AM Sunday
+        retention: 2160h  # 90 days
+
+# Falco - Runtime security monitoring
+falco:
+  enabled: false  # Optional, enable for runtime threat detection
+  version: 4.6.1
+  rules:
+    enabled: false  # Only if falco.enabled=true
+
+# Monitoring - Prometheus + Grafana stack
+monitoring:
+  enabled: true  # Optional, enable for observability
+  version: 11.x.x  # Bitnami kube-prometheus chart version
+  
+  # Prometheus configuration
+  prometheus:
+    retention: 30d  # How long to keep metrics
+    storageSize: 50Gi  # Prometheus data storage
+    storageClass: ""  # Auto-detect from cluster default
+  
+  # Grafana configuration (deployed as separate wrapper chart)
+  grafana:
+    enabled: true  # Enable Grafana deployment
+
+    # Bitnami grafana subchart values (nested under 'grafana:')
+    grafana:
+      admin:
+        user: admin
+        password: admin  # Override via External Secrets in production
+
+      # Use bitnamilegacy image (consistency with monitoring stack)
+      image:
+        registry: docker.io
+        repository: bitnamilegacy/grafana
+
+      resources:
+        requests:
+          cpu: "50m"
+          memory: "150Mi"
+        limits:
+          cpu: "500m"
+          memory: "512Mi"
+
+      persistence:
+        enabled: true
+        size: 10Gi
+        storageClass: ""  # Auto-detect from cluster default
+
+      # Dashboard provider configuration
+      dashboardsProvider:
+        enabled: true
+
+      # Dashboard ConfigMaps to load
+      dashboardsConfigMaps:
+        - configMapName: grafana-dashboard-global
+          fileName: global.json
+        - configMapName: grafana-dashboard-nodes
+          fileName: nodes.json
+        - configMapName: grafana-dashboard-namespaces
+          fileName: namespaces.json
+        - configMapName: grafana-dashboard-pods
+          fileName: pods.json
+        - configMapName: grafana-dashboard-apiserver
+          fileName: api-server.json
+        - configMapName: grafana-dashboard-prometheus
+          fileName: prometheus.json
+
+    # Wrapper chart gateway configuration (not nested)
+    gateway:
+      enabled: true
+      hostname: ""  # Uses grafana.{domain}
+  
+  # Alertmanager configuration
+  alertmanager:
+    enabled: true
+    storageClass: ""  # Auto-detect
+    
+    # Slack notifications (optional)
+    slack:
+      webhookUrl: ""  # Set to Slack webhook URL for alerts
+    
+    # Email notifications (optional)
+    email:
+      smarthost: ""  # SMTP server (e.g., smtp.gmail.com:587)
+      from: ""  # From email address
+      to: ""  # To email address
