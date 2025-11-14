@@ -16,10 +16,17 @@ spec:
     name: {{ include "gateway.clusterIssuer" . }}  # Production Let's Encrypt
     kind: ClusterIssuer
   dnsNames:
-    - {{ include "gateway.wildcardDomain" . | quote }}  # Wildcard certificate
-    {{- if .Values.tls.certManager.includeApex }}
-    - {{ .Values.domain | quote }}  # Apex domain
+    {{- if .Values.tls.certManager.useWildcard }}
+    # Wildcard certificate (requires DNS-01 challenge)
+    - {{ include "gateway.wildcardDomain" . | quote }}
+    {{- else }}
+    # Specific subdomains (HTTP-01 challenge compatible)
+    {{- range .Values.tls.certManager.subdomains }}
+    - {{ printf "%s.%s" . $.Values.domain | quote }}
     {{- end }}
-  # DNS-01 challenge (required for wildcard certificates)
-  # Configure per cloud provider in cert-manager setup
+    {{- end }}
+    {{- if .Values.tls.certManager.includeApex }}
+    # Apex domain
+    - {{ .Values.domain | quote }}
+    {{- end }}
 {{- end }}

@@ -49,6 +49,18 @@ tls:
     # Include apex domain in certificate
     includeApex: true
 
+    # Use wildcard certificate (*.domain.com) - requires DNS-01 challenge
+    # Set to false to use specific subdomains with HTTP-01 challenge
+    useWildcard: true
+
+    # Specific subdomains (only used when useWildcard=false)
+    # Will generate: subdomain.domain.com for each entry
+    subdomains: []
+    # Example for PhilCare:
+    # subdomains:
+    #   - mycure
+    #   - stg.mycure
+
 # HTTP to HTTPS redirect
 httpRedirect:
   # Enable automatic HTTP to HTTPS redirect

@@ -82,6 +82,11 @@ gateway:
       enabled: true
       clusterIssuer: letsencrypt-prod
       includeApex: true
+      # PhilCare: Use specific subdomains with HTTP-01 (not wildcard/DNS-01)
+      useWildcard: false
+      subdomains:
+        - mycure
+        - stg.mycure
 
   # HTTP to HTTPS redirect
   httpRedirect:
