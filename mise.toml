@@ -183,12 +183,12 @@ description = "Configure infrastructure secrets (TLS certificates, External Secr
 run = 'bun scripts/secrets.ts "$@"'
 
 [tasks.bootstrap]
-description = "Bootstrap empty cluster with GitOps (ArgoCD auto-discovery)"
-run = 'bash scripts/bootstrap.sh "$@"'
+description = "Bootstrap cluster with GitOps (includes GitHub App setup)"
+run = 'bun scripts/bootstrap.ts "$@"'
 
 [tasks.provision]
 description = "Provision Kubernetes cluster using Terraform/OpenTofu"
-run = 'bash scripts/provision.sh "$@"'
+run = 'bun scripts/provision.ts "$@"'
 
 [tasks.admin]
 description = "Port-forward to admin UIs (argocd, grafana, prometheus, etc.)"
@@ -208,8 +208,8 @@ run = 'bash scripts/resize-statefulset-storage.sh "$@"'
 
 [tasks.teardown]
 description = "Destroy cluster infrastructure - REQUIRES CONFIRMATION"
-run = 'bash scripts/teardown.sh "$@"'
+run = 'bun scripts/provision.ts --destroy "$@"'
 
 [tasks.unbootstrap]
-description = "Remove GitOps/ArgoCD - REQUIRES CONFIRMATION"
-run = 'bash scripts/unbootstrap.sh "$@"'
+description = "Unbootstrap cluster (destroy ArgoCD/Applications) - REQUIRES CONFIRMATION"
+run = 'bun scripts/bootstrap.ts --destroy "$@"'
