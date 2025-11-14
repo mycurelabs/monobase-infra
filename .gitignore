@@ -42,6 +42,9 @@ terraform/**/kubeconfig.yaml
 .terraform/
 .terragrunt-cache/
 
+# Active cluster configuration (copied from terraform/examples/)
+cluster/
+
 # IDE and OS files
 .vscode/
 .idea/

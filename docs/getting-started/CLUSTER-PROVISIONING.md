@@ -161,12 +161,12 @@ Choose the right module based on your deployment target:
 **Goal:** Provision production EKS cluster in 15 minutes
 
 ```bash
-# 1. Copy reference cluster config
+# 1. Copy example cluster config
 cd /path/to/monobase-infra
-cp -r clusters/default-cluster clusters/production-cluster
+cp -r terraform/examples/aws-eks cluster
 
-# 2. Navigate to new cluster
-cd clusters/production-cluster
+# 2. Navigate to cluster directory
+cd cluster
 
 # 3. Edit configuration
 vim terraform.tfvars
@@ -278,11 +278,11 @@ remote_state {
 ```
 
 ```bash
-# 2. Copy default-cluster
-cp -r clusters/default-cluster clusters/production-cluster
+# 2. Copy example cluster config
+cp -r terraform/examples/aws-eks cluster
 
 # 3. Use terragrunt.hcl instead of backend.tf
-cd clusters/production-cluster
+cd cluster
 rm backend.tf backend.tf.example
 
 # 4. Edit cluster config

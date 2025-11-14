@@ -187,7 +187,7 @@ description = "Bootstrap cluster with GitOps (includes GitHub App setup)"
 run = 'bun scripts/bootstrap.ts "$@"'
 
 [tasks.provision]
-description = "Provision Kubernetes cluster using Terraform/OpenTofu"
+description = "Provision Kubernetes cluster (uses cluster/ directory)"
 run = 'bun scripts/provision.ts "$@"'
 
 [tasks.admin]

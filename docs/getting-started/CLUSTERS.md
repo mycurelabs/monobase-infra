@@ -1,35 +1,36 @@
 # Cluster Provisioning Guide
 
-Complete guide for provisioning Kubernetes clusters using the example configurations in `clusters/`.
+Complete guide for provisioning Kubernetes clusters using the example configurations in `terraform/examples/`.
 
 ## Quick Reference
 
 | Example | Provider | Profile | Use Case | Quick Start |
 |---------|----------|---------|----------|-------------|
-| **example-aws-eks** | AWS EKS | Production | Multi-client production | `cp -r clusters/example-aws-eks clusters/myclient-eks` |
-| **example-azure-aks** | Azure AKS | Production | Azure-based production | `cp -r clusters/example-azure-aks clusters/myclient-aks` |
-| **example-gcp-gke** | GCP GKE | Production | GCP-based production | `cp -r clusters/example-gcp-gke clusters/myclient-gke` |
-| **example-do-doks** | DigitalOcean | Cost-effective | Budget-conscious prod | `cp -r clusters/example-do-doks clusters/myclient-doks` |
-| **example-k3d** | Local (Docker) | Development | Local testing/dev | `cp -r clusters/example-k3d clusters/k3d-local` |
-| **example-k3s** | On-Premises | Self-hosted | Bare-metal/VM clusters | `cp -r clusters/example-k3s clusters/myclient-k3s` |
+| **aws-eks** | AWS EKS | Production | Multi-client production | `cp -r terraform/examples/aws-eks cluster` |
+| **azure-aks** | Azure AKS | Production | Azure-based production | `cp -r terraform/examples/azure-aks cluster` |
+| **gcp-gke** | GCP GKE | Production | GCP-based production | `cp -r terraform/examples/gcp-gke cluster` |
+| **do-doks** | DigitalOcean | Cost-effective | Budget-conscious prod | `cp -r terraform/examples/do-doks cluster` |
+| **k3d** | Local (Docker) | Development | Local testing/dev | `cp -r terraform/examples/k3d cluster` |
 
 ## Workflow
+
+This infrastructure uses a single-cluster pattern: you work with one active cluster configuration at a time in the `cluster/` directory.
 
 ### 1. Choose and Copy Example
 
 ```bash
 # Choose based on your provider
-cp -r clusters/example-aws-eks clusters/myclient-eks
+cp -r terraform/examples/aws-eks cluster
 # OR
-cp -r clusters/example-do-doks clusters/myclient-doks
+cp -r terraform/examples/do-doks cluster
 # OR
-cp -r clusters/example-k3d clusters/k3d-local
+cp -r terraform/examples/k3d cluster
 ```
 
 ### 2. Customize Configuration
 
 ```bash
-cd clusters/myclient-eks
+cd cluster
 vim terraform.tfvars
 ```
 
@@ -41,20 +42,22 @@ vim terraform.tfvars
 ### 3. Provision Cluster
 
 ```bash
-./scripts/provision.sh --cluster myclient-eks
+mise run provision
+# OR with kubeconfig merge
+mise run provision -- --merge-kubeconfig
 ```
 
 The script automatically:
 - ✅ Initializes Terraform
 - ✅ Creates cluster infrastructure
-- ✅ Saves kubeconfig to `~/.kube/myclient-eks`
+- ✅ Saves kubeconfig to `~/.kube/<cluster-name>`
 - ✅ Tests connectivity with `kubectl cluster-info`
 
 ### 4. Bootstrap GitOps
 
 ```bash
 # Install ArgoCD and enable auto-discovery (one-time)
-./scripts/bootstrap.sh
+mise run bootstrap
 ```
 
 ## Configuration Options
@@ -223,8 +226,9 @@ git push  # ArgoCD auto-deploys!
 To destroy a cluster:
 
 ```bash
-cd clusters/myclient-eks
-terraform destroy
+mise run teardown
+# OR with dry run
+mise run teardown -- --dry-run
 ```
 
 **⚠️ Warning:** This destroys ALL cluster resources. Ensure you have:
@@ -237,7 +241,7 @@ terraform destroy
 ### Terraform Initialization Fails
 
 ```bash
-cd clusters/myclient-eks
+cd cluster
 rm -rf .terraform .terraform.lock.hcl
 terraform init
 ```
@@ -253,9 +257,9 @@ Check cloud provider quotas:
 
 ```bash
 # Re-export kubeconfig
-cd clusters/myclient-eks
-terraform output -raw kubeconfig > ~/.kube/myclient-eks
-export KUBECONFIG=~/.kube/myclient-eks
+cd cluster
+terraform output -raw kubeconfig > ~/.kube/$(grep cluster_name terraform.tfvars | cut -d'"' -f2)
+export KUBECONFIG=~/.kube/$(grep cluster_name terraform.tfvars | cut -d'"' -f2)
 kubectl cluster-info
 ```
 

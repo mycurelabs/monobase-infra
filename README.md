@@ -29,10 +29,13 @@ monobase-infra/
 │   │   ├── gcp-gke/         #    Only needed if provisioning clusters
 │   │   ├── on-prem-k3s/     #    Can skip if cluster already exists
 │   │   └── local-k3d/
-├── clusters/                # ← OPTIONAL: Cluster configurations
-│   ├── default-cluster/     #    Reference template for new clusters
-│   ├── k3d-local/           #    Local development cluster
-│   └── ...                  #    Your cluster configs (gitignored)
+│   └── examples/            #    Example cluster configurations
+│       ├── aws-eks/         #    AWS EKS example
+│       ├── azure-aks/       #    Azure AKS example
+│       ├── do-doks/         #    DigitalOcean DOKS example
+│       └── k3d/             #    Local k3d example
+├── cluster/                 # ← YOUR CLUSTER: Active cluster config (gitignored)
+│                            #    Copy from terraform/examples/
 ├── charts/                  # ← CORE: Helm charts for applications
 │   ├── api/
 │   ├── api-worker/

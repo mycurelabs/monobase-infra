@@ -15,9 +15,9 @@
  * - Progress indicators and colored output
  *
  * Usage:
- *   bun scripts/provision.ts --cluster <name>                    # Provision cluster
- *   bun scripts/provision.ts --cluster <name> --merge-kubeconfig # Provision + merge config
- *   bun scripts/provision.ts --destroy --cluster <name>          # Destroy cluster
+ *   bun scripts/provision.ts                                     # Provision cluster
+ *   bun scripts/provision.ts --merge-kubeconfig                  # Provision + merge config
+ *   bun scripts/provision.ts --destroy                           # Destroy cluster
  *   bun scripts/provision.ts --destroy --dry-run                 # Preview destruction
  */
 
@@ -32,7 +32,6 @@ import { join } from "path";
 // ===== Types =====
 
 interface ProvisionConfig {
-  cluster?: string;
   dryRun: boolean;
   autoApprove: boolean;
   mergeKubeconfig: boolean;
@@ -70,13 +69,12 @@ class ClusterProvisioner {
 
   async provision() {
     console.log(chalk.blue('\n==> Provision Configuration'));
-    console.log(`Cluster: ${this.config.cluster || 'will prompt'}`);
+    console.log(`Cluster directory: cluster/`);
     console.log(`Merge kubeconfig: ${this.config.mergeKubeconfig}`);
     console.log(`Auto-approve: ${this.config.autoApprove}`);
     console.log(`Dry run: ${this.config.dryRun}`);
 
     await this.validatePrerequisites();
-    await this.selectCluster();
     await this.validateClusterDirectory();
     await this.terraformInit();
     await this.terraformPlan();
@@ -125,49 +123,34 @@ class ClusterProvisioner {
     }
   }
 
-  // ===== Cluster Selection =====
-
-  async selectCluster() {
-    if (this.config.cluster) {
-      console.log(chalk.blue(`\n==> Using cluster: ${chalk.green(this.config.cluster)}`));
-      return;
-    }
-
-    console.log(chalk.blue('\n==> Step 2: Select Cluster'));
-
-    const clustersDir = 'clusters';
-    if (!existsSync(clustersDir)) {
-      throw new Error(`Clusters directory not found: ${clustersDir}`);
-    }
-
-    const clusters = readdirSync(clustersDir, { withFileTypes: true })
-      .filter(dirent => dirent.isDirectory())
-      .map(dirent => dirent.name)
-      .filter(name => !name.startsWith('.'));
-
-    if (clusters.length === 0) {
-      throw new Error('No cluster configurations found in clusters/');
-    }
-
-    console.log(chalk.blue('Available clusters:'));
-    clusters.forEach(cluster => {
-      console.log(`  - ${cluster}`);
-    });
-
-    this.config.cluster = await select({
-      message: 'Select cluster to provision:',
-      choices: clusters.map(cluster => ({
-        name: cluster,
-        value: cluster
-      }))
-    });
-  }
+  // ===== Cluster Directory Validation =====
 
   async validateClusterDirectory() {
-    this.clusterDir = join('clusters', this.config.cluster!);
+    this.clusterDir = 'cluster';
 
     if (!existsSync(this.clusterDir)) {
-      throw new Error(`Cluster directory not found: ${this.clusterDir}`);
+      const errorMessage = `
+${chalk.red('✗ No cluster configuration found')}
+
+${chalk.yellow('To get started, copy an example cluster configuration:')}
+
+  ${chalk.cyan('# For AWS EKS')}
+  cp -r terraform/examples/aws-eks cluster
+
+  ${chalk.cyan('# For DigitalOcean DOKS')}
+  cp -r terraform/examples/do-doks cluster
+
+  ${chalk.cyan('# For local k3d')}
+  cp -r terraform/examples/k3d cluster
+
+${chalk.yellow('Then customize the configuration:')}
+  cd cluster
+  vim terraform.tfvars
+
+${chalk.yellow('Finally, provision the cluster:')}
+  mise run provision
+`;
+      throw new Error(errorMessage);
     }
 
     // Check for required Terraform files
@@ -287,7 +270,10 @@ class ClusterProvisioner {
     console.log(chalk.blue('\n==> Step 6: Extract Kubeconfig'));
 
     const spinner = ora('Extracting kubeconfig...').start();
-    const kubeconfigPath = join(process.env.HOME || '~', '.kube', this.config.cluster!);
+    
+    // Get cluster name from cluster directory metadata
+    const clusterName = await this.getClusterName();
+    const kubeconfigPath = join(process.env.HOME || '~', '.kube', clusterName);
 
     try {
       // Get kubeconfig from terraform output
@@ -311,22 +297,22 @@ class ClusterProvisioner {
     console.log(chalk.blue('\n==> Step 7: Merge Kubeconfig'));
 
     const spinner = ora('Checking existing contexts...').start();
-    const contextName = this.config.cluster!;
+    const clusterName = await this.getClusterName();
 
     try {
       // Check if context already exists
       try {
-        await $`kubectl config get-contexts ${contextName}`.quiet();
-        spinner.info(`Context '${contextName}' already exists in ~/.kube/config`);
+        await $`kubectl config get-contexts ${clusterName}`.quiet();
+        spinner.info(`Context '${clusterName}' already exists in ~/.kube/config`);
 
         const switchContext = await confirm({
-          message: `Switch to context '${contextName}'?`,
+          message: `Switch to context '${clusterName}'?`,
           default: true
         });
 
         if (switchContext) {
-          await $`kubectl config use-context ${contextName}`.quiet();
-          console.log(chalk.green(`✓ Switched to context: ${contextName}`));
+          await $`kubectl config use-context ${clusterName}`.quiet();
+          console.log(chalk.green(`✓ Switched to context: ${clusterName}`));
         }
 
         return;
@@ -344,14 +330,14 @@ class ClusterProvisioner {
       } catch {}
 
       // Merge configs
-      const kubeconfigPath = join(process.env.HOME || '~', '.kube', this.config.cluster!);
+      const kubeconfigPath = join(process.env.HOME || '~', '.kube', clusterName);
       await $`KUBECONFIG=~/.kube/config:${kubeconfigPath} kubectl config view --flatten > ~/.kube/config.tmp`.quiet();
       await $`mv ~/.kube/config.tmp ~/.kube/config`.quiet();
 
       // Switch to new context
-      await $`kubectl config use-context ${contextName}`.quiet();
+      await $`kubectl config use-context ${clusterName}`.quiet();
 
-      spinner.succeed(`Kubeconfig merged and switched to context: ${contextName}`);
+      spinner.succeed(`Kubeconfig merged and switched to context: ${clusterName}`);
     } catch (error) {
       spinner.fail('Failed to merge kubeconfig');
       throw error;
@@ -362,7 +348,8 @@ class ClusterProvisioner {
     console.log(chalk.blue('\n==> Step 8: Verify Connectivity'));
 
     const spinner = ora('Testing cluster connection...').start();
-    const kubeconfigPath = join(process.env.HOME || '~', '.kube', this.config.cluster!);
+    const clusterName = await this.getClusterName();
+    const kubeconfigPath = join(process.env.HOME || '~', '.kube', clusterName);
 
     try {
       // Test connection
@@ -404,7 +391,8 @@ class ClusterProvisioner {
     }
 
     console.log(chalk.blue('\n==> Next Steps'));
-    const kubeconfigPath = join(process.env.HOME || '~', '.kube', this.config.cluster!);
+    const clusterName = await this.getClusterName();
+    const kubeconfigPath = join(process.env.HOME || '~', '.kube', clusterName);
     console.log(`1. Export kubeconfig: export KUBECONFIG=${kubeconfigPath}`);
     console.log(`2. Bootstrap cluster: mise run bootstrap`);
     console.log(`3. Monitor deployments: kubectl get nodes`);
@@ -417,7 +405,6 @@ class ClusterProvisioner {
     console.log(chalk.yellow('⚠️  This will destroy all cluster infrastructure\n'));
 
     await this.validatePrerequisites();
-    await this.selectCluster();
     await this.validateClusterDirectory();
     await this.checkTerraformState();
     await this.terraformInit();
@@ -492,14 +479,16 @@ class ClusterProvisioner {
     console.log(chalk.yellow('⚠️  This action is IRREVERSIBLE'));
     console.log(chalk.yellow('⚠️  All cluster resources will be permanently deleted\n'));
 
+    const clusterName = await this.getClusterName();
+
     // First confirmation: Type cluster name
-    const clusterName = await input({
-      message: `Type the cluster name '${chalk.red(this.config.cluster!)}' to confirm:`,
-      validate: (val) => val === this.config.cluster || `Must type exactly: ${this.config.cluster}`
+    await input({
+      message: `Type the cluster name '${chalk.red(clusterName)}' to confirm:`,
+      validate: (val) => val === clusterName || `Must type exactly: ${clusterName}`
     });
 
     // Second confirmation: Type DESTROY
-    const destroyConfirm = await input({
+    await input({
       message: `Type ${chalk.red('DESTROY')} to proceed:`,
       validate: (val) => val === 'DESTROY' || 'Must type exactly: DESTROY'
     });
@@ -513,9 +502,10 @@ class ClusterProvisioner {
     const spinner = ora('Creating state backup...').start();
 
     try {
+      const clusterName = await this.getClusterName();
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
       const backupDir = 'backups/terraform-state';
-      const backupFile = `${this.config.cluster}-${timestamp}.tfstate`;
+      const backupFile = `${clusterName}-${timestamp}.tfstate`;
 
       await $`mkdir -p ${backupDir}`.quiet();
       await $`cp ${this.clusterDir}/terraform.tfstate ${backupDir}/${backupFile}`.quiet();
@@ -545,7 +535,8 @@ class ClusterProvisioner {
     console.log(chalk.blue('\n==> Cleaning Up Kubeconfig'));
 
     const spinner = ora('Removing kubeconfig files...').start();
-    const kubeconfigPath = join(process.env.HOME || '~', '.kube', this.config.cluster!);
+    const clusterName = await this.getClusterName();
+    const kubeconfigPath = join(process.env.HOME || '~', '.kube', clusterName);
 
     try {
       // Remove standalone kubeconfig file
@@ -556,17 +547,17 @@ class ClusterProvisioner {
 
       // Check if context exists in merged config
       try {
-        await $`kubectl config get-contexts ${this.config.cluster}`.quiet();
+        await $`kubectl config get-contexts ${clusterName}`.quiet();
 
         const removeContext = await confirm({
-          message: `Remove context '${this.config.cluster}' from ~/.kube/config?`,
+          message: `Remove context '${clusterName}' from ~/.kube/config?`,
           default: true
         });
 
         if (removeContext) {
-          await $`kubectl config delete-context ${this.config.cluster}`.quiet();
-          await $`kubectl config delete-cluster ${this.config.cluster}`.quiet();
-          await $`kubectl config delete-user ${this.config.cluster}`.quiet();
+          await $`kubectl config delete-context ${clusterName}`.quiet();
+          await $`kubectl config delete-cluster ${clusterName}`.quiet();
+          await $`kubectl config delete-user ${clusterName}`.quiet();
           console.log(chalk.green('✓ Context removed from ~/.kube/config'));
         }
       } catch {
@@ -589,12 +580,31 @@ class ClusterProvisioner {
     console.log(chalk.gray('\nState backup location: backups/terraform-state/'));
 
     if (this.config.keepKubeconfig) {
-      const kubeconfigPath = join(process.env.HOME || '~', '.kube', this.config.cluster!);
+      const clusterName = await this.getClusterName();
+      const kubeconfigPath = join(process.env.HOME || '~', '.kube', clusterName);
       console.log(chalk.yellow(`\nKubeconfig preserved: ${kubeconfigPath}`));
     }
   }
 
   // ===== Utility =====
+
+  async getClusterName(): Promise<string> {
+    // Try to extract cluster name from terraform.tfvars
+    const tfvarsPath = join(this.clusterDir, 'terraform.tfvars');
+    
+    try {
+      if (existsSync(tfvarsPath)) {
+        const content = await Bun.file(tfvarsPath).text();
+        const match = content.match(/cluster_name\s*=\s*"([^"]+)"/);
+        if (match) {
+          return match[1];
+        }
+      }
+    } catch {}
+
+    // Fallback: use cluster directory name
+    return 'cluster';
+  }
 
   printHeader() {
     const title = this.config.destroy ? 'Cluster Destruction' : 'Cluster Provisioning';
@@ -613,9 +623,14 @@ ${chalk.bold('Monobase Infrastructure Provisioning')}
 ${chalk.bold('USAGE:')}
   bun scripts/provision.ts [OPTIONS]
 
+${chalk.bold('PREREQUISITES:')}
+  Copy an example cluster configuration to cluster/ directory:
+    ${chalk.cyan('cp -r terraform/examples/aws-eks cluster')}
+    ${chalk.cyan('cp -r terraform/examples/do-doks cluster')}
+    ${chalk.cyan('cp -r terraform/examples/k3d cluster')}
+
 ${chalk.bold('OPTIONS:')}
   ${chalk.cyan('--help')}                    Show this help message
-  ${chalk.cyan('--cluster <name>')}          Cluster name (directory in clusters/)
   ${chalk.cyan('--dry-run')}                 Preview changes without executing
   ${chalk.cyan('--auto-approve')}            Skip confirmation prompts
   ${chalk.cyan('--merge-kubeconfig')}        Merge kubeconfig into ~/.kube/config
@@ -625,20 +640,24 @@ ${chalk.bold('OPTIONS:')}
   ${chalk.cyan('--keep-kubeconfig')}         Don't remove kubeconfig files (destroy mode)
 
 ${chalk.bold('EXAMPLES:')}
+  ${chalk.gray('# Setup cluster configuration')}
+  cp -r terraform/examples/aws-eks cluster
+  cd cluster && vim terraform.tfvars
+
   ${chalk.gray('# Provision cluster')}
-  bun scripts/provision.ts --cluster mycure-prod
+  bun scripts/provision.ts
 
   ${chalk.gray('# Provision with kubeconfig merge')}
-  bun scripts/provision.ts --cluster mycure-prod --merge-kubeconfig
+  bun scripts/provision.ts --merge-kubeconfig
 
   ${chalk.gray('# Dry run provision')}
-  bun scripts/provision.ts --cluster mycure-prod --dry-run
+  bun scripts/provision.ts --dry-run
 
   ${chalk.gray('# Destroy cluster (interactive)')}
-  bun scripts/provision.ts --destroy --cluster mycure-prod
+  bun scripts/provision.ts --destroy
 
   ${chalk.gray('# Preview destroy plan')}
-  bun scripts/provision.ts --destroy --cluster mycure-prod --dry-run
+  bun scripts/provision.ts --destroy --dry-run
 `);
 }
 
@@ -647,7 +666,6 @@ function parseCliArgs(): ProvisionConfig {
     args: Bun.argv.slice(2),
     options: {
       help: { type: 'boolean', default: false },
-      cluster: { type: 'string' },
       'dry-run': { type: 'boolean', default: false },
       'auto-approve': { type: 'boolean', default: false },
       'merge-kubeconfig': { type: 'boolean', default: false },
@@ -663,7 +681,6 @@ function parseCliArgs(): ProvisionConfig {
   }
 
   return {
-    cluster: values.cluster,
     dryRun: values['dry-run'] || false,
     autoApprove: values['auto-approve'] || false,
     mergeKubeconfig: values['merge-kubeconfig'] || false,
