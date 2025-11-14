@@ -1,13 +1,7 @@
 {
-  "name": "mono-infra",
+  "name": "monobase-infra",
   "version": "1.0.0",
   "type": "module",
-  "scripts": {
-    "secrets": "bun scripts/secrets.ts",
-    "secrets:setup": "bun scripts/secrets.ts setup",
-    "secrets:generate": "bun scripts/secrets.ts generate",
-    "secrets:validate": "bun scripts/secrets.ts validate"
-  },
   "dependencies": {
     "@clack/prompts": "^0.8.2",
     "@google-cloud/secret-manager": "^6.1.1",
