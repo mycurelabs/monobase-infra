@@ -196,7 +196,7 @@ run = 'bun scripts/admin.ts "$@"'
 
 [tasks.validate-template]
 description = "Validate infrastructure template (check for hardcoded values)"
-run = 'bash scripts/validate.sh "$@"'
+run = 'bun scripts/validate.ts "$@"'
 
 [tasks.validate-secrets]
 description = "Validate secrets configuration and connectivity"
@@ -204,7 +204,7 @@ run = 'bun scripts/secrets.ts validate "$@"'
 
 [tasks.resize-storage]
 description = "Resize StatefulSet PVCs without downtime"
-run = 'bash scripts/resize-statefulset-storage.sh "$@"'
+run = 'bun scripts/resize.ts "$@"'
 
 [tasks.teardown]
 description = "Destroy cluster infrastructure - REQUIRES CONFIRMATION"
