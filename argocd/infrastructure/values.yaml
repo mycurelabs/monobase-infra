@@ -115,7 +115,7 @@ externalSecrets:
 
 # External DNS - Automatic DNS record management from HTTPRoutes
 externalDNS:
-  enabled: true
+  enabled: false  # Manual DNS configuration for PhilCare
 
 # Longhorn - Distributed block storage
 longhorn:
