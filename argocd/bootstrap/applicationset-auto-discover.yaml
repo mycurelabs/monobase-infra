@@ -71,10 +71,10 @@ spec:
 
         # Use Helm to render application templates
         helm:
-          # Value files are in the client/env deployment directory
-          # Pattern: deployments/{client-env}/values.yaml
+          # Value files are in the values/deployments directory
+          # Pattern: values/deployments/{client-env}.yaml
           valueFiles:
-            - '../../{{path}}/values.yaml'
+            - '../../values/deployments/{{path.basename}}.yaml'
 
       destination:
         # Deploy to the same cluster

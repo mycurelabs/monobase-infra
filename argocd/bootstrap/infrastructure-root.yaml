@@ -32,10 +32,9 @@ spec:
     # Use Helm to render infrastructure components
     helm:
       releaseName: infrastructure
-      # Cluster-specific values override defaults
-      # Pattern: clusters/{cluster-name}/infrastructure-values.yaml
+      # Infrastructure values are in values/infrastructure/main.yaml
       valueFiles:
-        - values.yaml
+        - ../../values/infrastructure/main.yaml
 
   destination:
     server: https://kubernetes.default.svc

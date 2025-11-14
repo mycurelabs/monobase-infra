@@ -22,7 +22,7 @@ spec:
     helm:
       releaseName: velero-resources
       valueFiles:
-        - ../../argocd/infrastructure/values.yaml
+        - ../../../values/infrastructure/main.yaml
 
   destination:
     server: https://kubernetes.default.svc
