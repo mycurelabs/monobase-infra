@@ -49,14 +49,14 @@ spec:
     metadata:
       # Application name: {filename-without-extension}-root
       # e.g., "clienta-prod-root", "clientb-staging-root"
-      name: '{{.path.basename | trimSuffix ".yaml"}}-root'
+      name: '{{.path.filename | trimSuffix ".yaml"}}-root'
       namespace: argocd
       labels:
-        client-env: '{{.path.basename | trimSuffix ".yaml"}}'
+        client-env: '{{.path.filename | trimSuffix ".yaml"}}'
         managed-by: applicationset
       annotations:
         # Link back to config file
-        config-path: '{{.path.path}}'
+        config-path: '{{.path.path}}/{{.path.filename}}'
       finalizers:
         - resources-finalizer.argocd.argoproj.io
 
@@ -74,7 +74,7 @@ spec:
           # Value file is the discovered file itself
           # e.g., values/deployments/clienta-prod.yaml
           valueFiles:
-            - '../../{{.path.path}}'
+            - '../../{{.path.path}}/{{.path.filename}}'
           # Inject repoURL from bootstrap (single source of truth)
           values: |
             argocd:
@@ -86,7 +86,7 @@ spec:
         server: https://kubernetes.default.svc
         # Namespace matches filename (without extension)
         # e.g., clienta-prod.yaml → clienta-prod namespace
-        namespace: '{{.path.basename | trimSuffix ".yaml"}}'
+        namespace: '{{.path.filename | trimSuffix ".yaml"}}'
 
       syncPolicy:
         # Automated sync: Git push → automatic deployment
