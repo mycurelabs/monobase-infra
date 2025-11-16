@@ -30,13 +30,18 @@ helm:
 
 ### Deployment Configuration
 
-Deployment values are automatically discovered by the ApplicationSet in `argocd/bootstrap/applicationset-auto-discover.yaml`:
+Deployment values are automatically discovered by the ApplicationSet in `argocd/bootstrap/applicationset-auto-discover.yaml`.
+
+The ApplicationSet uses a **Git Files Generator** to scan `values/deployments/*.yaml` files:
 
 ```yaml
-helm:
-  valueFiles:
-    - '../../values/deployments/{{path.basename}}.yaml'
+generators:
+  - git:
+      files:
+        - path: "values/deployments/*.yaml"
 ```
+
+Each YAML file discovered creates a corresponding ArgoCD Application.
 
 ## Adding New Deployments
 
@@ -97,4 +102,4 @@ This directory was created to consolidate configurations previously scattered ac
 - `infrastructure/*/values.yaml` → `values/infrastructure/{component}.yaml`
 - `deployments/{client}-{env}/values.yaml` → `values/deployments/{client}-{env}.yaml`
 
-Old files have been removed. The `deployments/` directory now contains only examples.
+The old `deployments/` marker directories have been removed. ApplicationSet now directly scans YAML files in `values/deployments/` for auto-discovery.

@@ -1,3 +1,0 @@
-# This directory serves as a registration marker for ArgoCD ApplicationSet auto-discovery
-# The ApplicationSet scans deployments/* directories to determine which applications to create
-# Actual configuration values are in: values/deployments/philcare-staging.yaml

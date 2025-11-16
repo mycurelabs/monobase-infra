@@ -1,19 +1,19 @@
 # ApplicationSet: Auto-Discover All Client/Environment Configurations
 #
 # This ApplicationSet automatically discovers all client/environment configurations
-# in the deployments/ directory and creates a root Application for each one.
+# by scanning YAML files in the values/deployments/ directory.
 #
 # How it works:
-# 1. Scans deployments/* directories (excluding example-* reference configs)
-# 2. For each directory found (e.g., deployments/clienta-prod/):
+# 1. Scans values/deployments/*.yaml files (excluding example-*.yaml)
+# 2. For each file found (e.g., values/deployments/clienta-prod.yaml):
 #    - Creates a root Application named "clienta-prod-root"
 #    - Deploys to namespace "clienta-prod"
-#    - Uses values from deployments/clienta-prod/values.yaml
+#    - Uses values from that YAML file
 # 3. Each root Application deploys the full stack (infrastructure + applications)
 #
 # True GitOps Workflow:
-# - Add new client: Create deployments/newclient-prod/ directory → git push
-# - Update client: Edit deployments/clienta-prod/values.yaml → git push
+# - Add new client: Create values/deployments/newclient-prod.yaml → git push
+# - Update client: Edit values/deployments/clienta-prod.yaml → git push
 # - ArgoCD automatically detects changes and syncs
 #
 # This is deployed ONCE during cluster bootstrap. After that, everything is Git-driven.
@@ -24,39 +24,39 @@ metadata:
   name: monobase-auto-discover
   namespace: argocd
 spec:
+  # Enable Go template support for string manipulation
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+
   # Prevent cascading deletes (safety)
   syncPolicy:
     preserveResourcesOnDeletion: true
 
   generators:
-    # Git Directory Generator: Scans deployments/ for client/env directories
+    # Git Files Generator: Scans values/deployments/*.yaml files
     - git:
         repoURL: https://github.com/mycurelabs/monobase-infra-philcare.git
         revision: HEAD
-        directories:
-          # Include: scan all directories in deployments/
-          - path: deployments/*
-          # Exclude: reference examples (each as separate entry)
-          - path: deployments/example-prod
-            exclude: true
-          - path: deployments/example-staging
-            exclude: true
-          - path: deployments/example-k3d
+        files:
+          # Include: scan all YAML files in values/deployments/
+          - path: "values/deployments/*.yaml"
+          # Exclude: reference examples
+          - path: "values/deployments/example-*.yaml"
             exclude: true
 
   # Template for creating root Applications
   template:
     metadata:
-      # Application name: {directory-name}-root
+      # Application name: {filename-without-extension}-root
       # e.g., "clienta-prod-root", "clientb-staging-root"
-      name: '{{path.basename}}-root'
+      name: '{{.path.basename | trimSuffix ".yaml"}}-root'
       namespace: argocd
       labels:
-        client-env: '{{path.basename}}'
+        client-env: '{{.path.basename | trimSuffix ".yaml"}}'
         managed-by: applicationset
       annotations:
-        # Link back to config directory
-        config-path: '{{path}}'
+        # Link back to config file
+        config-path: '{{.path.path}}'
       finalizers:
         - resources-finalizer.argocd.argoproj.io
 
@@ -71,10 +71,10 @@ spec:
 
         # Use Helm to render application templates
         helm:
-          # Value files are in the values/deployments directory
-          # Pattern: values/deployments/{client-env}.yaml
+          # Value file is the discovered file itself
+          # e.g., values/deployments/clienta-prod.yaml
           valueFiles:
-            - '../../values/deployments/{{path.basename}}.yaml'
+            - '../../{{.path.path}}'
           # Inject repoURL from bootstrap (single source of truth)
           values: |
             argocd:
@@ -84,9 +84,9 @@ spec:
       destination:
         # Deploy to the same cluster
         server: https://kubernetes.default.svc
-        # Namespace matches directory name
-        # e.g., clienta-prod → clienta-prod namespace
-        namespace: '{{path.basename}}'
+        # Namespace matches filename (without extension)
+        # e.g., clienta-prod.yaml → clienta-prod namespace
+        namespace: '{{.path.basename | trimSuffix ".yaml"}}'
 
       syncPolicy:
         # Automated sync: Git push → automatic deployment
@@ -124,21 +124,21 @@ spec:
 # After that, just manage deployments via Git:
 #
 # Add new client:
-#   cp -r deployments/example-prod deployments/newclient-prod
-#   # Edit deployments/newclient-prod/values.yaml
-#   git add deployments/newclient-prod/
+#   cp values/deployments/example-prod.yaml values/deployments/newclient-prod.yaml
+#   # Edit values/deployments/newclient-prod.yaml
+#   git add values/deployments/newclient-prod.yaml
 #   git commit -m "Add newclient-prod"
 #   git push
 #   # ✓ ArgoCD auto-detects and deploys!
 #
 # Update existing client:
-#   vim deployments/clienta-prod/values.yaml
+#   vim values/deployments/clienta-prod.yaml
 #   git commit -m "Update clienta-prod: increase replicas"
 #   git push
 #   # ✓ ArgoCD auto-syncs only clienta-prod
 #
 # Remove client:
-#   git rm -r deployments/oldclient-prod/
+#   git rm values/deployments/oldclient-prod.yaml
 #   git commit -m "Remove oldclient-prod"
 #   git push
 #   # ✓ ArgoCD auto-removes the Application (preserveResourcesOnDeletion=true prevents data loss)
