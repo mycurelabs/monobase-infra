@@ -114,7 +114,7 @@ hapihub:
       memory: 512Mi
 
   gateway:
-    hostname: ""
+    hostname: "api.mycure.stitchtechsolutions.com"
     timeouts:
       request: "60s"
 
@@ -177,11 +177,11 @@ mycure:
       memory: 128Mi
 
   gateway:
-    hostname: ""
+    hostname: "cms.mycure.stitchtechsolutions.com"
 
   config:
-    API_URL: "https://hapihub.mycure.stitchtechsolutions.com"
-    HAPIHUB_URL: "https://hapihub.mycure.stitchtechsolutions.com"
+    API_URL: "https://api.mycure.stitchtechsolutions.com"
+    HAPIHUB_URL: "https://api.mycure.stitchtechsolutions.com"
 
   podDisruptionBudget:
     enabled: false
