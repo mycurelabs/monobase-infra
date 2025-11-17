@@ -589,7 +589,7 @@ ${chalk.bold('EXAMPLES:')}
   bun scripts/admin.ts --service grafana --kubeconfig ~/.kube/prod
 
   ${chalk.gray('# Per-deployment service with namespace')}
-  bun scripts/admin.ts --service minio --namespace philcare-production
+  bun scripts/admin.ts --service minio --namespace example-production
 `);
 }
 

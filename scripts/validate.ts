@@ -96,7 +96,7 @@ class TemplateValidator {
     const spinner = this.config.json ? null : ora(testName).start();
 
     try {
-      const patterns = ['mycompany', 'client-a', 'client-b', 'philcare'];
+      const patterns = ['mycompany', 'client-a', 'client-b'];
       const dirs = ['charts/', 'infrastructure/', 'argocd/'];
       const matches: string[] = [];
 

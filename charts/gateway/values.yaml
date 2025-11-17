@@ -56,10 +56,10 @@ tls:
     # Specific subdomains (only used when useWildcard=false)
     # Will generate: subdomain.domain.com for each entry
     subdomains: []
-    # Example for PhilCare:
+    # Example for Example.com:
     # subdomains:
-    #   - mycure
-    #   - stg.mycure
+    #   - example
+    #   - stg.example
 
 # HTTP to HTTPS redirect
 httpRedirect:

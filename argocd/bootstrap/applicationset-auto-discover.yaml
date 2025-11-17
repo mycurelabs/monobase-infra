@@ -36,7 +36,7 @@ spec:
     # Git Files Generator: Scans values/deployments/*.yaml files
     - git:
         repoURL: https://github.com/mycurelabs/monobase-infra-philcare.git
-        revision: eaaa14ecd946865a150f5f75a09a38bae83cbd4e  # Temporarily pinned to force cache refresh
+        revision: HEAD
         files:
           # Include: scan all YAML files in values/deployments/
           - path: "values/deployments/*.yaml"
@@ -66,7 +66,7 @@ spec:
       source:
         # Point to this Git repository
         repoURL: https://github.com/mycurelabs/monobase-infra-philcare.git
-        targetRevision: eaaa14ecd946865a150f5f75a09a38bae83cbd4e  # Temporarily pinned to force cache refresh
+        targetRevision: HEAD
         path: argocd/applications
 
         # Use Helm to render application templates
@@ -79,7 +79,7 @@ spec:
           values: |
             argocd:
               repoURL: https://github.com/mycurelabs/monobase-infra-philcare.git
-              targetRevision: eaaa14ecd946865a150f5f75a09a38bae83cbd4e
+              targetRevision: HEAD
 
       destination:
         # Deploy to the same cluster
