@@ -1,0 +1,46 @@
+# Default values for envoy-proxy-config
+# This chart configures cloud-specific LoadBalancer settings for Envoy Gateway
+
+# Enable EnvoyProxy configuration
+enabled: true
+
+# EnvoyProxy resource name and namespace
+name: custom-proxy-config
+namespace: envoy-gateway-system
+
+# Enable service annotations
+serviceAnnotations: true
+
+# Cloud provider: azure, aws, gcp, digitalocean, or none
+# Override this in deployment-specific values files
+cloudProvider: none
+
+# Azure AKS Configuration
+azure:
+  # Public IP name (recommended method)
+  publicIpName: ""
+  # Resource group where public IP is located (node resource group)
+  resourceGroup: ""
+  # Direct IPv4 address (alternative to publicIpName)
+  ipv4Address: ""
+
+# AWS EKS Configuration
+aws:
+  # Comma-separated list of EIP allocation IDs (one per subnet)
+  # Example: "eipalloc-abc123,eipalloc-def456,eipalloc-ghi789"
+  eipAllocations: ""
+
+# GCP GKE Configuration
+gcp:
+  # Reserved static IP address or name
+  staticIpAddress: ""
+
+# DigitalOcean DOKS Configuration
+digitalocean:
+  # Load balancer ID to preserve (for migration/preservation)
+  loadBalancerId: ""
+  # Custom load balancer name
+  loadBalancerName: ""
+
+# Custom annotations (for any additional cloud-specific settings)
+customAnnotations: {}

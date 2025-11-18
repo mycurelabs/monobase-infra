@@ -1,0 +1,57 @@
+# Example: AWS EKS Production Infrastructure Configuration
+# AWS Elastic Kubernetes Service - Production Environment
+# Domain: example.com
+
+# EnvoyProxy Configuration - Static IP for AWS EKS
+envoyProxyConfig:
+  enabled: true
+  cloudProvider: aws
+
+  aws:
+    # Elastic IP Allocation IDs (comma-separated, one per subnet/AZ)
+    # TODO: Replace with actual EIP allocation IDs after creating Elastic IPs
+    # See: docs/infrastructure/static-ip-aws.md
+    # Format: "eipalloc-xxxxx,eipalloc-yyyyy,eipalloc-zzzzz"
+    eipAllocations: "eipalloc-0123456789abcdef0,eipalloc-0123456789abcdef1,eipalloc-0123456789abcdef2"
+
+# Gateway configuration
+gateway:
+  domain: example.com
+
+  gateway:
+    name: shared-gateway
+    namespace: gateway-system
+    gatewayClassName: envoy-gateway
+    listeners:
+      https:
+        enabled: true
+        port: 443
+        protocol: HTTPS
+      http:
+        enabled: true
+        port: 80
+        protocol: HTTP
+
+  # TLS/Certificate configuration
+  tls:
+    enabled: true
+    secretName: gateway-tls
+    certManager:
+      enabled: true
+      clusterIssuer: letsencrypt-prod
+      includeApex: true
+      subdomains:
+        - ""  # example.com (apex domain)
+        - app  # app.example.com
+        - api  # api.example.com
+
+  # HTTP to HTTPS redirect
+  httpRedirect:
+    enabled: true
+    statusCode: 301
+
+# Prerequisites:
+# 1. Create 3 Elastic IPs (one per subnet/AZ) in your VPC region
+# 2. Get allocation IDs: aws ec2 describe-addresses --region <region>
+# 3. Update eipAllocations above with comma-separated allocation IDs
+# 4. See docs/infrastructure/static-ip-aws.md for detailed instructions

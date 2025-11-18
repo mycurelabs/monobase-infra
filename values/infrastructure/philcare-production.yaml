@@ -1,0 +1,57 @@
+# PhilCare Production Infrastructure Configuration
+# Azure AKS Cluster - Production Environment
+# Domain: mycure.stitchtechsolutions.com
+
+# EnvoyProxy Configuration - Static IP for Azure AKS
+envoyProxyConfig:
+  enabled: true
+  cloudProvider: azure
+
+  azure:
+    # Public IP Name (recommended method)
+    # TODO: Replace with actual Azure public IP name after creating static IP
+    # See: docs/infrastructure/static-ip-azure.md
+    publicIpName: "philcare-production-gateway-ip"
+
+    # Node Resource Group (MC_* resource group)
+    # TODO: Replace with actual node resource group from: az aks show --query nodeResourceGroup
+    resourceGroup: "MC_philcare-production-rg_philcare-production-aks_eastus"
+
+    # Alternative: Use direct IP address (less preferred)
+    # ipv4Address: ""
+
+# Gateway configuration
+gateway:
+  domain: mycure.stitchtechsolutions.com
+
+  # Gateway configuration
+  gateway:
+    name: shared-gateway
+    namespace: gateway-system
+    gatewayClassName: envoy-gateway
+    listeners:
+      https:
+        enabled: true
+        port: 443
+        protocol: HTTPS
+      http:
+        enabled: true
+        port: 80
+        protocol: HTTP
+
+  # TLS/Certificate configuration
+  tls:
+    enabled: true
+    secretName: gateway-tls
+    certManager:
+      enabled: true
+      clusterIssuer: letsencrypt-prod
+      includeApex: true  # Include apex domain for production
+      # Specific subdomains for production environment
+      subdomains:
+        - ""  # mycure.stitchtechsolutions.com (apex domain)
+
+  # HTTP to HTTPS redirect
+  httpRedirect:
+    enabled: true
+    statusCode: 301

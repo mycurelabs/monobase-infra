@@ -1,0 +1,56 @@
+{{- if .Values.enabled }}
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: EnvoyProxy
+metadata:
+  name: {{ .Values.name }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "envoy-proxy-config.labels" . | nindent 4 }}
+spec:
+  provider:
+    type: Kubernetes
+    kubernetes:
+      envoyService:
+        {{- if .Values.serviceAnnotations }}
+        annotations:
+          {{- if eq .Values.cloudProvider "azure" }}
+          {{- if .Values.azure.publicIpName }}
+          service.beta.kubernetes.io/azure-pip-name: {{ .Values.azure.publicIpName | quote }}
+          {{- end }}
+          {{- if .Values.azure.resourceGroup }}
+          service.beta.kubernetes.io/azure-load-balancer-resource-group: {{ .Values.azure.resourceGroup | quote }}
+          {{- end }}
+          {{- if .Values.azure.ipv4Address }}
+          service.beta.kubernetes.io/azure-load-balancer-ipv4: {{ .Values.azure.ipv4Address | quote }}
+          {{- end }}
+          {{- end }}
+
+          {{- if eq .Values.cloudProvider "aws" }}
+          {{- if .Values.aws.eipAllocations }}
+          service.beta.kubernetes.io/aws-load-balancer-type: "external"
+          service.beta.kubernetes.io/aws-load-balancer-nlb-target-type: "instance"
+          service.beta.kubernetes.io/aws-load-balancer-scheme: "internet-facing"
+          service.beta.kubernetes.io/aws-load-balancer-eip-allocations: {{ .Values.aws.eipAllocations | quote }}
+          {{- end }}
+          {{- end }}
+
+          {{- if eq .Values.cloudProvider "gcp" }}
+          {{- if .Values.gcp.staticIpAddress }}
+          networking.gke.io/load-balancer-ip-addresses: {{ .Values.gcp.staticIpAddress | quote }}
+          {{- end }}
+          {{- end }}
+
+          {{- if eq .Values.cloudProvider "digitalocean" }}
+          {{- if .Values.digitalocean.loadBalancerId }}
+          kubernetes.digitalocean.com/load-balancer-id: {{ .Values.digitalocean.loadBalancerId | quote }}
+          {{- end }}
+          {{- if .Values.digitalocean.loadBalancerName }}
+          service.beta.kubernetes.io/do-loadbalancer-name: {{ .Values.digitalocean.loadBalancerName | quote }}
+          {{- end }}
+          {{- end }}
+
+          {{- with .Values.customAnnotations }}
+          {{- toYaml . | nindent 10 }}
+          {{- end }}
+        {{- end }}
+{{- end }}

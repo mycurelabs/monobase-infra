@@ -51,6 +51,31 @@ envoyGateway:
   enabled: true
   version: v1.2.0
 
+# EnvoyProxy Configuration - Cloud-specific LoadBalancer settings
+envoyProxyConfig:
+  enabled: false  # Override per deployment
+  name: custom-proxy-config
+  namespace: envoy-gateway-system
+  serviceAnnotations: true
+  cloudProvider: none
+
+  azure:
+    publicIpName: ""
+    resourceGroup: ""
+    ipv4Address: ""
+
+  aws:
+    eipAllocations: ""
+
+  gcp:
+    staticIpAddress: ""
+
+  digitalocean:
+    loadBalancerId: ""
+    loadBalancerName: ""
+
+  customAnnotations: {}
+
 # Gateway Resources - Shared Gateway configuration
 gateway:
   # Base domain for gateway (override per deployment)

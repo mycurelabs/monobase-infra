@@ -18,11 +18,12 @@ gatewayClass:
   controllerName: gateway.envoyproxy.io/gatewayclass-controller
 
   # Optional: Parameters reference for advanced Envoy Gateway configuration
-  # parametersRef:
-  #   group: gateway.envoyproxy.io
-  #   kind: EnvoyProxy
-  #   name: custom-proxy-config
-  #   namespace: envoy-gateway-system
+  # Enable this to use custom EnvoyProxy configuration (e.g., static IP)
+  parametersRef:
+    group: gateway.envoyproxy.io
+    kind: EnvoyProxy
+    name: custom-proxy-config
+    namespace: envoy-gateway-system
 
 # Gateway configuration
 gateway:

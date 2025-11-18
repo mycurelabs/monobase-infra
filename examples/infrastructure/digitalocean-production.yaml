@@ -1,0 +1,67 @@
+# Example: DigitalOcean DOKS Production Infrastructure Configuration
+# DigitalOcean Kubernetes Service - Production Environment
+# Domain: example.com
+
+# EnvoyProxy Configuration - Static IP for DigitalOcean DOKS
+envoyProxyConfig:
+  enabled: true
+  cloudProvider: digitalocean
+
+  digitalocean:
+    # Option 1: Load Balancer ID (created LoadBalancer, less stable)
+    # TODO: Replace with actual LoadBalancer ID after initial deployment
+    # See: docs/infrastructure/static-ip-digitalocean.md
+    loadBalancerId: "12345678-1234-1234-1234-123456789abc"
+
+    # Option 2: Load Balancer Name (alternative to ID)
+    loadBalancerName: "production-gateway-lb"
+
+    # Note: For true static IP with DigitalOcean, use FLIPOP operator
+    # See docs/infrastructure/static-ip-digitalocean.md for FLIPOP setup
+
+# Gateway configuration
+gateway:
+  domain: example.com
+
+  gateway:
+    name: shared-gateway
+    namespace: gateway-system
+    gatewayClassName: envoy-gateway
+    listeners:
+      https:
+        enabled: true
+        port: 443
+        protocol: HTTPS
+      http:
+        enabled: true
+        port: 80
+        protocol: HTTP
+
+  # TLS/Certificate configuration
+  tls:
+    enabled: true
+    secretName: gateway-tls
+    certManager:
+      enabled: true
+      clusterIssuer: letsencrypt-prod
+      includeApex: true
+      subdomains:
+        - ""  # example.com (apex domain)
+        - app  # app.example.com
+        - api  # api.example.com
+
+  # HTTP to HTTPS redirect
+  httpRedirect:
+    enabled: true
+    statusCode: 301
+
+# Prerequisites:
+# Option 1 (Basic): Use LoadBalancer ID after initial deployment
+# 1. Deploy gateway without static IP configuration
+# 2. Get LoadBalancer ID: doctl compute load-balancer list
+# 3. Update loadBalancerId above
+#
+# Option 2 (Recommended): Use FLIPOP operator for true static IP
+# 1. Create Floating IP: doctl compute floating-ip create --region <region>
+# 2. Install FLIPOP operator in cluster
+# 3. See docs/infrastructure/static-ip-digitalocean.md for detailed instructions

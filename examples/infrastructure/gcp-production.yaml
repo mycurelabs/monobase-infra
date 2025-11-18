@@ -1,0 +1,58 @@
+# Example: GCP GKE Production Infrastructure Configuration
+# Google Kubernetes Engine - Production Environment
+# Domain: example.com
+
+# EnvoyProxy Configuration - Static IP for GCP GKE
+envoyProxyConfig:
+  enabled: true
+  cloudProvider: gcp
+
+  gcp:
+    # Regional Static IP Address Name
+    # TODO: Replace with actual static IP address after creating it
+    # See: docs/infrastructure/static-ip-gcp.md
+    # Format: "projects/<project>/regions/<region>/addresses/<name>"
+    # Or just the IP address: "35.123.45.67"
+    staticIpAddress: "production-gateway-ip"
+
+# Gateway configuration
+gateway:
+  domain: example.com
+
+  gateway:
+    name: shared-gateway
+    namespace: gateway-system
+    gatewayClassName: envoy-gateway
+    listeners:
+      https:
+        enabled: true
+        port: 443
+        protocol: HTTPS
+      http:
+        enabled: true
+        port: 80
+        protocol: HTTP
+
+  # TLS/Certificate configuration
+  tls:
+    enabled: true
+    secretName: gateway-tls
+    certManager:
+      enabled: true
+      clusterIssuer: letsencrypt-prod
+      includeApex: true
+      subdomains:
+        - ""  # example.com (apex domain)
+        - app  # app.example.com
+        - api  # api.example.com
+
+  # HTTP to HTTPS redirect
+  httpRedirect:
+    enabled: true
+    statusCode: 301
+
+# Prerequisites:
+# 1. Reserve a regional static IP in GCP
+# 2. Get IP address or name: gcloud compute addresses describe <name> --region <region>
+# 3. Update staticIpAddress above with the IP address or resource name
+# 4. See docs/infrastructure/static-ip-gcp.md for detailed instructions
