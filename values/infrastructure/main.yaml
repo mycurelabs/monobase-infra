@@ -80,7 +80,7 @@ envoyProxyConfig:
 # Gateway Resources - Shared Gateway configuration
 gateway:
   # Base domain for gateway (override per deployment)
-  domain: stitchtechsolutions.com
+  domain: mycureapp.com
 
   # Gateway configuration
   gateway:
@@ -103,12 +103,13 @@ gateway:
     secretName: gateway-tls
     certManager:
       enabled: true
-      clusterIssuer: letsencrypt-prod
+      clusterIssuer: letsencrypt-mycure-cloudflare-prod
       includeApex: true
-      # Specific subdomains for HTTP-01 challenge
+      # Wildcard certificate via DNS-01 challenge
       subdomains:
-        - mycure
-        - stg.mycure
+        - "*"
+        - "stg"
+        - "*.stg"
 
   # HTTP to HTTPS redirect
   httpRedirect:
