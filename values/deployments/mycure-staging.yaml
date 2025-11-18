@@ -1,9 +1,9 @@
-# PhilCare Staging Configuration
-# Staging environment on AKS with Azure infrastructure
+# MyCure Staging Configuration
+# Staging environment on DigitalOcean Kubernetes (DOKS)
 
 global:
-  domain: stg.mycure.stitchtechsolutions.com
-  namespace: philcare-staging
+  domain: stg.mycureapp.com
+  namespace: mycure-staging
   environment: staging
 
   nodePool: ""
@@ -13,7 +13,7 @@ global:
     namespace: gateway-system
 
   storage:
-    provider: azure-disk
+    provider: ""
     className: ""
 
 # ===== CORE: Monobase API =====
@@ -89,7 +89,7 @@ account:
     hostname: ""
 
   config:
-    API_URL: "https://api.stg.mycure.stitchtechsolutions.com"
+    API_URL: "https://api.stg.mycureapp.com"
 
   podDisruptionBudget:
     enabled: false
@@ -114,7 +114,7 @@ hapihub:
       memory: 1Gi
 
   gateway:
-    hostname: "api.stg.mycure.stitchtechsolutions.com"
+    hostname: "api.stg.mycureapp.com"
     timeouts:
       request: "60s"
 
@@ -147,11 +147,11 @@ hapihub:
     refreshInterval: 1h
     secrets:
       - secretKey: GOOGLE_CLIENT_ID
-        remoteKey: philcare-staging-google-oauth-client-id
+        remoteKey: mycure-staging-google-oauth-client-id
       - secretKey: GOOGLE_CLIENT_SECRET
-        remoteKey: philcare-staging-google-oauth-client-secret
+        remoteKey: mycure-staging-google-oauth-client-secret
       - secretKey: STRIPE_SECRET_KEY
-        remoteKey: philcare-staging-stripe-secret-key
+        remoteKey: mycure-staging-stripe-secret-key
 
   mongodb:
     serviceName: mongodb
@@ -179,11 +179,11 @@ mycure:
       memory: 128Mi
 
   gateway:
-    hostname: "cms.stg.mycure.stitchtechsolutions.com"
+    hostname: "cms.stg.mycureapp.com"
 
   config:
-    API_URL: "https://api.stg.mycure.stitchtechsolutions.com"
-    HAPIHUB_URL: "https://api.stg.mycure.stitchtechsolutions.com"
+    API_URL: "https://api.stg.mycureapp.com"
+    HAPIHUB_URL: "https://api.stg.mycureapp.com"
 
   podDisruptionBudget:
     enabled: false

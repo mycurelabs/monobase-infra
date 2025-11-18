@@ -1,0 +1,51 @@
+# MyCure Staging Infrastructure Configuration
+# DigitalOcean Kubernetes (DOKS) - Staging Environment
+# Domain: stg.mycureapp.com
+
+# EnvoyProxy Configuration - Static IP for DigitalOcean DOKS
+envoyProxyConfig:
+  enabled: true
+  cloudProvider: digitalocean
+
+  digitalocean:
+    # LoadBalancer will auto-provision
+    # Note: For true static IP with DigitalOcean, use FLIPOP operator
+    # See: docs/infrastructure/static-ip-digitalocean.md
+    loadBalancerId: ""  # Auto-provision
+    loadBalancerName: ""  # Auto-provision
+
+# Gateway configuration
+gateway:
+  domain: stg.mycureapp.com
+
+  # Gateway  configuration
+  gateway:
+    name: shared-gateway
+    namespace: gateway-system
+    gatewayClassName: envoy-gateway
+    listeners:
+      https:
+        enabled: true
+        port: 443
+        protocol: HTTPS
+      http:
+        enabled: true
+        port: 80
+        protocol: HTTP
+
+  # TLS/Certificate configuration
+  tls:
+    enabled: true
+    secretName: gateway-tls
+    certManager:
+      enabled: true
+      clusterIssuer: letsencrypt-prod
+      includeApex: false  # No apex domain for staging
+      # Specific subdomains for staging environment
+      subdomains:
+        - ""  # stg.mycureapp.com (no subdomain prefix needed)
+
+  # HTTP to HTTPS redirect
+  httpRedirect:
+    enabled: true
+    statusCode: 301

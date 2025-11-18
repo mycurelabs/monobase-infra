@@ -1,9 +1,9 @@
-# PhilCare Production Configuration
-# Production environment on AKS with Azure infrastructure
+# MyCure Production Configuration
+# Production environment on DigitalOcean Kubernetes (DOKS)
 
 global:
-  domain: mycure.stitchtechsolutions.com
-  namespace: philcare-production
+  domain: mycureapp.com
+  namespace: mycure-production
   environment: production
 
   nodePool: ""
@@ -13,7 +13,7 @@ global:
     namespace: gateway-system
 
   storage:
-    provider: azure-disk
+    provider: ""
     className: ""
 
 # ===== CORE: Monobase API =====
@@ -89,7 +89,7 @@ account:
     hostname: ""
 
   config:
-    API_URL: "https://api.mycure.stitchtechsolutions.com"
+    API_URL: "https://api.mycureapp.com"
 
   podDisruptionBudget:
     enabled: false
@@ -114,7 +114,7 @@ hapihub:
       memory: 512Mi
 
   gateway:
-    hostname: "api.mycure.stitchtechsolutions.com"
+    hostname: "api.mycureapp.com"
     timeouts:
       request: "60s"
 
@@ -145,11 +145,11 @@ hapihub:
     refreshInterval: 1h
     secrets:
       - secretKey: GOOGLE_CLIENT_ID
-        remoteKey: philcare-production-google-oauth-client-id
+        remoteKey: mycure-production-google-oauth-client-id
       - secretKey: GOOGLE_CLIENT_SECRET
-        remoteKey: philcare-production-google-oauth-client-secret
+        remoteKey: mycure-production-google-oauth-client-secret
       - secretKey: STRIPE_SECRET_KEY
-        remoteKey: philcare-production-stripe-secret-key
+        remoteKey: mycure-production-stripe-secret-key
 
   mongodb:
     serviceName: mongodb
@@ -177,11 +177,11 @@ mycure:
       memory: 128Mi
 
   gateway:
-    hostname: "cms.mycure.stitchtechsolutions.com"
+    hostname: "cms.mycureapp.com"
 
   config:
-    API_URL: "https://api.mycure.stitchtechsolutions.com"
-    HAPIHUB_URL: "https://api.mycure.stitchtechsolutions.com"
+    API_URL: "https://api.mycureapp.com"
+    HAPIHUB_URL: "https://api.mycureapp.com"
 
   podDisruptionBudget:
     enabled: false
