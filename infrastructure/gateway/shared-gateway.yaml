@@ -33,7 +33,7 @@ metadata:
     app.kubernetes.io/component: gateway
     app.kubernetes.io/managed-by: argocd
   annotations:
-    # Cert-manager will automatically provision wildcard certificates
+    # Cert-manager will automatically provision certificates via HTTP-01
     cert-manager.io/cluster-issuer: letsencrypt-prod
 spec:
   # Use Envoy Gateway implementation
@@ -45,7 +45,7 @@ spec:
     - name: https
       port: 443
       protocol: HTTPS
-      hostname: "*.example.com"  # Wildcard - accepts all subdomains
+      hostname: "*"  # Accept all hostnames (routing by HTTPRoute)
       
       # Allow HTTPRoutes from any namespace
       allowedRoutes:
@@ -56,15 +56,15 @@ spec:
       tls:
         mode: Terminate
         certificateRefs:
-          # Wildcard certificate managed by cert-manager
-          - name: wildcard-tls
+          # Certificate managed by cert-manager
+          - name: gateway-tls
             kind: Secret
     
     # Optional: HTTP listener for redirect to HTTPS
     - name: http
       port: 80
       protocol: HTTP
-      hostname: "*.example.com"
+      hostname: "*"  # Accept all hostnames (routing by HTTPRoute)
       allowedRoutes:
         namespaces:
           from: All
@@ -87,7 +87,7 @@ spec:
       sectionName: http  # Attach to HTTP listener only
   
   hostnames:
-    - "*.example.com"  # Match all subdomains
+    - "*"  # Match all hostnames
   
   rules:
     - filters:
@@ -97,23 +97,23 @@ spec:
             statusCode: 301  # Permanent redirect
 
 ---
-# Wildcard TLS Certificate Request
+# TLS Certificate Request (HTTP-01 Challenge)
 # cert-manager will provision this automatically via Let's Encrypt
 apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
-  name: wildcard-tls
+  name: gateway-tls
   namespace: gateway-system
   labels:
-    app.kubernetes.io/name: wildcard-certificate
+    app.kubernetes.io/name: gateway-certificate
     app.kubernetes.io/component: gateway
 spec:
-  secretName: wildcard-tls  # Referenced by Gateway
+  secretName: gateway-tls  # Referenced by Gateway
   issuerRef:
     name: letsencrypt-prod  # Production Let's Encrypt
     kind: ClusterIssuer
   dnsNames:
-    - "*.example.com"  # Wildcard certificate
-    - "example.com"    # Apex domain
-  # DNS-01 challenge (required for wildcard certificates)
-  # Configure per cloud provider in cert-manager setup
+    - "app.example.com"   # Specific subdomain
+    - "api.example.com"   # Specific subdomain
+    - "example.com"       # Apex domain
+  # HTTP-01 challenge (works without external-dns)

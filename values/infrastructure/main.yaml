@@ -74,13 +74,12 @@ gateway:
   # TLS/Certificate configuration
   tls:
     enabled: true
-    secretName: wildcard-tls
+    secretName: gateway-tls
     certManager:
       enabled: true
       clusterIssuer: letsencrypt-prod
       includeApex: true
-      # PhilCare: Use specific subdomains with HTTP-01 (not wildcard/DNS-01)
-      useWildcard: false
+      # Specific subdomains for HTTP-01 challenge
       subdomains:
         - mycure
         - stg.mycure

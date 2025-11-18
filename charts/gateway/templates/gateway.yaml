@@ -15,7 +15,7 @@ metadata:
     {{- include "gateway.labels" . | nindent 4 }}
   annotations:
     {{- if .Values.tls.certManager.enabled }}
-    # Cert-manager will automatically provision wildcard certificates
+    # Cert-manager will automatically provision certificates via HTTP-01
     cert-manager.io/cluster-issuer: {{ include "gateway.clusterIssuer" . }}
     {{- end }}
     {{- with .Values.annotations }}
@@ -32,7 +32,7 @@ spec:
     - name: https
       port: {{ .Values.gateway.listeners.https.port }}
       protocol: {{ .Values.gateway.listeners.https.protocol }}
-      hostname: {{ include "gateway.wildcardDomain" . | quote }}
+      hostname: "*"  # Accept all hostnames (routing by HTTPRoute)
 
       # Allow HTTPRoutes from any namespace
       allowedRoutes:
@@ -44,7 +44,7 @@ spec:
       tls:
         mode: Terminate
         certificateRefs:
-          # Wildcard certificate managed by cert-manager
+          # Certificate managed by cert-manager
           - name: {{ include "gateway.tlsSecretName" . }}
             kind: Secret
       {{- end }}
@@ -55,7 +55,7 @@ spec:
     - name: http
       port: {{ .Values.gateway.listeners.http.port }}
       protocol: {{ .Values.gateway.listeners.http.protocol }}
-      hostname: {{ include "gateway.wildcardDomain" . | quote }}
+      hostname: "*"  # Accept all hostnames (routing by HTTPRoute)
       allowedRoutes:
         namespaces:
           from: All

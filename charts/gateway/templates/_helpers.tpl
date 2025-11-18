@@ -67,17 +67,10 @@ Gateway namespace
 {{- end }}
 
 {{/*
-Wildcard domain for listeners and certificates
-*/}}
-{{- define "gateway.wildcardDomain" -}}
-{{- printf "*.%s" .Values.domain }}
-{{- end }}
-
-{{/*
 TLS secret name
 */}}
 {{- define "gateway.tlsSecretName" -}}
-{{- .Values.tls.secretName | default "wildcard-tls" }}
+{{- .Values.tls.secretName | default "gateway-tls" }}
 {{- end }}
 
 {{/*

@@ -36,7 +36,7 @@ tls:
   enabled: true
 
   # Secret name for TLS certificate
-  secretName: wildcard-tls
+  secretName: gateway-tls
 
   # Cert-manager configuration
   certManager:
@@ -49,17 +49,16 @@ tls:
     # Include apex domain in certificate
     includeApex: true
 
-    # Use wildcard certificate (*.domain.com) - requires DNS-01 challenge
-    # Set to false to use specific subdomains with HTTP-01 challenge
-    useWildcard: true
-
-    # Specific subdomains (only used when useWildcard=false)
-    # Will generate: subdomain.domain.com for each entry
-    subdomains: []
-    # Example for Example.com:
-    # subdomains:
-    #   - example
-    #   - stg.example
+    # Specific subdomains for HTTP-01 challenge
+    # Each generates: subdomain.domain.com
+    subdomains:
+      - app
+      - api
+    # For multiple environments/services:
+    #   - cms
+    #   - admin
+    #   - stg.app
+    #   - stg.api
 
 # HTTP to HTTPS redirect
 httpRedirect:
