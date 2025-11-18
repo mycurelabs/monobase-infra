@@ -45,7 +45,7 @@ spec:
     - name: https
       port: 443
       protocol: HTTPS
-      hostname: "*"  # Accept all hostnames (routing by HTTPRoute)
+      hostname: "*.stitchtechsolutions.com"  # Accept all stitchtechsolutions.com subdomains
       
       # Allow HTTPRoutes from any namespace
       allowedRoutes:
@@ -64,7 +64,7 @@ spec:
     - name: http
       port: 80
       protocol: HTTP
-      hostname: "*"  # Accept all hostnames (routing by HTTPRoute)
+      hostname: "*.stitchtechsolutions.com"  # Accept all stitchtechsolutions.com subdomains
       allowedRoutes:
         namespaces:
           from: All
@@ -87,7 +87,7 @@ spec:
       sectionName: http  # Attach to HTTP listener only
   
   hostnames:
-    - "*"  # Match all hostnames
+    - "*.stitchtechsolutions.com"  # Match all stitchtechsolutions.com subdomains
   
   rules:
     - filters:
