@@ -108,7 +108,6 @@ gateway:
       # Wildcard certificate via DNS-01 challenge
       subdomains:
         - "*"
-        - "stg"
         - "*.stg"
 
   # HTTP to HTTPS redirect
