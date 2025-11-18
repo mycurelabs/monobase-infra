@@ -114,7 +114,7 @@ hapihub:
       memory: 1Gi
 
   gateway:
-    hostname: "api.stg.mycureapp.com"
+    hostname: ""
     timeouts:
       request: "60s"
 
@@ -179,7 +179,7 @@ mycure:
       memory: 128Mi
 
   gateway:
-    hostname: "cms.stg.mycureapp.com"
+    hostname: ""
 
   config:
     API_URL: "https://api.stg.mycureapp.com"

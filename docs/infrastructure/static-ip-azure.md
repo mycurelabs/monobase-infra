@@ -42,7 +42,7 @@ NODE_RG=$(az aks show \
 echo "Node Resource Group: $NODE_RG"
 ```
 
-**Example output:** `MC_philcare-rg_philcare-aks_eastus`
+**Example output:** `MC_example-rg_example-aks_eastus`
 
 ### Step 2: Create Static Public IP
 
@@ -91,7 +91,7 @@ Save these values for your infrastructure configuration:
 cloudProvider: azure
 azure:
   publicIpName: "production-gateway-ip"  # From Step 2
-  resourceGroup: "MC_philcare-rg_philcare-aks_eastus"  # From Step 1
+  resourceGroup: "MC_example-rg_example-aks_eastus"  # From Step 1
   # Note: The IP address ($IP_ADDRESS) will be automatically assigned
 ```
 
@@ -151,7 +151,7 @@ echo "IP promoted to Static successfully!"
 cloudProvider: azure
 azure:
   publicIpName: "kubernetes-xxx-yyy-zzz"  # Actual name from Step 1
-  resourceGroup: "MC_philcare-rg_philcare-aks_eastus"  # Node RG from Step 1
+  resourceGroup: "MC_example-rg_example-aks_eastus"  # Node RG from Step 1
 ```
 
 ## Method 3: Using Direct IP Address (Alternative)
@@ -162,7 +162,7 @@ Instead of using the Public IP name, you can configure using the IP address dire
 cloudProvider: azure
 azure:
   ipv4Address: "135.171.153.160"  # Your static IP address
-  resourceGroup: "MC_philcare-rg_philcare-aks_eastus"  # Node resource group
+  resourceGroup: "MC_example-rg_example-aks_eastus"  # Node resource group
 ```
 
 **Note**: Using `publicIpName` (Methods 1 & 2) is recommended over `ipv4Address` as it's more explicit and maintainable.

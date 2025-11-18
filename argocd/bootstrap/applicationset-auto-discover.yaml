@@ -35,7 +35,7 @@ spec:
   generators:
     # Git Files Generator: Scans values/deployments/*.yaml files
     - git:
-        repoURL: https://github.com/mycurelabs/monobase-infra-philcare.git
+        repoURL: https://github.com/mycurelabs/monobase-infra.git
         revision: HEAD
         files:
           # Include: scan all YAML files in values/deployments/
@@ -65,7 +65,7 @@ spec:
 
       source:
         # Point to this Git repository
-        repoURL: https://github.com/mycurelabs/monobase-infra-philcare.git
+        repoURL: https://github.com/mycurelabs/monobase-infra.git
         targetRevision: HEAD
         path: argocd/applications
 
@@ -78,7 +78,7 @@ spec:
           # Inject repoURL from bootstrap (single source of truth)
           values: |
             argocd:
-              repoURL: https://github.com/mycurelabs/monobase-infra-philcare.git
+              repoURL: https://github.com/mycurelabs/monobase-infra.git
               targetRevision: HEAD
 
       destination:

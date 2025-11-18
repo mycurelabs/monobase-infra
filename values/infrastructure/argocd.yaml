@@ -75,7 +75,7 @@ server:
     # Git repository credentials
     repositories: |
       - type: git
-        url: https://github.com/mycurelabs/monobase-infra-philcare.git
+        url: https://github.com/mycurelabs/monobase-infra.git
 
     # Resource customizations
     resource.customizations: |

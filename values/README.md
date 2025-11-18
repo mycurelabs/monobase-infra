@@ -11,8 +11,8 @@ values/
 │   ├── external-dns.yaml   # External DNS configuration
 │   └── argocd.yaml         # ArgoCD Helm values
 └── deployments/            # Application deployment configurations
-    ├── philcare-staging.yaml     # PhilCare staging environment
-    └── philcare-production.yaml  # PhilCare production environment
+    ├── acme-staging.yaml     # Acme staging environment
+    └── acme-production.yaml  # Acme production environment
 ```
 
 ## Usage
@@ -54,7 +54,7 @@ To add a new client deployment:
 
 Example:
 ```bash
-cp values/deployments/philcare-staging.yaml values/deployments/newclient-staging.yaml
+cp values/deployments/acme-staging.yaml values/deployments/newclient-staging.yaml
 # Edit values/deployments/newclient-staging.yaml
 git add values/deployments/newclient-staging.yaml
 git commit -m "feat: add newclient staging deployment"
@@ -66,7 +66,7 @@ git push
 ### Naming Convention
 
 - **Infrastructure**: `{component}.yaml` (e.g., `main.yaml`, `argocd.yaml`)
-- **Deployments**: `{client}-{environment}.yaml` (e.g., `philcare-staging.yaml`)
+- **Deployments**: `{client}-{environment}.yaml` (e.g., `acme-staging.yaml`)
 
 ### Secrets
 
