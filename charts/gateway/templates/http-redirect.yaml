@@ -17,7 +17,7 @@ spec:
       sectionName: http  # Attach to HTTP listener only
 
   hostnames:
-    - "*"  # Match all hostnames
+    - "*.{{ .Values.domain }}"  # Match all subdomains for this domain
 
   rules:
     - filters:

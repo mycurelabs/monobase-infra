@@ -32,7 +32,7 @@ spec:
     - name: https
       port: {{ .Values.gateway.listeners.https.port }}
       protocol: {{ .Values.gateway.listeners.https.protocol }}
-      hostname: "*"  # Accept all hostnames (routing by HTTPRoute)
+      hostname: "*.{{ .Values.domain }}"  # Accept all subdomains for this domain
 
       # Allow HTTPRoutes from any namespace
       allowedRoutes:
@@ -55,7 +55,7 @@ spec:
     - name: http
       port: {{ .Values.gateway.listeners.http.port }}
       protocol: {{ .Values.gateway.listeners.http.protocol }}
-      hostname: "*"  # Accept all hostnames (routing by HTTPRoute)
+      hostname: "*.{{ .Values.domain }}"  # Accept all subdomains for this domain
       allowedRoutes:
         namespaces:
           from: All
