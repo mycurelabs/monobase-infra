@@ -66,9 +66,4 @@ spec:
       kind: Certificate
       jsonPointers:
         - /status
-    # GatewayClass is managed by Envoy Gateway operator, not this application
-    - group: gateway.networking.k8s.io
-      kind: GatewayClass
-      jqPathExpressions:
-        - .
 {{- end }}
