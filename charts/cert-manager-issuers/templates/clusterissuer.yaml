@@ -23,10 +23,19 @@ spec:
     # Solvers configuration based on provider
     solvers:
       {{- if eq (.provider | default "http01") "http01" }}
-      # HTTP-01 Challenge (requires port 80 access, no DNS provider needed)
+      # HTTP-01 Challenge using Gateway API (compatible with Envoy Gateway)
       - http01:
-          ingress:
-            class: envoy-gateway
+          gatewayHTTPRoute:
+            parentRefs:
+              - name: {{ .http01.gatewayName | default "shared-gateway" }}
+                namespace: {{ .http01.gatewayNamespace | default "gateway-system" }}
+                kind: Gateway
+            {{- if .http01.labels }}
+            labels:
+              {{- range $key, $value := .http01.labels }}
+              {{ $key }}: {{ $value | quote }}
+              {{- end }}
+            {{- end }}
       {{- else if eq .provider "cloudflare" }}
       # Cloudflare DNS-01 Challenge
       - dns01:
