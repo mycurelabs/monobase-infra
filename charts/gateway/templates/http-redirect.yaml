@@ -17,7 +17,7 @@ spec:
       sectionName: http  # Attach to HTTP listener only
 
   hostnames:
-    - {{ include "gateway.wildcardDomain" . | quote }}
+    - "*"  # Match all hostnames
 
   rules:
     - filters:
