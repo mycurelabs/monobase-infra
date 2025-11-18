@@ -89,7 +89,7 @@ account:
     hostname: ""
 
   config:
-    API_URL: "https://api.mycureapp.com"
+    API_URL: "https://hapihub.mycureapp.com"
 
   podDisruptionBudget:
     enabled: false
@@ -180,8 +180,8 @@ mycure:
     hostname: ""
 
   config:
-    API_URL: "https://api.mycureapp.com"
-    HAPIHUB_URL: "https://api.mycureapp.com"
+    API_URL: "https://hapihub.mycureapp.com"
+    HAPIHUB_URL: "https://hapihub.mycureapp.com"
 
   podDisruptionBudget:
     enabled: false
