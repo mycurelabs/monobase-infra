@@ -21,8 +21,6 @@ spec:
     helm:
       releaseName: envoy-gateway
       skipCrds: false  # Install Gateway API CRDs (required for fresh clusters)
-      values: |
-        createGatewayClass: true  # Create default GatewayClass resource
   
   destination:
     server: https://kubernetes.default.svc

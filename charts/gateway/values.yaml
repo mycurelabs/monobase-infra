@@ -5,6 +5,25 @@
 # Override this in deployment-specific values (e.g., stg.mycureapp.com)
 domain: example.com
 
+# GatewayClass configuration
+# This creates the cluster-scoped GatewayClass resource
+gatewayClass:
+  # Enable GatewayClass creation
+  enabled: true
+
+  # GatewayClass name (must match gateway.gatewayClassName below)
+  name: envoy-gateway
+
+  # Controller name (must match Envoy Gateway installation)
+  controllerName: gateway.envoyproxy.io/gatewayclass-controller
+
+  # Optional: Parameters reference for advanced Envoy Gateway configuration
+  # parametersRef:
+  #   group: gateway.envoyproxy.io
+  #   kind: EnvoyProxy
+  #   name: custom-proxy-config
+  #   namespace: envoy-gateway-system
+
 # Gateway configuration
 gateway:
   # Gateway name (referenced by HTTPRoutes)
