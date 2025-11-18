@@ -103,16 +103,26 @@ gateway:
     secretName: gateway-tls
     certManager:
       enabled: true
-      clusterIssuer: letsencrypt-mycure-cloudflare-prod
+      clusterIssuer: letsencrypt-prod
       includeApex: true
-      # Wildcard certificate via DNS-01 challenge
+      # Specific subdomains for HTTP-01 challenge
       subdomains:
-        - "*"
-        - "*.stg"
+        # Production subdomains
+        - grafana
+        - hapihub
+        - mycure
+        - sync
+        - storage
+        # Staging subdomains
+        - hapihub.stg
+        - mail.stg
+        - storage.stg
+        - mycure.stg
+        - sync.stg
 
   # HTTP to HTTPS redirect
   httpRedirect:
-    enabled: true
+    enabled: false  # Disabled: wildcard redirect incompatible with HTTP-01
     statusCode: 301
 
 # External Secrets - Secret management
