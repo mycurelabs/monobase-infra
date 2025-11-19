@@ -119,6 +119,10 @@ hapihub:
       request: "60s"
 
   env:
+    - name: NODE_ENV
+      value: "production"
+    - name: WEB_CONCURRENCY
+      value: "1"
     - name: BETTER_AUTH_RATE_LIMIT_ENABLED
       value: "true"
     - name: BETTER_AUTH_RATE_LIMIT_WINDOW
