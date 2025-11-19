@@ -70,33 +70,6 @@ spec:
           from: All
 
 ---
-# HTTP to HTTPS Redirect Policy (Optional)
-# Automatically redirects all HTTP traffic to HTTPS
-apiVersion: gateway.networking.k8s.io/v1
-kind: HTTPRoute
-metadata:
-  name: http-to-https-redirect
-  namespace: gateway-system
-  labels:
-    app.kubernetes.io/name: http-redirect
-    app.kubernetes.io/component: gateway
-spec:
-  parentRefs:
-    - name: shared-gateway
-      namespace: gateway-system
-      sectionName: http  # Attach to HTTP listener only
-  
-  hostnames:
-    - "*.stitchtechsolutions.com"  # Match all stitchtechsolutions.com subdomains
-  
-  rules:
-    - filters:
-        - type: RequestRedirect
-          requestRedirect:
-            scheme: https
-            statusCode: 301  # Permanent redirect
-
----
 # TLS Certificate Request (HTTP-01 Challenge)
 # cert-manager will provision this automatically via Let's Encrypt
 apiVersion: cert-manager.io/v1
