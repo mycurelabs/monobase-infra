@@ -45,7 +45,7 @@ spec:
     - name: https
       port: 443
       protocol: HTTPS
-      hostname: "*.stitchtechsolutions.com"  # Accept all stitchtechsolutions.com subdomains
+      hostname: "*.mycureapp.com"  # Accept all mycureapp.com subdomains
       
       # Allow HTTPRoutes from any namespace
       allowedRoutes:
@@ -64,7 +64,7 @@ spec:
     - name: http
       port: 80
       protocol: HTTP
-      hostname: "*.stitchtechsolutions.com"  # Accept all stitchtechsolutions.com subdomains
+      hostname: "*.mycureapp.com"  # Accept all mycureapp.com subdomains
       allowedRoutes:
         namespaces:
           from: All
