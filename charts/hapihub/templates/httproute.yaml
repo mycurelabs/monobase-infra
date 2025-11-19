@@ -10,9 +10,10 @@ spec:
   parentRefs:
     - name: {{ include "hapihub.gateway.name" . }}
       namespace: {{ include "hapihub.gateway.namespace" . }}
-      sectionName: https  # Only attach to HTTPS listener
       {{- if .Values.gateway.sectionName }}
-      # Override: {{ .Values.gateway.sectionName }}
+      sectionName: {{ .Values.gateway.sectionName }}
+      {{- else }}
+      sectionName: https  # Default: attach to HTTPS listener
       {{- end }}
   hostnames:
     - {{ include "hapihub.gateway.hostname" . }}
