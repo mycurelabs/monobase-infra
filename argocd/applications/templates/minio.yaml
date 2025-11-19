@@ -26,68 +26,84 @@ spec:
     jqPathExpressions:
     - .data
 
-  source:
-    chart: minio
-    repoURL: https://charts.bitnami.com/bitnami
-    targetRevision: 14.x.x
-    helm:
-      releaseName: minio
-      valuesObject:
-        global:
-          security:
-            allowInsecureImages: true
-        image:
-          repository: {{ .Values.minio.image.repository | default "bitnamilegacy/minio" }}
-          tag: {{ .Values.minio.image.tag | default "2025.7.23-debian-12-r3" }}
-        mode: {{ .Values.minio.mode | default "standalone" }}
-        statefulset:
-          replicaCount: {{ .Values.minio.statefulset.replicaCount | default 1 }}
-        auth:
-          {{- if .Values.minio.auth.existingSecret }}
-          existingSecret: {{ .Values.minio.auth.existingSecret }}
-          {{- else }}
-          rootUser: {{ .Values.minio.auth.rootUser | default "minioadmin" }}
-          rootPassword: {{ .Values.minio.auth.rootPassword | default "minioadmin" }}
+  sources:
+    # Source 1: Bitnami MinIO Helm chart
+    - chart: minio
+      repoURL: https://charts.bitnami.com/bitnami
+      targetRevision: 14.x.x
+      helm:
+        releaseName: minio
+        valuesObject:
+          global:
+            security:
+              allowInsecureImages: true
+          image:
+            repository: {{ .Values.minio.image.repository | default "bitnamilegacy/minio" }}
+            tag: {{ .Values.minio.image.tag | default "2025.7.23-debian-12-r3" }}
+          mode: {{ .Values.minio.mode | default "standalone" }}
+          statefulset:
+            replicaCount: {{ .Values.minio.statefulset.replicaCount | default 1 }}
+          auth:
+            {{- if .Values.minio.auth.existingSecret }}
+            existingSecret: {{ .Values.minio.auth.existingSecret }}
+            {{- else }}
+            rootUser: {{ .Values.minio.auth.rootUser | default "minioadmin" }}
+            rootPassword: {{ .Values.minio.auth.rootPassword | default "minioadmin" }}
+            {{- end }}
+          persistence:
+            enabled: {{ .Values.minio.persistence.enabled | default true }}
+            storageClass: {{ .Values.minio.persistence.storageClass | default "" }}
+            size: {{ .Values.minio.persistence.size | default "10Gi" }}
+          resources:
+            requests:
+              cpu: {{ .Values.minio.resources.requests.cpu | default "100m" }}
+              memory: {{ .Values.minio.resources.requests.memory | default "256Mi" }}
+            limits:
+              cpu: {{ .Values.minio.resources.limits.cpu | default "500m" }}
+              memory: {{ .Values.minio.resources.limits.memory | default "512Mi" }}
+          defaultBuckets: {{ .Values.minio.defaultBuckets | default "monobase-files" }}
+          podSecurityContext:
+            enabled: true
+            fsGroup: 1001
+            fsGroupChangePolicy: "OnRootMismatch"
+          containerSecurityContext:
+            enabled: true
+            runAsUser: 1001
+            runAsGroup: 1001
+            runAsNonRoot: true
+            privileged: false
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            seccompProfile:
+              type: RuntimeDefault
+          {{- if .Values.global.nodePool }}
+          # Node pool scheduling - inherited from global.nodePool
+          nodeSelector:
+            node-pool: {{ .Values.global.nodePool }}
+          tolerations:
+            - key: "node-pool"
+              operator: "Equal"
+              value: {{ .Values.global.nodePool | quote }}
+              effect: "NoSchedule"
           {{- end }}
-        persistence:
-          enabled: {{ .Values.minio.persistence.enabled | default true }}
-          storageClass: {{ .Values.minio.persistence.storageClass | default "" }}
-          size: {{ .Values.minio.persistence.size | default "10Gi" }}
-        resources:
-          requests:
-            cpu: {{ .Values.minio.resources.requests.cpu | default "100m" }}
-            memory: {{ .Values.minio.resources.requests.memory | default "256Mi" }}
-          limits:
-            cpu: {{ .Values.minio.resources.limits.cpu | default "500m" }}
-            memory: {{ .Values.minio.resources.limits.memory | default "512Mi" }}
-        defaultBuckets: {{ .Values.minio.defaultBuckets | default "monobase-files" }}
-        podSecurityContext:
-          enabled: true
-          fsGroup: 1001
-          fsGroupChangePolicy: "OnRootMismatch"
-        containerSecurityContext:
-          enabled: true
-          runAsUser: 1001
-          runAsGroup: 1001
-          runAsNonRoot: true
-          privileged: false
-          readOnlyRootFilesystem: true
-          allowPrivilegeEscalation: false
-          capabilities:
-            drop:
-              - ALL
-          seccompProfile:
-            type: RuntimeDefault
-        {{- if .Values.global.nodePool }}
-        # Node pool scheduling - inherited from global.nodePool
-        nodeSelector:
-          node-pool: {{ .Values.global.nodePool }}
-        tolerations:
-          - key: "node-pool"
-            operator: "Equal"
-            value: {{ .Values.global.nodePool | quote }}
-            effect: "NoSchedule"
-        {{- end }}
+
+    {{- if .Values.minio.gateway.enabled }}
+    # Source 2: HTTPRoute for Gateway API integration
+    - repoURL: {{ .Values.argocd.repoURL }}
+      path: infrastructure/httproutes/minio
+      targetRevision: {{ .Values.argocd.targetRevision | default "main" }}
+      helm:
+        releaseName: minio-httproute
+        valuesObject:
+          hostname: {{ .Values.minio.gateway.hostname | default (printf "storage.%s" .Values.global.domain) }}
+          namespace: {{ .Values.global.namespace }}
+          gateway:
+            name: {{ .Values.global.gateway.name }}
+            namespace: {{ .Values.global.gateway.namespace }}
+    {{- end }}
 
   destination:
     server: https://kubernetes.default.svc
