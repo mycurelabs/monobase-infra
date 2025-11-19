@@ -231,7 +231,7 @@ syncd:
 
 # ===== DATABASE: PostgreSQL =====
 postgresql:
-  enabled: false
+  enabled: true
 
   fullnameOverride: "postgresql"
 
@@ -265,7 +265,7 @@ postgresql:
 
 # ===== DATABASE: MongoDB =====
 mongodb:
-  enabled: false
+  enabled: true
 
   fullnameOverride: "mongodb"
 
