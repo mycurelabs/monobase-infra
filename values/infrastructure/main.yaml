@@ -82,6 +82,12 @@ gateway:
   # Base domain for gateway (override per deployment)
   domain: mycureapp.com
 
+  # Override GatewayClass defaults to remove parametersRef
+  # The chart defaults include a parametersRef to "custom-proxy-config" EnvoyProxy
+  # which doesn't exist when envoyProxyConfig.enabled=false
+  gatewayClass:
+    parametersRef: null  # Remove reference to non-existent EnvoyProxy resource
+
   # Gateway configuration
   gateway:
     name: shared-gateway
