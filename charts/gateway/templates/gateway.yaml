@@ -29,7 +29,9 @@ spec:
       port: {{ .Values.gateway.listeners.https.port }}
       protocol: {{ .Values.gateway.listeners.https.protocol }}
       {{- if .Values.gateway.listeners.https.hostname }}
-      hostname: {{ .Values.gateway.listeners.https.hostname | quote }}  # Optional: filter by hostname
+      hostname: {{ .Values.gateway.listeners.https.hostname | quote }}  # Manual override
+      {{- else if .Values.domain }}
+      hostname: "*.{{ .Values.domain }}"  # Derived from domain
       {{- end }}
 
       # Allow HTTPRoutes from any namespace
@@ -54,7 +56,9 @@ spec:
       port: {{ .Values.gateway.listeners.http.port }}
       protocol: {{ .Values.gateway.listeners.http.protocol }}
       {{- if .Values.gateway.listeners.http.hostname }}
-      hostname: {{ .Values.gateway.listeners.http.hostname | quote }}  # Optional: filter by hostname
+      hostname: {{ .Values.gateway.listeners.http.hostname | quote }}  # Manual override
+      {{- else if .Values.domain }}
+      hostname: "*.{{ .Values.domain }}"  # Derived from domain
       {{- end }}
       allowedRoutes:
         namespaces:

@@ -92,12 +92,12 @@ gateway:
         enabled: true
         port: 443
         protocol: HTTPS
-        hostname: "*.mycureapp.com"  # Accept all mycureapp.com subdomains
+        # hostname automatically derived from gateway.domain as *.mycureapp.com
       http:
         enabled: true
         port: 80
         protocol: HTTP
-        hostname: "*.mycureapp.com"  # Accept all mycureapp.com subdomains
+        # hostname automatically derived from gateway.domain as *.mycureapp.com
 
   # TLS/Certificate configuration
   tls:
