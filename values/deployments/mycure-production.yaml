@@ -115,7 +115,7 @@ hapihub:
 
   gateway:
     hostname: ""
-    sectionName: http  # Temporarily use HTTP listener until TLS is configured
+    sectionName: https  # Use HTTPS listener with wildcard TLS certificate
     timeouts:
       request: "60s"
 
@@ -181,7 +181,7 @@ mycure:
 
   gateway:
     hostname: ""
-    sectionName: http  # Temporarily use HTTP listener until TLS is configured
+    sectionName: https  # Use HTTPS listener with wildcard TLS certificate
 
   config:
     API_URL: "https://hapihub.mycureapp.com"
@@ -211,7 +211,7 @@ syncd:
 
   gateway:
     hostname: ""
-    sectionName: http  # Temporarily use HTTP listener until TLS is configured
+    sectionName: https  # Use HTTPS listener with wildcard TLS certificate
 
   livenessProbe:
     enabled: true
