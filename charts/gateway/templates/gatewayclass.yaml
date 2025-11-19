@@ -12,9 +12,9 @@ metadata:
 spec:
   # Controller name must match the Envoy Gateway installation
   controllerName: {{ .Values.gatewayClass.controllerName }}
-  {{- with .Values.gatewayClass.parametersRef }}
+  {{- if and .Values.gatewayClass.parametersRef .Values.gatewayClass.parametersRef.name }}
   # Optional: Reference to advanced configuration
   parametersRef:
-    {{- toYaml . | nindent 4 }}
+    {{- toYaml .Values.gatewayClass.parametersRef | nindent 4 }}
   {{- end }}
 {{- end }}
