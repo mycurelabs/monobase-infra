@@ -5,7 +5,7 @@
 # Cert Manager - TLS certificate automation
 certManager:
   enabled: true
-  version: v1.14.2
+  version: v1.16.2
 
 # Cert Manager Resources - ClusterIssuers and certificate configuration
 certManagerIssuers:
@@ -102,7 +102,7 @@ gateway:
     enabled: true
     secretName: gateway-tls
     certManager:
-      enabled: true
+      enabled: false  # Disabled: No applications deployed, DNS records don't exist
       clusterIssuer: letsencrypt-prod
       includeApex: true
       # Specific subdomains for HTTP-01 challenge

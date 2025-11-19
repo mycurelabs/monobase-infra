@@ -68,25 +68,3 @@ spec:
       allowedRoutes:
         namespaces:
           from: All
-
----
-# TLS Certificate Request (HTTP-01 Challenge)
-# cert-manager will provision this automatically via Let's Encrypt
-apiVersion: cert-manager.io/v1
-kind: Certificate
-metadata:
-  name: gateway-tls
-  namespace: gateway-system
-  labels:
-    app.kubernetes.io/name: gateway-certificate
-    app.kubernetes.io/component: gateway
-spec:
-  secretName: gateway-tls  # Referenced by Gateway
-  issuerRef:
-    name: letsencrypt-prod  # Production Let's Encrypt
-    kind: ClusterIssuer
-  dnsNames:
-    - "app.example.com"   # Specific subdomain
-    - "api.example.com"   # Specific subdomain
-    - "example.com"       # Apex domain
-  # HTTP-01 challenge (works without external-dns)
