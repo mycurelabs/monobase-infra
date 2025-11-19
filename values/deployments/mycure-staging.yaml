@@ -6,7 +6,7 @@ global:
   namespace: mycure-staging
   environment: staging
 
-  nodePool: ""
+  nodePool: "staging"
 
   gateway:
     name: shared-gateway

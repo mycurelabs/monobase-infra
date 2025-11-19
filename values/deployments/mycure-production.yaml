@@ -6,7 +6,7 @@ global:
   namespace: mycure-production
   environment: production
 
-  nodePool: ""
+  nodePool: "production"
 
   gateway:
     name: shared-gateway
