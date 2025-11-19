@@ -107,11 +107,11 @@ hapihub:
 
   resources:
     requests:
-      cpu: 100m
-      memory: 512Mi
+      cpu: 500m
+      memory: 256Mi
     limits:
       cpu: 500m
-      memory: 2Gi
+      memory: 1Gi
 
   gateway:
     hostname: ""
@@ -120,9 +120,7 @@ hapihub:
       request: "60s"
 
   env:
-    - name: NODE_ENV
-      value: "production"
-    - name: WEB_CONCURRENCY
+    - name: CLUSTER_INSTANCES
       value: "1"
     - name: BETTER_AUTH_RATE_LIMIT_ENABLED
       value: "true"
