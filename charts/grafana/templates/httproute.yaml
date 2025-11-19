@@ -10,6 +10,7 @@ spec:
   parentRefs:
     - name: {{ include "grafana.gateway.name" . }}
       namespace: {{ include "grafana.gateway.namespace" . }}
+      sectionName: https
   hostnames:
     - {{ include "grafana.gateway.hostname" . }}
   rules:

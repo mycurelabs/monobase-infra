@@ -10,6 +10,7 @@ spec:
   parentRefs:
     - name: {{ include "mailpit.gateway.name" . }}
       namespace: {{ include "mailpit.gateway.namespace" . }}
+      sectionName: https
   hostnames:
     - {{ include "mailpit.gateway.hostname" . }}
   rules:
