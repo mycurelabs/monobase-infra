@@ -96,7 +96,7 @@ account:
 
 # ===== HEALTHCARE: HapiHub API =====
 hapihub:
-  enabled: false
+  enabled: true
 
   image:
     repository: ghcr.io/mycurelabs/hapihub
@@ -159,7 +159,7 @@ hapihub:
 
 # ===== HEALTHCARE: Frontend Application =====
 mycure:
-  enabled: false
+  enabled: true
 
   image:
     repository: ghcr.io/mycurelabs/mycureapp
@@ -188,7 +188,7 @@ mycure:
 
 # ===== HEALTHCARE: SyncD Real-time Synchronization =====
 syncd:
-  enabled: false
+  enabled: true
 
   image:
     repository: ghcr.io/mycurelabs/syncd
