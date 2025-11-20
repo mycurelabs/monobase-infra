@@ -118,6 +118,11 @@ hapihub:
     timeouts:
       request: "60s"
 
+  betterAuth:
+    passkey:
+      rpName: "Mycure"
+      rpId: "mycureapp.com"
+
   env:
     - name: CLUSTER_INSTANCES
       value: "1"
