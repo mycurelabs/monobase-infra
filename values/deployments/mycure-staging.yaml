@@ -188,6 +188,35 @@ mycure:
   podDisruptionBudget:
     enabled: false
 
+# ===== HEALTHCARE: Frontend Application (v8 Legacy) =====
+mycurev8:
+  enabled: true
+
+  image:
+    repository: ghcr.io/mycurelabs/mycureapp
+    tag: "8.22.4"
+    pullPolicy: IfNotPresent
+
+  replicaCount: 1
+
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 128Mi
+
+  gateway:
+    hostname: ""
+
+  config:
+    API_URL: "https://hapihub.stg.mycureapp.com"
+    HAPIHUB_URL: "https://hapihub.stg.mycureapp.com"
+
+  podDisruptionBudget:
+    enabled: false
+
 # ===== HEALTHCARE: DentaLemon Dental Application =====
 dentalemon:
   enabled: true

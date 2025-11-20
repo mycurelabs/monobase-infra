@@ -1,0 +1,18 @@
+apiVersion: v2
+name: mycurev8
+description: MyCure v8 - Legacy patient-facing healthcare application
+type: application
+version: 1.0.0
+appVersion: "8.22.4"
+keywords:
+  - mycurev8
+  - mycure
+  - frontend
+  - vue
+  - healthcare
+home: https://github.com/monobaselabs/monobase-infra
+sources:
+  - https://github.com/monobaselabs/monobase
+maintainers:
+  - name: Your Organization
+    email: devops@example.com

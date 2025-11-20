@@ -93,10 +93,12 @@ gateway:
         - dentalemon
         - hapihub
         - mycure
+        - mycurev8
         # Staging subdomains
         - dentalemon.stg
         - hapihub.stg
         - mycure.stg
+        - mycurev8.stg
         - api.stg
         - mail.stg
         - storage.stg
