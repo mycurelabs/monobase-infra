@@ -2,15 +2,15 @@
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
-  name: {{ include "mycure.fullname" . }}
-  namespace: {{ include "mycure.namespace" . }}
+  name: {{ include "mycurev8.fullname" . }}
+  namespace: {{ include "mycurev8.namespace" . }}
   labels:
-    {{- include "mycure.labels" . | nindent 4 }}
+    {{- include "mycurev8.labels" . | nindent 4 }}
 spec:
   scaleTargetRef:
     apiVersion: apps/v1
     kind: Deployment
-    name: {{ include "mycure.fullname" . }}
+    name: {{ include "mycurev8.fullname" . }}
   minReplicas: {{ .Values.autoscaling.minReplicas }}
   maxReplicas: {{ .Values.autoscaling.maxReplicas }}
   metrics:

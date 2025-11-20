@@ -2,10 +2,10 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: {{ include "mycure.fullname" . }}
-  namespace: {{ include "mycure.namespace" . }}
+  name: {{ include "mycurev8.fullname" . }}
+  namespace: {{ include "mycurev8.namespace" . }}
   labels:
-    {{- include "mycure.labels" . | nindent 4 }}
+    {{- include "mycurev8.labels" . | nindent 4 }}
 data:
   {{- range $key, $value := .Values.config }}
   {{ $key }}: {{ $value | quote }}

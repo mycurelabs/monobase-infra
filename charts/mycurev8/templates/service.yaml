@@ -2,10 +2,10 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "mycure.fullname" . }}
-  namespace: {{ include "mycure.namespace" . }}
+  name: {{ include "mycurev8.fullname" . }}
+  namespace: {{ include "mycurev8.namespace" . }}
   labels:
-    {{- include "mycure.labels" . | nindent 4 }}
+    {{- include "mycurev8.labels" . | nindent 4 }}
   {{- with .Values.service.annotations }}
   annotations:
     {{- toYaml . | nindent 4 }}
@@ -18,5 +18,5 @@ spec:
       protocol: TCP
       name: http
   selector:
-    {{- include "mycure.selectorLabels" . | nindent 4 }}
+    {{- include "mycurev8.selectorLabels" . | nindent 4 }}
 {{- end }}

@@ -2,17 +2,17 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "mycure.fullname" . }}
-  namespace: {{ include "mycure.namespace" . }}
+  name: {{ include "mycurev8.fullname" . }}
+  namespace: {{ include "mycurev8.namespace" . }}
   labels:
-    {{- include "mycure.labels" . | nindent 4 }}
+    {{- include "mycurev8.labels" . | nindent 4 }}
 spec:
   {{- if not .Values.autoscaling.enabled }}
   replicas: {{ .Values.replicaCount }}
   {{- end }}
   selector:
     matchLabels:
-      {{- include "mycure.selectorLabels" . | nindent 6 }}
+      {{- include "mycurev8.selectorLabels" . | nindent 6 }}
   template:
     metadata:
       annotations:
@@ -21,13 +21,13 @@ spec:
         {{- toYaml . | nindent 8 }}
         {{- end }}
       labels:
-        {{- include "mycure.selectorLabels" . | nindent 8 }}
+        {{- include "mycurev8.selectorLabels" . | nindent 8 }}
     spec:
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      serviceAccountName: {{ include "mycure.serviceAccountName" . }}
+      serviceAccountName: {{ include "mycurev8.serviceAccountName" . }}
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
       containers:
@@ -80,7 +80,7 @@ spec:
         emptyDir: {}
       - name: caddy-config
         emptyDir: {}
-      {{- $nodePool := include "mycure.nodePool" . -}}
+      {{- $nodePool := include "mycurev8.nodePool" . -}}
       {{- if or $nodePool .Values.nodeSelector }}
       nodeSelector:
         {{- if $nodePool }}

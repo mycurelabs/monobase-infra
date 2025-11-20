@@ -2,28 +2,28 @@
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
-  name: {{ include "mycure.fullname" . }}
-  namespace: {{ include "mycure.namespace" . }}
+  name: {{ include "mycurev8.fullname" . }}
+  namespace: {{ include "mycurev8.namespace" . }}
   labels:
-    {{- include "mycure.labels" . | nindent 4 }}
+    {{- include "mycurev8.labels" . | nindent 4 }}
 spec:
   parentRefs:
-    - name: {{ include "mycure.gateway.name" . }}
-      namespace: {{ include "mycure.gateway.namespace" . }}
+    - name: {{ include "mycurev8.gateway.name" . }}
+      namespace: {{ include "mycurev8.gateway.namespace" . }}
       {{- if .Values.gateway.sectionName }}
       sectionName: {{ .Values.gateway.sectionName }}
       {{- else }}
       sectionName: https  # Default: attach to HTTPS listener
       {{- end }}
   hostnames:
-    - {{ include "mycure.gateway.hostname" . }}
+    - {{ include "mycurev8.gateway.hostname" . }}
   rules:
     - matches:
         - path:
             type: PathPrefix
             value: /
       backendRefs:
-        - name: {{ include "mycure.fullname" . }}
+        - name: {{ include "mycurev8.fullname" . }}
           port: {{ .Values.service.port }}
           weight: 1
 {{- end }}
