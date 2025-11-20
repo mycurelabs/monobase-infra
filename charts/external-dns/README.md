@@ -253,8 +253,8 @@ instances:
 
     # Domain filtering (highly recommended)
     domainFilters:
-      - mycureapp.com
-      - "*.mycureapp.com"
+      - example.com
+      - "*.example.com"
 
     # Provider-specific configuration
     cloudflare:

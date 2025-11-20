@@ -22,7 +22,7 @@ export function generateKey(length: number = 32): string {
 /**
  * Infer deployment name from file path
  * Examples:
- *   /path/to/deployments/mycure-staging/secrets.yaml → mycure-staging
+ *   /path/to/deployments/example-staging/secrets.yaml → example-staging
  *   /path/to/infrastructure/secrets.yaml → infrastructure
  */
 export function inferDeploymentName(filePath: string): string {
@@ -47,7 +47,7 @@ export function inferDeploymentName(filePath: string): string {
 /**
  * Infer target namespace from deployment name
  * infrastructure → undefined (cross-namespace)
- * mycure-staging → mycure-staging
+ * example-staging → example-staging
  */
 export function inferNamespace(deploymentName: string): string | undefined {
   if (deploymentName === "infrastructure") {

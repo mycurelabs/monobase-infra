@@ -94,7 +94,7 @@ The mono-infra Gateway supports **two types of domains**:
 **Centralized:**
 ```
 gateway-system/
-  ├── wildcard-mycureapp-tls (Secret)
+  ├── wildcard-example-tls (Secret)
   ├── client1-domain-tls (Secret)
   ├── client2-domain-tls (Secret)
   └── client3-domain-tls (Secret)
@@ -108,7 +108,7 @@ Operations:
 **Distributed:**
 ```
 gateway-system/
-  └── wildcard-mycureapp-tls
+  └── wildcard-example-tls
 
 client1/
   ├── client1-domain-tls

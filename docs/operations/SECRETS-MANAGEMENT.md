@@ -116,7 +116,7 @@ echo -n "YOUR_CLOUDFLARE_TOKEN" | gcloud secrets create cloudflare-api-token \
 ```bash
 # Set variables
 PROJECT_ID="your-gcp-project"
-NAMESPACE="mycure-staging"
+NAMESPACE="example-staging"
 KSA_NAME="external-secrets"
 GSA_NAME="external-secrets"
 
@@ -245,10 +245,10 @@ echo -n "$NEW_SECRET" | gcloud secrets versions add api-jwt-secret --data-file=-
 # Or force refresh:
 kubectl annotate externalsecret api-secrets \
   force-sync=$(date +%s) \
-  -n mycure-staging
+  -n example-staging
 
 # 4. Restart pods to use new secret
-kubectl rollout restart deployment api -n mycure-staging
+kubectl rollout restart deployment api -n example-staging
 ```
 
 ### Rotate Cloudflare API Token
@@ -274,7 +274,7 @@ kubectl logs -n cert-manager deploy/cert-manager -f
 ### Reference ExternalSecret in Helm Values
 
 ```yaml
-# In deployments/mycure-staging/values.yaml
+# In deployments/example-staging/values.yaml
 postgresql:
   auth:
     existingSecret: postgresql-secrets
@@ -285,12 +285,12 @@ postgresql:
 ### Create ExternalSecret for Deployment
 
 ```yaml
-# In deployments/mycure-staging/external-secrets/postgresql.yaml
+# In deployments/example-staging/external-secrets/postgresql.yaml
 apiVersion: external-secrets.io/v1beta1
 kind: ExternalSecret
 metadata:
   name: postgresql-secrets
-  namespace: mycure-staging
+  namespace: example-staging
 spec:
   refreshInterval: 1h
   secretStoreRef:
@@ -391,12 +391,12 @@ External Secrets Operator uses a **declarative, GitOps-first approach**:
 **Step 1: Create ExternalSecret in Git**
 
 ```yaml
-# deployments/mycure-staging/cloudflare-externalsecret.yaml
+# deployments/example-staging/cloudflare-externalsecret.yaml
 apiVersion: external-secrets.io/v1beta1
 kind: ExternalSecret
 metadata:
   name: cloudflare-api-token
-  namespace: mycure-staging
+  namespace: example-staging
 spec:
   refreshInterval: 1h
   secretStoreRef:
@@ -424,10 +424,10 @@ echo -n "YOUR_CLOUDFLARE_TOKEN" | gcloud secrets create infrastructure-cloudflar
 
 ```bash
 # Watch ExternalSecret status
-kubectl get externalsecret -n mycure-staging cloudflare-api-token -w
+kubectl get externalsecret -n example-staging cloudflare-api-token -w
 
 # Verify synced Kubernetes Secret
-kubectl get secret -n mycure-staging cloudflare-api-token
+kubectl get secret -n example-staging cloudflare-api-token
 ```
 
 ### Common Patterns

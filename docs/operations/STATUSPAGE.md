@@ -39,13 +39,13 @@ If your Kubernetes cluster goes down, your status page goes down with it → use
    ```bash
    # Visit https://github.com/upptime/upptime
    # Click "Use this template" → Create new repository
-   # Name: mycure-status (or similar)
+   # Name: platform-status (or similar)
    ```
 
 2. **Configure `.upptimerc.yml`:**
    ```yaml
    owner: your-org
-   repo: mycure-status
+   repo: platform-status
    
    sites:
      - name: Account App
@@ -65,7 +65,7 @@ If your Kubernetes cluster goes down, your status page goes down with it → use
      cname: status.stg.example.com
      name: Example Status
      introTitle: "Service Status"
-     introMessage: Real-time status of MyCure services
+     introMessage: Real-time status of platform services
    
    # Notifications (optional)
    notifications:
@@ -98,7 +98,7 @@ If your Kubernetes cluster goes down, your status page goes down with it → use
    
    # Create fly.toml
    cat > fly.toml << 'EOF'
-   app = "mycure-status"
+   app = "platform-status"
    
    [build]
      image = "louislam/uptime-kuma:1"

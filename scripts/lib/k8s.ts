@@ -179,7 +179,7 @@ export function findKubeconfigFiles(): string[] {
   const entries = Bun.file(kubeDir).text();
 
   // For now, just return common patterns
-  const commonFiles = ["config", "mycure-doks-main", "k3d-main"];
+  const commonFiles = ["config", "cluster-main", "k3d-main"];
 
   for (const file of commonFiles) {
     const filePath = join(kubeDir, file);

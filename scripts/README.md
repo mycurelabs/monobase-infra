@@ -54,8 +54,8 @@ Provider-agnostic secrets management with centralized `secrets.yaml` configurati
 
 **Configuration:**
 - `infrastructure/secrets.yaml` - Infrastructure-level secrets ✅
-- `deployments/mycure-staging/secrets.yaml` - Staging secrets ✅
-- `deployments/mycure-production/secrets.yaml` - Production secrets ✅
+- `deployments/example-staging/secrets.yaml` - Staging secrets ✅
+- `deployments/example-production/secrets.yaml` - Production secrets ✅
 
 **Auto-Detection Features:**
 - **GCP Project**: Detects from existing `gcp-secretstore.yaml` → `gcloud config` → prompts
@@ -83,8 +83,8 @@ bun scripts/secrets.ts setup
 bun scripts/secrets.ts setup --full
 
 # Explicit values (overrides auto-detection)
-bun scripts/secrets.ts setup --project mc-v4-prod
-bun scripts/secrets.ts setup --full --project mc-v4-prod --kubeconfig ~/.kube/mycure-doks-main
+bun scripts/secrets.ts setup --project my-project
+bun scripts/secrets.ts setup --full --project my-project --kubeconfig ~/.kube/cluster-main
 
 # Validate secrets.yaml files
 bun scripts/secrets.ts validate
