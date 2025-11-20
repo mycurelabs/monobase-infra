@@ -129,8 +129,8 @@ mise run secrets:validate
 ```yaml
 secrets:
   - name: postgresql              # K8s secret name
-    remoteRef: staging-postgresql # Provider reference (abstract)
-    targetNamespace: mycure-staging  # Optional, inferred from location
+    remoteRef: example-staging-postgresql-password # Provider reference (abstract)
+    targetNamespace: example-staging  # Optional, inferred from location
     keys:
       - key: postgres-password    # K8s secret key
         remoteKey: staging-postgresql-password  # Provider key
