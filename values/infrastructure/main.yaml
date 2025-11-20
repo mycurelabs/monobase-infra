@@ -114,8 +114,12 @@ gateway:
         - sync
         - storage
         - dentalemon
+        - hapihub
+        - mycure
         # Staging subdomains
         - dentalemon.stg
+        - hapihub.stg
+        - mycure.stg
         - api.stg
         - mail.stg
         - storage.stg
