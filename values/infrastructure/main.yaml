@@ -13,38 +13,36 @@ certManagerIssuers:
   issuers:
     # HTTP-01 challenge type (no DNS provider needed)
     - name: letsencrypt-prod
-      email: "caretheextramile@gmail.com"
+      email: "admin@example.com"
       server: production
       provider: http01
     
     - name: letsencrypt-staging
-      email: "caretheextramile@gmail.com"
+      email: "admin@example.com"
       server: staging
       provider: http01
 
-    # DNS-01 Cloudflare challenge (for wildcard certificates and MyCure domains)
-    - name: letsencrypt-mycure-cloudflare-prod
-      email: "caretheextramile@gmail.com"
+    # DNS-01 Cloudflare challenge (for wildcard certificates and platform domains)
+    - name: letsencrypt-example-cloudflare-prod
+      email: "admin@example.com"
       server: production
       provider: cloudflare
       cloudflare:
         dnsZones:
-          - "mycureapp.com"
-          - "stitchtechsolutions.com"
+          - "example.com"
         apiTokenSecretRef:
-          name: mycure-cloudflare-api-token
+          name: example-cloudflare-api-token
           key: api-token
 
-    - name: letsencrypt-mycure-cloudflare-staging
-      email: "caretheextramile@gmail.com"
+    - name: letsencrypt-example-cloudflare-staging
+      email: "admin@example.com"
       server: staging
       provider: cloudflare
       cloudflare:
         dnsZones:
-          - "mycureapp.com"
-          - "stitchtechsolutions.com"
+          - "example.com"
         apiTokenSecretRef:
-          name: mycure-cloudflare-api-token
+          name: example-cloudflare-api-token
           key: api-token
 
 # Envoy Gateway - Gateway API implementation
@@ -80,7 +78,7 @@ envoyProxyConfig:
 # Gateway Resources - Shared Gateway configuration
 gateway:
   # Base domain for gateway (override per deployment)
-  domain: mycureapp.com
+  domain: example.com
 
   # Gateway configuration
   gateway:
@@ -105,21 +103,21 @@ gateway:
     secretName: gateway-tls
     certManager:
       enabled: true  # Enabled: DNS records exist, ready for certificate provisioning
-      clusterIssuer: letsencrypt-mycure-cloudflare-prod  # DNS-01 challenge for wildcard cert
+      clusterIssuer: letsencrypt-example-cloudflare-prod  # DNS-01 challenge for wildcard cert
       includeApex: true
       # Specific subdomains for HTTP-01 challenge
       subdomains:
         # Production subdomains
         - grafana
-        - hapihub
-        - mycure
+        - api
+        - web
         - sync
         - storage
         # Staging subdomains
-        - hapihub.stg
+        - api.stg
         - mail.stg
         - storage.stg
-        - mycure.stg
+        - web.stg
         - sync.stg
 
   # HTTP to HTTPS redirect

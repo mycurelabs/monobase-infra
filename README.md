@@ -8,7 +8,7 @@ This repository provides production-ready, template-based Kubernetes infrastruct
 
 - **Fork-Based Workflow** - Clients fork this template and add their configuration
 - **100% Parameterized** - No hardcoded client-specific values in base template
-- **Multi-Domain Gateway** - Support for both platform subdomains and client-owned custom domains
+- **Multi-Domain Gateway** - Support for both platform subdomains (`*.example.com`) and client-owned custom domains (`app.client.com`)
 - **Security by Default** - NetworkPolicies, Pod Security Standards, encryption
 - **Compliance Ready** - Built-in security controls and compliance features
 - **Modern Stack** - Gateway API, ArgoCD GitOps, External Secrets, Velero backups
@@ -85,11 +85,11 @@ monobase-infra/
 This repository includes OpenTofu/Terraform modules for provisioning Kubernetes clusters. Use the unified `provision.sh` script for all cluster types:
 
 **Supported Platforms:**
-- **AWS EKS** - `./scripts/provision.sh --cluster myclient-eks`
-- **Azure AKS** - `./scripts/provision.sh --cluster myclient-aks`
-- **GCP GKE** - `./scripts/provision.sh --cluster myclient-gke`
-- **DigitalOcean DOKS** - `./scripts/provision.sh --cluster myclient-doks`
-- **On-Premises K3s** - `./scripts/provision.sh --cluster myclient-k3s`
+- **AWS EKS** - `./scripts/provision.sh --cluster acme-eks`
+- **Azure AKS** - `./scripts/provision.sh --cluster acme-aks`
+- **GCP GKE** - `./scripts/provision.sh --cluster acme-gke`
+- **DigitalOcean DOKS** - `./scripts/provision.sh --cluster acme-doks`
+- **On-Premises K3s** - `./scripts/provision.sh --cluster acme-k3s`
 - **Local k3d (Development)** - `./scripts/provision.sh --cluster k3d-local`
 
 **Workflow:**
@@ -136,20 +136,20 @@ cd monobase-infra
 
 ```bash
 # 3. Create client configuration from example
-cp -r deployments/example-prod deployments/myclient-prod
+cp -r deployments/example-prod deployments/acme-prod
 
 # 4. Edit configuration
-vim deployments/myclient-prod/values.yaml
+vim deployments/acme-prod/values.yaml
 # Required changes:
-#   - global.domain: myclient.com
-#   - global.namespace: myclient-prod
-#   - argocd.repoURL: https://github.com/monobaselabs/monobase-infra.git
+#   - global.domain: acme.com
+#   - global.namespace: acme-prod
+#   - argocd.repoURL: https://github.com/yourorg/monobase-infra.git
 #   - api.image.tag: "5.215.2" (pin version, not "latest")
 #   - account.image.tag: "1.0.0" (pin version, not "latest")
 
 # 5. Commit and push to deploy
-git add deployments/myclient-prod/
-git commit -m "Add myclient-prod"
+git add deployments/acme-prod/
+git commit -m "Add acme-prod"
 git push
 ```
 
@@ -163,10 +163,10 @@ The bootstrap script outputs ArgoCD UI access information. Use the admin credent
 
 ```bash
 # Just edit, commit, and push - ArgoCD syncs automatically
-vim deployments/myclient-prod/values-production.yaml
-git commit -am "Update myclient-prod: increase replicas"
+vim deployments/acme-prod/values-production.yaml
+git commit -am "Update acme-prod: increase replicas"
 git push
-# ✓ ArgoCD auto-syncs only myclient-prod
+# ✓ ArgoCD auto-syncs only acme-prod
 ```
 
 ---
@@ -198,21 +198,21 @@ cd monobase-infra
 ./scripts/bootstrap.sh
 
 # 5. Create client configuration
-cp -r deployments/example-prod deployments/myclient-prod
+cp -r deployments/example-prod deployments/acme-prod
 
 # 6. Edit configuration
-vim deployments/myclient-prod/values.yaml
+vim deployments/acme-prod/values.yaml
 # Required changes:
-#   - global.domain: myclient.com
-#   - global.namespace: myclient-prod
+#   - global.domain: acme.com
+#   - global.namespace: acme-prod
 #   - global.storage.provider: cloud-default (EKS/AKS/GKE) or longhorn (on-prem)
-#   - argocd.repoURL: https://github.com/monobaselabs/monobase-infra.git
+#   - argocd.repoURL: https://github.com/yourorg/monobase-infra.git
 #   - api.image.tag: "5.215.2" (pin version, not "latest")
 #   - account.image.tag: "1.0.0" (pin version, not "latest")
 
 # 7. Commit and push to deploy
-git add deployments/myclient-prod/
-git commit -m "Add myclient-prod"
+git add deployments/acme-prod/
+git commit -m "Add acme-prod"
 git push
 # ✓ ArgoCD auto-detects and deploys!
 ```
@@ -236,17 +236,17 @@ This template provides **complete reference examples** for each environment type
 **Example:**
 ```bash
 # Create production deployment
-cp -r deployments/example-prod deployments/myclient-prod
-vim deployments/myclient-prod/values.yaml
+cp -r deployments/example-prod deployments/acme-prod
+vim deployments/acme-prod/values.yaml
 # Change: domain, namespace, image tags, backup bucket
 
 # Create staging deployment
-cp -r deployments/example-staging deployments/myclient-staging
-vim deployments/myclient-staging/values.yaml
+cp -r deployments/example-staging deployments/acme-staging
+vim deployments/acme-staging/values.yaml
 # Change: domain, namespace
 
-git add deployments/myclient-*
-git commit -m "Add myclient deployments"
+git add deployments/acme-*
+git commit -m "Add acme deployments"
 git push
 ```
 
@@ -307,7 +307,7 @@ Internet → Envoy Gateway (shared, HA) → HTTPRoutes (per client/env) → Appl
 
 **Key Design Decisions:**
 - **Shared Gateway** - One Gateway in `gateway-system`, HTTPRoutes per client (zero-downtime)
-- **Multi-Domain Support** - Platform subdomains (`*.mycureapp.com`) + client custom domains (`app.client.com`)
+- **Multi-Domain Support** - Platform subdomains (`*.example.com`) + client custom domains (`app.client.com`)
 - **Centralized Certificates** - All TLS certificates in `gateway-system` namespace (security best practice)
 - **Namespace Isolation** - Each client/environment gets separate namespace (`{client}-{env}`)
 - **No Overengineering** - No service mesh, no self-hosted Vault (use cloud KMS)

@@ -9,7 +9,7 @@ Quick reference for managing TLS certificates in the Gateway.
 All certificates for the Gateway are centrally managed and stored in the `gateway-system` namespace.
 
 **Certificate Types:**
-- **Wildcard (DNS-01):** `*.mycureapp.com` - covers platform subdomains
+- **Wildcard (DNS-01):** `*.example.com` - covers platform subdomains
 - **HTTP-01 Auto:** `app.client.com` - auto-provisioned for client domains
 - **Client-Provided:** Client uploads to GCP Secret Manager, ESO syncs
 
@@ -24,9 +24,9 @@ All certificates declared in a single file for centralized management.
 ```yaml
 certificates:
   # Platform wildcard certificate (DNS-01)
-  - name: wildcard-mycureapp
-    domain: "*.mycureapp.com"
-    issuer: letsencrypt-mycure-cloudflare-prod
+  - name: wildcard-example
+    domain: "*.example.com"
+    issuer: letsencrypt-example-cloudflare-prod
     challengeType: dns01
   
   # Client domain certificates (HTTP-01 auto-provisioned)
@@ -162,14 +162,14 @@ ClusterIssuers are now managed via the `cert-manager-issuers` Helm chart.
 - Avoids Let's Encrypt rate limits
 - Certificates NOT trusted by browsers
 
-### letsencrypt-mycure-cloudflare-prod (DNS-01)
+### letsencrypt-example-cloudflare-prod (DNS-01)
 
-- **For MyCure platform wildcard certificates**
-- Supports wildcard domains (`*.mycureapp.com`)
+- **For platform wildcard certificates**
+- Supports wildcard domains (`*.example.com`)
 - Requires Cloudflare API access
 - Used for platform subdomains
 
-### letsencrypt-mycure-cloudflare-staging (DNS-01)
+### letsencrypt-example-cloudflare-staging (DNS-01)
 
 - Testing DNS-01 certificate provisioning
 - For wildcard certificate testing
@@ -190,7 +190,7 @@ spec:
       hostname: "*"  # Accept all domains
       tls:
         certificateRefs:
-          - name: wildcard-mycureapp-tls
+          - name: wildcard-example-tls
           - name: client1-domain-tls
           - name: client2-domain-tls
           # ... auto-generated from certificates.yaml
@@ -216,8 +216,8 @@ spec:
 **ClusterIssuer Names:**
 - `letsencrypt-prod` - HTTP-01 production (default for client domains)
 - `letsencrypt-staging` - HTTP-01 staging
-- `letsencrypt-mycure-cloudflare-prod` - DNS-01 production (MyCure platform wildcard)
-- `letsencrypt-mycure-cloudflare-staging` - DNS-01 staging
+- `letsencrypt-example-cloudflare-prod` - DNS-01 production (platform wildcard)
+- `letsencrypt-example-cloudflare-staging` - DNS-01 staging
 
 ---
 
