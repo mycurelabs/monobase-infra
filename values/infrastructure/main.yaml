@@ -113,6 +113,7 @@ gateway:
         - web
         - sync
         - storage
+        - dentalemon
         # Staging subdomains
         - api.stg
         - mail.stg
