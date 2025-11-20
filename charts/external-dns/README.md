@@ -20,10 +20,10 @@ Unlike traditional cluster-wide External DNS deployments, this chart is designed
 
 ```
 deployments/
-├── mycure-staging/
+├── example-staging/
 │   ├── values.yaml                    # External DNS config for staging
 │   └── cloudflare-externalsecret.yaml # External Secrets credentials
-├── mycure-production/
+├── example-production/
 │   ├── values.yaml                    # External DNS config for production
 │   └── cloudflare-externalsecret.yaml # Different credentials
 └── client-acme/
@@ -48,7 +48,7 @@ externalDNS:
     # Instance 1: Primary Cloudflare account
     - name: primary
       provider: cloudflare
-      domainFilters: [mycureapp.com]
+      domainFilters: [example.com]
       cloudflare:
         apiTokenSecretRef:
           name: cloudflare-token-primary
@@ -56,7 +56,7 @@ externalDNS:
     # Instance 2: Client subdomain on different Cloudflare account
     - name: client-subdomain
       provider: cloudflare
-      domainFilters: [client.mycureapp.com]
+      domainFilters: [client.example.com]
       cloudflare:
         apiTokenSecretRef:
           name: cloudflare-token-client
@@ -64,7 +64,7 @@ externalDNS:
     # Instance 3: AWS Route53 for different domain
     - name: aws-production
       provider: aws
-      domainFilters: [example.com]
+      domainFilters: [acme.example.com]
       aws:
         region: us-east-1
 ```
@@ -86,24 +86,24 @@ Create a Cloudflare API token with **DNS Edit** permissions:
 
 1. Go to Cloudflare Dashboard → My Profile → API Tokens
 2. Create Token → Edit zone DNS (use template)
-3. Zone Resources: Include → Specific zone → `mycureapp.com`
+3. Zone Resources: Include → Specific zone → `example.com`
 4. Create Token
 
 Store in GCP Secret Manager and sync with External Secrets Operator:
 
 ```bash
 # Store token in GCP Secret Manager
-echo -n "YOUR_CLOUDFLARE_TOKEN" | gcloud secrets create mycure-staging-cloudflare-token \
+echo -n "YOUR_CLOUDFLARE_TOKEN" | gcloud secrets create example-staging-cloudflare-token \
   --data-file=- \
   --replication-policy=automatic
 
 # Create ExternalSecret manifest
-cat > deployments/mycure-staging/cloudflare-externalsecret.yaml <<EOF
+cat > deployments/example-staging/cloudflare-externalsecret.yaml <<EOF
 apiVersion: external-secrets.io/v1beta1
 kind: ExternalSecret
 metadata:
   name: cloudflare-api-token
-  namespace: mycure-staging
+  namespace: example-staging
 spec:
   refreshInterval: 1h
   secretStoreRef:
@@ -115,7 +115,7 @@ spec:
   data:
     - secretKey: api-token
       remoteRef:
-        key: mycure-staging-cloudflare-token
+        key: example-staging-cloudflare-token
 EOF
 ```
 
@@ -168,7 +168,7 @@ externalDNS:
       provider: cloudflare
 
       domainFilters:
-        - mycureapp.com
+        - example.com
 
       cloudflare:
         proxied: false  # DNS only, no Cloudflare proxy
@@ -194,10 +194,10 @@ The chart is automatically deployed via ArgoCD ApplicationSet:
 kubectl get app -n argocd | grep external-dns
 
 # Check deployment status
-kubectl get deployment -n mycure-staging | grep external-dns
+kubectl get deployment -n example-staging | grep external-dns
 
 # View logs
-kubectl logs -n mycure-staging deployment/external-dns-primary
+kubectl logs -n example-staging deployment/external-dns-primary
 ```
 
 ## Configuration
@@ -286,7 +286,7 @@ instances:
 instances:
   - name: cloudflare-primary
     provider: cloudflare
-    domainFilters: [mycureapp.com]
+    domainFilters: [example.com]
     cloudflare:
       proxied: false              # DNS only
       apiTokenSecretRef:
@@ -407,7 +407,7 @@ externalDNS:
   instances:
     - name: primary
       provider: cloudflare
-      domainFilters: [mycureapp.com]
+      domainFilters: [example.com]
       cloudflare:
         apiTokenSecretRef:
           name: cloudflare-token
@@ -422,14 +422,14 @@ externalDNS:
   instances:
     - name: primary-domain
       provider: cloudflare
-      domainFilters: [mycureapp.com]
+      domainFilters: [example.com]
       cloudflare:
         apiTokenSecretRef:
           name: cloudflare-token-primary
 
     - name: client-domain
       provider: cloudflare
-      domainFilters: [client-example.com]
+      domainFilters: [client.example.com]
       cloudflare:
         apiTokenSecretRef:
           name: cloudflare-token-client
@@ -444,14 +444,14 @@ externalDNS:
   instances:
     - name: cloudflare-main
       provider: cloudflare
-      domainFilters: [mycureapp.com]
+      domainFilters: [example.com]
       cloudflare:
         apiTokenSecretRef:
           name: cloudflare-token
 
     - name: aws-backup
       provider: aws
-      domainFilters: [mycureapp.net]
+      domainFilters: [example.net]
       aws:
         region: us-east-1
       serviceAccount:
@@ -468,24 +468,24 @@ externalDNS:
   instances:
     - name: main-domain
       provider: cloudflare
-      domainFilters: [mycureapp.com]
+      domainFilters: [example.com]
       cloudflare:
         apiTokenSecretRef:
           name: cloudflare-token-main
 
     - name: tenant-acme
       provider: cloudflare
-      domainFilters: [acme.mycureapp.com]
+      domainFilters: [acme.example.com]
       cloudflare:
         apiTokenSecretRef:
           name: cloudflare-token-acme
 
-    - name: tenant-example
+    - name: tenant-globex
       provider: cloudflare
-      domainFilters: [example.mycureapp.com]
+      domainFilters: [globex.example.com]
       cloudflare:
         apiTokenSecretRef:
-          name: cloudflare-token-example
+          name: cloudflare-token-globex
 ```
 
 ## How It Works
@@ -499,10 +499,10 @@ apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
   name: api
-  namespace: mycure-staging
+  namespace: example-staging
 spec:
   hostnames:
-    - api.stg.mycureapp.com
+    - api.stg.example.com
   parentRefs:
     - name: shared-gateway
       namespace: gateway-system
@@ -510,15 +510,15 @@ spec:
 
 External DNS automatically:
 1. Watches the HTTPRoute resource
-2. Extracts hostname: `api.stg.mycureapp.com`
+2. Extracts hostname: `api.stg.example.com`
 3. Gets LoadBalancer IP from Gateway Service: `188.166.196.111`
 4. Creates DNS A record in Cloudflare:
    ```
-   api.stg.mycureapp.com → 188.166.196.111
+   api.stg.example.com → 188.166.196.111
    ```
 5. Creates TXT record for ownership tracking:
    ```
-   TXT external-dns-api.stg.mycureapp.com → "heritage=external-dns,owner=mycure-staging-primary"
+   TXT external-dns-api.stg.example.com → "heritage=external-dns,owner=example-staging-primary"
    ```
 
 ### 2. Service with LoadBalancer → DNS Record
@@ -531,7 +531,7 @@ kind: Service
 metadata:
   name: my-service
   annotations:
-    external-dns.alpha.kubernetes.io/hostname: service.stg.mycureapp.com
+    external-dns.alpha.kubernetes.io/hostname: service.stg.example.com
 spec:
   type: LoadBalancer
   loadBalancerIP: 203.0.113.42
@@ -539,7 +539,7 @@ spec:
 
 External DNS creates:
 ```
-service.stg.mycureapp.com → 203.0.113.42
+service.stg.example.com → 203.0.113.42
 ```
 
 ### 3. Ownership and Conflict Prevention
@@ -548,7 +548,7 @@ Each External DNS instance uses TXT records to track ownership:
 
 - **TXT prefix**: `external-dns-` (configurable)
 - **Owner ID**: `{namespace}-{instance-name}`
-- **Example**: `mycure-staging-primary`
+- **Example**: `example-staging-primary`
 
 This prevents conflicts when:
 - Multiple instances manage overlapping domains
@@ -561,22 +561,22 @@ This prevents conflicts when:
 
 ```bash
 # View External DNS logs
-kubectl logs -n mycure-staging deployment/external-dns-primary
+kubectl logs -n example-staging deployment/external-dns-primary
 
 # Expected output:
-# time="2025-01-15T10:30:00Z" level=info msg="Applying provider record filter for domains: [mycureapp.com]"
-# time="2025-01-15T10:30:01Z" level=info msg="Desired change: CREATE api.stg.mycureapp.com A [Id: /hostedzone/Z1234567890ABC]"
-# time="2025-01-15T10:30:02Z" level=info msg="2 record(s) in zone mycureapp.com were successfully updated"
+# time="2025-01-15T10:30:00Z" level=info msg="Applying provider record filter for domains: [example.com]"
+# time="2025-01-15T10:30:01Z" level=info msg="Desired change: CREATE api.stg.example.com A [Id: /hostedzone/Z1234567890ABC]"
+# time="2025-01-15T10:30:02Z" level=info msg="2 record(s) in zone example.com were successfully updated"
 ```
 
 ### Verify DNS Records in Cloudflare
 
 ```bash
 # Check DNS resolution
-dig api.stg.mycureapp.com
+dig api.stg.example.com
 
 # Check TXT ownership record
-dig TXT external-dns-api.stg.mycureapp.com
+dig TXT external-dns-api.stg.example.com
 ```
 
 ### Common Log Messages
@@ -588,7 +588,7 @@ level=info msg="All records are already up to date"
 
 **Creating new record:**
 ```
-level=info msg="Desired change: CREATE api.stg.mycureapp.com A"
+level=info msg="Desired change: CREATE api.stg.example.com A"
 level=info msg="2 record(s) were successfully updated"
 ```
 
@@ -600,7 +600,7 @@ level=error msg="failed to list records: HTTP 403: Forbidden"
 
 **Domain filter blocked:**
 ```
-level=info msg="Skipping endpoint api.example.com because it doesn't match domain filter [mycureapp.com]"
+level=info msg="Skipping endpoint api.other-domain.com because it doesn't match domain filter [example.com]"
 ```
 → Expected - domain filters working correctly
 
@@ -610,30 +610,30 @@ level=info msg="Skipping endpoint api.example.com because it doesn't match domai
 
 1. **Check External DNS is running:**
    ```bash
-   kubectl get pods -n mycure-staging | grep external-dns
+   kubectl get pods -n example-staging | grep external-dns
    ```
 
 2. **Check logs for errors:**
    ```bash
-   kubectl logs -n mycure-staging deployment/external-dns-primary
+   kubectl logs -n example-staging deployment/external-dns-primary
    ```
 
 3. **Verify HTTPRoute has correct hostname:**
    ```bash
-   kubectl get httproute -n mycure-staging -o yaml
+   kubectl get httproute -n example-staging -o yaml
    ```
 
 4. **Check domain filters:**
    ```bash
    # Ensure hostname matches domain filter
-   # If filter is "mycureapp.com", then "api.stg.mycureapp.com" will NOT match
-   # Use "*.mycureapp.com" or specific "stg.mycureapp.com"
+   # If filter is "example.com", then "api.stg.example.com" will NOT match
+   # Use "*.example.com" or specific "stg.example.com"
    ```
 
 5. **Verify credentials:**
    ```bash
    # Check secret exists
-   kubectl get secret cloudflare-api-token -n mycure-staging
+   kubectl get secret cloudflare-api-token -n example-staging
 
    # Test API token manually
    curl -X GET "https://api.cloudflare.com/client/v4/zones" \
@@ -689,7 +689,7 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
   name: external-dns
-  namespace: mycure-staging
+  namespace: example-staging
 ```
 
 Benefits:
@@ -704,12 +704,12 @@ Benefits:
 #### Cloudflare with GCP Secret Manager
 
 ```yaml
-# deployments/mycure-staging/cloudflare-externalsecret.yaml
+# deployments/example-staging/cloudflare-externalsecret.yaml
 apiVersion: external-secrets.io/v1beta1
 kind: ExternalSecret
 metadata:
   name: cloudflare-api-token
-  namespace: mycure-staging
+  namespace: example-staging
 spec:
   refreshInterval: 1h
   secretStoreRef:
@@ -721,18 +721,18 @@ spec:
   data:
     - secretKey: api-token
       remoteRef:
-        key: mycure-staging-cloudflare-token
+        key: example-staging-cloudflare-token
 ```
 
 #### AWS Route53 with AWS Secrets Manager
 
 ```yaml
-# deployments/mycure-production/route53-externalsecret.yaml
+# deployments/example-production/route53-externalsecret.yaml
 apiVersion: external-secrets.io/v1beta1
 kind: ExternalSecret
 metadata:
   name: route53-credentials
-  namespace: mycure-production
+  namespace: example-production
 spec:
   refreshInterval: 1h
   secretStoreRef:
@@ -744,10 +744,10 @@ spec:
   data:
     - secretKey: access-key-id
       remoteRef:
-        key: mycure-production-route53-access-key-id
+        key: example-production-route53-access-key-id
     - secretKey: secret-access-key
       remoteRef:
-        key: mycure-production-route53-secret-access-key
+        key: example-production-route53-secret-access-key
 ```
 
 #### Google Cloud DNS with GCP Secret Manager

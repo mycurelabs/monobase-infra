@@ -43,7 +43,7 @@ This infrastructure supports **4 DNS providers**:
 3. Permissions:
    - Zone / DNS / Edit
 4. Zone Resources:
-   - Include / Specific zone / `mycureapp.com`
+   - Include / Specific zone / `example.com`
 5. Copy the generated token
 
 ### 2. Store Token in GCP Secret Manager
@@ -58,12 +58,12 @@ echo -n "YOUR_CLOUDFLARE_TOKEN" | gcloud secrets create infrastructure-cloudflar
 ### 3. Create ExternalSecret
 
 ```yaml
-# deployments/mycure-staging/cloudflare-externalsecret.yaml
+# deployments/example-staging/cloudflare-externalsecret.yaml
 apiVersion: external-secrets.io/v1beta1
 kind: ExternalSecret
 metadata:
   name: cloudflare-api-token
-  namespace: mycure-staging
+  namespace: example-staging
 spec:
   refreshInterval: 1h
   secretStoreRef:
@@ -81,7 +81,7 @@ spec:
 ### 4. Enable External-DNS
 
 ```yaml
-# deployments/mycure-staging/values.yaml
+# deployments/example-staging/values.yaml
 externalDNS:
   enabled: true
 
@@ -91,7 +91,7 @@ externalDNS:
       provider: cloudflare
 
       domainFilters:
-        - mycureapp.com
+        - example.com
 
       cloudflare:
         proxied: false  # DNS only, no CDN
@@ -112,18 +112,18 @@ externalDNS:
 
 ```bash
 # Deploy via ArgoCD (or commit and push)
-kubectl get externalsecret -n mycure-staging cloudflare-api-token
+kubectl get externalsecret -n example-staging cloudflare-api-token
 # Should show: Ready: True
 
 # Check External DNS pod
-kubectl get pods -n mycure-staging -l app.kubernetes.io/name=external-dns
+kubectl get pods -n example-staging -l app.kubernetes.io/name=external-dns
 
 # View External DNS logs
-kubectl logs -n mycure-staging -l app.kubernetes.io/name=external-dns --tail=50
+kubectl logs -n example-staging -l app.kubernetes.io/name=external-dns --tail=50
 
 # Verify DNS records created
-dig mycure.stg.mycureapp.com
-dig api.stg.mycureapp.com
+dig app.stg.example.com
+dig api.stg.example.com
 ```
 
 ## Provider Setup Guides
@@ -187,7 +187,7 @@ externalDNS:
     - name: primary
       enabled: true
       provider: cloudflare
-      domainFilters: [mycureapp.com]
+      domainFilters: [example.com]
       cloudflare:
         apiTokenSecretRef:
           name: cloudflare-token-primary
@@ -197,7 +197,7 @@ externalDNS:
     - name: client-subdomain
       enabled: true
       provider: cloudflare
-      domainFilters: [client.mycureapp.com]
+      domainFilters: [client.example.com]
       cloudflare:
         proxied: true  # Enable CDN for this subdomain
         apiTokenSecretRef:
@@ -572,14 +572,14 @@ kubectl logs -n NAMESPACE -l app.kubernetes.io/name=external-dns --tail=100
 
 ```bash
 # Query DNS
-dig mycure.stg.mycureapp.com
-dig api.stg.mycureapp.com +short
+dig app.stg.example.com
+dig api.stg.example.com +short
 
 # Should return Gateway IP
 157.245.123.45
 
 # Test HTTP
-curl https://mycure.stg.mycureapp.com
+curl https://app.stg.example.com
 ```
 
 ### Check HTTPRoutes
@@ -668,7 +668,7 @@ curl -X GET "https://api.cloudflare.com/client/v4/zones" \
 kubectl rollout restart deployment -n NAMESPACE external-dns-primary
 
 # 3. Check TXT records (External DNS ownership)
-dig txt mycure.stg.mycureapp.com
+dig txt app.stg.example.com
 
 # Should show: "heritage=external-dns,external-dns/owner=..."
 
@@ -742,16 +742,16 @@ az role assignment list \
 ### Namespace-Scoped Deployment
 
 ```
-mycure-staging namespace:
-├── HTTPRoute (mycure.stg.mycureapp.com)
-├── HTTPRoute (api.stg.mycureapp.com)
+example-staging namespace:
+├── HTTPRoute (app.stg.example.com)
+├── HTTPRoute (api.stg.example.com)
 ├── ExternalSecret (cloudflare-api-token)
 └── External DNS Pod
     └── Watches HTTPRoutes in THIS namespace only
     └── Creates DNS records in Cloudflare
 
-mycure-production namespace:
-├── HTTPRoute (mycure.mycureapp.com)
+example-production namespace:
+├── HTTPRoute (app.example.com)
 ├── ExternalSecret (route53-credentials)
 └── External DNS Pod
     └── Watches HTTPRoutes in THIS namespace only

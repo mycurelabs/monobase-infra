@@ -49,21 +49,21 @@ If your Kubernetes cluster goes down, your status page goes down with it → use
    
    sites:
      - name: Account App
-       url: https://account.stg.mycureapp.com
+       url: https://account.stg.example.com
      - name: API Health
-       url: https://api.stg.mycureapp.com/health
-     - name: HapiHub Health
-       url: https://hapihub.stg.mycureapp.com/health
-     - name: MyCure Frontend
-       url: https://mycure.stg.mycureapp.com
+       url: https://api.stg.example.com/health
+     - name: Backend Health
+       url: https://backend.stg.example.com/health
+     - name: Frontend
+       url: https://frontend.stg.example.com
      - name: Mailpit
-       url: https://mail.stg.mycureapp.com
+       url: https://mail.stg.example.com
      - name: MinIO Health
-       url: https://storage.stg.mycureapp.com/minio/health/live
+       url: https://storage.stg.example.com/minio/health/live
    
    status-website:
-     cname: status.stg.mycureapp.com
-     name: MyCure Status
+     cname: status.stg.example.com
+     name: Example Status
      introTitle: "Service Status"
      introMessage: Real-time status of MyCure services
    
@@ -74,7 +74,7 @@ If your Kubernetes cluster goes down, your status page goes down with it → use
    ```
 
 3. **Custom Domain:**
-   - Add DNS CNAME: `status.stg.mycureapp.com` → `your-org.github.io`
+   - Add DNS CNAME: `status.stg.example.com` → `your-org.github.io`
    - Enable GitHub Pages in repo settings
    - Wait for SSL cert provisioning (~5 min)
 
@@ -133,16 +133,16 @@ If your Kubernetes cluster goes down, your status page goes down with it → use
 
 3. **Custom domain:**
    ```bash
-   fly certs add status.stg.mycureapp.com
-   # Add DNS CNAME: status.stg.mycureapp.com → mycure-status.fly.dev
+   fly certs add status.stg.example.com
+   # Add DNS CNAME: status.stg.example.com → example-status.fly.dev
    ```
 
 4. **Configure Uptime Kuma:**
-   - Visit `https://status.stg.mycureapp.com`
+   - Visit `https://status.stg.example.com`
    - Create admin account
    - Add monitors (same URLs as Upptime above)
    - Create public status page: Settings → Status Pages → Add
-   - Set slug: `mycure-staging`
+   - Set slug: `example-staging`
    - Publish it
 
 5. **Notifications:**
@@ -162,21 +162,21 @@ fly ssh console
 
 ---
 
-## MyCure Service Monitors
+## Service Monitors
 
 ### Endpoints to Monitor
 
 **Staging:**
-- `https://account.stg.mycureapp.com` - Account App
-- `https://api.stg.mycureapp.com/health` - API Health
-- `https://hapihub.stg.mycureapp.com/health` - HapiHub Health  
-- `https://mycure.stg.mycureapp.com` - MyCure Frontend
-- `https://mail.stg.mycureapp.com` - Mailpit
-- `https://storage.stg.mycureapp.com/minio/health/live` - MinIO
+- `https://account.stg.example.com` - Account App
+- `https://api.stg.example.com/health` - API Health
+- `https://backend.stg.example.com/health` - Backend Health  
+- `https://frontend.stg.example.com` - Frontend
+- `https://mail.stg.example.com` - Mailpit
+- `https://storage.stg.example.com/minio/health/live` - MinIO
 
 **Production** (when ready):
-- `https://account.mycureapp.com`
-- `https://api.mycureapp.com/health`
+- `https://account.example.com`
+- `https://api.example.com/health`
 - etc.
 
 ### Check Configuration

@@ -2,7 +2,7 @@
 # This chart deploys a shared Gateway resource for multi-tenant applications
 
 # Base domain for the gateway
-# Override this in deployment-specific values (e.g., stg.mycureapp.com)
+# Override this in deployment-specific values (e.g., stg.example.com)
 domain: example.com
 
 # GatewayClass configuration

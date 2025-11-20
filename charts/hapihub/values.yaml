@@ -25,6 +25,12 @@ imagePullSecrets: []
 nameOverride: ""
 fullnameOverride: ""
 
+# Better Auth - Authentication configuration
+betterAuth:
+  passkey:
+    rpName: "Acme"  # Relying Party name for WebAuthn/Passkeys (override per deployment)
+    rpId: "example.com"  # Relying Party ID - should match your domain (override per deployment)
+
 serviceAccount:
   create: true
   annotations: {}

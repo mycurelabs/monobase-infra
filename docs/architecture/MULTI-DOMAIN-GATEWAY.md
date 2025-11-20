@@ -8,7 +8,7 @@ Comprehensive guide to the centralized certificate management architecture for s
 
 The mono-infra Gateway supports **two types of domains**:
 
-1. **Platform Subdomains** (`*.mycureapp.com`)
+1. **Platform Subdomains** (`*.example.com`)
    - Covered by wildcard certificate
    - Automatic for all deployments
    
@@ -252,7 +252,7 @@ spec:
     - name: https
       port: 443
       protocol: HTTPS
-      hostname: "*"  # ← Accept ALL domains (not just "*.mycureapp.com")
+      hostname: "*"  # ← Accept ALL domains (not just "*.example.com")
       allowedRoutes:
         namespaces:
           from: All

@@ -253,7 +253,7 @@ class Bootstrap {
 
   displayGithubAppInstructions() {
     console.log(chalk.bold('\n1. Create GitHub App'));
-    console.log(`   Go to: ${chalk.cyan('https://github.com/organizations/mycurelabs/settings/apps/new')}`);
+    console.log(`   Go to: ${chalk.cyan('https://github.com/organizations/YOUR_ORG/settings/apps/new')}`);
     
     console.log(chalk.bold('\n2. Configure Permissions'));
     console.log('   Repository permissions:');
@@ -349,7 +349,7 @@ spec:
     name: gcp-secretstore
     kind: ClusterSecretStore
   target:
-    name: github-mycurelabs-repo-creds
+    name: github-repo-creds
     creationPolicy: Owner
     template:
       metadata:
@@ -357,7 +357,7 @@ spec:
           argocd.argoproj.io/secret-type: repo-creds
       data:
         type: git
-        url: https://github.com/mycurelabs
+        url: https://github.com/YOUR_ORG
         githubAppID: "{{ .appId }}"
         githubAppInstallationID: "{{ .installationId }}"
         githubAppPrivateKey: "{{ .privateKey }}"
@@ -521,7 +521,7 @@ spec:
       if (lb) {
         console.log(chalk.blue('\n==> LoadBalancer IP'));
         console.log(chalk.green(lb));
-        console.log(chalk.gray(`\nConfigure DNS: *.mycure.stitchtechsolutions.com → ${lb}`));
+        console.log(chalk.gray(`\nConfigure DNS: *.example.com → ${lb}`));
       }
     } catch {
       console.log(chalk.yellow('\nLoadBalancer IP not yet available'));

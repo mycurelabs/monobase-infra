@@ -14,8 +14,8 @@ keywords:
   - route53
 
 maintainers:
-  - name: MyCure DevOps
-    email: devops@mycureapp.com
+  - name: Your Organization
+    email: devops@example.com
 
 # Dependencies
 dependencies: []

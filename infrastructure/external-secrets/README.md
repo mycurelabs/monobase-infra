@@ -90,7 +90,7 @@ spec:
           clusterName: my-gke-cluster
           serviceAccountRef:
             name: external-secrets
-            namespace: mycure-staging
+            namespace: example-staging
 ```
 
 ### AWS Secrets Manager (Not Yet Implemented)
@@ -191,7 +191,7 @@ apiVersion: external-secrets.io/v1beta1
 kind: ExternalSecret
 metadata:
   name: postgresql-secrets
-  namespace: mycure-staging
+  namespace: example-staging
 spec:
   refreshInterval: 1h
   secretStoreRef:
@@ -216,7 +216,7 @@ apiVersion: external-secrets.io/v1beta1
 kind: ExternalSecret
 metadata:
   name: api-secrets
-  namespace: mycure-staging
+  namespace: example-staging
 spec:
   refreshInterval: 1h
   secretStoreRef:
@@ -246,7 +246,7 @@ spec:
    - Commit to Git
 
 3. **Script generates ExternalSecret manifests:**
-   - Saved to your deployment directory (e.g., `deployments/mycure-staging/external-secrets/`)
+   - Saved to your deployment directory (e.g., `deployments/example-staging/external-secrets/`)
    - Commit to Git
 
 4. **ArgoCD syncs manifests:**
@@ -340,7 +340,7 @@ gcloud iam service-accounts get-iam-policy \
   external-secrets@PROJECT_ID.iam.gserviceaccount.com
 
 # Verify service account annotation
-kubectl get sa external-secrets -n mycure-staging -o yaml | grep iam.gke.io
+kubectl get sa external-secrets -n example-staging -o yaml | grep iam.gke.io
 
 # Check IAM permissions
 gcloud projects get-iam-policy PROJECT_ID \

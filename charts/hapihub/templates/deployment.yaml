@@ -115,9 +115,9 @@ spec:
           value: {{ include "hapihub.externalUrl" . | quote }}
         # Better Auth - Passkey/WebAuthn configuration
         - name: BETTER_AUTH_PASSKEY_RP_NAME
-          value: "Mycure"
+          value: {{ .Values.betterAuth.passkey.rpName | default "Acme" | quote }}
         - name: BETTER_AUTH_PASSKEY_RP_ID
-          value: "mycureapp.com"
+          value: {{ .Values.betterAuth.passkey.rpId | default .Values.global.domain | quote }}
         # Service URLs from dependencies
         {{- if .Values.valkey.enabled }}
         - name: REDIS_URL

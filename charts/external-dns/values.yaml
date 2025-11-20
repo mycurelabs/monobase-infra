@@ -21,8 +21,8 @@ instances: []
   #
   #   # Domain filters (only manage these domains)
   #   domainFilters:
-  #     - mycureapp.com
-  #     - monobase.io
+  #     - example.com
+  #     - example.net
   #
   #   # Cloudflare-specific configuration
   #   cloudflare:
@@ -45,14 +45,14 @@ instances: []
   # - name: primary
   #   enabled: true
   #   provider: cloudflare
-  #   domainFilters: [mycureapp.com]
+  #   domainFilters: [example.com]
   #   cloudflare:
   #     apiTokenSecretRef: {name: cloudflare-token-primary}
   #
   # - name: client-subdomain
   #   enabled: true
   #   provider: cloudflare
-  #   domainFilters: [client.mycureapp.com]
+  #   domainFilters: [client.example.com]
   #   cloudflare:
   #     proxied: true
   #     apiTokenSecretRef: {name: cloudflare-token-client}
