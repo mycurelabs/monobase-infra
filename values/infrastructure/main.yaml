@@ -115,6 +115,7 @@ gateway:
         - storage
         - dentalemon
         # Staging subdomains
+        - dentalemon.stg
         - api.stg
         - mail.stg
         - storage.stg
