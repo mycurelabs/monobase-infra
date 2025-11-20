@@ -78,7 +78,7 @@ envoyProxyConfig:
 # Gateway Resources - Shared Gateway configuration
 gateway:
   # Base domain for gateway (override per deployment)
-  domain: example.com
+  domain: mycureapp.com
 
   # Gateway configuration
   gateway:
@@ -103,7 +103,7 @@ gateway:
     secretName: gateway-tls
     certManager:
       enabled: true  # Enabled: DNS records exist, ready for certificate provisioning
-      clusterIssuer: letsencrypt-example-cloudflare-prod  # DNS-01 challenge for wildcard cert
+      clusterIssuer: letsencrypt-mycure-cloudflare-prod  # DNS-01 challenge for wildcard cert
       includeApex: true
       # Specific subdomains for HTTP-01 challenge
       subdomains:
