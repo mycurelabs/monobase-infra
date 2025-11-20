@@ -1,0 +1,14 @@
+{{- if and .Values.enabled .Values.podDisruptionBudget.enabled }}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "dentalemon.fullname" . }}
+  namespace: {{ include "dentalemon.namespace" . }}
+  labels:
+    {{- include "dentalemon.labels" . | nindent 4 }}
+spec:
+  minAvailable: {{ .Values.podDisruptionBudget.minAvailable }}
+  selector:
+    matchLabels:
+      {{- include "dentalemon.selectorLabels" . | nindent 6 }}
+{{- end }}

@@ -1,0 +1,17 @@
+apiVersion: v2
+name: dentalemon
+description: DentaLemon - Dental healthcare application
+type: application
+version: 1.0.0
+appVersion: "10.2.4"
+keywords:
+  - dentalemon
+  - frontend
+  - vue
+  - healthcare
+home: https://github.com/monobaselabs/monobase-infra
+sources:
+  - https://github.com/monobaselabs/monobase
+maintainers:
+  - name: Your Organization
+    email: devops@example.com

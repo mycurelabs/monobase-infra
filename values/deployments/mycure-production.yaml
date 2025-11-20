@@ -190,6 +190,36 @@ mycure:
   podDisruptionBudget:
     enabled: false
 
+# ===== HEALTHCARE: DentaLemon Dental Application =====
+dentalemon:
+  enabled: true
+
+  image:
+    repository: ghcr.io/mycurelabs/dentalemonapp
+    tag: "10.2.4"
+    pullPolicy: IfNotPresent
+
+  replicaCount: 1
+
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 128Mi
+
+  gateway:
+    hostname: ""
+    sectionName: https  # Use HTTPS listener with wildcard TLS certificate
+
+  config:
+    API_URL: "https://hapihub.mycureapp.com"
+    HAPIHUB_URL: "https://hapihub.mycureapp.com"
+
+  podDisruptionBudget:
+    enabled: false
+
 # ===== HEALTHCARE: SyncD Real-time Synchronization =====
 syncd:
   enabled: true

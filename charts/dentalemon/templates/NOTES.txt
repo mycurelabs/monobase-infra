@@ -1,0 +1,43 @@
+{{- if .Values.enabled }}
+🎉 MyCure Frontend has been deployed!
+
+Chart: {{ .Chart.Name }}-{{ .Chart.Version }}
+Release: {{ .Release.Name }}
+Namespace: {{ include "dentalemon.namespace" . }}
+
+📋 Deployment Information:
+  - Replicas: {{ .Values.replicaCount }}
+  - Image: {{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}
+  - Service: {{ include "dentalemon.fullname" . }}:{{ .Values.service.port }}
+
+🌐 Access Information:
+{{- if .Values.gateway.enabled }}
+  MyCure App: https://{{ include "dentalemon.gateway.hostname" . }}
+
+  Open in browser:
+  open https://{{ include "dentalemon.gateway.hostname" . }}
+{{- else }}
+  Gateway is disabled. Use port-forward to access:
+  kubectl port-forward -n {{ include "dentalemon.namespace" . }} svc/{{ include "dentalemon.fullname" . }} 8080:{{ .Values.service.port }}
+  # Open http://localhost:8080
+{{- end }}
+
+🔍 Next Steps:
+  1. Verify pods are running:
+     kubectl get pods -n {{ include "dentalemon.namespace" . }} -l app.kubernetes.io/name={{ include "dentalemon.name" . }}
+
+  2. Check logs:
+     kubectl logs -n {{ include "dentalemon.namespace" . }} -l app.kubernetes.io/name={{ include "dentalemon.name" . }} --tail=50
+
+  3. Test frontend:
+     curl https://{{ include "dentalemon.gateway.hostname" . }}
+
+📱 Frontend Features:
+  - Static file serving (nginx)
+  - Read-only root filesystem (security)
+  - CDN-ready configuration
+  - Environment variable injection
+
+{{- else }}
+MyCure Frontend is disabled (enabled: false)
+{{- end }}
