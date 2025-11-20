@@ -9,7 +9,6 @@ Quick reference for managing TLS certificates in the Gateway.
 All certificates for the Gateway are centrally managed and stored in the `gateway-system` namespace.
 
 **Certificate Types:**
-- **Wildcard (DNS-01):** `*.example.com` - covers platform subdomains
 - **HTTP-01 Auto:** `app.client.com` - auto-provisioned for client domains
 - **Client-Provided:** Client uploads to GCP Secret Manager, ESO syncs
 
@@ -23,12 +22,6 @@ All certificates declared in a single file for centralized management.
 
 ```yaml
 certificates:
-  # Platform wildcard certificate (DNS-01)
-  - name: wildcard-example
-    domain: "*.example.com"
-    issuer: letsencrypt-example-cloudflare-prod
-    challengeType: dns01
-  
   # Client domain certificates (HTTP-01 auto-provisioned)
   - name: client1-domain
     domain: "app.client.com"
@@ -114,8 +107,7 @@ infrastructure/
 │   └── certificates.yaml            # Certificate declarations (to be created)
 │
 ├── tls/
-│   ├── README.md                    # TLS infrastructure documentation
-│   └── cloudflare-token-externalsecret.yaml  # Cloudflare API token for DNS-01
+│   └── README.md                    # TLS infrastructure documentation
 │
 └── gateway/
     ├── shared-gateway.yaml          # Gateway resource with certificateRefs
@@ -162,19 +154,6 @@ ClusterIssuers are now managed via the `cert-manager-issuers` Helm chart.
 - Avoids Let's Encrypt rate limits
 - Certificates NOT trusted by browsers
 
-### letsencrypt-example-cloudflare-prod (DNS-01)
-
-- **For platform wildcard certificates**
-- Supports wildcard domains (`*.example.com`)
-- Requires Cloudflare API access
-- Used for platform subdomains
-
-### letsencrypt-example-cloudflare-staging (DNS-01)
-
-- Testing DNS-01 certificate provisioning
-- For wildcard certificate testing
-- Certificates NOT trusted by browsers
-
 ---
 
 ## Gateway Configuration
@@ -190,7 +169,6 @@ spec:
       hostname: "*"  # Accept all domains
       tls:
         certificateRefs:
-          - name: wildcard-example-tls
           - name: client1-domain-tls
           - name: client2-domain-tls
           # ... auto-generated from certificates.yaml
@@ -201,23 +179,20 @@ spec:
 ## Naming Conventions
 
 **Certificate Names:**
-- Format: `{type}-{client}-{purpose}`
+- Format: `{client}-{purpose}`
 - Examples:
-  - `wildcard-platform`
   - `client-acme-main`
   - `client-globex-portal`
 
 **Secret Names:**
 - Automatically generated: `{certificate-name}-tls`
 - Examples:
-  - `wildcard-platform-tls`
   - `client-acme-main-tls`
+  - `client-globex-portal-tls`
 
 **ClusterIssuer Names:**
 - `letsencrypt-prod` - HTTP-01 production (default for client domains)
 - `letsencrypt-staging` - HTTP-01 staging
-- `letsencrypt-example-cloudflare-prod` - DNS-01 production (platform wildcard)
-- `letsencrypt-example-cloudflare-staging` - DNS-01 staging
 
 ---
 

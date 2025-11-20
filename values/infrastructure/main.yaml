@@ -22,29 +22,6 @@ certManagerIssuers:
       server: staging
       provider: http01
 
-    # DNS-01 Cloudflare challenge (for wildcard certificates and platform domains)
-    - name: letsencrypt-example-cloudflare-prod
-      email: "admin@example.com"
-      server: production
-      provider: cloudflare
-      cloudflare:
-        dnsZones:
-          - "example.com"
-        apiTokenSecretRef:
-          name: example-cloudflare-api-token
-          key: api-token
-
-    - name: letsencrypt-example-cloudflare-staging
-      email: "admin@example.com"
-      server: staging
-      provider: cloudflare
-      cloudflare:
-        dnsZones:
-          - "example.com"
-        apiTokenSecretRef:
-          name: example-cloudflare-api-token
-          key: api-token
-
 # Envoy Gateway - Gateway API implementation
 envoyGateway:
   enabled: true
@@ -103,7 +80,7 @@ gateway:
     secretName: gateway-tls
     certManager:
       enabled: true  # Enabled: DNS records exist, ready for certificate provisioning
-      clusterIssuer: letsencrypt-mycure-cloudflare-prod  # DNS-01 challenge for wildcard cert
+      clusterIssuer: letsencrypt-prod  # HTTP-01 challenge
       includeApex: true
       # Specific subdomains for HTTP-01 challenge
       subdomains:

@@ -62,7 +62,6 @@ module "gke_cluster" {
 ### Workload Identity Outputs (for Monobase components)
 - `external_secrets_sa_email` - Service account for External Secrets Operator
 - `velero_sa_email` - Service account for Velero backups
-- `cert_manager_sa_email` - Service account for cert-manager DNS-01
 
 ### Network Outputs
 - `network_name` - VPC network name

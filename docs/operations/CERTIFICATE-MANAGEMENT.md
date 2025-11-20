@@ -50,35 +50,7 @@ certificates:
 
 ## Certificate Types
 
-### 1. Wildcard Certificate (DNS-01)
-
-**Purpose:** Cover all platform subdomains
-
-**Example:**
-```yaml
-certificates:
-  - name: wildcard-mycureapp
-    domain: "*.mycureapp.com"
-    issuer: letsencrypt-mycure-cloudflare-prod
-    challengeType: dns01
-```
-
-**Requirements:**
-- DNS provider API access (Cloudflare, Route53, etc.)
-- API token configured via External Secrets
-- DNS zone: `mycureapp.com`
-
-**Use Cases:**
-- Platform subdomains: `api.mycureapp.com`, `app.mycureapp.com`
-- Internal services: `hapihub.mycureapp.com`, `syncd.mycureapp.com`
-
-**Limitations:**
-- Requires DNS provider API credentials
-- Only works for domains you control DNS for
-
----
-
-### 2. HTTP-01 Auto-Provisioned Certificate
+### 1. HTTP-01 Auto-Provisioned Certificate
 
 **Purpose:** Automatically provision certificates for client-owned domains
 
@@ -118,7 +90,7 @@ certificates:
 
 ---
 
-### 3. Client-Provided Certificate
+### 2. Client-Provided Certificate
 
 **Purpose:** Client provides their own TLS certificate
 
@@ -253,7 +225,7 @@ kubectl get gateway shared-gateway -n gateway-system -o yaml | grep -A 5 certifi
 
 # Should show:
 # certificateRefs:
-#   - name: wildcard-mycureapp-tls
+#   - name: gateway-tls  # Platform certificate
 #   - name: client1-domain-tls  # ← New certificate
 ```
 
@@ -293,7 +265,7 @@ kubectl get certificate -n gateway-system
 
 # Example output:
 # NAME                     READY   SECRET                   AGE
-# wildcard-mycureapp-tls   True    wildcard-mycureapp-tls   30d
+# gateway-tls              True    gateway-tls              30d
 # client1-domain-tls       True    client1-domain-tls       5d
 # client2-domain-tls       True    client2-domain-tls       2d
 ```
@@ -309,7 +281,7 @@ kubectl get secret -n gateway-system -o json | \
     capture("Not After : (?<date>[^\n]+)") | .date)'
 
 # Example output:
-# wildcard-mycureapp-tls: Jan 15 12:00:00 2025 GMT
+# gateway-tls: Jan 15 12:00:00 2025 GMT
 # client1-domain-tls: Feb 20 15:30:00 2025 GMT
 ```
 
@@ -349,7 +321,7 @@ certmanager_acme_orders_total{namespace="gateway-system", status="invalid"}
 
 ### Certificate Renewal
 
-#### Automatic Renewal (HTTP-01, DNS-01)
+#### Automatic Renewal (HTTP-01)
 
 cert-manager automatically renews certificates:
 
@@ -476,9 +448,9 @@ kubectl get certificate client1-domain-tls -n gateway-system
    ```bash
    kubectl get challenge -n gateway-system
    kubectl describe challenge <challenge-name> -n gateway-system
-   
+
    # Look for:
-   # - Challenge type (http-01, dns-01)
+   # - Challenge type (http-01)
    # - Challenge state (pending, valid, invalid)
    # - Failure reasons
    ```
@@ -531,16 +503,6 @@ curl -v http://app.client.com/.well-known/acme-challenge/test
 # - 404 (if no active challenge) = OK
 # - OR challenge response (if active challenge)
 # - NOT redirect to HTTPS
-```
-
-**DNS-01 Challenge Failed:**
-
-```bash
-# Check DNS provider credentials
-kubectl get secret cloudflare-api-token -n gateway-system
-
-# Check cert-manager can access DNS
-kubectl logs -n cert-manager -l app=cert-manager | grep DNS
 ```
 
 ---
@@ -677,12 +639,6 @@ certificates:
     domain: "app.client.com"
     issuer: letsencrypt-staging  # HTTP-01 staging
     challengeType: http01
-  
-  # Or for wildcard testing:
-  - name: wildcard-test
-    domain: "*.test.com"
-    issuer: letsencrypt-mycure-cloudflare-staging  # DNS-01 staging
-    challengeType: dns01
 ```
 
 **Verify:**
@@ -698,12 +654,6 @@ certificates:
     domain: "app.client.com"
     issuer: letsencrypt-prod  # ← HTTP-01 production
     challengeType: http01
-  
-  # Or for wildcard:
-  - name: wildcard-prod
-    domain: "*.mycureapp.com"
-    issuer: letsencrypt-mycure-cloudflare-prod  # ← DNS-01 production
-    challengeType: dns01
 ```
 
 ### 2. Certificate Naming
@@ -711,10 +661,10 @@ certificates:
 **Consistent naming convention:**
 - Format: `{type}-{client}-{purpose}`
 - Examples:
-  - `wildcard-platform`
   - `client-acme-main`
   - `client-globex-portal`
   - `client-initech-api`
+  - `platform-api`
 
 **Benefits:**
 - Easy to identify certificate purpose

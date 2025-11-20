@@ -119,7 +119,7 @@ mise run secrets:validate
 
 3. **TLS Setup:**
    - Generate Let's Encrypt ClusterIssuer manifests (staging + production)
-   - Cloudflare DNS-01 challenge configuration
+   - HTTP-01 challenge configuration
 
 4. **Secrets Setup:**
    - Create/update GCP Secret Manager secrets

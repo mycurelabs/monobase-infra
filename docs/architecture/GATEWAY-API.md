@@ -283,33 +283,7 @@ kubectl get svc -n gateway-system
 
 The Gateway architecture supports **two types of domains**:
 
-### 1. Platform Subdomains (Wildcard Certificate)
-
-**Pattern:** `*.mycureapp.com`
-
-**Use Case:** Platform-managed services and standard deployments
-
-**Example:**
-- `api.mycureapp.com`
-- `app.mycureapp.com`
-- `hapihub.mycureapp.com`
-- `storage.mycureapp.com`
-
-**Configuration:**
-```yaml
-# Automatic - no additional configuration needed
-# Covered by wildcard certificate: *.mycureapp.com
-```
-
-**How it Works:**
-- Single wildcard certificate covers all subdomains
-- DNS-01 challenge (requires Cloudflare API access)
-- Automatic for all deployments
-- Zero additional configuration
-
----
-
-### 2. Client Custom Domains (Per-Domain Certificates)
+### Client Custom Domains (Per-Domain Certificates)
 
 **Pattern:** `app.client.com`, `portal.company.io`
 
@@ -326,7 +300,7 @@ The Gateway architecture supports **two types of domains**:
 certificates:
   - name: client1-domain
     domain: "app.client.com"
-    issuer: letsencrypt-http01-prod
+    issuer: letsencrypt-prod
     challengeType: http01
 ```
 
@@ -351,7 +325,6 @@ All certificates stored in `gateway-system` namespace (centralized):
 
 ```
 gateway-system/
-  ├── wildcard-mycureapp-tls (Secret)       # Platform wildcard
   ├── client1-domain-tls (Secret)           # Client domain 1
   ├── client2-domain-tls (Secret)           # Client domain 2
   └── client3-domain-tls (Secret)           # Client domain 3
@@ -373,10 +346,9 @@ metadata:
 spec:
   listeners:
     - name: https
-      hostname: "*"  # Accept all domains (not just *.mycureapp.com)
+      hostname: "*"  # Accept all domains
       tls:
         certificateRefs:
-          - name: wildcard-mycureapp-tls   # Platform wildcard
           - name: client1-domain-tls       # Client certificate 1
           - name: client2-domain-tls       # Client certificate 2
 ```
@@ -390,17 +362,17 @@ spec:
 
 ---
 
-### Comparison: Subdomain vs Custom Domain
+### Certificate Options
 
-| Feature | Platform Subdomain | Client Custom Domain |
-|---------|-------------------|---------------------|
-| **DNS Management** | Platform | Client |
-| **Certificate** | Wildcard (auto) | Per-domain (HTTP-01 or provided) |
-| **Setup Time** | Instant | 2-5 minutes (cert provisioning) |
-| **Renewal** | Automatic | Automatic (HTTP-01) or Client-managed |
-| **Client Control** | None | Full DNS control |
-| **Use Case** | Standard deployments | White-label, branding |
-| **Cost** | Included | Included (HTTP-01) |
+| Feature | HTTP-01 Auto-Provisioned | Client-Provided |
+|---------|-------------------------|-----------------|
+| **DNS Management** | Client creates A record | Client manages DNS |
+| **Certificate** | Let's Encrypt (auto) | Client uploads cert |
+| **Setup Time** | 2-5 minutes | 10-30 seconds (sync) |
+| **Renewal** | Automatic | Client-managed |
+| **Wildcard Support** | No | Yes (if client provides) |
+| **Use Case** | Most deployments | Custom CA, existing certs |
+| **Cost** | Free | Free |
 
 ---
 

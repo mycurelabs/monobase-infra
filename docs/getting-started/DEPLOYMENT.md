@@ -197,11 +197,11 @@ echo "Gateway LoadBalancer IP: $GATEWAY_IP"
 
 **Certificate Management:**
 
-For client custom domains (not covered by wildcard), see:
+For client custom domains, see:
 - [Certificate Management Operations Guide](../operations/CERTIFICATE-MANAGEMENT.md)
 - [Multi-Domain Gateway Architecture](../architecture/MULTI-DOMAIN-GATEWAY.md)
 
-Default wildcard certificate (`*.mycureapp.com`) is automatically provisioned via DNS-01 challenge.
+Certificates are provisioned via HTTP-01 challenge or can be client-provided.
 
 ### Step 5: Deploy External Secrets Operator
 

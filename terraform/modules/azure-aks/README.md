@@ -62,7 +62,6 @@ module "aks_cluster" {
 ### Workload Identity Outputs (for Monobase components)
 - `external_secrets_identity_client_id` - For External Secrets Operator
 - `velero_identity_client_id` - For Velero backups
-- `cert_manager_identity_client_id` - For cert-manager DNS-01 challenges
 
 ### Network Outputs
 - `vnet_id` - Virtual Network ID

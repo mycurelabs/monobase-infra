@@ -63,7 +63,6 @@ module "eks_cluster" {
 ### IRSA Role ARNs (for Monobase components)
 - `external_secrets_role_arn` - For External Secrets Operator
 - `velero_role_arn` - For Velero backups
-- `cert_manager_role_arn` - For cert-manager Route53 DNS-01
 - `cluster_autoscaler_role_arn` - For cluster autoscaler
 
 ### Network Outputs

@@ -146,34 +146,7 @@ Operations:
 
 ## Certificate Types
 
-### 1. Wildcard Certificate (DNS-01)
-
-**Purpose:** Cover all platform subdomains
-
-**Example:**
-- Certificate: `*.mycureapp.com`
-- Covers: `api.mycureapp.com`, `app.mycureapp.com`, `hapihub.mycureapp.com`, etc.
-- Type: DNS-01 challenge (requires DNS provider API access)
-- Issuer: `letsencrypt-mycure-cloudflare-prod` ClusterIssuer
-
-**When to Use:**
-- Your own subdomains
-- Platform-managed services
-- Already configured and working today
-
-**Configuration:**
-```yaml
-# infrastructure/certificates.yaml
-certificates:
-  - name: wildcard-mycureapp
-    domain: "*.mycureapp.com"
-    issuer: letsencrypt-mycure-cloudflare-prod
-    challengeType: dns01
-```
-
----
-
-### 2. HTTP-01 Auto-Provisioned (Client Domains)
+### 1. HTTP-01 Auto-Provisioned (Client Domains)
 
 **Purpose:** Auto-provision certificates for client-owned domains
 
@@ -218,7 +191,7 @@ certificates:
 
 ---
 
-### 3. Client-Provided Certificates
+### 2. Client-Provided Certificates
 
 **Purpose:** Client provides their own certificate
 
@@ -286,9 +259,6 @@ spec:
       tls:
         mode: Terminate
         certificateRefs:
-          # Wildcard for platform subdomains
-          - name: wildcard-mycureapp-tls
-            kind: Secret
           # Client domain certificates
           - name: client1-domain-tls
             kind: Secret
@@ -352,7 +322,7 @@ Platform team adds to `infrastructure/certificates.yaml`:
 certificates:
   - name: client1-domain
     domain: "app.client.com"
-    issuer: letsencrypt-http01-prod
+    issuer: letsencrypt-prod
     challengeType: http01
 ```
 
@@ -555,11 +525,6 @@ Backend Pod (terminates TLS)
 - Deleted immediately after validation
 - No security risk (challenge tokens are single-use)
 
-**DNS-01 Challenges:**
-- Requires DNS provider API credentials
-- Stored in Kubernetes Secret via External Secrets
-- Only cert-manager has access
-
 ### 4. Client-Provided Certificates
 
 **Validation:**
@@ -611,11 +576,11 @@ certificates:
 ### 4. Testing
 
 **Before Production:**
-1. Use `letsencrypt-staging` (HTTP-01) or `letsencrypt-mycure-cloudflare-staging` (DNS-01) ClusterIssuer
+1. Use `letsencrypt-staging` ClusterIssuer
 2. Verify certificate issued successfully
 3. Test TLS handshake
 4. Verify HTTP routing works
-5. Switch to production issuer: `letsencrypt-prod` (HTTP-01) or `letsencrypt-mycure-cloudflare-prod` (DNS-01)
+5. Switch to production issuer: `letsencrypt-prod`
 
 ---
 
