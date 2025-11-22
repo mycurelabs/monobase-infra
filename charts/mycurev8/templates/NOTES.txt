@@ -3,34 +3,34 @@
 
 Chart: {{ .Chart.Name }}-{{ .Chart.Version }}
 Release: {{ .Release.Name }}
-Namespace: {{ include "mycure.namespace" . }}
+Namespace: {{ include "mycurev8.namespace" . }}
 
 📋 Deployment Information:
   - Replicas: {{ .Values.replicaCount }}
   - Image: {{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}
-  - Service: {{ include "mycure.fullname" . }}:{{ .Values.service.port }}
+  - Service: {{ include "mycurev8.fullname" . }}:{{ .Values.service.port }}
 
 🌐 Access Information:
 {{- if .Values.gateway.enabled }}
-  MyCure App: https://{{ include "mycure.gateway.hostname" . }}
+  MyCure App: https://{{ include "mycurev8.gateway.hostname" . }}
 
   Open in browser:
-  open https://{{ include "mycure.gateway.hostname" . }}
+  open https://{{ include "mycurev8.gateway.hostname" . }}
 {{- else }}
   Gateway is disabled. Use port-forward to access:
-  kubectl port-forward -n {{ include "mycure.namespace" . }} svc/{{ include "mycure.fullname" . }} 8080:{{ .Values.service.port }}
+  kubectl port-forward -n {{ include "mycurev8.namespace" . }} svc/{{ include "mycurev8.fullname" . }} 8080:{{ .Values.service.port }}
   # Open http://localhost:8080
 {{- end }}
 
 🔍 Next Steps:
   1. Verify pods are running:
-     kubectl get pods -n {{ include "mycure.namespace" . }} -l app.kubernetes.io/name={{ include "mycure.name" . }}
+     kubectl get pods -n {{ include "mycurev8.namespace" . }} -l app.kubernetes.io/name={{ include "mycurev8.name" . }}
 
   2. Check logs:
-     kubectl logs -n {{ include "mycure.namespace" . }} -l app.kubernetes.io/name={{ include "mycure.name" . }} --tail=50
+     kubectl logs -n {{ include "mycurev8.namespace" . }} -l app.kubernetes.io/name={{ include "mycurev8.name" . }} --tail=50
 
   3. Test frontend:
-     curl https://{{ include "mycure.gateway.hostname" . }}
+     curl https://{{ include "mycurev8.gateway.hostname" . }}
 
 📱 Frontend Features:
   - Static file serving (nginx)
