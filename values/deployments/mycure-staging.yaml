@@ -294,7 +294,7 @@ syncd:
 
 # ===== DATABASE: PostgreSQL =====
 postgresql:
-  enabled: true
+  enabled: false  # Disabled - API application not in use
 
   fullnameOverride: "postgresql"
 
