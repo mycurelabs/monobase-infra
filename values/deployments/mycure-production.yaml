@@ -381,7 +381,7 @@ postgresql:
 
 # ===== DATABASE: MongoDB =====
 mongodb:
-  enabled: true
+  enabled: false  # Disabled - using managed DigitalOcean MongoDB
 
   fullnameOverride: "mongodb"
 
