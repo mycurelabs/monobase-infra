@@ -147,7 +147,7 @@ affinity:
 config:
   # NOTE: PORT removed - causes known issue in HapiHub (port: NaN error)
   # App automatically uses default port 7500
-  CLUSTER_INSTANCES: "max"
+  CLUSTER_INSTANCES: "1"  # Default to single instance to prevent OOM; override if needed
   RUN_WORKERS: "true"
   STORAGE_TYPE: "gfs"  # or "s3" for MinIO
   DB_SKIP_CREATE_INDEXES: "false"

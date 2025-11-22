@@ -124,9 +124,6 @@ hapihub:
       rpName: "Mycure"
       rpId: "mycureapp.com"
 
-  config:
-    CLUSTER_INSTANCES: "1"  # Override chart default of "max" to prevent OOM
-
   env:
     - name: BETTER_AUTH_RATE_LIMIT_ENABLED
       value: "true"
