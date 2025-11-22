@@ -142,7 +142,7 @@ hapihub:
     enabled: false
 
   autoscaling:
-    enabled: false
+    enabled: true
 
   externalSecrets:
     enabled: true
