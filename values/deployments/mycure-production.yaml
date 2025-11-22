@@ -150,12 +150,60 @@ hapihub:
     secretStoreKind: ClusterSecretStore
     refreshInterval: 1h
     secrets:
+      # Google OAuth
       - secretKey: GOOGLE_CLIENT_ID
         remoteKey: mycure-production-google-oauth-client-id
       - secretKey: GOOGLE_CLIENT_SECRET
         remoteKey: mycure-production-google-oauth-client-secret
       - secretKey: STRIPE_SECRET_KEY
         remoteKey: mycure-production-stripe-secret-key
+      # Encryption keys
+      - secretKey: ENC_BILLING_INVOICES
+        remoteKey: mycure-production-enc-billing-invoices
+      - secretKey: ENC_BILLING_ITEMS
+        remoteKey: mycure-production-enc-billing-items
+      - secretKey: ENC_BILLING_PAYMENTS
+        remoteKey: mycure-production-enc-billing-payments
+      - secretKey: ENC_MEDICAL_RECORDS
+        remoteKey: mycure-production-enc-medical-records
+      - secretKey: ENC_PERSONAL_DETAILS
+        remoteKey: mycure-production-enc-personal-details
+      # CalCom integration
+      - secretKey: CALCOM_DATASOURCE_URL
+        remoteKey: mycure-production-calcom-datasource-url
+      - secretKey: CALCOM_WEB_URL
+        remoteKey: mycure-production-calcom-web-url
+      # MongoDB URI (managed DigitalOcean)
+      - secretKey: MONGO_URI
+        remoteKey: mycure-production-mongo-uri
+      # JWT/Auth keys
+      - secretKey: PRIVATE_KEY
+        remoteKey: mycure-production-private-key
+      - secretKey: PUBLIC_KEY
+        remoteKey: mycure-production-public-key
+      # Search engine
+      - secretKey: SEARCH_ENGINE_URI
+        remoteKey: mycure-production-search-engine-uri
+      # Storage configuration (GCP)
+      - secretKey: STORAGE_BUCKET
+        remoteKey: mycure-production-storage-bucket
+      - secretKey: STORAGE_CLIENT_EMAIL
+        remoteKey: mycure-production-storage-client-email
+      - secretKey: STORAGE_DIRECTORY
+        remoteKey: mycure-production-storage-directory
+      - secretKey: STORAGE_PRIVATE_KEY
+        remoteKey: mycure-production-storage-private-key
+      - secretKey: STORAGE_PROJECT_ID
+        remoteKey: mycure-production-storage-project-id
+      - secretKey: STORAGE_TYPE
+        remoteKey: mycure-production-storage-type
+      # Stripe configuration
+      - secretKey: STRIPE_KEY
+        remoteKey: mycure-production-stripe-key
+      - secretKey: STRIPE_CHECKOUT_SUCCESS_URL
+        remoteKey: mycure-production-stripe-checkout-success-url
+      - secretKey: STRIPE_CHECKOUT_CANCEL_URL
+        remoteKey: mycure-production-stripe-checkout-cancel-url
 
   mongodb:
     serviceName: mongodb

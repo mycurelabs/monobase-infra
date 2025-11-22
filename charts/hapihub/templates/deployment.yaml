@@ -195,6 +195,133 @@ spec:
               name: {{ include "hapihub.fullname" . }}-secrets
               key: STRIPE_SECRET_KEY
               optional: true
+        # Encryption keys
+        - name: ENC_BILLING_INVOICES
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "hapihub.fullname" . }}-secrets
+              key: ENC_BILLING_INVOICES
+              optional: true
+        - name: ENC_BILLING_ITEMS
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "hapihub.fullname" . }}-secrets
+              key: ENC_BILLING_ITEMS
+              optional: true
+        - name: ENC_BILLING_PAYMENTS
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "hapihub.fullname" . }}-secrets
+              key: ENC_BILLING_PAYMENTS
+              optional: true
+        - name: ENC_MEDICAL_RECORDS
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "hapihub.fullname" . }}-secrets
+              key: ENC_MEDICAL_RECORDS
+              optional: true
+        - name: ENC_PERSONAL_DETAILS
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "hapihub.fullname" . }}-secrets
+              key: ENC_PERSONAL_DETAILS
+              optional: true
+        # CalCom integration
+        - name: CALCOM_DATASOURCE_URL
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "hapihub.fullname" . }}-secrets
+              key: CALCOM_DATASOURCE_URL
+              optional: true
+        - name: CALCOM_WEB_URL
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "hapihub.fullname" . }}-secrets
+              key: CALCOM_WEB_URL
+              optional: true
+        # MongoDB URI (managed)
+        - name: MONGO_URI
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "hapihub.fullname" . }}-secrets
+              key: MONGO_URI
+              optional: true
+        # JWT/Auth keys
+        - name: PRIVATE_KEY
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "hapihub.fullname" . }}-secrets
+              key: PRIVATE_KEY
+              optional: true
+        - name: PUBLIC_KEY
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "hapihub.fullname" . }}-secrets
+              key: PUBLIC_KEY
+              optional: true
+        # Search engine
+        - name: SEARCH_ENGINE_URI
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "hapihub.fullname" . }}-secrets
+              key: SEARCH_ENGINE_URI
+              optional: true
+        # Storage configuration
+        - name: STORAGE_BUCKET
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "hapihub.fullname" . }}-secrets
+              key: STORAGE_BUCKET
+              optional: true
+        - name: STORAGE_CLIENT_EMAIL
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "hapihub.fullname" . }}-secrets
+              key: STORAGE_CLIENT_EMAIL
+              optional: true
+        - name: STORAGE_DIRECTORY
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "hapihub.fullname" . }}-secrets
+              key: STORAGE_DIRECTORY
+              optional: true
+        - name: STORAGE_PRIVATE_KEY
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "hapihub.fullname" . }}-secrets
+              key: STORAGE_PRIVATE_KEY
+              optional: true
+        - name: STORAGE_PROJECT_ID
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "hapihub.fullname" . }}-secrets
+              key: STORAGE_PROJECT_ID
+              optional: true
+        - name: STORAGE_TYPE
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "hapihub.fullname" . }}-secrets
+              key: STORAGE_TYPE
+              optional: true
+        # Stripe configuration
+        - name: STRIPE_KEY
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "hapihub.fullname" . }}-secrets
+              key: STRIPE_KEY
+              optional: true
+        - name: STRIPE_CHECKOUT_SUCCESS_URL
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "hapihub.fullname" . }}-secrets
+              key: STRIPE_CHECKOUT_SUCCESS_URL
+              optional: true
+        - name: STRIPE_CHECKOUT_CANCEL_URL
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "hapihub.fullname" . }}-secrets
+              key: STRIPE_CHECKOUT_CANCEL_URL
+              optional: true
         {{- end }}
         # Additional environment variables from config
         {{- range $key, $value := .Values.config }}
