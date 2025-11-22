@@ -100,7 +100,7 @@ hapihub:
 
   image:
     repository: ghcr.io/mycurelabs/hapihub
-    tag: "10.0.25"
+    tag: "10.1.0"
     pullPolicy: IfNotPresent
 
   replicaCount: 1
@@ -227,7 +227,7 @@ mycurev8:
 
 # ===== HEALTHCARE: DentaLemon Dental Application =====
 dentalemon:
-  enabled: true
+  enabled: false
 
   image:
     repository: ghcr.io/mycurelabs/dentalemonapp
