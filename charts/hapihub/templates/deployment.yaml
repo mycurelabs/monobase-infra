@@ -239,13 +239,15 @@ spec:
               name: {{ include "hapihub.fullname" . }}-secrets
               key: CALCOM_WEB_URL
               optional: true
-        # MongoDB URI (managed)
+        # MongoDB URI (managed) - only if not using local MongoDB
+        {{- if not .Values.mongodb.enabled }}
         - name: MONGO_URI
           valueFrom:
             secretKeyRef:
               name: {{ include "hapihub.fullname" . }}-secrets
               key: MONGO_URI
               optional: true
+        {{- end }}
         # JWT/Auth keys
         - name: PRIVATE_KEY
           valueFrom:
@@ -266,7 +268,8 @@ spec:
               name: {{ include "hapihub.fullname" . }}-secrets
               key: SEARCH_ENGINE_URI
               optional: true
-        # Storage configuration
+        # Storage configuration - only if not using local MinIO
+        {{- if not .Values.minio.enabled }}
         - name: STORAGE_BUCKET
           valueFrom:
             secretKeyRef:
@@ -303,6 +306,7 @@ spec:
               name: {{ include "hapihub.fullname" . }}-secrets
               key: STORAGE_TYPE
               optional: true
+        {{- end }}
         # Stripe configuration
         - name: STRIPE_KEY
           valueFrom:
