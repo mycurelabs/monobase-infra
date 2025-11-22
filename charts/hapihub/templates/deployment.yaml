@@ -92,8 +92,8 @@ spec:
           value: {{ .Values.service.targetPort | quote }}
         - name: PORT
           value: {{ .Values.service.targetPort | quote }}
-        # MongoDB connection - individual components
-        # Note: MongoDB may be deployed separately in GitOps
+        # MongoDB connection - individual components (only when using in-cluster MongoDB)
+        {{- if .Values.mongodb.enabled }}
         - name: MONGODB_HOST
           value: {{ include "hapihub.mongodb.host" . | quote }}
         - name: MONGODB_PORT
@@ -110,6 +110,7 @@ spec:
         # MONGO_URI constructed from components using K8s variable expansion
         - name: MONGO_URI
           value: "mongodb://$(MONGODB_USER):$(MONGODB_PASSWORD)@$(MONGODB_HOST):$(MONGODB_PORT)/$(MONGODB_DATABASE)?replicaSet={{ .Values.mongodb.replicaSet }}&directConnection=true&authSource=admin"
+        {{- end }}
         # External URL - public HTTPS endpoint for callbacks, webhooks, etc.
         - name: EXTERNAL_ADDRESS
           value: {{ include "hapihub.externalUrl" . | quote }}
