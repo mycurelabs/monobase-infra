@@ -107,10 +107,10 @@ hapihub:
 
   resources:
     requests:
-      cpu: 500m
-      memory: 512Mi
+      cpu: 1000m
+      memory: 768Mi
     limits:
-      cpu: "1"
+      cpu: "2"
       memory: 2Gi
 
   gateway:
