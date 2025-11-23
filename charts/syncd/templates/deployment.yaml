@@ -133,23 +133,17 @@ spec:
         - name: SMTP_SECURE
           value: "false"
         {{- end }}
-        # Load non-DB secrets from External Secrets Operator
+        # Load secrets from External Secrets Operator (only if defined)
         {{- if .Values.externalSecrets.enabled }}
-        - name: JWT_SECRET
+        {{- range .Values.externalSecrets.secrets }}
+        {{- if ne .secretKey "MONGO_URI" }}
+        - name: {{ .secretKey }}
           valueFrom:
             secretKeyRef:
-              name: {{ include "syncd.fullname" . }}-secrets
-              key: JWT_SECRET
-        - name: S3_ACCESS_KEY_ID
-          valueFrom:
-            secretKeyRef:
-              name: {{ include "syncd.fullname" . }}-secrets
-              key: S3_ACCESS_KEY_ID
-        - name: S3_SECRET_ACCESS_KEY
-          valueFrom:
-            secretKeyRef:
-              name: {{ include "syncd.fullname" . }}-secrets
-              key: S3_SECRET_ACCESS_KEY
+              name: {{ include "syncd.fullname" $ }}-secrets
+              key: {{ .secretKey }}
+        {{- end }}
+        {{- end }}
         {{- end }}
         # Additional environment variables from config
         {{- range $key, $value := .Values.config }}
