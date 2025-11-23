@@ -337,9 +337,17 @@ syncd:
     enabled: false
 
   externalSecrets:
-    enabled: false
+    enabled: true
+    secretStore: gcp-secretstore
+    secretStoreKind: ClusterSecretStore
+    refreshInterval: 1h
+    secrets:
+      # MongoDB URI (managed DigitalOcean - shared with hapihub)
+      - secretKey: MONGO_URI
+        remoteKey: mycure-production-mongo-uri
 
   mongodb:
+    external: true  # Use external/managed MongoDB
     serviceName: mongodb
     database: hapihub
     username: root
