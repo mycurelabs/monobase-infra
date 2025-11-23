@@ -77,7 +77,7 @@ spec:
           port: 443
 
 ---
-# Allow HapiHub → MongoDB
+# Allow HapiHub/SyncD → MongoDB (ingress to in-cluster MongoDB)
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -99,12 +99,15 @@ spec:
         - podSelector:
             matchLabels:
               app.kubernetes.io/name: hapihub
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: syncd
       ports:
         - protocol: TCP
           port: 27017
 
 ---
-# Egress from HapiHub to MongoDB
+# Egress from HapiHub to MongoDB (in-cluster or managed)
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -121,12 +124,18 @@ spec:
     - Egress
 
   egress:
-    # To MongoDB
+    # To in-cluster MongoDB (if enabled)
     - to:
         - podSelector:
             matchLabels:
               app.kubernetes.io/name: mongodb
       ports:
+        - protocol: TCP
+          port: 27017
+
+    # To external/managed MongoDB (DigitalOcean, Atlas, etc.)
+    # No 'to' selector = allows all destinations on MongoDB port
+    - ports:
         - protocol: TCP
           port: 27017
 
@@ -151,9 +160,56 @@ spec:
           port: 443
 
 ---
+# Egress from SyncD to MongoDB (in-cluster or managed)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-syncd-egress-to-mongodb
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    security-policy: allow-egress
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: syncd
+
+  policyTypes:
+    - Egress
+
+  egress:
+    # To in-cluster MongoDB (if enabled)
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: mongodb
+      ports:
+        - protocol: TCP
+          port: 27017
+
+    # To external/managed MongoDB (DigitalOcean, Atlas, etc.)
+    # No 'to' selector = allows all destinations on MongoDB port
+    - ports:
+        - protocol: TCP
+          port: 27017
+
+    # To DNS (required for service discovery)
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+        - podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+
+---
 # Notes:
 # 1. Only API backend can access PostgreSQL
-# 2. Only HapiHub backend can access MongoDB
+# 2. Only HapiHub and SyncD backends can access MongoDB
 # 3. Account and MyCure (frontends) have NO database access (security!)
 # 4. DNS access required for service name resolution
 # 5. Kubernetes API access needed for service discovery
