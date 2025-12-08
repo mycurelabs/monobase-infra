@@ -92,8 +92,16 @@ spec:
           value: {{ .Values.service.targetPort | quote }}
         - name: PORT
           value: {{ .Values.service.targetPort | quote }}
-        # MongoDB connection - individual components (only when using in-cluster MongoDB)
-        {{- if .Values.mongodb.enabled }}
+        # MongoDB connection
+        {{- if .Values.mongodb.external }}
+        # External/managed MongoDB - MONGO_URI from ExternalSecrets
+        - name: MONGO_URI
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "hapihub.fullname" . }}-secrets
+              key: MONGO_URI
+        {{- else if .Values.mongodb.enabled }}
+        # In-cluster MongoDB - individual components
         - name: MONGODB_HOST
           value: {{ include "hapihub.mongodb.host" . | quote }}
         - name: MONGODB_PORT
@@ -240,8 +248,8 @@ spec:
               name: {{ include "hapihub.fullname" . }}-secrets
               key: CALCOM_WEB_URL
               optional: true
-        # MongoDB URI (managed) - only if not using local MongoDB
-        {{- if not .Values.mongodb.enabled }}
+        # MongoDB URI (fallback) - only if neither external nor in-cluster MongoDB configured
+        {{- if and (not .Values.mongodb.external) (not .Values.mongodb.enabled) }}
         - name: MONGO_URI
           valueFrom:
             secretKeyRef:

@@ -170,7 +170,9 @@ externalSecrets:
 # MongoDB dependency configuration (deployed separately)
 mongodb:
   enabled: true
-  # Service name - points to separate MongoDB release
+  # Use external/managed MongoDB (e.g., DigitalOcean, Atlas) via MONGO_URI from ExternalSecrets
+  external: false
+  # Service name - points to separate MongoDB release (only used when external: false)
   serviceName: "mongodb"
   database: "hapihub"
   replicaSet: "rs0"
