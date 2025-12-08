@@ -206,7 +206,7 @@ hapihub:
         remoteKey: mycure-production-stripe-checkout-cancel-url
 
   mongodb:
-    external: true  # Use managed DigitalOcean MongoDB via MONGO_URI from ExternalSecrets
+    external: false  # Use in-cluster MongoDB
     serviceName: mongodb
     database: hapihub
     username: root
