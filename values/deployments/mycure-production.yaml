@@ -389,7 +389,7 @@ postgresql:
 
 # ===== DATABASE: MongoDB =====
 mongodb:
-  enabled: false  # Disabled - using managed DigitalOcean MongoDB
+  enabled: true  # Self-hosted MongoDB in Kubernetes
 
   fullnameOverride: "mongodb"
 
@@ -410,7 +410,7 @@ mongodb:
   persistence:
     enabled: true
     storageClass: ""
-    size: 20Gi
+    size: 100Gi
 
   resources:
     requests:
