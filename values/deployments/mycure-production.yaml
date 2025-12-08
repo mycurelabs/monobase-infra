@@ -416,10 +416,10 @@ mongodb:
   resources:
     requests:
       cpu: 2000m
-      memory: 8Gi
+      memory: 5Gi
     limits:
       cpu: 2000m
-      memory: 8Gi
+      memory: 5Gi
 
   podDisruptionBudget:
     enabled: false
