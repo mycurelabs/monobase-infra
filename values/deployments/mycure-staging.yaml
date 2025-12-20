@@ -11,6 +11,7 @@ global:
   gateway:
     name: shared-gateway
     namespace: gateway-system
+    sectionName: https-lfh-stg  # Use localfirsthealth.com listener
 
   storage:
     provider: ""
@@ -115,6 +116,7 @@ hapihub:
 
   gateway:
     hostname: ""
+    sectionName: https-lfh-stg
     timeouts:
       request: "60s"
 
@@ -183,6 +185,7 @@ mycure:
 
   gateway:
     hostname: ""
+    sectionName: https-lfh-stg
 
   config:
     API_URL: "https://hapihub.stg.localfirsthealth.com"
@@ -212,6 +215,7 @@ mycurev8:
 
   gateway:
     hostname: ""
+    sectionName: https-lfh-stg
 
   config:
     API_URL: "https://hapihub.stg.localfirsthealth.com"
@@ -241,6 +245,7 @@ dentalemon:
 
   gateway:
     hostname: ""
+    sectionName: https-lfh-stg
 
   config:
     API_URL: "https://hapihub.stg.localfirsthealth.com"
@@ -270,6 +275,7 @@ syncd:
 
   gateway:
     hostname: ""
+    sectionName: https-lfh-stg
 
   livenessProbe:
     enabled: true
@@ -445,6 +451,7 @@ minio:
   gateway:
     enabled: true
     hostname: ""
+    sectionName: https-lfh-stg
     rateLimit:
       enabled: false
 
@@ -463,6 +470,7 @@ mailpit:
   gateway:
     enabled: true
     hostname: ""
+    sectionName: https-lfh-stg
 
 # ===== BACKUP =====
 backup:
