@@ -26,11 +26,10 @@ spec:
           leaderElection:
             namespace: cert-manager
 
-        # Enable Gateway API support for HTTP-01 challenges (v1.15+ method)
-        config:
-          apiVersion: controller.config.cert-manager.io/v1alpha1
-          kind: ControllerConfiguration
-          enableGatewayAPI: true
+        # Enable Gateway API support for HTTP-01 challenges
+        # In v1.15+, use --enable-gateway-api flag via extraArgs
+        extraArgs:
+          - --enable-gateway-api
 
         # Resource limits for cert-manager components
         # Actual usage: controller=39Mi, cainjector=89Mi, webhook=18Mi
