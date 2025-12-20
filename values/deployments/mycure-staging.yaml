@@ -2,7 +2,7 @@
 # Staging environment on DigitalOcean Kubernetes (DOKS)
 
 global:
-  domain: stg.mycureapp.com
+  domain: stg.localfirsthealth.com
   namespace: mycure-staging
   environment: staging
 
@@ -89,7 +89,7 @@ account:
     hostname: ""
 
   config:
-    API_URL: "https://hapihub.stg.mycureapp.com"
+    API_URL: "https://hapihub.stg.localfirsthealth.com"
 
   podDisruptionBudget:
     enabled: false
@@ -121,7 +121,7 @@ hapihub:
   betterAuth:
     passkey:
       rpName: "Mycure"
-      rpId: "mycureapp.com"
+      rpId: "localfirsthealth.com"
 
   env:
     - name: BETTER_AUTH_RATE_LIMIT_ENABLED
@@ -185,8 +185,8 @@ mycure:
     hostname: ""
 
   config:
-    API_URL: "https://hapihub.stg.mycureapp.com"
-    HAPIHUB_URL: "https://hapihub.stg.mycureapp.com"
+    API_URL: "https://hapihub.stg.localfirsthealth.com"
+    HAPIHUB_URL: "https://hapihub.stg.localfirsthealth.com"
 
   podDisruptionBudget:
     enabled: false
@@ -214,8 +214,8 @@ mycurev8:
     hostname: ""
 
   config:
-    API_URL: "https://hapihub.stg.mycureapp.com"
-    HAPIHUB_URL: "https://hapihub.stg.mycureapp.com"
+    API_URL: "https://hapihub.stg.localfirsthealth.com"
+    HAPIHUB_URL: "https://hapihub.stg.localfirsthealth.com"
 
   podDisruptionBudget:
     enabled: false
@@ -243,8 +243,8 @@ dentalemon:
     hostname: ""
 
   config:
-    API_URL: "https://hapihub.stg.mycureapp.com"
-    HAPIHUB_URL: "https://hapihub.stg.mycureapp.com"
+    API_URL: "https://hapihub.stg.localfirsthealth.com"
+    HAPIHUB_URL: "https://hapihub.stg.localfirsthealth.com"
 
   podDisruptionBudget:
     enabled: false

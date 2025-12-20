@@ -13,14 +13,15 @@ image:
 # Multiple External DNS instances
 # Each instance can manage different DNS provider and domains
 instances:
-  # Primary instance: Cloudflare for mycureapp.com (all environments)
+  # Primary instance: Cloudflare for mycureapp.com and localfirsthealth.com
   - name: primary
     enabled: true
     provider: cloudflare
 
-    # Manage all mycureapp.com subdomains across all namespaces
+    # Manage DNS subdomains across all namespaces
     domainFilters:
       - mycureapp.com
+      - localfirsthealth.com
 
     # Cloudflare-specific configuration
     cloudflare:
