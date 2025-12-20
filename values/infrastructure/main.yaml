@@ -91,7 +91,7 @@ gateway:
     certManager:
       enabled: true  # Enabled: DNS records exist, ready for certificate provisioning
       clusterIssuer: letsencrypt-prod  # HTTP-01 challenge
-      includeApex: true
+      includeApex: false  # Wildcard listeners don't match apex domain
       # Specific subdomains for HTTP-01 challenge
       subdomains:
         # Production subdomains
