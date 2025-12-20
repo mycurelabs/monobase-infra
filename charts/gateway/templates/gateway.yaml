@@ -64,3 +64,23 @@ spec:
         namespaces:
           from: All
     {{- end }}
+
+    {{- if .Values.gateway.additionalListeners }}
+    # Additional listeners for other domains
+    {{- range $idx, $listener := .Values.gateway.additionalListeners }}
+    - name: {{ $listener.name }}
+      port: {{ $listener.port }}
+      protocol: {{ $listener.protocol }}
+      hostname: {{ $listener.hostname | quote }}
+      allowedRoutes:
+        namespaces:
+          from: All
+      {{- if eq $listener.protocol "HTTPS" }}
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - name: {{ $.Values.tls.secretName | default "gateway-tls" }}
+            kind: Secret
+      {{- end }}
+    {{- end }}
+    {{- end }}

@@ -24,4 +24,10 @@ spec:
     # Apex domain
     - {{ .Values.domain | quote }}
     {{- end }}
+    {{- if .Values.tls.certManager.additionalDomains }}
+    # Additional domains (different base domains)
+    {{- range .Values.tls.certManager.additionalDomains }}
+    - {{ . | quote }}
+    {{- end }}
+    {{- end }}
 {{- end }}
