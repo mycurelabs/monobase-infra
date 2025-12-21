@@ -73,8 +73,18 @@ gateway:
         port: 80
         protocol: HTTP
         # hostname automatically derived from gateway.domain as *.mycureapp.com
-    # Additional listeners for other domains (staging localfirsthealth.com)
+    # Additional listeners for localfirsthealth.com domains
     additionalListeners:
+      # Production localfirsthealth.com
+      - name: https-lfh
+        port: 443
+        protocol: HTTPS
+        hostname: "*.localfirsthealth.com"
+      - name: http-lfh
+        port: 80
+        protocol: HTTP
+        hostname: "*.localfirsthealth.com"
+      # Staging localfirsthealth.com
       - name: https-lfh-stg
         port: 443
         protocol: HTTPS
@@ -114,8 +124,15 @@ gateway:
         - storage.stg
         - web.stg
         - sync.stg
-      # Additional domains for localfirsthealth.com staging
+      # Additional domains for localfirsthealth.com
       additionalDomains:
+        # Production localfirsthealth.com
+        - grafana.localfirsthealth.com
+        - hapihub.localfirsthealth.com
+        - mycure.localfirsthealth.com
+        - mycurev8.localfirsthealth.com
+        - sync.localfirsthealth.com
+        # Staging localfirsthealth.com
         - dentalemon.stg.localfirsthealth.com
         - hapihub.stg.localfirsthealth.com
         - mycure.stg.localfirsthealth.com
