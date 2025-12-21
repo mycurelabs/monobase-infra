@@ -2,7 +2,7 @@
 # Production environment on DigitalOcean Kubernetes (DOKS)
 
 global:
-  domain: mycureapp.com
+  domain: localfirsthealth.com
   namespace: mycure-production
   environment: production
 
@@ -89,7 +89,7 @@ account:
     hostname: ""
 
   config:
-    API_URL: "https://hapihub.mycureapp.com"
+    API_URL: "https://hapihub.localfirsthealth.com"
 
   podDisruptionBudget:
     enabled: false
@@ -115,14 +115,14 @@ hapihub:
 
   gateway:
     hostname: ""
-    sectionName: https  # Use HTTPS listener with wildcard TLS certificate
+    sectionName: https-lfh  # Use localfirsthealth.com HTTPS listener
     timeouts:
       request: "60s"
 
   betterAuth:
     passkey:
       rpName: "Mycure"
-      rpId: "mycureapp.com"
+      rpId: "localfirsthealth.com"
 
   env:
     - name: BETTER_AUTH_RATE_LIMIT_ENABLED
@@ -233,11 +233,11 @@ mycure:
 
   gateway:
     hostname: ""
-    sectionName: https  # Use HTTPS listener with wildcard TLS certificate
+    sectionName: https-lfh  # Use localfirsthealth.com HTTPS listener
 
   config:
-    API_URL: "https://hapihub.mycureapp.com"
-    HAPIHUB_URL: "https://hapihub.mycureapp.com"
+    API_URL: "https://hapihub.localfirsthealth.com"
+    HAPIHUB_URL: "https://hapihub.localfirsthealth.com"
 
   podDisruptionBudget:
     enabled: false
@@ -263,11 +263,11 @@ mycurev8:
 
   gateway:
     hostname: ""
-    sectionName: https  # Use HTTPS listener with wildcard TLS certificate
+    sectionName: https-lfh  # Use localfirsthealth.com HTTPS listener
 
   config:
-    API_URL: "https://hapihub.mycureapp.com"
-    HAPIHUB_URL: "https://hapihub.mycureapp.com"
+    API_URL: "https://hapihub.localfirsthealth.com"
+    HAPIHUB_URL: "https://hapihub.localfirsthealth.com"
 
   podDisruptionBudget:
     enabled: false
@@ -293,11 +293,11 @@ dentalemon:
 
   gateway:
     hostname: ""
-    sectionName: https  # Use HTTPS listener with wildcard TLS certificate
+    sectionName: https-lfh  # Use localfirsthealth.com HTTPS listener
 
   config:
-    API_URL: "https://hapihub.mycureapp.com"
-    HAPIHUB_URL: "https://hapihub.mycureapp.com"
+    API_URL: "https://hapihub.localfirsthealth.com"
+    HAPIHUB_URL: "https://hapihub.localfirsthealth.com"
 
   podDisruptionBudget:
     enabled: false
@@ -323,7 +323,7 @@ syncd:
 
   gateway:
     hostname: ""
-    sectionName: https  # Use HTTPS listener with wildcard TLS certificate
+    sectionName: https-lfh  # Use localfirsthealth.com HTTPS listener
 
   livenessProbe:
     enabled: true
