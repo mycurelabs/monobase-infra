@@ -21,6 +21,11 @@ spec:
     helm:
       releaseName: envoy-gateway
       skipCrds: false  # Install Gateway API CRDs (required for fresh clusters)
+      valuesObject:
+        config:
+          envoyGateway:
+            extensionApis:
+              enableEnvoyPatchPolicy: true
   
   destination:
     server: https://kubernetes.default.svc
