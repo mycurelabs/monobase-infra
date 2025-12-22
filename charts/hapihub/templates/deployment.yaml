@@ -235,19 +235,6 @@ spec:
               name: {{ include "hapihub.fullname" . }}-secrets
               key: ENC_PERSONAL_DETAILS
               optional: true
-        # CalCom integration
-        - name: CALCOM_DATASOURCE_URL
-          valueFrom:
-            secretKeyRef:
-              name: {{ include "hapihub.fullname" . }}-secrets
-              key: CALCOM_DATASOURCE_URL
-              optional: true
-        - name: CALCOM_WEB_URL
-          valueFrom:
-            secretKeyRef:
-              name: {{ include "hapihub.fullname" . }}-secrets
-              key: CALCOM_WEB_URL
-              optional: true
         # MongoDB URI (fallback) - only if neither external nor in-cluster MongoDB configured
         {{- if and (not .Values.mongodb.external) (not .Values.mongodb.enabled) }}
         - name: MONGO_URI
