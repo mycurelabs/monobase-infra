@@ -94,3 +94,19 @@ labels: {}
 
 # Annotations to apply to all resources
 annotations: {}
+
+# EnvoyPatchPolicy configuration
+# Used to patch Envoy proxy settings like max header size
+envoyPatchPolicy:
+  # Enable EnvoyPatchPolicy
+  enabled: false
+
+  # Max request headers size in KB (default 60, max 96)
+  maxRequestHeadersKb: 96
+
+  # Listeners to apply the patch to
+  # Use listener names from gateway.listeners and additionalListeners
+  listeners: []
+  # Example:
+  # - https
+  # - https-lfh

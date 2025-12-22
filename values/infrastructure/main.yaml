@@ -146,6 +146,16 @@ gateway:
     enabled: false  # Disabled: wildcard redirect incompatible with HTTP-01
     statusCode: 301
 
+  # EnvoyPatchPolicy - Increase max request headers size
+  # Fixes HTTP 431 "Request Header Fields Too Large" errors
+  envoyPatchPolicy:
+    enabled: true
+    maxRequestHeadersKb: 96  # Default 60, max 96
+    listeners:
+      - https
+      - https-lfh
+      - https-lfh-stg
+
 # External Secrets - Secret management
 externalSecrets:
   enabled: true

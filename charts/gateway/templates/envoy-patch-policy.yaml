@@ -1,0 +1,27 @@
+# EnvoyPatchPolicy to increase max request headers size
+# Fixes HTTP 431 "Request Header Fields Too Large" errors
+# Default is 60KB, increased to 96KB (maximum allowed)
+{{- if .Values.envoyPatchPolicy.enabled }}
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: EnvoyPatchPolicy
+metadata:
+  name: increase-header-size
+  namespace: {{ include "gateway.namespace" . }}
+  labels:
+    {{- include "gateway.labels" . | nindent 4 }}
+spec:
+  targetRef:
+    group: gateway.networking.k8s.io
+    kind: Gateway
+    name: {{ include "gateway.gatewayName" . }}
+  type: JSONPatch
+  jsonPatches:
+    {{- range .Values.envoyPatchPolicy.listeners }}
+    - type: "type.googleapis.com/envoy.config.listener.v3.Listener"
+      name: "{{ $.Values.namespace | default "gateway-system" }}/{{ include "gateway.gatewayName" $ }}/{{ . }}"
+      operation:
+        op: replace
+        path: "/default_filter_chain/filters/0/typed_config/max_request_headers_kb"
+        value: {{ $.Values.envoyPatchPolicy.maxRequestHeadersKb | default 96 }}
+    {{- end }}
+{{- end }}
