@@ -257,13 +257,6 @@ spec:
               name: {{ include "hapihub.fullname" . }}-secrets
               key: PUBLIC_KEY
               optional: true
-        # Search engine
-        - name: SEARCH_ENGINE_URI
-          valueFrom:
-            secretKeyRef:
-              name: {{ include "hapihub.fullname" . }}-secrets
-              key: SEARCH_ENGINE_URI
-              optional: true
         # Storage configuration - only if not using local MinIO
         {{- if not .Values.minio.enabled }}
         - name: STORAGE_BUCKET
