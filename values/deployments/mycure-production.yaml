@@ -176,9 +176,6 @@ hapihub:
         remoteKey: mycure-production-private-key
       - secretKey: PUBLIC_KEY
         remoteKey: mycure-production-public-key
-      # Search engine
-      - secretKey: SEARCH_ENGINE_URI
-        remoteKey: mycure-production-search-engine-uri
       # Storage configuration (GCP)
       - secretKey: STORAGE_BUCKET
         remoteKey: mycure-production-storage-bucket
