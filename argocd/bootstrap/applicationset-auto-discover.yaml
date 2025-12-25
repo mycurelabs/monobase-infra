@@ -35,8 +35,9 @@ spec:
   generators:
     # Git Files Generator: Scans values/deployments/*.yaml files
     - git:
-        repoURL: https://github.com/mycurelabs/monobase-infra.git
-        revision: HEAD
+        # TODO: Change this to YOUR forked repository URL!
+        repoURL: https://github.com/jericho1050/monobase-infra.git
+        targetRevision: HEAD
         files:
           # Include: scan all YAML files in values/deployments/
           - path: "values/deployments/*.yaml"
@@ -65,7 +66,7 @@ spec:
 
       source:
         # Point to this Git repository
-        repoURL: https://github.com/mycurelabs/monobase-infra.git
+        repoURL: https://github.com/jericho1050/monobase-infra.git
         targetRevision: HEAD
         path: argocd/applications
 
@@ -78,7 +79,7 @@ spec:
           # Inject repoURL from bootstrap (single source of truth)
           values: |
             argocd:
-              repoURL: https://github.com/mycurelabs/monobase-infra.git
+        repoURL: https://github.com/jericho1050/monobase-infra.git
               targetRevision: HEAD
 
       destination:

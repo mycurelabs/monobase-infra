@@ -1,0 +1,258 @@
+# =============================================================================
+# Practice Deployment Configuration
+# =============================================================================
+# This is a simple staging deployment for learning DevOps!
+# 
+# What this deploys:
+# - A frontend app (mycure)
+# - A backend API (hapihub)
+# - MongoDB database
+# - MinIO object storage
+# - Mailpit for email testing
+# =============================================================================
+
+global:
+  # IMPORTANT: Change this to YOUR domain!
+  # Options:
+  #   - Your real domain: "practice.yourdomain.com"
+  #   - Using nip.io: "YOUR_LB_IP.nip.io" (get IP after Gateway deploys)
+  domain: practice.yourdomain.com
+  
+  # Namespace for this deployment
+  namespace: practice-staging
+  
+  # Environment identifier
+  environment: staging
+  
+  # Node pool (use default for DOKS)
+  nodePool: "general"
+  
+  # Gateway configuration (shared gateway in gateway-system namespace)
+  gateway:
+    name: shared-gateway
+    namespace: gateway-system
+  
+  # Storage configuration
+  # For DOKS, leave empty to use DigitalOcean's default storage class
+  storage:
+    provider: ""
+    className: ""
+
+# =============================================================================
+# FRONTEND: MyCure Application
+# =============================================================================
+mycure:
+  enabled: true
+  
+  image:
+    repository: ghcr.io/mycurelabs/mycureapp
+    tag: "10.2.6"
+    pullPolicy: IfNotPresent
+  
+  replicaCount: 1
+  
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 128Mi
+  
+  gateway:
+    # This becomes: app.practice.yourdomain.com
+    hostname: "app"
+  
+  config:
+    API_URL: "https://api.practice.yourdomain.com"
+    HAPIHUB_URL: "https://api.practice.yourdomain.com"
+  
+  podDisruptionBudget:
+    enabled: false
+
+# =============================================================================
+# BACKEND: HapiHub API
+# =============================================================================
+hapihub:
+  enabled: true
+  
+  image:
+    repository: ghcr.io/mycurelabs/hapihub
+    tag: "10.1.0"
+    pullPolicy: IfNotPresent
+  
+  replicaCount: 1
+  
+  resources:
+    requests:
+      cpu: 250m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 1Gi
+  
+  gateway:
+    # This becomes: api.practice.yourdomain.com
+    hostname: "api"
+    timeouts:
+      request: "60s"
+  
+  livenessProbe:
+    enabled: true
+  
+  readinessProbe:
+    enabled: true
+  
+  podDisruptionBudget:
+    enabled: false
+  
+  autoscaling:
+    enabled: false
+  
+  # External Secrets disabled for practice
+  # Enable this in production to sync secrets from cloud KMS
+  externalSecrets:
+    enabled: false
+  
+  mongodb:
+    serviceName: mongodb
+    database: hapihub
+    username: root
+    replicaSet: rs0
+
+# =============================================================================
+# DATABASE: MongoDB
+# =============================================================================
+mongodb:
+  enabled: true
+  
+  fullnameOverride: "mongodb"
+  
+  architecture: replicaset
+  replicaCount: 1
+  
+  image:
+    repository: bitnamilegacy/mongodb
+    tag: 7.0.15-debian-12-r0
+  
+  auth:
+    rootUser: root
+    # For practice, we'll create a simple secret
+    # In production, use External Secrets
+    existingSecret: mongodb
+  
+  arbiter:
+    enabled: false
+  
+  persistence:
+    enabled: true
+    storageClass: ""  # Uses default DOKS storage
+    size: 10Gi  # Smaller for practice
+  
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  
+  podDisruptionBudget:
+    enabled: false
+
+# =============================================================================
+# STORAGE: MinIO Object Storage
+# =============================================================================
+minio:
+  enabled: true
+  
+  fullnameOverride: "minio"
+  
+  image:
+    repository: bitnamilegacy/minio
+    tag: "2025.7.23-debian-12-r3"
+  
+  mode: standalone
+  
+  statefulset:
+    replicaCount: 1
+  
+  auth:
+    existingSecret: minio
+  
+  persistence:
+    enabled: true
+    storageClass: ""
+    size: 5Gi  # Smaller for practice
+  
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  
+  defaultBuckets: "practice-files"
+  region: "us-east-1"
+  
+  gateway:
+    enabled: true
+    hostname: "storage"  # storage.practice.yourdomain.com
+
+# =============================================================================
+# EMAIL TESTING: Mailpit
+# =============================================================================
+mailpit:
+  enabled: true
+  
+  resources:
+    requests:
+      cpu: 25m
+      memory: 32Mi
+    limits:
+      cpu: 100m
+      memory: 64Mi
+  
+  gateway:
+    enabled: true
+    hostname: "mail"  # mail.practice.yourdomain.com
+
+# =============================================================================
+# DISABLED FOR PRACTICE
+# Enable these as you learn more
+# =============================================================================
+api:
+  enabled: false
+
+account:
+  enabled: false
+
+mycurev8:
+  enabled: false
+
+dentalemon:
+  enabled: false
+
+syncd:
+  enabled: false
+
+postgresql:
+  enabled: false
+
+valkey:
+  enabled: false
+
+backup:
+  enabled: false
+
+# =============================================================================
+# SECURITY
+# =============================================================================
+podSecurityStandards:
+  enabled: true
+  level: restricted
+
+resourceQuotas:
+  enabled: false
+
