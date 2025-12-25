@@ -26,6 +26,9 @@ spec:
           leaderElection:
             namespace: cert-manager
         
+        # Enable Gateway API support for HTTP-01 challenges
+        featureGates: "ExperimentalGatewayAPISupport=true"
+        
         # Resource limits for cert-manager components
         # Actual usage: controller=39Mi, cainjector=89Mi, webhook=18Mi
         resources:
