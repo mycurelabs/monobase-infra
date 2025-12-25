@@ -62,6 +62,7 @@ mycure:
   gateway:
     # Full hostname for the frontend
     hostname: "stg.mediqueue.online"
+    sectionName: http  # Use HTTP listener (HTTPS needs TLS cert setup)
   
   config:
     API_URL: "https://api.stg.mediqueue.online"
@@ -94,6 +95,7 @@ hapihub:
   gateway:
     # Full hostname for the API
     hostname: "api.stg.mediqueue.online"
+    sectionName: http  # Use HTTP listener
     timeouts:
       request: "60s"
   

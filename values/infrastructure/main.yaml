@@ -11,16 +11,22 @@ certManager:
 certManagerIssuers:
   enabled: true
   issuers:
-    # HTTP-01 challenge type (no DNS provider needed)
+    # HTTP-01 challenge type (no DNS provider needed, works with Namecheap)
     - name: letsencrypt-prod
-      email: "admin@example.com"
+      email: "jericho.serrano@example.com"  # Change to your email!
       server: production
       provider: http01
+      http01:
+        gatewayName: shared-gateway
+        gatewayNamespace: gateway-system
     
     - name: letsencrypt-staging
-      email: "admin@example.com"
+      email: "jericho.serrano@example.com"  # Change to your email!
       server: staging
       provider: http01
+      http01:
+        gatewayName: shared-gateway
+        gatewayNamespace: gateway-system
 
 # Envoy Gateway - Gateway API implementation
 envoyGateway:
@@ -81,26 +87,14 @@ gateway:
     certManager:
       enabled: true  # Enabled: DNS records exist, ready for certificate provisioning
       clusterIssuer: letsencrypt-prod  # HTTP-01 challenge
-      includeApex: true
-      # Specific subdomains for HTTP-01 challenge
+      includeApex: false  # We don't need mediqueue.online apex
+      # Specific subdomains for HTTP-01 challenge (for mediqueue.online)
       subdomains:
-        # Production subdomains
-        - grafana
-        - api
-        - web
-        - sync
-        - storage
-        - dentalemon
-        - hapihub
-        - mycure
-        - mycurev8
-        # Staging subdomains
-        - dentalemon.stg
-        - hapihub.stg
-        - mycure.stg
-        - mycurev8.stg
-        - api.stg
-        - mail.stg
+        # Staging subdomains (stg.mediqueue.online)
+        - stg           # stg.mediqueue.online (frontend)
+        - api.stg       # api.stg.mediqueue.online (hapihub API)
+        - mail.stg      # mail.stg.mediqueue.online (mailpit)
+        - storage.stg   # storage.stg.mediqueue.online (minio)
         - storage.stg
         - web.stg
         - sync.stg
