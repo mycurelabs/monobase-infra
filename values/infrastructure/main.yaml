@@ -13,7 +13,7 @@ certManagerIssuers:
   issuers:
     # HTTP-01 challenge type (no DNS provider needed, works with Namecheap)
     - name: letsencrypt-prod
-      email: "jericho.serrano@example.com"  # Change to your email!
+      email: "serranojerichowenzel@gmail.com"  # Your real email for Let's Encrypt notifications
       server: production
       provider: http01
       http01:
@@ -21,7 +21,7 @@ certManagerIssuers:
         gatewayNamespace: gateway-system
     
     - name: letsencrypt-staging
-      email: "jericho.serrano@example.com"  # Change to your email!
+      email: "serranojerichowenzel@gmail.com"  # Your real email
       server: staging
       provider: http01
       http01:
