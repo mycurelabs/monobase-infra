@@ -55,7 +55,7 @@ envoyProxyConfig:
 # Gateway Resources - Shared Gateway configuration
 gateway:
   # Base domain for gateway (override per deployment)
-  domain: mycureapp.com
+  domain: mediqueue.online
 
   # Gateway configuration
   gateway:
