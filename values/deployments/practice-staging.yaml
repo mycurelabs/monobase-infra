@@ -60,8 +60,8 @@ mycure:
       memory: 128Mi
   
   gateway:
-    # This becomes: app.practice.yourdomain.com
-    hostname: "app"
+    # Full hostname for the frontend
+    hostname: "stg.mediqueue.online"
   
   config:
     API_URL: "https://api.stg.mediqueue.online"
@@ -92,8 +92,8 @@ hapihub:
       memory: 1Gi
   
   gateway:
-    # This becomes: api.practice.yourdomain.com
-    hostname: "api"
+    # Full hostname for the API
+    hostname: "api.stg.mediqueue.online"
     timeouts:
       request: "60s"
   
@@ -198,7 +198,7 @@ minio:
   
   gateway:
     enabled: true
-    hostname: "storage"  # storage.practice.yourdomain.com
+    hostname: "storage.stg.mediqueue.online"
 
 # =============================================================================
 # EMAIL TESTING: Mailpit
@@ -216,7 +216,7 @@ mailpit:
   
   gateway:
     enabled: true
-    hostname: "mail"  # mail.practice.yourdomain.com
+    hostname: "mail.stg.mediqueue.online"
 
 # =============================================================================
 # DISABLED FOR PRACTICE
