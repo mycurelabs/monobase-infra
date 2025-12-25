@@ -16,16 +16,16 @@ global:
   # Options:
   #   - Your real domain: "practice.yourdomain.com"
   #   - Using nip.io: "YOUR_LB_IP.nip.io" (get IP after Gateway deploys)
-  domain: practice.yourdomain.com
+  domain: stg.mediqueue.online
   
   # Namespace for this deployment
-  namespace: practice-staging
+  namespace: mediqueue-staging
   
   # Environment identifier
   environment: staging
   
-  # Node pool (use default for DOKS)
-  nodePool: "general"
+  # Node pool - leave empty for DOKS (no node selector needed)
+  nodePool: ""
   
   # Gateway configuration (shared gateway in gateway-system namespace)
   gateway:
@@ -64,8 +64,8 @@ mycure:
     hostname: "app"
   
   config:
-    API_URL: "https://api.practice.yourdomain.com"
-    HAPIHUB_URL: "https://api.practice.yourdomain.com"
+    API_URL: "https://api.stg.mediqueue.online"
+    HAPIHUB_URL: "https://api.stg.mediqueue.online"
   
   podDisruptionBudget:
     enabled: false

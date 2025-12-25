@@ -37,13 +37,13 @@ spec:
     - git:
         # TODO: Change this to YOUR forked repository URL!
         repoURL: https://github.com/jericho1050/monobase-infra.git
-        targetRevision: HEAD
+        revision: HEAD
         files:
-          # Include: scan all YAML files in values/deployments/
-          - path: "values/deployments/*.yaml"
-          # Exclude: reference examples
-          - path: "values/deployments/example-*.yaml"
-            exclude: true
+          # Scan all YAML files in values/deployments/
+          # Note: example-*.yaml files are excluded by naming convention
+          - path: "values/deployments/*-staging.yaml"
+          - path: "values/deployments/*-production.yaml"
+          - path: "values/deployments/*-prod.yaml"
 
   # Template for creating root Applications
   template:
@@ -79,7 +79,7 @@ spec:
           # Inject repoURL from bootstrap (single source of truth)
           values: |
             argocd:
-        repoURL: https://github.com/jericho1050/monobase-infra.git
+              repoURL: https://github.com/jericho1050/monobase-infra.git
               targetRevision: HEAD
 
       destination:
