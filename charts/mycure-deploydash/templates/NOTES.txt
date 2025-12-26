@@ -1,0 +1,37 @@
+{{- if .Values.enabled }}
+DeployDash has been deployed!
+
+Chart: {{ .Chart.Name }}-{{ .Chart.Version }}
+Release: {{ .Release.Name }}
+Namespace: {{ include "mycure-deploydash.namespace" . }}
+
+Deployment Information:
+  - Replicas: {{ .Values.replicaCount }}
+  - Image: {{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}
+  - Service: {{ include "mycure-deploydash.fullname" . }}:{{ .Values.service.port }}
+
+Access Information:
+{{- if .Values.gateway.enabled }}
+  DeployDash App: https://{{ include "mycure-deploydash.gateway.hostname" . }}
+
+  Open in browser:
+  open https://{{ include "mycure-deploydash.gateway.hostname" . }}
+{{- else }}
+  Gateway is disabled. Use port-forward to access:
+  kubectl port-forward -n {{ include "mycure-deploydash.namespace" . }} svc/{{ include "mycure-deploydash.fullname" . }} 8080:{{ .Values.service.port }}
+  # Open http://localhost:8080
+{{- end }}
+
+Next Steps:
+  1. Verify pods are running:
+     kubectl get pods -n {{ include "mycure-deploydash.namespace" . }} -l app.kubernetes.io/name={{ include "mycure-deploydash.name" . }}
+
+  2. Check logs:
+     kubectl logs -n {{ include "mycure-deploydash.namespace" . }} -l app.kubernetes.io/name={{ include "mycure-deploydash.name" . }} --tail=50
+
+  3. Test frontend:
+     curl https://{{ include "mycure-deploydash.gateway.hostname" . }}
+
+{{- else }}
+DeployDash is disabled (enabled: false)
+{{- end }}

@@ -296,6 +296,36 @@ dentalemon-myaccount:
   podDisruptionBudget:
     enabled: false
 
+# ===== HEALTHCARE: MyCure DeployDash Application =====
+mycure-deploydash:
+  enabled: true
+
+  image:
+    repository: ghcr.io/mycurelabs/deploydash
+    tag: "10.0.1"
+    pullPolicy: IfNotPresent
+
+  replicaCount: 1
+
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 128Mi
+
+  gateway:
+    hostname: ""
+    sectionName: https-lfh  # Use localfirsthealth.com HTTPS listener
+
+  config:
+    API_URL: "https://hapihub.localfirsthealth.com"
+    HAPIHUB_URL: "https://hapihub.localfirsthealth.com"
+
+  podDisruptionBudget:
+    enabled: false
+
 # ===== HEALTHCARE: Frontend Application (v8 Legacy) =====
 mycurev8:
   enabled: true
