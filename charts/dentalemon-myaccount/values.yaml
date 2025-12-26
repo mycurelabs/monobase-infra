@@ -1,0 +1,114 @@
+# Default values for DentaLemon MyAccount chart
+# Override these values in deployments/{env}/values.yaml
+
+global:
+  domain: example.com
+  namespace: example-prod
+  environment: production
+  gateway:
+    name: shared-gateway
+    namespace: gateway-system
+
+enabled: true
+
+replicaCount: 1
+
+image:
+  repository: ghcr.io/mycurelabs/dentalemon-myaccount
+  pullPolicy: IfNotPresent
+  tag: "latest"
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+podAnnotations: {}
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 101  # caddy-k8s user
+  fsGroup: 101
+  seccompProfile:
+    type: RuntimeDefault
+
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+  readOnlyRootFilesystem: true
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 8080
+  annotations: {}
+
+gateway:
+  enabled: true
+  hostname: ""  # Empty = uses dentalemon-myaccount.{global.domain}
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    cpu: 200m
+    memory: 128Mi
+
+livenessProbe:
+  enabled: true
+  httpGet:
+    path: /
+    port: 8080
+  initialDelaySeconds: 10
+  periodSeconds: 10
+
+readinessProbe:
+  enabled: true
+  httpGet:
+    path: /
+    port: 8080
+  initialDelaySeconds: 5
+  periodSeconds: 5
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 3
+  targetCPUUtilizationPercentage: 70
+
+podDisruptionBudget:
+  enabled: false
+  minAvailable: 1
+
+# Node pool scheduling (optional, disabled by default)
+# Inherits from global.nodePool if configured
+# nodePool:
+#   enabled: false     # Set to false to explicitly disable (overrides global)
+#   name: "staging"    # Override global node pool name
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
+# Frontend configuration (passed as environment variables)
+config:
+  API_URL: ""  # Set to HapiHub public URL (e.g., https://hapihub.example.com)
+  HAPIHUB_URL: ""  # Set to HapiHub public URL (e.g., https://hapihub.example.com)
+
+networkPolicy:
+  enabled: false
+  policyTypes:
+    - Ingress
+    - Egress
+
+serviceMonitor:
+  enabled: false
+  interval: 30s
+  path: /metrics

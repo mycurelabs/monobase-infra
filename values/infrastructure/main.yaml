@@ -127,6 +127,7 @@ gateway:
       # Additional domains for localfirsthealth.com
       additionalDomains:
         # Production localfirsthealth.com
+        - dentalemon-myaccount.localfirsthealth.com
         - grafana.localfirsthealth.com
         - hapihub.localfirsthealth.com
         - myaccount.localfirsthealth.com
@@ -134,6 +135,7 @@ gateway:
         - mycurev8.localfirsthealth.com
         - sync.localfirsthealth.com
         # Staging localfirsthealth.com
+        - dentalemon-myaccount.stg.localfirsthealth.com
         - dentalemon.stg.localfirsthealth.com
         - hapihub.stg.localfirsthealth.com
         - myaccount.stg.localfirsthealth.com
