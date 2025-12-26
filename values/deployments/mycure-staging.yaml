@@ -215,10 +215,11 @@ myaccount:
 
   gateway:
     hostname: ""
+    sectionName: https-lfh-stg
 
   config:
-    API_URL: "https://hapihub.stg.mycureapp.com"
-    HAPIHUB_URL: "https://hapihub.stg.mycureapp.com"
+    API_URL: "https://hapihub.stg.localfirsthealth.com"
+    HAPIHUB_URL: "https://hapihub.stg.localfirsthealth.com"
 
   podDisruptionBudget:
     enabled: false
