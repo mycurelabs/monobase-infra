@@ -241,7 +241,33 @@ mycurev8:
   enabled: false
 
 dentalemon:
-  enabled: false
+  enabled: true
+  
+  image:
+    repository: ghcr.io/mycurelabs/dentalemonapp
+    tag: "10.0.0"
+    pullPolicy: IfNotPresent
+  
+  replicaCount: 1
+  
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 128Mi
+  
+  gateway:
+    hostname: "dental-stg.mediqueue.online"  # First-level subdomain for free Cloudflare SSL
+    sectionName: http
+  
+  config:
+    API_URL: "https://api-stg.mediqueue.online"
+    HAPIHUB_URL: "https://api-stg.mediqueue.online"
+  
+  podDisruptionBudget:
+    enabled: false
 
 syncd:
   enabled: false
