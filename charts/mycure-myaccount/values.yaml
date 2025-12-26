@@ -1,4 +1,4 @@
-# Default values for MyAccount chart
+# Default values for MyCure MyAccount chart
 # Override these values in deployments/{env}/values.yaml
 
 global:
@@ -51,7 +51,7 @@ service:
 
 gateway:
   enabled: true
-  hostname: ""  # Empty = uses myaccount.{global.domain}
+  hostname: ""  # Empty = uses mycure-myaccount.{global.domain}
 
 resources:
   requests:

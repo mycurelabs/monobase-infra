@@ -236,8 +236,8 @@ mycure:
   podDisruptionBudget:
     enabled: false
 
-# ===== HEALTHCARE: MyAccount Application =====
-myaccount:
+# ===== HEALTHCARE: MyCure MyAccount Application =====
+mycure-myaccount:
   enabled: true
 
   image:

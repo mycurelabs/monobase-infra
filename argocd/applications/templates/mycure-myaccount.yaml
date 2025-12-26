@@ -1,11 +1,12 @@
-{{- if .Values.myaccount.enabled }}
-# ArgoCD Application: MyAccount Frontend
+{{- if index .Values "mycure-myaccount" }}
+{{- if (index .Values "mycure-myaccount").enabled }}
+# ArgoCD Application: MyCure MyAccount Frontend
 # Sync Wave 3 - Deploy application after database
 
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: {{ .Values.global.namespace }}-myaccount
+  name: {{ .Values.global.namespace }}-mycure-myaccount
   namespace: argocd
   annotations:
     argocd.argoproj.io/sync-wave: "3"
@@ -15,13 +16,13 @@ spec:
   project: default
 
   source:
-    path: charts/myaccount
+    path: charts/mycure-myaccount
     repoURL: {{ .Values.argocd.repoURL }}
     targetRevision: {{ .Values.argocd.targetRevision | default "main" }}
     helm:
-      releaseName: myaccount
+      releaseName: mycure-myaccount
       valuesObject:
-        {{- toYaml .Values.myaccount | nindent 8 }}
+        {{- toYaml (index .Values "mycure-myaccount") | nindent 8 }}
         global: {{ .Values.global | toYaml | nindent 10 }}
 
   destination:
@@ -39,4 +40,5 @@ spec:
       backoff:
         duration: 10s
         maxDuration: 5m
+{{- end }}
 {{- end }}

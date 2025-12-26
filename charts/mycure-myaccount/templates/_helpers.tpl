@@ -1,14 +1,14 @@
 {{/*
 Expand the name of the chart.
 */}}
-{{- define "myaccount.name" -}}
+{{- define "mycure-myaccount.name" -}}
 {{- default .Chart.Name .Values.nameOverride | trunc 63 | trimSuffix "-" }}
 {{- end }}
 
 {{/*
 Create a default fully qualified app name.
 */}}
-{{- define "myaccount.fullname" -}}
+{{- define "mycure-myaccount.fullname" -}}
 {{- if .Values.fullnameOverride }}
 {{- .Values.fullnameOverride | trunc 63 | trimSuffix "-" }}
 {{- else }}
@@ -24,71 +24,71 @@ Create a default fully qualified app name.
 {{/*
 Create chart name and version as used by the chart label.
 */}}
-{{- define "myaccount.chart" -}}
+{{- define "mycure-myaccount.chart" -}}
 {{- printf "%s-%s" .Chart.Name .Chart.Version | replace "+" "_" | trunc 63 | trimSuffix "-" }}
 {{- end }}
 
 {{/*
 Common labels
 */}}
-{{- define "myaccount.labels" -}}
-helm.sh/chart: {{ include "myaccount.chart" . }}
-{{ include "myaccount.selectorLabels" . }}
+{{- define "mycure-myaccount.labels" -}}
+helm.sh/chart: {{ include "mycure-myaccount.chart" . }}
+{{ include "mycure-myaccount.selectorLabels" . }}
 {{- if .Chart.AppVersion }}
 app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
 {{- end }}
 app.kubernetes.io/managed-by: {{ .Release.Service }}
-app.kubernetes.io/part-of: myaccount
+app.kubernetes.io/part-of: mycure-myaccount
 {{- end }}
 
 {{/*
 Selector labels
 */}}
-{{- define "myaccount.selectorLabels" -}}
-app.kubernetes.io/name: {{ include "myaccount.name" . }}
+{{- define "mycure-myaccount.selectorLabels" -}}
+app.kubernetes.io/name: {{ include "mycure-myaccount.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
 
 {{/*
 Create the name of the service account to use
 */}}
-{{- define "myaccount.serviceAccountName" -}}
+{{- define "mycure-myaccount.serviceAccountName" -}}
 {{- if .Values.serviceAccount.create }}
-{{- default (include "myaccount.fullname" .) .Values.serviceAccount.name }}
+{{- default (include "mycure-myaccount.fullname" .) .Values.serviceAccount.name }}
 {{- else }}
 {{- default "default" .Values.serviceAccount.name }}
 {{- end }}
 {{- end }}
 
 {{/*
-Gateway hostname - defaults to myaccount.{global.domain}
+Gateway hostname - defaults to mycure-myaccount.{global.domain}
 */}}
-{{- define "myaccount.gateway.hostname" -}}
+{{- define "mycure-myaccount.gateway.hostname" -}}
 {{- if .Values.gateway.hostname }}
 {{- .Values.gateway.hostname }}
 {{- else }}
-{{- printf "myaccount.%s" .Values.global.domain }}
+{{- printf "mycure-myaccount.%s" .Values.global.domain }}
 {{- end }}
 {{- end }}
 
 {{/*
 Namespace - uses global.namespace or Release.Namespace
 */}}
-{{- define "myaccount.namespace" -}}
+{{- define "mycure-myaccount.namespace" -}}
 {{- default .Release.Namespace .Values.global.namespace }}
 {{- end }}
 
 {{/*
 Gateway parent reference name
 */}}
-{{- define "myaccount.gateway.name" -}}
+{{- define "mycure-myaccount.gateway.name" -}}
 {{- default "shared-gateway" .Values.global.gateway.name }}
 {{- end }}
 
 {{/*
 Gateway parent reference namespace
 */}}
-{{- define "myaccount.gateway.namespace" -}}
+{{- define "mycure-myaccount.gateway.namespace" -}}
 {{- default "gateway-system" .Values.global.gateway.namespace }}
 {{- end }}
 
@@ -96,7 +96,7 @@ Gateway parent reference namespace
 Node Pool - returns the effective node pool name (component-level or global)
 Returns empty string if disabled or not configured
 */}}
-{{- define "myaccount.nodePool" -}}
+{{- define "mycure-myaccount.nodePool" -}}
 {{- if hasKey .Values "nodePool" -}}
   {{- if and .Values.nodePool (hasKey .Values.nodePool "enabled") (not .Values.nodePool.enabled) -}}
     {{- /* Component explicitly disabled node pool */ -}}

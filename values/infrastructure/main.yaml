@@ -130,7 +130,7 @@ gateway:
         - dentalemon-myaccount.localfirsthealth.com
         - grafana.localfirsthealth.com
         - hapihub.localfirsthealth.com
-        - myaccount.localfirsthealth.com
+        - mycure-myaccount.localfirsthealth.com
         - mycure.localfirsthealth.com
         - mycurev8.localfirsthealth.com
         - sync.localfirsthealth.com
@@ -138,7 +138,7 @@ gateway:
         - dentalemon-myaccount.stg.localfirsthealth.com
         - dentalemon.stg.localfirsthealth.com
         - hapihub.stg.localfirsthealth.com
-        - myaccount.stg.localfirsthealth.com
+        - mycure-myaccount.stg.localfirsthealth.com
         - mycure.stg.localfirsthealth.com
         - mycurev8.stg.localfirsthealth.com
         - mail.stg.localfirsthealth.com

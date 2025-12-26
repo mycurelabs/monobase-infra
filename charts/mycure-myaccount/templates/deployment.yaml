@@ -2,17 +2,17 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "myaccount.fullname" . }}
-  namespace: {{ include "myaccount.namespace" . }}
+  name: {{ include "mycure-myaccount.fullname" . }}
+  namespace: {{ include "mycure-myaccount.namespace" . }}
   labels:
-    {{- include "myaccount.labels" . | nindent 4 }}
+    {{- include "mycure-myaccount.labels" . | nindent 4 }}
 spec:
   {{- if not .Values.autoscaling.enabled }}
   replicas: {{ .Values.replicaCount }}
   {{- end }}
   selector:
     matchLabels:
-      {{- include "myaccount.selectorLabels" . | nindent 6 }}
+      {{- include "mycure-myaccount.selectorLabels" . | nindent 6 }}
   template:
     metadata:
       annotations:
@@ -21,13 +21,13 @@ spec:
         {{- toYaml . | nindent 8 }}
         {{- end }}
       labels:
-        {{- include "myaccount.selectorLabels" . | nindent 8 }}
+        {{- include "mycure-myaccount.selectorLabels" . | nindent 8 }}
     spec:
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      serviceAccountName: {{ include "myaccount.serviceAccountName" . }}
+      serviceAccountName: {{ include "mycure-myaccount.serviceAccountName" . }}
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
       containers:
@@ -80,7 +80,7 @@ spec:
         emptyDir: {}
       - name: caddy-config
         emptyDir: {}
-      {{- $nodePool := include "myaccount.nodePool" . -}}
+      {{- $nodePool := include "mycure-myaccount.nodePool" . -}}
       {{- if or $nodePool .Values.nodeSelector }}
       nodeSelector:
         {{- if $nodePool }}
