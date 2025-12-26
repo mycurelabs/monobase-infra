@@ -65,8 +65,8 @@ mycure:
     sectionName: http  # Use HTTP listener (HTTPS needs TLS cert setup)
   
   config:
-    API_URL: "https://api.stg.mediqueue.online"
-    HAPIHUB_URL: "https://api.stg.mediqueue.online"
+    API_URL: "https://api-stg.mediqueue.online"
+    HAPIHUB_URL: "https://api-stg.mediqueue.online"
   
   podDisruptionBudget:
     enabled: false
@@ -93,8 +93,8 @@ hapihub:
       memory: 1Gi
   
   gateway:
-    # Full hostname for the API
-    hostname: "api.stg.mediqueue.online"
+    # Full hostname for the API (first-level subdomain for free Cloudflare SSL)
+    hostname: "api-stg.mediqueue.online"
     sectionName: http  # Use HTTP listener
     timeouts:
       request: "60s"
@@ -115,6 +115,13 @@ hapihub:
   # Enable this in production to sync secrets from cloud KMS
   externalSecrets:
     enabled: false
+  
+  # Environment variables for HapiHub
+  env:
+    - name: PUBLIC_URL
+      value: "https://api-stg.mediqueue.online"
+    - name: APP_URL
+      value: "https://api-stg.mediqueue.online"
   
   mongodb:
     serviceName: mongodb
@@ -200,7 +207,7 @@ minio:
   
   gateway:
     enabled: true
-    hostname: "storage.stg.mediqueue.online"
+    hostname: "storage-stg.mediqueue.online"
 
 # =============================================================================
 # EMAIL TESTING: Mailpit
@@ -218,7 +225,7 @@ mailpit:
   
   gateway:
     enabled: true
-    hostname: "mail.stg.mediqueue.online"
+    hostname: "mail-stg.mediqueue.online"
 
 # =============================================================================
 # DISABLED FOR PRACTICE
