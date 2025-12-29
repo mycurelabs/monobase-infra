@@ -128,6 +128,7 @@ gateway:
       additionalDomains:
         # Production localfirsthealth.com
         - dentalemon-myaccount.localfirsthealth.com
+        - dentalemon-website.localfirsthealth.com
         - grafana.localfirsthealth.com
         - hapihub.localfirsthealth.com
         - mycure-deploydash.localfirsthealth.com
@@ -137,6 +138,7 @@ gateway:
         - sync.localfirsthealth.com
         # Staging localfirsthealth.com
         - dentalemon-myaccount.stg.localfirsthealth.com
+        - dentalemon-website.stg.localfirsthealth.com
         - dentalemon.stg.localfirsthealth.com
         - hapihub.stg.localfirsthealth.com
         - mycure-deploydash.stg.localfirsthealth.com
