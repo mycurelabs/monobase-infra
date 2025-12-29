@@ -31,8 +31,8 @@ podAnnotations: {}
 
 podSecurityContext:
   runAsNonRoot: true
-  runAsUser: 101  # caddy-k8s user
-  fsGroup: 101
+  runAsUser: 1001  # nextjs user
+  fsGroup: 1001
   seccompProfile:
     type: RuntimeDefault
 
@@ -41,12 +41,12 @@ securityContext:
   capabilities:
     drop:
       - ALL
-  readOnlyRootFilesystem: true
+  readOnlyRootFilesystem: false  # Next.js needs writable filesystem
 
 service:
   type: ClusterIP
   port: 80
-  targetPort: 8080
+  targetPort: 3000
   annotations: {}
 
 gateway:
@@ -65,7 +65,7 @@ livenessProbe:
   enabled: true
   httpGet:
     path: /
-    port: 8080
+    port: 3000
   initialDelaySeconds: 10
   periodSeconds: 10
 
@@ -73,7 +73,7 @@ readinessProbe:
   enabled: true
   httpGet:
     path: /
-    port: 8080
+    port: 3000
   initialDelaySeconds: 5
   periodSeconds: 5
 

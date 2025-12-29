@@ -65,21 +65,6 @@ spec:
           value: {{ $value | quote }}
         {{- end }}
         {{- end }}
-        # Caddy volumes for tmp, data, and config (read-only root filesystem)
-        volumeMounts:
-        - name: tmp
-          mountPath: /tmp
-        - name: caddy-data
-          mountPath: /data
-        - name: caddy-config
-          mountPath: /config
-      volumes:
-      - name: tmp
-        emptyDir: {}
-      - name: caddy-data
-        emptyDir: {}
-      - name: caddy-config
-        emptyDir: {}
       {{- $nodePool := include "dentalemon-website.nodePool" . -}}
       {{- if or $nodePool .Values.nodeSelector }}
       nodeSelector:
