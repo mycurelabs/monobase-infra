@@ -257,11 +257,11 @@ mycure-myaccount:
 
   gateway:
     hostname: ""
-    sectionName: https  # Use HTTPS listener with wildcard TLS certificate
+    sectionName: https-lfh  # Use localfirsthealth.com HTTPS listener
 
   config:
-    API_URL: "https://hapihub.mycureapp.com"
-    HAPIHUB_URL: "https://hapihub.mycureapp.com"
+    API_URL: "https://hapihub.localfirsthealth.com"
+    HAPIHUB_URL: "https://hapihub.localfirsthealth.com"
 
   podDisruptionBudget:
     enabled: false
