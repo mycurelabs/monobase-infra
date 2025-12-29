@@ -207,9 +207,49 @@ spec:
           port: 53
 
 ---
+# Egress from DentaLemon Website to External APIs
+# Required for Next.js middleware to proxy API requests to HapiHub
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-dentalemon-website-egress-https
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    security-policy: allow-egress
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: dentalemon-website
+
+  policyTypes:
+    - Egress
+
+  egress:
+    # To DNS (required for service discovery)
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+        - podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+
+    # To External HTTPS Services (HapiHub API)
+    # No 'to' selector = allows all destinations
+    - ports:
+        - protocol: TCP
+          port: 443
+
+---
 # Notes:
 # 1. Only API backend can access PostgreSQL
 # 2. Only HapiHub and SyncD backends can access MongoDB
 # 3. Account and MyCure (frontends) have NO database access (security!)
 # 4. DNS access required for service name resolution
 # 5. Kubernetes API access needed for service discovery
+# 6. DentaLemon Website needs HTTPS egress for Next.js middleware API proxy

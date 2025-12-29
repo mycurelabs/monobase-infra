@@ -338,8 +338,8 @@ dentalemon-website:
     sectionName: https-lfh-stg
 
   config:
-    API_URL: "http://hapihub.mycure-staging.svc.cluster.local:7500"
-    HAPIHUB_URL: "http://hapihub.mycure-staging.svc.cluster.local:7500"
+    API_URL: "https://hapihub.stg.localfirsthealth.com"
+    HAPIHUB_URL: "https://hapihub.stg.localfirsthealth.com"
 
   podDisruptionBudget:
     enabled: false
