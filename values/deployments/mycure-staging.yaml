@@ -260,7 +260,7 @@ mycure-deploydash:
 
   image:
     repository: ghcr.io/mycurelabs/deploydash
-    tag: "10.0.4"
+    tag: "10.0.5"
     pullPolicy: IfNotPresent
 
   replicaCount: 1
