@@ -350,7 +350,7 @@ dentalemon:
 
   image:
     repository: ghcr.io/mycurelabs/dentalemonapp
-    tag: "10.2.0"
+    tag: "10.3.0"
     pullPolicy: IfNotPresent
 
   replicaCount: 1
