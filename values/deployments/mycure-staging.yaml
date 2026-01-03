@@ -170,7 +170,7 @@ mycure:
 
   image:
     repository: ghcr.io/mycurelabs/mycureapp
-    tag: "10.2.14"
+    tag: "10.3.0"
     pullPolicy: IfNotPresent
 
   replicaCount: 1
@@ -350,7 +350,7 @@ dentalemon:
 
   image:
     repository: ghcr.io/mycurelabs/dentalemonapp
-    tag: "10.1.0"
+    tag: "10.2.0"
     pullPolicy: IfNotPresent
 
   replicaCount: 1
