@@ -332,7 +332,7 @@ mycurev8:
 
   image:
     repository: ghcr.io/mycurelabs/mycureapp
-    tag: "8.23.6"
+    tag: "8.23.7"
     pullPolicy: IfNotPresent
 
   replicaCount: 1
