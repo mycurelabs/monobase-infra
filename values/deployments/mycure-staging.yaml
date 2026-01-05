@@ -320,7 +320,7 @@ dentalemon-website:
 
   image:
     repository: ghcr.io/mycurelabs/dentalemon-website
-    tag: "0.4.1"
+    tag: "0.5.2"
     pullPolicy: IfNotPresent
 
   replicaCount: 1
@@ -339,7 +339,7 @@ dentalemon-website:
 
   config:
     API_URL: "https://hapihub.stg.localfirsthealth.com"
-    HAPIHUB_URL: "https://hapihub.stg.localfirsthealth.com"
+    ACCOUNT_URL: "https://dentalemon-myaccount.stg.localfirsthealth.com"
 
   podDisruptionBudget:
     enabled: false

@@ -381,7 +381,7 @@ dentalemon-website:
 
   config:
     API_URL: "https://hapihub.localfirsthealth.com"
-    HAPIHUB_URL: "https://hapihub.localfirsthealth.com"
+    ACCOUNT_URL: "https://dentalemon-myaccount.localfirsthealth.com"
 
   podDisruptionBudget:
     enabled: false
