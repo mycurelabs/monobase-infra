@@ -100,7 +100,7 @@ affinity: {}
 # Frontend configuration (passed as environment variables)
 config:
   API_URL: ""  # Set to HapiHub public URL (e.g., https://hapihub.example.com)
-  HAPIHUB_URL: ""  # Set to HapiHub public URL (e.g., https://hapihub.example.com)
+  ACCOUNT_URL: ""  # Set to MyAccount app URL (e.g., https://dentalemon-myaccount.example.com)
 
 networkPolicy:
   enabled: false
