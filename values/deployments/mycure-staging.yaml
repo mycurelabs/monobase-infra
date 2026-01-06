@@ -230,7 +230,7 @@ dentalemon-myaccount:
 
   image:
     repository: ghcr.io/mycurelabs/dentalemon-myaccount
-    tag: "1.0.5"
+    tag: "1.0.6"
     pullPolicy: IfNotPresent
 
   replicaCount: 1
