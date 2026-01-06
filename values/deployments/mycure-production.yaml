@@ -362,7 +362,7 @@ dentalemon-website:
 
   image:
     repository: ghcr.io/mycurelabs/dentalemon-website
-    tag: "0.3.0"
+    tag: "0.3.1"
     pullPolicy: IfNotPresent
 
   replicaCount: 1
