@@ -1,0 +1,90 @@
+# Default values for dentalemon-seeder chart
+# This is a Kubernetes Job for seeding demo data
+
+# Global configuration (shared across charts)
+global:
+  namespace: mycure-staging
+  environment: staging
+
+# Enable/disable the seeder job
+enabled: false
+
+image:
+  repository: ghcr.io/mycurelabs/dentalemon-seeder
+  pullPolicy: Always
+  tag: "latest"
+
+imagePullSecrets:
+  - name: ghcr-secret
+
+nameOverride: ""
+fullnameOverride: ""
+
+# Job configuration
+job:
+  # Number of retry attempts before marking job as failed
+  backoffLimit: 3
+  # Keep completed job for 24 hours for log inspection
+  ttlSecondsAfterFinished: 86400
+  # Restart policy (OnFailure or Never)
+  restartPolicy: OnFailure
+
+# Pod security context
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1001
+  fsGroup: 1001
+
+# Container security context
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+  readOnlyRootFilesystem: false
+
+# Resource limits
+resources:
+  requests:
+    memory: "256Mi"
+    cpu: "100m"
+  limits:
+    memory: "512Mi"
+    cpu: "500m"
+
+# Seeder configuration
+config:
+  # Number of sample patients to generate
+  patientCount: "20"
+  # Reset existing demo data before seeding
+  resetData: "false"
+  # Dry run mode - validate without making changes
+  dryRun: "false"
+  # Log level (trace, debug, info, warn, error, fatal)
+  logLevel: "info"
+  # Demo organization name
+  demoOrgName: "Smile Bright Dental Clinic"
+
+# External Secrets configuration for MongoDB URI
+externalSecrets:
+  enabled: false
+  secretStore: ""
+  refreshInterval: 1h
+  # Remote key for MongoDB URI in secret store
+  mongoUriKey: ""
+
+# Manual secret configuration (if not using ExternalSecrets)
+# The secret should contain 'mongo-uri' key
+existingSecret: ""
+
+# MongoDB configuration (used if not using external secrets)
+mongodb:
+  # Service name of MongoDB in the cluster
+  serviceName: "mongodb"
+  database: "hapihub"
+
+# Node selector
+nodeSelector: {}
+
+# Tolerations
+tolerations: []

@@ -1,0 +1,43 @@
+{{- if index .Values "dentalemon-seeder" "enabled" }}
+# ArgoCD Application: DENTALEMON Demo Data Seeder
+# Sync Wave 4 - Deploy after all services are ready
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ .Values.global.namespace }}-dentalemon-seeder
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "4"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+
+  source:
+    path: charts/dentalemon-seeder
+    repoURL: {{ .Values.argocd.repoURL }}
+    targetRevision: {{ .Values.argocd.targetRevision | default "main" }}
+    helm:
+      releaseName: dentalemon-seeder
+      valuesObject:
+        {{- $seederValues := index .Values "dentalemon-seeder" }}
+        {{- toYaml $seederValues | nindent 8 }}
+        global: {{ .Values.global | toYaml | nindent 10 }}
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: {{ .Values.global.namespace }}
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false
+    retry:
+      limit: 3
+      backoff:
+        duration: 10s
+        maxDuration: 2m
+{{- end }}

@@ -1,0 +1,15 @@
+{{- if .Values.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "dentalemon-seeder.fullname" . }}-config
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "dentalemon-seeder.labels" . | nindent 4 }}
+data:
+  patient-count: {{ .Values.config.patientCount | quote }}
+  reset-data: {{ .Values.config.resetData | quote }}
+  dry-run: {{ .Values.config.dryRun | quote }}
+  log-level: {{ .Values.config.logLevel | quote }}
+  demo-org-name: {{ .Values.config.demoOrgName | quote }}
+{{- end }}

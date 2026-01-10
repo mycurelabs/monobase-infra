@@ -1,0 +1,86 @@
+{{- if .Values.enabled }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "dentalemon-seeder.fullname" . }}
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "dentalemon-seeder.labels" . | nindent 4 }}
+  annotations:
+    # Ensure job runs after MongoDB is ready
+    argocd.argoproj.io/sync-wave: "4"
+    # Allow job to be recreated on each sync
+    argocd.argoproj.io/hook: PostSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+spec:
+  backoffLimit: {{ .Values.job.backoffLimit }}
+  ttlSecondsAfterFinished: {{ .Values.job.ttlSecondsAfterFinished }}
+  parallelism: 1
+  completions: 1
+  template:
+    metadata:
+      labels:
+        {{- include "dentalemon-seeder.selectorLabels" . | nindent 8 }}
+    spec:
+      restartPolicy: {{ .Values.job.restartPolicy }}
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: seeder
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          env:
+            # MongoDB connection
+            - name: MONGO_URI
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "dentalemon-seeder.secretName" . }}
+                  key: mongo-uri
+            # Configuration from ConfigMap
+            - name: PATIENT_COUNT
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "dentalemon-seeder.fullname" . }}-config
+                  key: patient-count
+                  optional: true
+            - name: RESET_DATA
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "dentalemon-seeder.fullname" . }}-config
+                  key: reset-data
+                  optional: true
+            - name: DRY_RUN
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "dentalemon-seeder.fullname" . }}-config
+                  key: dry-run
+                  optional: true
+            - name: LOG_LEVEL
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "dentalemon-seeder.fullname" . }}-config
+                  key: log-level
+                  optional: true
+            - name: DEMO_ORG_NAME
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "dentalemon-seeder.fullname" . }}-config
+                  key: demo-org-name
+                  optional: true
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}

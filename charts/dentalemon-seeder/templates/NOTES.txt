@@ -1,0 +1,27 @@
+{{- if .Values.enabled }}
+DENTALEMON Seeder has been deployed!
+
+To check the job status:
+  kubectl get jobs -n {{ .Values.global.namespace }} -l app.kubernetes.io/name={{ include "dentalemon-seeder.name" . }}
+
+To view the seeder logs:
+  kubectl logs -n {{ .Values.global.namespace }} -l app.kubernetes.io/name={{ include "dentalemon-seeder.name" . }} -f
+
+Configuration:
+  - Patient Count: {{ .Values.config.patientCount }}
+  - Reset Data: {{ .Values.config.resetData }}
+  - Dry Run: {{ .Values.config.dryRun }}
+  - Organization: {{ .Values.config.demoOrgName }}
+
+Demo users created (password: demo123):
+  - dr.santos@dentalemon.demo (Dentist/Admin)
+  - dr.reyes@dentalemon.demo (Dentist)
+  - dr.garcia@dentalemon.demo (Orthodontist)
+  - assistant@dentalemon.demo (Dental Assistant)
+  - front@dentalemon.demo (Receptionist)
+  - admin@dentalemon.demo (Admin)
+{{- else }}
+DENTALEMON Seeder is DISABLED.
+
+To enable, set `enabled: true` in your values file.
+{{- end }}

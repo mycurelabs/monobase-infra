@@ -1,0 +1,17 @@
+apiVersion: v2
+name: dentalemon-seeder
+description: Demo data seeder for DENTALEMON dental clinic management application
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+keywords:
+  - dentalemon
+  - seeder
+  - demo-data
+  - dental
+home: https://github.com/mycurelabs/monobase-infra
+sources:
+  - https://github.com/mycurelabs/monobase-mycure
+maintainers:
+  - name: MYCURE Inc.
+    email: devops@mycure.md
