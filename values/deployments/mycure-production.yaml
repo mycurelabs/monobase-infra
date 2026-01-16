@@ -422,7 +422,7 @@ syncd:
 
   image:
     repository: ghcr.io/mycurelabs/syncd
-    tag: "5.130.24"
+    tag: "5.130.29"
     pullPolicy: IfNotPresent
 
   replicaCount: 1
@@ -449,7 +449,7 @@ syncd:
     enabled: false
 
   autoscaling:
-    enabled: false
+    enabled: true
 
   externalSecrets:
     enabled: true
@@ -460,6 +460,17 @@ syncd:
       # MongoDB URI (managed DigitalOcean - shared with hapihub)
       - secretKey: MONGO_URI
         remoteKey: mycure-production-mongo-uri
+      # Encryption keys (same as hapihub)
+      - secretKey: ENC_BILLING_INVOICES
+        remoteKey: mycure-production-enc-billing-invoices
+      - secretKey: ENC_BILLING_ITEMS
+        remoteKey: mycure-production-enc-billing-items
+      - secretKey: ENC_BILLING_PAYMENTS
+        remoteKey: mycure-production-enc-billing-payments
+      - secretKey: ENC_MEDICAL_RECORDS
+        remoteKey: mycure-production-enc-medical-records
+      - secretKey: ENC_PERSONAL_DETAILS
+        remoteKey: mycure-production-enc-personal-details
 
   mongodb:
     external: true  # Use external/managed MongoDB
