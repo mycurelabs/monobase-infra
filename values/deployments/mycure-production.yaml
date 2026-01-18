@@ -145,6 +145,7 @@ hapihub:
 
   autoscaling:
     enabled: true
+    maxReplicas: 3
 
   externalSecrets:
     enabled: true
@@ -450,6 +451,7 @@ syncd:
 
   autoscaling:
     enabled: true
+    maxReplicas: 2
 
   externalSecrets:
     enabled: true
