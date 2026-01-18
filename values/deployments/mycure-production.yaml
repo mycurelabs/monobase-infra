@@ -269,7 +269,7 @@ mycure-myaccount:
 
 # ===== HEALTHCARE: DentaLemon MyAccount Application =====
 dentalemon-myaccount:
-  enabled: true
+  enabled: false
 
   image:
     repository: ghcr.io/mycurelabs/dentalemon-myaccount
@@ -359,7 +359,7 @@ mycurev8:
 
 # ===== HEALTHCARE: DentaLemon Website =====
 dentalemon-website:
-  enabled: true
+  enabled: false
 
   image:
     repository: ghcr.io/mycurelabs/dentalemon-website
