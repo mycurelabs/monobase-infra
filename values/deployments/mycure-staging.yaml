@@ -380,7 +380,7 @@ syncd:
 
   image:
     repository: ghcr.io/mycurelabs/syncd
-    tag: "5.130.29"
+    tag: "5.130.34"
     pullPolicy: IfNotPresent
 
   replicaCount: 1
