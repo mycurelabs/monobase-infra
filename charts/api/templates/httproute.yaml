@@ -15,7 +15,13 @@ spec:
       # Override: {{ .Values.gateway.sectionName }}
       {{- end }}
   hostnames:
+    {{- if .Values.gateway.hostnames }}
+    {{- range .Values.gateway.hostnames }}
+    - {{ . }}
+    {{- end }}
+    {{- else }}
     - {{ include "api.gateway.hostname" . }}
+    {{- end }}
   rules:
     - matches:
         - path:

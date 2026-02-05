@@ -16,7 +16,13 @@ spec:
       sectionName: https  # Default: attach to HTTPS listener
       {{- end }}
   hostnames:
+    {{- if .Values.gateway.hostnames }}
+    {{- range .Values.gateway.hostnames }}
+    - {{ . }}
+    {{- end }}
+    {{- else }}
     - {{ include "dentalemon-myaccount.gateway.hostname" . }}
+    {{- end }}
   rules:
     - matches:
         - path:

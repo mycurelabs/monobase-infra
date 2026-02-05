@@ -12,7 +12,13 @@ spec:
       namespace: {{ include "account.gateway.namespace" . }}
       sectionName: https  # Only attach to HTTPS listener
   hostnames:
+    {{- if .Values.gateway.hostnames }}
+    {{- range .Values.gateway.hostnames }}
+    - {{ . }}
+    {{- end }}
+    {{- else }}
     - {{ include "account.gateway.hostname" . }}
+    {{- end }}
   rules:
     - matches:
         - path:

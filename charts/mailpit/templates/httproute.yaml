@@ -11,7 +11,13 @@ spec:
     - name: {{ include "mailpit.gateway.name" . }}
       namespace: {{ include "mailpit.gateway.namespace" . }}
   hostnames:
+    {{- if .Values.gateway.hostnames }}
+    {{- range .Values.gateway.hostnames }}
+    - {{ . }}
+    {{- end }}
+    {{- else }}
     - {{ include "mailpit.gateway.hostname" . }}
+    {{- end }}
   rules:
     - matches:
         - path:
