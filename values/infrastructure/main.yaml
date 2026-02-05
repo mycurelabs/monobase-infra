@@ -144,6 +144,7 @@ gateway:
         - mycure-deploydash.stg.localfirsthealth.com
         - mycure-myaccount.stg.localfirsthealth.com
         - mycure.stg.localfirsthealth.com
+        - mycurelocal.stg.localfirsthealth.com
         - mycurev8.stg.localfirsthealth.com
         - mail.stg.localfirsthealth.com
         - storage.stg.localfirsthealth.com
