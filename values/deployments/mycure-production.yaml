@@ -201,7 +201,8 @@ hapihub:
         remoteKey: mycure-production-stripe-checkout-cancel-url
 
   mongodb:
-    external: true  # Use managed DigitalOcean MongoDB
+    external: false  # Use in-cluster MongoDB
+    enabled: true
     serviceName: mongodb
     database: hapihub
     username: root
@@ -501,7 +502,8 @@ syncd:
         remoteKey: mycure-production-enc-personal-details
 
   mongodb:
-    external: true  # Use external/managed MongoDB
+    external: false  # Use in-cluster MongoDB
+    enabled: true
     serviceName: mongodb
     database: hapihub
     username: root
