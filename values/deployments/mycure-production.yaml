@@ -243,7 +243,7 @@ mycurelocal:
 
   image:
     repository: ghcr.io/mycurelabs/mycurelocal
-    tag: "1.0.0"
+    tag: "1.1.0"
     pullPolicy: IfNotPresent
 
   replicaCount: 1
