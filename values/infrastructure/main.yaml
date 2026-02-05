@@ -134,6 +134,7 @@ gateway:
         - mycure-deploydash.localfirsthealth.com
         - mycure-myaccount.localfirsthealth.com
         - mycure.localfirsthealth.com
+        - mycurelocal.localfirsthealth.com
         - mycurev8.localfirsthealth.com
         - sync.localfirsthealth.com
         # Staging localfirsthealth.com

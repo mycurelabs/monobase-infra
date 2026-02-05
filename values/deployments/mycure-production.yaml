@@ -237,6 +237,32 @@ mycure:
   podDisruptionBudget:
     enabled: false
 
+# ===== HEALTHCARE: MyCure Local Frontend Application =====
+mycurelocal:
+  enabled: true
+
+  image:
+    repository: ghcr.io/mycurelabs/mycurelocal
+    tag: "1.0.0"
+    pullPolicy: IfNotPresent
+
+  replicaCount: 1
+
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 128Mi
+
+  gateway:
+    hostname: ""
+    sectionName: https-lfh  # Use localfirsthealth.com HTTPS listener
+
+  podDisruptionBudget:
+    enabled: false
+
 # ===== HEALTHCARE: MyCure MyAccount Application =====
 mycure-myaccount:
   enabled: true
