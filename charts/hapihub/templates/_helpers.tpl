@@ -121,7 +121,7 @@ Supports both standalone and replicaset architectures
 {{- $namespace := include "hapihub.namespace" . -}}
 {{- $architecture := .Values.mongodb.architecture | default "replicaset" -}}
 {{- if eq $architecture "replicaset" -}}
-{{- printf "%s-0.%s-headless.%s.svc.cluster.local" $serviceName $serviceName $namespace -}}
+{{- printf "%s-headless.%s.svc.cluster.local" $serviceName $namespace -}}
 {{- else -}}
 {{- printf "%s.%s.svc.cluster.local" $serviceName $namespace -}}
 {{- end -}}

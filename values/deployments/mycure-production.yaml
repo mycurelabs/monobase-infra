@@ -550,7 +550,7 @@ mongodb:
   fullnameOverride: "mongodb"
 
   architecture: replicaset
-  replicaCount: 2
+  replicaCount: 1
 
   image:
     repository: bitnamilegacy/mongodb
@@ -561,19 +561,7 @@ mongodb:
     existingSecret: mongodb
 
   arbiter:
-    enabled: true
-
-  livenessProbe:
-    enabled: true
-    timeoutSeconds: 30
-    periodSeconds: 30
-    failureThreshold: 6
-
-  readinessProbe:
-    enabled: true
-    timeoutSeconds: 15
-    periodSeconds: 15
-    failureThreshold: 6
+    enabled: false
 
   persistence:
     enabled: true
