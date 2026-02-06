@@ -563,6 +563,18 @@ mongodb:
   arbiter:
     enabled: true
 
+  livenessProbe:
+    enabled: true
+    timeoutSeconds: 30
+    periodSeconds: 30
+    failureThreshold: 6
+
+  readinessProbe:
+    enabled: true
+    timeoutSeconds: 15
+    periodSeconds: 15
+    failureThreshold: 6
+
   persistence:
     enabled: true
     storageClass: ""
