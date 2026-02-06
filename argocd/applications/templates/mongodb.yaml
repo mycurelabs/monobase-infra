@@ -43,6 +43,14 @@ spec:
         resources:
           {{- toYaml .Values.mongodb.resources | nindent 10 }}
         {{- end }}
+        {{- if .Values.mongodb.livenessProbe }}
+        livenessProbe:
+          {{- toYaml .Values.mongodb.livenessProbe | nindent 10 }}
+        {{- end }}
+        {{- if .Values.mongodb.readinessProbe }}
+        readinessProbe:
+          {{- toYaml .Values.mongodb.readinessProbe | nindent 10 }}
+        {{- end }}
         {{- if .Values.global.nodePool }}
         # Node pool scheduling - inherited from global.nodePool
         nodeSelector:
