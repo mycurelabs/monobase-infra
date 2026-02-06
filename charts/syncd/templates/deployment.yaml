@@ -118,7 +118,7 @@ spec:
               key: mongodb-root-password
         # MONGO_URI constructed from components using K8s variable expansion
         - name: MONGO_URI
-          value: "mongodb://$(MONGODB_USER):$(MONGODB_PASSWORD)@$(MONGODB_HOST):$(MONGODB_PORT)/$(MONGODB_DATABASE)?replicaSet={{ .Values.mongodb.replicaSet }}&directConnection=true&authSource=admin"
+          value: "mongodb://$(MONGODB_USER):$(MONGODB_PASSWORD)@$(MONGODB_HOST):$(MONGODB_PORT)/$(MONGODB_DATABASE)?replicaSet={{ .Values.mongodb.replicaSet }}&authSource=admin"
         {{- end }}
         # Service URLs from dependencies
         {{- if .Values.valkey.enabled }}
