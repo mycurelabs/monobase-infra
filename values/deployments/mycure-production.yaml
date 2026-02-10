@@ -478,7 +478,7 @@ syncd:
 
   autoscaling:
     enabled: true
-    maxReplicas: 3
+    maxReplicas: 5
 
   externalSecrets:
     enabled: true
