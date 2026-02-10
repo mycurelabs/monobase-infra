@@ -453,7 +453,7 @@ syncd:
     tag: "5.130.34"
     pullPolicy: IfNotPresent
 
-  replicaCount: 1
+  replicaCount: 3
 
   resources:
     requests:
@@ -478,7 +478,7 @@ syncd:
 
   autoscaling:
     enabled: true
-    maxReplicas: 2
+    maxReplicas: 3
 
   externalSecrets:
     enabled: true
