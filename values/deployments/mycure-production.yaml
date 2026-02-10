@@ -453,7 +453,7 @@ syncd:
     tag: "5.130.34"
     pullPolicy: IfNotPresent
 
-  replicaCount: 3
+  replicaCount: 5
 
   resources:
     requests:
