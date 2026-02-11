@@ -420,7 +420,7 @@ dentalemon:
 
   image:
     repository: ghcr.io/mycurelabs/dentalemonapp
-    tag: "10.6.0"
+    tag: "10.8.5"
     pullPolicy: IfNotPresent
 
   replicaCount: 1
