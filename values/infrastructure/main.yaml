@@ -93,6 +93,15 @@ gateway:
         port: 80
         protocol: HTTP
         hostname: "*.stg.localfirsthealth.com"
+      # Production mycure.md
+      - name: https-mycure
+        port: 443
+        protocol: HTTPS
+        hostname: "*.mycure.md"
+      - name: http-mycure
+        port: 80
+        protocol: HTTP
+        hostname: "*.mycure.md"
 
   # TLS/Certificate configuration
   tls:
@@ -150,6 +159,8 @@ gateway:
         - mail.stg.localfirsthealth.com
         - storage.stg.localfirsthealth.com
         - sync.stg.localfirsthealth.com
+        # Production mycure.md
+        - api.mycure.md
 
   # HTTP to HTTPS redirect
   httpRedirect:
@@ -165,6 +176,7 @@ gateway:
       - https
       - https-lfh
       - https-lfh-stg
+      - https-mycure
 
 # External Secrets - Secret management
 externalSecrets:

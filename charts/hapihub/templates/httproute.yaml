@@ -15,6 +15,11 @@ spec:
       {{- else }}
       sectionName: https  # Default: attach to HTTPS listener
       {{- end }}
+    {{- range .Values.gateway.additionalSectionNames }}
+    - name: {{ include "hapihub.gateway.name" $ }}
+      namespace: {{ include "hapihub.gateway.namespace" $ }}
+      sectionName: {{ . }}
+    {{- end }}
   hostnames:
     {{- if .Values.gateway.hostnames }}
     {{- range .Values.gateway.hostnames }}

@@ -114,8 +114,12 @@ hapihub:
       memory: 2Gi
 
   gateway:
-    hostname: ""
+    hostnames:
+      - hapihub.localfirsthealth.com
+      - api.mycure.md
     sectionName: https-lfh  # Use localfirsthealth.com HTTPS listener
+    additionalSectionNames:
+      - https-mycure
     timeouts:
       request: "60s"
 
