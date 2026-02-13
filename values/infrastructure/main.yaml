@@ -22,6 +22,21 @@ certManagerIssuers:
       server: staging
       provider: http01
 
+    # Cloudflare DNS-01 challenge (for wildcard and multi-level subdomains)
+    - name: letsencrypt-mycure-cloudflare-prod
+      email: "caretheextramile@gmail.com"
+      server: production
+      provider: cloudflare
+      cloudflare:
+        apiTokenSecretRef:
+          name: mycure-cloudflare-api-token
+          key: api-token
+        dnsZones:
+          - mycureapp.com
+          - stitchtechsolutions.com
+          - localfirsthealth.com
+          - mycure.md
+
 # Envoy Gateway - Gateway API implementation
 envoyGateway:
   enabled: true
