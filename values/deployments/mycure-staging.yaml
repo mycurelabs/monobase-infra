@@ -361,8 +361,11 @@ dentalemon-website:
       memory: 128Mi
 
   gateway:
-    hostname: ""
-    sectionName: https-stg-lfh
+    hostnames:
+      - hostname: dentalemon-website.stg.localfirsthealth.com
+        sectionName: https-stg-lfh
+      - hostname: dentalemon.stg.mycure.md
+        sectionName: https-stg-mycure
     gatewayName: nginx-shared-gateway
     gatewayNamespace: nginx-gateway-system
 

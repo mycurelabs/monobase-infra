@@ -52,6 +52,16 @@ nginxGatewayResources:
         port: 80
         protocol: HTTP
         hostname: "*.stg.localfirsthealth.com"
+      # Staging mycure.md
+      - name: https-stg-mycure
+        port: 443
+        protocol: HTTPS
+        hostname: "*.stg.mycure.md"
+        tlsSecretName: nginx-gateway-tls-stg-mycure
+      - name: http-stg-mycure
+        port: 80
+        protocol: HTTP
+        hostname: "*.stg.mycure.md"
       # Production
       - name: https-lfh
         port: 443
@@ -69,6 +79,10 @@ nginxGatewayResources:
         clusterIssuer: letsencrypt-mycure-cloudflare-prod  # DNS-01
         dnsNames:
           - dentalemon-website.stg.localfirsthealth.com
+      - secretName: nginx-gateway-tls-stg-mycure
+        clusterIssuer: letsencrypt-mycure-cloudflare-prod  # DNS-01
+        dnsNames:
+          - dentalemon.stg.mycure.md
       - secretName: nginx-gateway-tls-prod
         clusterIssuer: letsencrypt-mycure-cloudflare-prod  # DNS-01
         dnsNames:

@@ -8,6 +8,13 @@ metadata:
     {{- include "dentalemon-website.labels" . | nindent 4 }}
 spec:
   parentRefs:
+    {{- if .Values.gateway.hostnames }}
+    {{- range .Values.gateway.hostnames }}
+    - name: {{ include "dentalemon-website.gateway.name" $ }}
+      namespace: {{ include "dentalemon-website.gateway.namespace" $ }}
+      sectionName: {{ .sectionName }}
+    {{- end }}
+    {{- else }}
     - name: {{ include "dentalemon-website.gateway.name" . }}
       namespace: {{ include "dentalemon-website.gateway.namespace" . }}
       {{- if .Values.gateway.sectionName }}
@@ -15,10 +22,11 @@ spec:
       {{- else }}
       sectionName: https  # Default: attach to HTTPS listener
       {{- end }}
+    {{- end }}
   hostnames:
     {{- if .Values.gateway.hostnames }}
     {{- range .Values.gateway.hostnames }}
-    - {{ . }}
+    - {{ .hostname }}
     {{- end }}
     {{- else }}
     - {{ include "dentalemon-website.gateway.hostname" . }}
