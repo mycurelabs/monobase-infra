@@ -21,7 +21,7 @@ spec:
     targetRevision: {{ .Values.nginxGateway.version | default "2.4.1" }}
     helm:
       releaseName: nginx-gateway-fabric
-      skipCrds: true  # Gateway API CRDs already installed by Envoy Gateway
+      skipCrds: false  # NGINX-specific CRDs (NginxGateway, NginxProxy) required
 
   destination:
     server: https://kubernetes.default.svc
