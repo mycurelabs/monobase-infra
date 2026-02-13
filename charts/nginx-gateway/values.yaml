@@ -1,0 +1,30 @@
+gatewayClass:
+  enabled: true
+  name: nginx
+  controllerName: gateway.nginx.org/nginx-gateway-controller
+
+gateway:
+  name: nginx-shared-gateway
+  namespace: nginx-gateway-system
+  gatewayClassName: nginx
+  # Flat list of listeners — each HTTPS listener references a certificate by tlsSecretName
+  listeners: []
+  # Example:
+  # - name: https-stg-lfh
+  #   port: 443
+  #   protocol: HTTPS
+  #   hostname: "*.stg.localfirsthealth.com"
+  #   tlsSecretName: nginx-gateway-tls
+  # - name: http-stg-lfh
+  #   port: 80
+  #   protocol: HTTP
+  #   hostname: "*.stg.localfirsthealth.com"
+
+tls:
+  # List of certificates — each can use a different ClusterIssuer
+  certificates: []
+  # Example:
+  # - secretName: nginx-gateway-tls
+  #   clusterIssuer: letsencrypt-mycure-cloudflare-prod
+  #   dnsNames:
+  #     - dentalemon-website.stg.localfirsthealth.com

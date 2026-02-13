@@ -1,0 +1,61 @@
+{{- if .Values.nginxGateway.enabled }}
+# ArgoCD Application: NGINX Gateway Resources
+# Deploys the NGINX shared Gateway resource after NGINX Gateway Fabric operator is ready
+# Sync Wave 1 - Deployed after NGINX Gateway Fabric operator (wave 0)
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: nginx-gateway-resources
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"  # After nginx-gateway operator
+  labels:
+    app.kubernetes.io/name: nginx-gateway-resources
+    app.kubernetes.io/component: infrastructure
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+
+  source:
+    repoURL: {{ .Values.argocd.repoURL }}
+    targetRevision: {{ .Values.argocd.targetRevision }}
+    path: charts/nginx-gateway
+    helm:
+      releaseName: nginx-gateway
+      valuesObject:
+        {{- toYaml .Values.nginxGatewayResources | nindent 8 }}
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: nginx-gateway-system
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+      - RespectIgnoreDifferences=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 3m
+
+  # Ignore expected differences
+  ignoreDifferences:
+    # Gateway status is managed by controller
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      jsonPointers:
+        - /status
+    # Certificate status is managed by cert-manager
+    - group: cert-manager.io
+      kind: Certificate
+      jsonPointers:
+        - /status
+{{- end }}

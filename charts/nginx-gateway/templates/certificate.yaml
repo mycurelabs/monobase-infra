@@ -1,0 +1,19 @@
+{{- range .Values.tls.certificates }}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ .secretName }}
+  namespace: {{ include "nginx-gateway.namespace" $ }}
+  labels:
+    {{- include "nginx-gateway.labels" $ | nindent 4 }}
+spec:
+  secretName: {{ .secretName }}
+  issuerRef:
+    name: {{ .clusterIssuer }}
+    kind: ClusterIssuer
+  dnsNames:
+    {{- range .dnsNames }}
+    - {{ . | quote }}
+    {{- end }}
+{{- end }}

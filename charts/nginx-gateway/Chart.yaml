@@ -1,0 +1,12 @@
+apiVersion: v2
+name: nginx-gateway
+description: NGINX Gateway Fabric shared Gateway resources
+type: application
+version: 0.1.0
+appVersion: "1.0"
+keywords:
+  - gateway
+  - nginx
+  - gateway-api
+maintainers:
+  - name: Monobase Labs

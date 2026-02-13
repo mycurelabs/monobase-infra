@@ -1,0 +1,42 @@
+{{- if .Values.nginxGateway.enabled }}
+# ArgoCD Application: NGINX Gateway Fabric
+# Sync Wave 0 - Deploy gateway infrastructure (cluster-wide)
+# Runs alongside Envoy Gateway — staging proof-of-concept
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: nginx-gateway
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+
+  source:
+    chart: nginx-gateway-fabric
+    repoURL: oci://ghcr.io/nginx/charts
+    targetRevision: {{ .Values.nginxGateway.version | default "2.4.1" }}
+    helm:
+      releaseName: nginx-gateway-fabric
+      skipCrds: true  # Gateway API CRDs already installed by Envoy Gateway
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: nginx-gateway-system
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        maxDuration: 3m
+{{- end }}

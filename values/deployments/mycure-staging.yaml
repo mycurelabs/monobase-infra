@@ -341,6 +341,7 @@ mycurev8:
     enabled: false
 
 # ===== HEALTHCARE: DentaLemon Website =====
+# Routed through NGINX Gateway Fabric (staging proof-of-concept)
 dentalemon-website:
   enabled: true
 
@@ -361,7 +362,9 @@ dentalemon-website:
 
   gateway:
     hostname: ""
-    sectionName: https-lfh-stg
+    sectionName: https-stg-lfh
+    gatewayName: nginx-shared-gateway
+    gatewayNamespace: nginx-gateway-system
 
   config:
     API_URL: "https://hapihub.stg.localfirsthealth.com"

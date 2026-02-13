@@ -27,6 +27,40 @@ envoyGateway:
   enabled: true
   version: v1.2.0
 
+# NGINX Gateway Fabric - Staging test (alongside Envoy Gateway)
+nginxGateway:
+  enabled: true
+  version: "2.4.1"
+
+# NGINX Gateway Resources
+nginxGatewayResources:
+  gatewayClass:
+    enabled: true
+    name: nginx
+    controllerName: gateway.nginx.org/nginx-gateway-controller
+
+  gateway:
+    name: nginx-shared-gateway
+    namespace: nginx-gateway-system
+    gatewayClassName: nginx
+    listeners:
+      - name: https-stg-lfh
+        port: 443
+        protocol: HTTPS
+        hostname: "*.stg.localfirsthealth.com"
+        tlsSecretName: nginx-gateway-tls
+      - name: http-stg-lfh
+        port: 80
+        protocol: HTTP
+        hostname: "*.stg.localfirsthealth.com"
+
+  tls:
+    certificates:
+      - secretName: nginx-gateway-tls
+        clusterIssuer: letsencrypt-mycure-cloudflare-prod  # DNS-01
+        dnsNames:
+          - dentalemon-website.stg.localfirsthealth.com
+
 # EnvoyProxy Configuration - Cloud-specific LoadBalancer settings
 envoyProxyConfig:
   enabled: false  # Override per deployment

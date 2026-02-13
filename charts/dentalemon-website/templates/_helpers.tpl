@@ -80,16 +80,20 @@ Namespace - uses global.namespace or Release.Namespace
 
 {{/*
 Gateway parent reference name
+Checks .Values.gateway.gatewayName first (per-service override),
+then falls back to .Values.global.gateway.name, then "shared-gateway"
 */}}
 {{- define "dentalemon-website.gateway.name" -}}
-{{- default "shared-gateway" .Values.global.gateway.name }}
+{{- .Values.gateway.gatewayName | default .Values.global.gateway.name | default "shared-gateway" }}
 {{- end }}
 
 {{/*
 Gateway parent reference namespace
+Checks .Values.gateway.gatewayNamespace first (per-service override),
+then falls back to .Values.global.gateway.namespace, then "gateway-system"
 */}}
 {{- define "dentalemon-website.gateway.namespace" -}}
-{{- default "gateway-system" .Values.global.gateway.namespace }}
+{{- .Values.gateway.gatewayNamespace | default .Values.global.gateway.namespace | default "gateway-system" }}
 {{- end }}
 
 {{/*
