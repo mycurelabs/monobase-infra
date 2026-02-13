@@ -11,7 +11,7 @@ global:
   gateway:
     name: shared-gateway
     namespace: gateway-system
-    sectionName: https-lfh-stg  # Use localfirsthealth.com listener
+    sectionName: https-lfh-stg # Use localfirsthealth.com listener
 
   storage:
     provider: ""
@@ -376,7 +376,7 @@ dentalemon:
 
   image:
     repository: ghcr.io/mycurelabs/dentalemonapp
-    tag: "10.8.5"
+    tag: "10.8.6"
     pullPolicy: IfNotPresent
 
   replicaCount: 1
@@ -446,7 +446,7 @@ syncd:
 
 # ===== DATABASE: PostgreSQL =====
 postgresql:
-  enabled: false  # Disabled - API application not in use
+  enabled: false # Disabled - API application not in use
 
   fullnameOverride: "postgresql"
 
@@ -561,7 +561,7 @@ minio:
     tag: "2025.7.23-debian-12-r3"
 
   mode: standalone
-  
+
   statefulset:
     replicaCount: 1
 
@@ -582,7 +582,7 @@ minio:
       memory: 512Mi
 
   defaultBuckets: "monobase-files"
-  
+
   buckets:
     - name: "monobase-files"
   region: "us-east-1"

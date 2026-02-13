@@ -115,7 +115,7 @@ hapihub:
 
   gateway:
     hostname: ""
-    sectionName: https-lfh  # Use localfirsthealth.com HTTPS listener
+    sectionName: https-lfh # Use localfirsthealth.com HTTPS listener
     timeouts:
       request: "60s"
 
@@ -201,7 +201,7 @@ hapihub:
         remoteKey: mycure-production-stripe-checkout-cancel-url
 
   mongodb:
-    external: false  # Use in-cluster MongoDB
+    external: false # Use in-cluster MongoDB
     enabled: true
     serviceName: mongodb
     database: hapihub
@@ -229,7 +229,7 @@ mycure:
 
   gateway:
     hostname: ""
-    sectionName: https-lfh  # Use localfirsthealth.com HTTPS listener
+    sectionName: https-lfh # Use localfirsthealth.com HTTPS listener
 
   config:
     API_URL: "https://hapihub.localfirsthealth.com"
@@ -259,7 +259,7 @@ mycurelocal:
 
   gateway:
     hostname: ""
-    sectionName: https-lfh  # Use localfirsthealth.com HTTPS listener
+    sectionName: https-lfh # Use localfirsthealth.com HTTPS listener
 
   podDisruptionBudget:
     enabled: false
@@ -285,7 +285,7 @@ mycure-myaccount:
 
   gateway:
     hostname: ""
-    sectionName: https-lfh  # Use localfirsthealth.com HTTPS listener
+    sectionName: https-lfh # Use localfirsthealth.com HTTPS listener
 
   config:
     API_URL: "https://hapihub.localfirsthealth.com"
@@ -315,7 +315,7 @@ dentalemon-myaccount:
 
   gateway:
     hostname: ""
-    sectionName: https-lfh  # Use localfirsthealth.com HTTPS listener
+    sectionName: https-lfh # Use localfirsthealth.com HTTPS listener
 
   config:
     API_URL: "https://hapihub.localfirsthealth.com"
@@ -345,7 +345,7 @@ mycure-deploydash:
 
   gateway:
     hostname: ""
-    sectionName: https-lfh  # Use localfirsthealth.com HTTPS listener
+    sectionName: https-lfh # Use localfirsthealth.com HTTPS listener
 
   config:
     API_URL: "https://hapihub.localfirsthealth.com"
@@ -375,7 +375,7 @@ mycurev8:
 
   gateway:
     hostname: ""
-    sectionName: https-lfh  # Use localfirsthealth.com HTTPS listener
+    sectionName: https-lfh # Use localfirsthealth.com HTTPS listener
 
   config:
     API_URL: "https://hapihub.localfirsthealth.com"
@@ -405,7 +405,7 @@ dentalemon-website:
 
   gateway:
     hostname: ""
-    sectionName: https-lfh  # Use localfirsthealth.com HTTPS listener
+    sectionName: https-lfh # Use localfirsthealth.com HTTPS listener
 
   config:
     API_URL: "https://hapihub.localfirsthealth.com"
@@ -420,7 +420,7 @@ dentalemon:
 
   image:
     repository: ghcr.io/mycurelabs/dentalemonapp
-    tag: "10.8.5"
+    tag: "10.8.6"
     pullPolicy: IfNotPresent
 
   replicaCount: 1
@@ -435,7 +435,7 @@ dentalemon:
 
   gateway:
     hostname: ""
-    sectionName: https-lfh  # Use localfirsthealth.com HTTPS listener
+    sectionName: https-lfh # Use localfirsthealth.com HTTPS listener
 
   config:
     API_URL: "https://hapihub.localfirsthealth.com"
@@ -465,7 +465,7 @@ syncd:
 
   gateway:
     hostname: ""
-    sectionName: https-lfh  # Use localfirsthealth.com HTTPS listener
+    sectionName: https-lfh # Use localfirsthealth.com HTTPS listener
 
   livenessProbe:
     enabled: true
@@ -502,7 +502,7 @@ syncd:
         remoteKey: mycure-production-enc-personal-details
 
   mongodb:
-    external: false  # Use in-cluster MongoDB
+    external: false # Use in-cluster MongoDB
     enabled: true
     serviceName: mongodb
     database: hapihub
@@ -511,7 +511,7 @@ syncd:
 
 # ===== DATABASE: PostgreSQL =====
 postgresql:
-  enabled: false  # Disabled - API application not in use
+  enabled: false # Disabled - API application not in use
 
   fullnameOverride: "postgresql"
 
@@ -545,7 +545,7 @@ postgresql:
 
 # ===== DATABASE: MongoDB =====
 mongodb:
-  enabled: true  # Self-hosted MongoDB in Kubernetes
+  enabled: true # Self-hosted MongoDB in Kubernetes
 
   fullnameOverride: "mongodb"
 
@@ -626,7 +626,7 @@ minio:
     tag: "2025.7.23-debian-12-r3"
 
   mode: standalone
-  
+
   statefulset:
     replicaCount: 1
 
@@ -647,7 +647,7 @@ minio:
       memory: 512Mi
 
   defaultBuckets: "monobase-files"
-  
+
   buckets:
     - name: "monobase-files"
   region: "us-east-1"
