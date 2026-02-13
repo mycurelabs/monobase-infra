@@ -409,7 +409,12 @@ dentalemon-website:
 
   gateway:
     hostname: ""
-    sectionName: https-lfh # Use localfirsthealth.com HTTPS listener
+    sectionName: https-lfh
+    gatewayName: nginx-shared-gateway
+    gatewayNamespace: nginx-gateway-system
+
+  networkPolicy:
+    enabled: true
 
   config:
     API_URL: "https://hapihub.localfirsthealth.com"
