@@ -100,7 +100,7 @@ hapihub:
 
   image:
     repository: ghcr.io/mycurelabs/hapihub
-    tag: "10.11.15"
+    tag: "10.11.17"
     pullPolicy: IfNotPresent
 
   replicaCount: 1
@@ -114,8 +114,12 @@ hapihub:
       memory: 2Gi
 
   gateway:
-    hostname: ""
-    sectionName: https-lfh # Use localfirsthealth.com HTTPS listener
+    hostnames:
+      - hapihub.localfirsthealth.com
+      - api.mycure.md
+    sectionName: https-lfh  # Use localfirsthealth.com HTTPS listener
+    additionalSectionNames:
+      - https-mycure
     timeouts:
       request: "60s"
 
