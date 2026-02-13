@@ -117,7 +117,7 @@ hapihub:
     hostnames:
       - hapihub.localfirsthealth.com
       - api.mycure.md
-    sectionName: https-lfh  # Use localfirsthealth.com HTTPS listener
+    sectionName: https-lfh # Use localfirsthealth.com HTTPS listener
     additionalSectionNames:
       - https-mycure
     timeouts:
@@ -218,7 +218,7 @@ mycure:
 
   image:
     repository: ghcr.io/mycurelabs/mycureapp
-    tag: "10.3.0"
+    tag: "10.3.9"
     pullPolicy: IfNotPresent
 
   replicaCount: 1
