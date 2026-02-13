@@ -366,6 +366,9 @@ dentalemon-website:
     gatewayName: nginx-shared-gateway
     gatewayNamespace: nginx-gateway-system
 
+  networkPolicy:
+    enabled: true
+
   config:
     API_URL: "https://hapihub.stg.localfirsthealth.com"
     ACCOUNT_URL: "https://dentalemon-myaccount.stg.localfirsthealth.com"
