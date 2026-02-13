@@ -35,9 +35,7 @@ nginxGateway:
 # NGINX Gateway Resources
 nginxGatewayResources:
   gatewayClass:
-    enabled: true
-    name: nginx
-    controllerName: gateway.nginx.org/nginx-gateway-controller
+    enabled: false  # GatewayClass created by operator chart
 
   gateway:
     name: nginx-shared-gateway
