@@ -22,10 +22,86 @@ certManagerIssuers:
       server: staging
       provider: http01
 
+    # Cloudflare DNS-01 challenge (for wildcard and multi-level subdomains)
+    - name: letsencrypt-mycure-cloudflare-prod
+      email: "caretheextramile@gmail.com"
+      server: production
+      provider: cloudflare
+      cloudflare:
+        apiTokenSecretRef:
+          name: mycure-cloudflare-api-token
+          key: api-token
+        dnsZones:
+          - mycureapp.com
+          - stitchtechsolutions.com
+          - localfirsthealth.com
+          - mycure.md
+
 # Envoy Gateway - Gateway API implementation
 envoyGateway:
   enabled: true
   version: v1.2.0
+
+# NGINX Gateway Fabric - Staging test (alongside Envoy Gateway)
+nginxGateway:
+  enabled: true
+  version: "2.4.1"
+
+# NGINX Gateway Resources
+nginxGatewayResources:
+  gatewayClass:
+    enabled: false  # GatewayClass created by operator chart
+
+  gateway:
+    name: nginx-shared-gateway
+    namespace: nginx-gateway-system
+    gatewayClassName: nginx
+    listeners:
+      # Staging
+      - name: https-stg-lfh
+        port: 443
+        protocol: HTTPS
+        hostname: "*.stg.localfirsthealth.com"
+        tlsSecretName: nginx-gateway-tls
+      - name: http-stg-lfh
+        port: 80
+        protocol: HTTP
+        hostname: "*.stg.localfirsthealth.com"
+      # Staging mycure.md
+      - name: https-stg-mycure
+        port: 443
+        protocol: HTTPS
+        hostname: "*.stg.mycure.md"
+        tlsSecretName: nginx-gateway-tls-stg-mycure
+      - name: http-stg-mycure
+        port: 80
+        protocol: HTTP
+        hostname: "*.stg.mycure.md"
+      # Production
+      - name: https-lfh
+        port: 443
+        protocol: HTTPS
+        hostname: "*.localfirsthealth.com"
+        tlsSecretName: nginx-gateway-tls-prod
+      - name: http-lfh
+        port: 80
+        protocol: HTTP
+        hostname: "*.localfirsthealth.com"
+
+  tls:
+    certificates:
+      - secretName: nginx-gateway-tls
+        clusterIssuer: letsencrypt-mycure-cloudflare-prod  # DNS-01
+        dnsNames:
+          - dentalemon-website.stg.localfirsthealth.com
+      - secretName: nginx-gateway-tls-stg-mycure
+        clusterIssuer: letsencrypt-mycure-cloudflare-prod  # DNS-01
+        dnsNames:
+          - dentalemon.stg.mycure.md
+      - secretName: nginx-gateway-tls-prod
+        clusterIssuer: letsencrypt-mycure-cloudflare-prod  # DNS-01
+        dnsNames:
+          - dentalemon-website.localfirsthealth.com
 
 # EnvoyProxy Configuration - Cloud-specific LoadBalancer settings
 envoyProxyConfig:
