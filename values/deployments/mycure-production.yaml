@@ -424,7 +424,7 @@ dentalemon:
 
   image:
     repository: ghcr.io/mycurelabs/dentalemonapp
-    tag: "10.8.6"
+    tag: "10.8.7"
     pullPolicy: IfNotPresent
 
   replicaCount: 1
