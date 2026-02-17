@@ -23,14 +23,14 @@ spec:
     # Solvers configuration based on provider
     solvers:
       {{- if eq (.provider | default "http01") "http01" }}
-      # HTTP-01 Challenge using Gateway API (compatible with Envoy Gateway)
+      # HTTP-01 Challenge using Gateway API
       - http01:
           gatewayHTTPRoute:
             parentRefs:
-              - name: {{ .http01.gatewayName | default "shared-gateway" }}
-                namespace: {{ .http01.gatewayNamespace | default "gateway-system" }}
+              - name: {{ if .http01 }}{{ .http01.gatewayName | default "shared-gateway" }}{{ else }}shared-gateway{{ end }}
+                namespace: {{ if .http01 }}{{ .http01.gatewayNamespace | default "gateway-system" }}{{ else }}gateway-system{{ end }}
                 kind: Gateway
-            {{- if .http01.labels }}
+            {{- if and .http01 .http01.labels }}
             labels:
               {{- range $key, $value := .http01.labels }}
               {{ $key }}: {{ $value | quote }}
