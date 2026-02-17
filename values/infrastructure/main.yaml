@@ -178,6 +178,15 @@ gateway:
         port: 80
         protocol: HTTP
         hostname: "*.mycure.md"
+      # Staging mycure.md
+      - name: https-stg-mycure
+        port: 443
+        protocol: HTTPS
+        hostname: "*.stg.mycure.md"
+      - name: http-stg-mycure
+        port: 80
+        protocol: HTTP
+        hostname: "*.stg.mycure.md"
 
   # TLS/Certificate configuration
   tls:
@@ -237,6 +246,8 @@ gateway:
         - sync.stg.localfirsthealth.com
         # Production mycure.md
         - api.mycure.md
+        # Staging mycure.md
+        - dentalemon.stg.mycure.md
 
   # HTTP to HTTPS redirect
   httpRedirect:
