@@ -9,9 +9,9 @@ global:
   nodePool: "staging"
 
   gateway:
-    name: shared-gateway
-    namespace: gateway-system
-    sectionName: https-lfh-stg # Use localfirsthealth.com listener
+    name: nginx-shared-gateway
+    namespace: nginx-gateway-system
+    sectionName: https-stg-lfh # NGINX Gateway listener
 
   storage:
     provider: ""
@@ -116,7 +116,7 @@ hapihub:
 
   gateway:
     hostname: ""
-    sectionName: https-lfh-stg
+    sectionName: https-stg-lfh
     timeouts:
       request: "60s"
 
@@ -185,7 +185,7 @@ mycure:
 
   gateway:
     hostname: ""
-    sectionName: https-lfh-stg
+    sectionName: https-stg-lfh
 
   config:
     API_URL: "https://hapihub.stg.localfirsthealth.com"
@@ -215,7 +215,7 @@ mycurelocal:
 
   gateway:
     hostname: ""
-    sectionName: https-lfh-stg
+    sectionName: https-stg-lfh
 
   podDisruptionBudget:
     enabled: false
@@ -241,7 +241,7 @@ mycure-myaccount:
 
   gateway:
     hostname: ""
-    sectionName: https-lfh-stg
+    sectionName: https-stg-lfh
 
   config:
     API_URL: "https://hapihub.stg.localfirsthealth.com"
@@ -271,7 +271,7 @@ dentalemon-myaccount:
 
   gateway:
     hostname: ""
-    sectionName: https-lfh-stg
+    sectionName: https-stg-lfh
 
   config:
     API_URL: "https://hapihub.stg.localfirsthealth.com"
@@ -301,7 +301,7 @@ mycure-deploydash:
 
   gateway:
     hostname: ""
-    sectionName: https-lfh-stg
+    sectionName: https-stg-lfh
 
   config:
     API_URL: "https://hapihub.stg.localfirsthealth.com"
@@ -331,7 +331,7 @@ mycurev8:
 
   gateway:
     hostname: ""
-    sectionName: https-lfh-stg
+    sectionName: https-stg-lfh
 
   config:
     API_URL: "https://hapihub.stg.localfirsthealth.com"
@@ -400,7 +400,7 @@ dentalemon:
 
   gateway:
     hostname: ""
-    sectionName: https-lfh-stg
+    sectionName: https-stg-lfh
 
   config:
     API_URL: "https://hapihub.stg.localfirsthealth.com"
@@ -430,7 +430,7 @@ syncd:
 
   gateway:
     hostname: ""
-    sectionName: https-lfh-stg
+    sectionName: https-stg-lfh
 
   livenessProbe:
     enabled: true
@@ -618,7 +618,7 @@ minio:
   gateway:
     enabled: true
     hostname: ""
-    sectionName: https-lfh-stg
+    sectionName: https-stg-lfh
     rateLimit:
       enabled: false
 
@@ -637,7 +637,7 @@ mailpit:
   gateway:
     enabled: true
     hostname: ""
-    sectionName: https-lfh-stg
+    sectionName: https-stg-lfh
 
 # ===== BACKUP =====
 backup:
