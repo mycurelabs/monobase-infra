@@ -22,6 +22,15 @@ certManagerIssuers:
       server: staging
       provider: http01
 
+    # HTTP-01 challenge via NGINX Gateway (for domains routed through NGINX)
+    - name: letsencrypt-nginx-http01
+      email: "caretheextramile@gmail.com"
+      server: production
+      provider: http01
+      http01:
+        gatewayName: nginx-shared-gateway
+        gatewayNamespace: nginx-gateway-system
+
     # Cloudflare DNS-01 challenge (for wildcard and multi-level subdomains)
     - name: letsencrypt-mycure-cloudflare-prod
       email: "caretheextramile@gmail.com"
@@ -95,7 +104,7 @@ nginxGatewayResources:
         dnsNames:
           - dentalemon-website.stg.localfirsthealth.com
       - secretName: nginx-gateway-tls-stg-mycure
-        clusterIssuer: letsencrypt-prod  # HTTP-01
+        clusterIssuer: letsencrypt-nginx-http01  # HTTP-01 via NGINX Gateway
         dnsNames:
           - dentalemon.stg.mycure.md
       - secretName: nginx-gateway-tls-prod
