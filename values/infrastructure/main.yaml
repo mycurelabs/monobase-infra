@@ -102,7 +102,7 @@ nginxGatewayResources:
       - secretName: nginx-gateway-tls
         clusterIssuer: letsencrypt-mycure-cloudflare-prod  # DNS-01
         dnsNames:
-          - dentalemon-website.stg.localfirsthealth.com
+          - "*.stg.localfirsthealth.com"
       - secretName: nginx-gateway-tls-stg-mycure
         clusterIssuer: letsencrypt-nginx-http01  # HTTP-01 via NGINX Gateway
         dnsNames:
