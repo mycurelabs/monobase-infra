@@ -44,10 +44,12 @@ affinity: {}
 gateway:
   enabled: true
   hostname: ""  # Empty = uses mail.{global.domain}
-  parentRefs:
-    - name: shared-gateway
-      namespace: gateway-system
-  
+  # parentRefs: Resolved via global.gateway.name/namespace by default
+  # Override per-deployment if needed:
+  # parentRefs:
+  #   - name: custom-gateway
+  #     namespace: custom-namespace
+
   # Optional: Rate limiting configuration for Mailpit web UI
   # Mailpit is typically for internal/staging use, lighter limits than MinIO
   rateLimit:

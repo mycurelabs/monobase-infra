@@ -59,14 +59,22 @@ Resolve the namespace to use
 Resolve the gateway name to use
 */}}
 {{- define "mailpit.gateway.name" -}}
+{{- if .Values.gateway.parentRefs }}
 {{- .Values.gateway.parentRefs | first | dig "name" .Values.global.gateway.name }}
+{{- else }}
+{{- .Values.global.gateway.name }}
+{{- end }}
 {{- end }}
 
 {{/*
 Resolve the gateway namespace to use
 */}}
 {{- define "mailpit.gateway.namespace" -}}
+{{- if .Values.gateway.parentRefs }}
 {{- .Values.gateway.parentRefs | first | dig "namespace" .Values.global.gateway.namespace }}
+{{- else }}
+{{- .Values.global.gateway.namespace }}
+{{- end }}
 {{- end }}
 
 {{/*
