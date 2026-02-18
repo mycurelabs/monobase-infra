@@ -151,6 +151,13 @@ config:
   RUN_WORKERS: "true"
   DB_SKIP_CREATE_INDEXES: "false"
   DB_RECREATE_INDEX_ON_CONFLICT: "false"
+  # CORS - secure defaults (override per environment)
+  CORS_STRICT: "true"
+  CORS_ALLOW_LOCAL_NETWORK: "false"
+  CORS_ALLOW_TUNNELING: "false"
+  CORS_ALLOW_MOBILE_APPS: "true"
+  CORS_CREDENTIALS: "true"
+  # CORS_ORIGINS must be set per deployment
 
 # External Secrets configuration
 externalSecrets:
