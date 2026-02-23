@@ -128,6 +128,12 @@ hapihub:
       rpName: "Mycure"
       rpId: "localfirsthealth.com"
 
+  config:
+    CORS_ORIGINS: "https://mycure.localfirsthealth.com,https://mycurev8.localfirsthealth.com,https://mycurelocal.localfirsthealth.com,https://mycure-myaccount.localfirsthealth.com,https://mycure-deploydash.localfirsthealth.com,https://dentalemon.localfirsthealth.com,https://dentalemon-myaccount.localfirsthealth.com,https://dentalemon-website.localfirsthealth.com"
+    CORS_STRICT: "true"
+    CORS_ALLOW_LOCAL_NETWORK: "false"
+    CORS_ALLOW_MOBILE_APPS: "true"
+
   env:
     - name: BETTER_AUTH_RATE_LIMIT_ENABLED
       value: "true"
@@ -304,7 +310,7 @@ dentalemon-myaccount:
 
   image:
     repository: ghcr.io/mycurelabs/dentalemon-myaccount
-    tag: "1.0.9"
+    tag: "1.0.11"
     pullPolicy: IfNotPresent
 
   replicaCount: 1
