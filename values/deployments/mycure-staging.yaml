@@ -421,7 +421,7 @@ syncd:
 
   image:
     repository: ghcr.io/mycurelabs/syncd
-    tag: "5.130.34"
+    tag: "5.130.36"
     pullPolicy: IfNotPresent
 
   replicaCount: 1
