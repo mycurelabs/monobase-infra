@@ -101,7 +101,7 @@ hapihub:
 
   image:
     repository: ghcr.io/mycurelabs/hapihub
-    tag: "10.12.0"
+    tag: "10.13.3"
     pullPolicy: IfNotPresent
 
   replicaCount: 1
@@ -262,7 +262,7 @@ dentalemon-myaccount:
 
   image:
     repository: ghcr.io/mycurelabs/dentalemon-myaccount
-    tag: "1.0.10"
+    tag: "1.0.14"
     pullPolicy: IfNotPresent
 
   replicaCount: 1
@@ -421,7 +421,7 @@ syncd:
 
   image:
     repository: ghcr.io/mycurelabs/syncd
-    tag: "5.130.34"
+    tag: "5.130.36"
     pullPolicy: IfNotPresent
 
   replicaCount: 1
