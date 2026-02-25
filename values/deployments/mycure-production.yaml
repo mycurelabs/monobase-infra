@@ -9,8 +9,8 @@ global:
   nodePool: "production"
 
   gateway:
-    name: shared-gateway
-    namespace: gateway-system
+    name: nginx-shared-gateway
+    namespace: nginx-gateway-system
 
   storage:
     provider: ""
