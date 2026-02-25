@@ -86,7 +86,7 @@ nginxGatewayResources:
         port: 80
         protocol: HTTP
         hostname: "*.stg.mycure.md"
-      # Production
+      # Production localfirsthealth.com
       - name: https-lfh
         port: 443
         protocol: HTTPS
@@ -96,6 +96,16 @@ nginxGatewayResources:
         port: 80
         protocol: HTTP
         hostname: "*.localfirsthealth.com"
+      # Production mycure.md
+      - name: https-mycure
+        port: 443
+        protocol: HTTPS
+        hostname: "*.mycure.md"
+        tlsSecretName: nginx-gateway-tls-prod-mycure
+      - name: http-mycure
+        port: 80
+        protocol: HTTP
+        hostname: "*.mycure.md"
 
   tls:
     certificates:
@@ -110,7 +120,11 @@ nginxGatewayResources:
       - secretName: nginx-gateway-tls-prod
         clusterIssuer: letsencrypt-mycure-cloudflare-prod  # DNS-01
         dnsNames:
-          - dentalemon-website.localfirsthealth.com
+          - "*.localfirsthealth.com"
+      - secretName: nginx-gateway-tls-prod-mycure
+        clusterIssuer: letsencrypt-mycure-cloudflare-prod  # DNS-01
+        dnsNames:
+          - "*.mycure.md"
 
 # EnvoyProxy Configuration - Cloud-specific LoadBalancer settings
 envoyProxyConfig:
