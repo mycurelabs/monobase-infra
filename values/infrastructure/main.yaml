@@ -122,9 +122,9 @@ nginxGatewayResources:
         dnsNames:
           - "*.localfirsthealth.com"
       - secretName: nginx-gateway-tls-prod-mycure
-        clusterIssuer: letsencrypt-mycure-cloudflare-prod  # DNS-01
+        clusterIssuer: letsencrypt-nginx-http01  # HTTP-01 via NGINX Gateway
         dnsNames:
-          - "*.mycure.md"
+          - api.mycure.md
 
 # EnvoyProxy Configuration - Cloud-specific LoadBalancer settings
 envoyProxyConfig:
