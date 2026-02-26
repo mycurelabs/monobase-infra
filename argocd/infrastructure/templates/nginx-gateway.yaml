@@ -22,6 +22,9 @@ spec:
     helm:
       releaseName: nginx-gateway-fabric
       skipCrds: false  # NGINX-specific CRDs (NginxGateway, NginxProxy) required
+      valuesObject:
+        snippets:
+          enable: true
 
   destination:
     server: https://kubernetes.default.svc
