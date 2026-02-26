@@ -2,13 +2,13 @@
 apiVersion: gateway.nginx.org/v1alpha1
 kind: SnippetsPolicy
 metadata:
-  name: {{ include "hapihub.fullname" . }}
-  namespace: {{ include "hapihub.namespace" . }}
+  name: {{ include "hapihub.fullname" . }}-proxy-timeout
+  namespace: {{ include "hapihub.gateway.namespace" . }}
 spec:
   targetRefs:
     - group: gateway.networking.k8s.io
-      kind: HTTPRoute
-      name: {{ include "hapihub.fullname" . }}
+      kind: Gateway
+      name: {{ include "hapihub.gateway.name" . }}
   snippets:
     - context: http.server.location
       value: |
