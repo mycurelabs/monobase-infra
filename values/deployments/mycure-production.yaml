@@ -122,6 +122,9 @@ hapihub:
       - https-mycure
     timeouts:
       request: "60s"
+    snippetsPolicy:
+      enabled: true
+      proxyReadTimeout: "3600s"
 
   betterAuth:
     passkey:
@@ -155,7 +158,8 @@ hapihub:
 
   autoscaling:
     enabled: true
-    maxReplicas: 3
+    minReplicas: 3
+    maxReplicas: 5
 
   externalSecrets:
     enabled: true

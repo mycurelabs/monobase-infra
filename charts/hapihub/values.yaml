@@ -81,6 +81,11 @@ gateway:
       # Connection idle timeout - how long to keep idle connections open
       # connectionIdleTimeout: "300s"
 
+  # NGINX Gateway SnippetsPolicy for proxy timeout tuning
+  snippetsPolicy:
+    enabled: false
+    proxyReadTimeout: "3600s"
+
 resources:
   requests:
     cpu: 500m

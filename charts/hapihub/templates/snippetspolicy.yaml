@@ -1,0 +1,16 @@
+{{- if and .Values.enabled .Values.gateway.enabled .Values.gateway.snippetsPolicy.enabled }}
+apiVersion: gateway.nginx.org/v1alpha1
+kind: SnippetsPolicy
+metadata:
+  name: {{ include "hapihub.fullname" . }}
+  namespace: {{ include "hapihub.namespace" . }}
+spec:
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: {{ include "hapihub.fullname" . }}
+  snippets:
+    - context: http.server.location
+      value: |
+        proxy_read_timeout {{ .Values.gateway.snippetsPolicy.proxyReadTimeout }};
+{{- end }}
