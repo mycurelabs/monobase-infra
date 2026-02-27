@@ -85,6 +85,7 @@ gateway:
   snippetsPolicy:
     enabled: false
     proxyReadTimeout: "3600s"
+    clientMaxBodySize: "50m"
 
 resources:
   requests:

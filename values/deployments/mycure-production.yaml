@@ -125,6 +125,7 @@ hapihub:
     snippetsPolicy:
       enabled: true
       proxyReadTimeout: "3600s"
+      clientMaxBodySize: "50m"
 
   betterAuth:
     passkey:
