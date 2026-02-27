@@ -119,6 +119,10 @@ hapihub:
     sectionName: https-stg-lfh
     timeouts:
       request: "60s"
+    snippetsPolicy:
+      enabled: true
+      proxyReadTimeout: "3600s"
+      clientMaxBodySize: "50m"
 
   betterAuth:
     passkey:
