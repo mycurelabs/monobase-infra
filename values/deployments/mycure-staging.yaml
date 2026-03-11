@@ -130,6 +130,7 @@ hapihub:
       rpId: "localfirsthealth.com"
 
   config:
+    CLUSTER_INSTANCES: "max"
     CORS_ORIGINS: "https://mycure.stg.localfirsthealth.com,https://mycurev8.stg.localfirsthealth.com,https://mycurelocal.stg.localfirsthealth.com,https://mycure-myaccount.stg.localfirsthealth.com,https://mycure-deploydash.stg.localfirsthealth.com,https://dentalemon.stg.localfirsthealth.com,https://dentalemon-myaccount.stg.localfirsthealth.com,https://dentalemon-website.stg.localfirsthealth.com,https://dentalemon.stg.mycure.md"
     CORS_STRICT: "true"
     CORS_ALLOW_LOCAL_NETWORK: "false"
