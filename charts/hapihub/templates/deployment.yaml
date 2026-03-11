@@ -130,7 +130,7 @@ spec:
           valueFrom:
             secretKeyRef:
               name: {{ .Values.postgresql.auth.existingSecret | default "postgresql" }}
-              key: password
+              key: postgres-password
         - name: DATABASE_URI
           value: "postgres://$(POSTGRESQL_USER):$(POSTGRESQL_PASSWORD)@{{ include "hapihub.postgresql.host" . }}:5432/{{ include "hapihub.postgresql.database" . }}"
         {{- end }}
