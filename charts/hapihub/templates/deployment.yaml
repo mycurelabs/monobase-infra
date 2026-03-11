@@ -119,6 +119,28 @@ spec:
         - name: MONGO_URI
           value: "mongodb://$(MONGODB_USER):$(MONGODB_PASSWORD)@$(MONGODB_HOST):$(MONGODB_PORT)/$(MONGODB_DATABASE)?replicaSet={{ .Values.mongodb.replicaSet }}&directConnection=true&authSource=admin"
         {{- end }}
+        # PostgreSQL connection (v11+)
+        {{- if .Values.postgresql.enabled }}
+        {{- if .Values.postgresql.external }}
+        # External PostgreSQL — DATABASE_URI from ExternalSecrets
+        {{- else }}
+        - name: POSTGRESQL_USER
+          value: {{ include "hapihub.postgresql.username" . | quote }}
+        - name: POSTGRESQL_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.postgresql.auth.existingSecret | default "postgresql" }}
+              key: password
+        - name: DATABASE_URI
+          value: "postgres://$(POSTGRESQL_USER):$(POSTGRESQL_PASSWORD)@{{ include "hapihub.postgresql.host" . }}:5432/{{ include "hapihub.postgresql.database" . }}"
+        {{- end }}
+        - name: DATABASE_WAIT_FOR_READY
+          value: "true"
+        - name: DATABASE_STARTUP_RETRIES
+          value: "10"
+        - name: DATABASE_STARTUP_RETRY_DELAY_MS
+          value: "5000"
+        {{- end }}
         # External URL - public HTTPS endpoint for callbacks, webhooks, etc.
         - name: EXTERNAL_ADDRESS
           value: {{ include "hapihub.externalUrl" . | quote }}
@@ -157,6 +179,25 @@ spec:
           value: "300"
         - name: STORAGE_DOWNLOAD_URL_EXPIRY
           value: "900"
+        # v11 storage naming
+        - name: STORAGE_TYPE
+          value: "s3"
+        - name: STORAGE_S3_ENDPOINT
+          value: {{ include "hapihub.minio.url" . | quote }}
+        - name: STORAGE_S3_REGION
+          value: "us-east-1"
+        - name: STORAGE_S3_FORCE_PATH_STYLE
+          value: "true"
+        - name: STORAGE_S3_ACCESS_KEY_ID
+          valueFrom:
+            secretKeyRef:
+              name: minio
+              key: root-user
+        - name: STORAGE_S3_SECRET_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: minio
+              key: root-password
         {{- end }}
         {{- if .Values.mailpit.enabled }}
         - name: SMTP_HOST
@@ -204,6 +245,28 @@ spec:
               name: {{ include "hapihub.fullname" . }}-secrets
               key: STRIPE_SECRET_KEY
               optional: true
+        # v11 auth secrets
+        - name: AUTH_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "hapihub.fullname" . }}-secrets
+              key: AUTH_SECRET
+              optional: true
+        - name: BETTER_AUTH_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "hapihub.fullname" . }}-secrets
+              key: BETTER_AUTH_SECRET
+              optional: true
+        # v11 database URI (from ExternalSecrets, for external PostgreSQL)
+        {{- if not (and .Values.postgresql.enabled (not .Values.postgresql.external)) }}
+        - name: DATABASE_URI
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "hapihub.fullname" . }}-secrets
+              key: DATABASE_URI
+              optional: true
+        {{- end }}
         # Encryption keys
         - name: ENC_BILLING_INVOICES
           valueFrom:
@@ -318,7 +381,7 @@ spec:
         {{- end }}
         # Additional environment variables from config
         {{- range $key, $value := .Values.config }}
-        {{- if not (has $key (list "NODE_ENV" "LOG_LEVEL" "PORT")) }}
+        {{- if not (has $key (list "NODE_ENV" "LOG_LEVEL" "PORT" "DATABASE_WAIT_FOR_READY" "DATABASE_STARTUP_RETRIES" "DATABASE_STARTUP_RETRY_DELAY_MS")) }}
         - name: {{ $key }}
           value: {{ $value | quote }}
         {{- end }}

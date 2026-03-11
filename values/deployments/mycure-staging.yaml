@@ -101,7 +101,7 @@ hapihub:
 
   image:
     repository: ghcr.io/mycurelabs/hapihub
-    tag: "10.15.3"
+    tag: "11.0.0"
     pullPolicy: IfNotPresent
 
   replicaCount: 1
@@ -167,6 +167,16 @@ hapihub:
         remoteKey: mycure-staging-google-oauth-client-secret
       - secretKey: STRIPE_SECRET_KEY
         remoteKey: mycure-staging-stripe-secret-key
+      - secretKey: AUTH_SECRET
+        remoteKey: mycure-staging-auth-secret
+      - secretKey: BETTER_AUTH_SECRET
+        remoteKey: mycure-staging-better-auth-secret
+
+  postgresql:
+    enabled: true
+    serviceName: postgresql
+    auth:
+      database: hapihub
 
   mongodb:
     serviceName: mongodb
