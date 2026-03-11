@@ -502,10 +502,10 @@ postgresql:
   resources:
     requests:
       cpu: 50m
-      memory: 128Mi
+      memory: 256Mi
     limits:
       cpu: 500m
-      memory: 1Gi
+      memory: 512Mi
 
   podDisruptionBudget:
     enabled: false

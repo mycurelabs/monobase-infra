@@ -42,9 +42,13 @@ spec:
           enabled: {{ .Values.postgresql.persistence.enabled | default true }}
           storageClass: {{ .Values.postgresql.persistence.storageClass | default "" }}
           size: {{ .Values.postgresql.persistence.size | default "20Gi" }}
-        {{- if .Values.global.nodePool }}
-        # Node pool scheduling - inherited from global.nodePool
+        {{- if or .Values.global.nodePool .Values.postgresql.resources }}
         primary:
+          {{- if .Values.postgresql.resources }}
+          resources:
+            {{- toYaml .Values.postgresql.resources | nindent 12 }}
+          {{- end }}
+          {{- if .Values.global.nodePool }}
           nodeSelector:
             node-pool: {{ .Values.global.nodePool }}
           tolerations:
@@ -52,6 +56,7 @@ spec:
               operator: "Equal"
               value: {{ .Values.global.nodePool | quote }}
               effect: "NoSchedule"
+          {{- end }}
         {{- end }}
 
   destination:
