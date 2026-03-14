@@ -16,7 +16,7 @@ data:
   # NOTE: PORT removed - causes known issue in HapiHub app (port: NaN)
   # App uses default port 7500 automatically
   {{- range $key, $value := .Values.config }}
-  {{- if not (has $key (list "NODE_ENV" "LOG_LEVEL" "PORT")) }}
+  {{- if not (has $key (list "NODE_ENV" "LOG_LEVEL" "PORT" "DATABASE_WAIT_FOR_READY" "DATABASE_STARTUP_RETRIES" "DATABASE_STARTUP_RETRY_DELAY_MS")) }}
   {{ $key }}: {{ $value | quote }}
   {{- end }}
   {{- end }}

@@ -193,6 +193,18 @@ mongodb:
     enabled: false
     existingSecret: ""
 
+# PostgreSQL dependency configuration (v11+, deployed separately)
+postgresql:
+  enabled: false
+  # Use external/managed PostgreSQL via DATABASE_URI from ExternalSecrets
+  external: false
+  # Service name - points to separate PostgreSQL release (only used when external: false)
+  serviceName: "postgresql"
+  auth:
+    database: hapihub
+    username: postgres
+    existingSecret: ""
+
 # Service Monitor for Prometheus (if monitoring enabled)
 serviceMonitor:
   enabled: false

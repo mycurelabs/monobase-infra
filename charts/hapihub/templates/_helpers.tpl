@@ -153,6 +153,30 @@ mongodb://{{ $username }}@{{ $host }}:27017/{{ $database }}?replicaSet={{ $repli
 {{- end }}
 
 {{/*
+PostgreSQL host - constructs hostname from PostgreSQL dependency
+Supports both standalone and replication architectures
+*/}}
+{{- define "hapihub.postgresql.host" -}}
+{{- $serviceName := .Values.postgresql.serviceName | default "postgresql" -}}
+{{- $namespace := include "hapihub.namespace" . -}}
+{{- printf "%s.%s.svc.cluster.local" $serviceName $namespace -}}
+{{- end }}
+
+{{/*
+PostgreSQL database name
+*/}}
+{{- define "hapihub.postgresql.database" -}}
+{{- .Values.postgresql.auth.database | default "hapihub" -}}
+{{- end }}
+
+{{/*
+PostgreSQL username
+*/}}
+{{- define "hapihub.postgresql.username" -}}
+{{- .Values.postgresql.auth.username | default "postgres" -}}
+{{- end }}
+
+{{/*
 Valkey (Redis) URL - constructs connection URL from Valkey dependency
 */}}
 {{- define "hapihub.valkey.url" -}}

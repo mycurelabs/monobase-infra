@@ -101,7 +101,7 @@ hapihub:
 
   image:
     repository: ghcr.io/mycurelabs/hapihub
-    tag: "10.15.3"
+    tag: "11.1.13"
     pullPolicy: IfNotPresent
 
   replicaCount: 1
@@ -130,6 +130,7 @@ hapihub:
       rpId: "localfirsthealth.com"
 
   config:
+    CLUSTER_INSTANCES: "max"
     CORS_ORIGINS: "https://mycure.stg.localfirsthealth.com,https://mycurev8.stg.localfirsthealth.com,https://mycurelocal.stg.localfirsthealth.com,https://mycure-myaccount.stg.localfirsthealth.com,https://mycure-deploydash.stg.localfirsthealth.com,https://dentalemon.stg.localfirsthealth.com,https://dentalemon-myaccount.stg.localfirsthealth.com,https://dentalemon-website.stg.localfirsthealth.com,https://dentalemon.stg.mycure.md"
     CORS_STRICT: "true"
     CORS_ALLOW_LOCAL_NETWORK: "false"
@@ -167,6 +168,16 @@ hapihub:
         remoteKey: mycure-staging-google-oauth-client-secret
       - secretKey: STRIPE_SECRET_KEY
         remoteKey: mycure-staging-stripe-secret-key
+      - secretKey: AUTH_SECRET
+        remoteKey: mycure-staging-auth-secret
+      - secretKey: BETTER_AUTH_SECRET
+        remoteKey: mycure-staging-better-auth-secret
+
+  postgresql:
+    enabled: true
+    serviceName: postgresql
+    auth:
+      database: hapihub
 
   mongodb:
     serviceName: mongodb
@@ -180,7 +191,7 @@ mycure:
 
   image:
     repository: ghcr.io/mycurelabs/mycureapp
-    tag: "10.3.9"
+    tag: "10.3.15"
     pullPolicy: IfNotPresent
 
   replicaCount: 1
@@ -465,7 +476,7 @@ syncd:
 
 # ===== DATABASE: PostgreSQL =====
 postgresql:
-  enabled: false # Disabled - API application not in use
+  enabled: true
 
   fullnameOverride: "postgresql"
 
@@ -477,6 +488,8 @@ postgresql:
 
   auth:
     enabled: true
+    database: hapihub
+    username: postgres
     existingSecret: postgresql
     secretKeys:
       adminPasswordKey: postgres-password
@@ -489,7 +502,7 @@ postgresql:
   resources:
     requests:
       cpu: 50m
-      memory: 128Mi
+      memory: 512Mi
     limits:
       cpu: 500m
       memory: 1Gi
