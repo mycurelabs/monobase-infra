@@ -1,0 +1,22 @@
+{{- if .Values.enabled }}
+HapiHub Docs has been deployed!
+
+Chart: {{ .Chart.Name }}-{{ .Chart.Version }}
+Release: {{ .Release.Name }}
+Namespace: {{ include "hapihub-docs.namespace" . }}
+
+Deployment Information:
+  - Replicas: {{ .Values.replicaCount }}
+  - Image: {{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}
+  - Service: {{ include "hapihub-docs.fullname" . }}:{{ .Values.service.port }}
+
+Access Information:
+{{- if .Values.gateway.enabled }}
+  HapiHub Docs: https://{{ include "hapihub-docs.gateway.hostname" . }}
+{{- else }}
+  Gateway is disabled. Use port-forward to access:
+  kubectl port-forward -n {{ include "hapihub-docs.namespace" . }} svc/{{ include "hapihub-docs.fullname" . }} 8080:{{ .Values.service.port }}
+{{- end }}
+{{- else }}
+HapiHub Docs is disabled (enabled: false)
+{{- end }}
