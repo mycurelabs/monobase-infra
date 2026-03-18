@@ -1,0 +1,44 @@
+{{- if index .Values "hapihub-docs" }}
+{{- if (index .Values "hapihub-docs").enabled }}
+# ArgoCD Application: HapiHub API Documentation
+# Sync Wave 3 - Deploy application after database
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ .Values.global.namespace }}-hapihub-docs
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+
+  source:
+    path: charts/hapihub-docs
+    repoURL: {{ .Values.argocd.repoURL }}
+    targetRevision: {{ .Values.argocd.targetRevision | default "main" }}
+    helm:
+      releaseName: hapihub-docs
+      valuesObject:
+        {{- toYaml (index .Values "hapihub-docs") | nindent 8 }}
+        global: {{ .Values.global | toYaml | nindent 10 }}
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: {{ .Values.global.namespace }}
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false
+    retry:
+      limit: 5
+      backoff:
+        duration: 10s
+        maxDuration: 5m
+{{- end }}
+{{- end }}
