@@ -172,6 +172,8 @@ hapihub:
         remoteKey: mycure-staging-auth-secret
       - secretKey: BETTER_AUTH_SECRET
         remoteKey: mycure-staging-better-auth-secret
+      - secretKey: PRIVATE_KEY
+        remoteKey: mycure-staging-private-key
 
   postgresql:
     enabled: true
