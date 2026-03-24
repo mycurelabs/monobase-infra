@@ -68,6 +68,9 @@ spec:
         resources:
           {{- toYaml .Values.resources | nindent 12 }}
         env:
+        # Data directory for metadata storage
+        - name: CADENCE_DATA_DIR
+          value: {{ if .Values.persistence.enabled }}{{ .Values.persistence.mountPath | default "/app/data" }}{{ else }}"/tmp/cadence-data"{{ end }}
         # Cadence API port
         - name: CADENCE_API_PORT
           value: {{ .Values.service.targetPort | quote }}
