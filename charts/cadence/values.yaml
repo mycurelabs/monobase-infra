@@ -76,7 +76,7 @@ livenessProbe:
   httpGet:
     path: /health
     port: 7890
-  initialDelaySeconds: 10
+  initialDelaySeconds: 15
   periodSeconds: 10
   timeoutSeconds: 5
   failureThreshold: 3
@@ -86,10 +86,10 @@ readinessProbe:
   httpGet:
     path: /health
     port: 7890
-  initialDelaySeconds: 5
+  initialDelaySeconds: 10
   periodSeconds: 5
-  timeoutSeconds: 3
-  failureThreshold: 2
+  timeoutSeconds: 5
+  failureThreshold: 3
 
 autoscaling:
   enabled: false
