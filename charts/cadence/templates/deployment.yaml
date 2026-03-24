@@ -90,8 +90,13 @@ spec:
         {{- if .Values.valkey.enabled }}
         - name: CADENCE_METADATA_BACKEND
           value: "valkey"
+        - name: VALKEY_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.valkey.auth.existingSecret | default "valkey" }}
+              key: {{ .Values.valkey.auth.secretKey | default "valkey-password" }}
         - name: CADENCE_VALKEY_URL
-          value: {{ include "cadence.valkey.url" . | quote }}
+          value: "redis://:$(VALKEY_PASSWORD)@{{ include "cadence.valkey.host" . }}:{{ .Values.valkey.port | default 6379 }}"
         {{- end }}
         # Load secrets from External Secrets Operator
         {{- if .Values.externalSecrets.enabled }}

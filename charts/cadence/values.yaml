@@ -166,6 +166,9 @@ valkey:
   enabled: false
   serviceName: "valkey-primary"  # Bitnami chart uses valkey-primary for standalone
   port: 6379
+  auth:
+    existingSecret: "valkey"     # Bitnami chart creates this secret
+    secretKey: "valkey-password"
 
 # Service Monitor for Prometheus (if monitoring enabled)
 serviceMonitor:
