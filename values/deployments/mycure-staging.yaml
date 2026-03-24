@@ -590,6 +590,10 @@ mongodb:
 valkey:
   enabled: true
 
+  global:
+    security:
+      allowInsecureImages: true
+
   architecture: standalone
 
   image:
