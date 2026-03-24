@@ -688,6 +688,42 @@ mailpit:
     hostname: ""
     sectionName: https-stg-lfh
 
+# ===== P2P SYNC: Cadence =====
+cadence:
+  enabled: true
+
+  image:
+    repository: ghcr.io/mycurelabs/cadence
+    tag: "latest"
+    pullPolicy: Always
+
+  replicaCount: 1
+
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 250m
+      memory: 128Mi
+
+  gateway:
+    hostname: ""
+    sectionName: https-stg-lfh
+    snippetsPolicy:
+      enabled: true
+      proxyReadTimeout: "3600s"
+      clientMaxBodySize: "10m"
+
+  postgresql:
+    enabled: true
+    serviceName: postgresql
+    auth:
+      database: hapihub
+
+  config:
+    RUST_LOG: "info"
+
 # ===== BACKUP =====
 backup:
   enabled: false

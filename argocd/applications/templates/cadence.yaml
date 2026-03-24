@@ -1,0 +1,45 @@
+{{- if .Values.cadence.enabled }}
+# ArgoCD Application: Cadence P2P Sync Engine
+# Sync Wave 3 - Deploy application after database
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ .Values.global.namespace }}-cadence
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+
+  source:
+    path: charts/cadence
+    repoURL: {{ .Values.argocd.repoURL }}
+    targetRevision: {{ .Values.argocd.targetRevision | default "main" }}
+    helm:
+      releaseName: cadence
+      valuesObject:
+        {{- $cadenceValues := omit .Values.cadence "postgresql" "valkey" }}
+        {{- toYaml $cadenceValues | nindent 8 }}
+        global: {{ .Values.global | toYaml | nindent 10 }}
+        postgresql: {{ mergeOverwrite (deepCopy .Values.postgresql) (.Values.cadence.postgresql | default dict) | toYaml | nindent 10 }}
+        valkey: {{ mergeOverwrite (deepCopy .Values.valkey) (.Values.cadence.valkey | default dict) | toYaml | nindent 10 }}
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: {{ .Values.global.namespace }}
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false
+    retry:
+      limit: 5
+      backoff:
+        duration: 10s
+        maxDuration: 5m
+{{- end }}

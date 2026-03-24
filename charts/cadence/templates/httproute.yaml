@@ -1,0 +1,55 @@
+{{- if and .Values.enabled .Values.gateway.enabled }}
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: {{ include "cadence.fullname" . }}
+  namespace: {{ include "cadence.namespace" . }}
+  labels:
+    {{- include "cadence.labels" . | nindent 4 }}
+spec:
+  parentRefs:
+    - name: {{ include "cadence.gateway.name" . }}
+      namespace: {{ include "cadence.gateway.namespace" . }}
+      {{- if .Values.gateway.sectionName }}
+      sectionName: {{ .Values.gateway.sectionName }}
+      {{- else }}
+      sectionName: https
+      {{- end }}
+  hostnames:
+    {{- if .Values.gateway.hostnames }}
+    {{- range .Values.gateway.hostnames }}
+    - {{ . }}
+    {{- end }}
+    {{- else }}
+    - {{ include "cadence.gateway.hostname" . }}
+    {{- end }}
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      backendRefs:
+        - name: {{ include "cadence.fullname" . }}
+          port: {{ .Values.service.port }}
+          weight: 1
+---
+{{- if .Values.gateway.snippetsPolicy.enabled }}
+apiVersion: gateway.nginx.org/v1alpha1
+kind: SnippetsPolicy
+metadata:
+  name: {{ include "cadence.fullname" . }}-snippets
+  namespace: {{ include "cadence.namespace" . }}
+  labels:
+    {{- include "cadence.labels" . | nindent 4 }}
+spec:
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: {{ include "cadence.fullname" . }}
+  snippets:
+    - context: http.server.location
+      value: |
+        proxy_read_timeout {{ .Values.gateway.snippetsPolicy.proxyReadTimeout }};
+        client_max_body_size {{ .Values.gateway.snippetsPolicy.clientMaxBodySize }};
+{{- end }}
+{{- end }}
