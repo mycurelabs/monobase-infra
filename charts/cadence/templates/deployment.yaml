@@ -118,13 +118,23 @@ spec:
         {{- with .Values.env }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
-        {{- if .Values.persistence.enabled }}
         volumeMounts:
+        - name: config
+          mountPath: /app/cadence.yml
+          subPath: cadence.yml
+          readOnly: true
+        {{- if .Values.persistence.enabled }}
         - name: data
           mountPath: {{ .Values.persistence.mountPath | default "/app/data" }}
         {{- end }}
-      {{- if .Values.persistence.enabled }}
       volumes:
+      - name: config
+        configMap:
+          name: {{ include "cadence.fullname" . }}
+          items:
+          - key: cadence.yml
+            path: cadence.yml
+      {{- if .Values.persistence.enabled }}
       - name: data
         persistentVolumeClaim:
           claimName: {{ include "cadence.fullname" . }}-data

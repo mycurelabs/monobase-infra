@@ -122,7 +122,20 @@ persistence:
   accessMode: ReadWriteOnce
   mountPath: /app/data
 
-# Application configuration (ConfigMap)
+# Cadence config file (mounted as /app/cadence.yml)
+cadenceConfig:
+  collections:
+    "*":
+      strategy: lww
+      scope_rules:
+        facility: organization
+        organization: organization
+        warehouse: organization
+  collectionsBlacklist:
+    - "--drizzle-migrations"
+    - "-migration-checkpoints"
+
+# Application configuration (ConfigMap env vars)
 config:
   RUST_LOG: "info"
 

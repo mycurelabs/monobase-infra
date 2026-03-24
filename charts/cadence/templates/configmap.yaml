@@ -10,4 +10,22 @@ data:
   {{- range $key, $value := .Values.config }}
   {{ $key }}: {{ $value | quote }}
   {{- end }}
+  cadence.yml: |
+    collections:
+      {{- range $name, $col := .Values.cadenceConfig.collections }}
+      {{ $name | quote }}:
+        strategy: {{ $col.strategy }}
+        {{- if $col.scope_rules }}
+        scope_rules:
+          {{- range $k, $v := $col.scope_rules }}
+          {{ $k }}: {{ $v }}
+          {{- end }}
+        {{- end }}
+      {{- end }}
+    {{- if .Values.cadenceConfig.collectionsBlacklist }}
+    collections_blacklist:
+      {{- range .Values.cadenceConfig.collectionsBlacklist }}
+      - {{ . | quote }}
+      {{- end }}
+    {{- end }}
 {{- end }}
