@@ -6,6 +6,109 @@ allowed-tools: Read, Write, Edit, Glob, Grep, Bash
 
 # ArgoCD GitOps Deployment Skill
 
+## Kubeconfig Resolution
+
+All kubectl/argocd commands use this priority order:
+1. Explicit `--kubeconfig` flag (if provided)
+2. `KUBECONFIG` environment variable
+3. **Default:** `~/.kube/mycure-doks-main` (if exists)
+4. Interactive selection (if multiple configs in `~/.kube/`)
+5. Fall back to `~/.kube/config`
+
+Set kubeconfig before running commands:
+```bash
+export KUBECONFIG=~/.kube/mycure-doks-main
+```
+
+---
+
+## Quick Operations
+
+### sync — Force sync application (bypass 3-min polling cycle)
+```bash
+# Sync single application
+argocd app sync {app-name}
+
+# Sync with prune (remove deleted resources)
+argocd app sync {app-name} --prune
+
+# Sync with force (replace changed resources)
+argocd app sync {app-name} --force
+
+# Examples:
+argocd app sync mycure-staging-root
+argocd app sync mycure-production-root --prune
+```
+
+### diff — Preview pending changes before sync
+```bash
+# Show what would change on next sync
+argocd app diff {app-name}
+
+# Examples:
+argocd app diff mycure-staging-root
+argocd app diff infrastructure
+```
+
+### status — Check sync/health status
+```bash
+# List all applications with status
+argocd app list -o wide
+
+# Get detailed status for specific app
+argocd app get {app-name}
+
+# Show operation history
+argocd app get {app-name} --show-operation
+
+# Via kubectl (no argocd CLI needed)
+kubectl get applications -n argocd
+kubectl get applications -n argocd -o wide
+
+# Examples:
+argocd app list
+argocd app get mycure-staging-root
+```
+
+### rollback — Rollback to previous revision ⚠️ DESTRUCTIVE
+```bash
+# ⚠️ CONFIRM BEFORE EXECUTING - this reverts to a previous state
+
+# Show revision history
+argocd app history {app-name}
+
+# Rollback to specific revision
+argocd app rollback {app-name} {revision}
+
+# Examples:
+argocd app history mycure-staging-root
+argocd app rollback mycure-staging-root 5
+```
+
+### pause — Pause/resume auto-sync for maintenance
+```bash
+# Pause auto-sync (for manual maintenance)
+kubectl patch application {app-name} -n argocd --type merge \
+  -p '{"spec":{"syncPolicy":null}}'
+
+# Resume auto-sync
+kubectl patch application {app-name} -n argocd --type merge \
+  -p '{"spec":{"syncPolicy":{"automated":{"prune":true,"selfHeal":true}}}}'
+
+# Examples:
+kubectl patch application mycure-staging-root -n argocd --type merge -p '{"spec":{"syncPolicy":null}}'
+```
+
+### refresh — Hard refresh from Git (re-read manifests)
+```bash
+argocd app get {app-name} --hard-refresh
+
+# Examples:
+argocd app get mycure-staging-root --hard-refresh
+```
+
+---
+
 ## Current Deployments
 
 ```

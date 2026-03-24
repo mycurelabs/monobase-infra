@@ -6,6 +6,105 @@ allowed-tools: Read, Write, Edit, Glob, Grep, Bash
 
 # Helm Chart Management Skill
 
+## Kubeconfig Resolution
+
+All helm commands use this priority order:
+1. Explicit `--kubeconfig` flag (if provided)
+2. `KUBECONFIG` environment variable
+3. **Default:** `~/.kube/mycure-doks-main` (if exists)
+4. Interactive selection (if multiple configs in `~/.kube/`)
+5. Fall back to `~/.kube/config`
+
+Set kubeconfig before running commands:
+```bash
+export KUBECONFIG=~/.kube/mycure-doks-main
+```
+
+---
+
+## Quick Operations
+
+### diff — Compare local chart changes vs deployed release
+```bash
+# Requires helm-diff plugin: helm plugin install https://github.com/databus23/helm-diff
+
+# Diff against deployed release
+helm diff upgrade {release} charts/{chart} -f values/deployments/{deployment}.yaml -n {namespace}
+
+# Diff with additional values
+helm diff upgrade {release} charts/{chart} -f values/deployments/{deployment}.yaml -f override.yaml -n {namespace}
+
+# Show only changes (no context)
+helm diff upgrade {release} charts/{chart} -f values/deployments/{deployment}.yaml -n {namespace} --no-color
+
+# Examples:
+helm diff upgrade api charts/api -f values/deployments/mycure-staging.yaml -n mycure-staging
+helm diff upgrade hapihub charts/hapihub -f values/deployments/mycure-production.yaml -n mycure-production
+```
+
+### values — Get values from deployed release
+```bash
+# Get user-supplied values
+helm get values {release} -n {namespace}
+
+# Get all values (including defaults)
+helm get values {release} -n {namespace} -a
+
+# Output as YAML
+helm get values {release} -n {namespace} -o yaml
+
+# Examples:
+helm get values api -n mycure-staging
+helm get values hapihub -n mycure-production -a -o yaml
+```
+
+### template — Render templates locally for validation
+```bash
+# Basic template rendering
+helm template {release} charts/{chart} -f values/deployments/{deployment}.yaml
+
+# With debug output (shows template processing)
+helm template {release} charts/{chart} -f values/deployments/{deployment}.yaml --debug
+
+# Validate against cluster (dry-run)
+helm template {release} charts/{chart} -f values/deployments/{deployment}.yaml --validate
+
+# Output to file for inspection
+helm template {release} charts/{chart} -f values/deployments/{deployment}.yaml > rendered.yaml
+
+# Examples:
+helm template api charts/api -f values/deployments/mycure-staging.yaml --debug
+helm template hapihub charts/hapihub -f values/deployments/mycure-production.yaml --validate
+```
+
+### lint — Validate chart structure
+```bash
+# Lint single chart
+helm lint charts/{chart}
+
+# Lint with values
+helm lint charts/{chart} -f values/deployments/{deployment}.yaml
+
+# Lint all charts
+for chart in charts/*/; do helm lint "$chart"; done
+
+# Examples:
+helm lint charts/api
+helm lint charts/hapihub -f values/deployments/mycure-staging.yaml
+```
+
+### history — View release history
+```bash
+# Show release history
+helm history {release} -n {namespace}
+
+# Examples:
+helm history api -n mycure-staging
+helm history hapihub -n mycure-production
+```
+
+---
+
 ## Current Charts
 
 ```
