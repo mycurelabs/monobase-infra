@@ -132,6 +132,17 @@ Mailpit host - constructs hostname from Mailpit service
 {{- end }}
 
 {{/*
+Valkey (Redis) URL - constructs connection URL from Valkey dependency
+*/}}
+{{- define "syncd.valkey.url" -}}
+{{- if .Values.valkey.enabled -}}
+{{- $release := .Release.Name -}}
+{{- $namespace := include "syncd.namespace" . -}}
+redis://{{ $release }}-valkey-master.{{ $namespace }}.svc.cluster.local:6379
+{{- end -}}
+{{- end }}
+
+{{/*
 Node Pool - returns the effective node pool name (component-level or global)
 Returns empty string if disabled or not configured
 */}}
