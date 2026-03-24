@@ -99,6 +99,7 @@ spec:
           - CreateNamespace=true              # Auto-create namespace if missing
           - PrunePropagationPolicy=foreground # Delete in correct order
           - PruneLast=true                    # Prune after new resources are healthy
+          - ServerSideApply=true              # Avoids resourceVersion conflicts on large Application CRDs
 
         retry:
           limit: 5
