@@ -21,9 +21,11 @@ spec:
     helm:
       releaseName: valkey
       valuesObject:
+        {{- if and .Values.valkey.global .Values.valkey.global.security }}
         global:
           security:
             allowInsecureImages: {{ .Values.valkey.global.security.allowInsecureImages | default false }}
+        {{- end }}
         image:
           repository: {{ .Values.valkey.image.repository | default "bitnamilegacy/valkey" }}
           tag: {{ .Values.valkey.image.tag | default "8.0.1-debian-12-r2" }}
