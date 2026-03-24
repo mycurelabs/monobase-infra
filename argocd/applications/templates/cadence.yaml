@@ -1,4 +1,4 @@
-{{- if .Values.cadence.enabled }}
+{{- if and .Values.cadence .Values.cadence.enabled }}
 # ArgoCD Application: Cadence P2P Sync Engine
 # Sync Wave 3 - Deploy application after database
 

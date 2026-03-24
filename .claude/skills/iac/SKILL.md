@@ -6,6 +6,91 @@ allowed-tools: Read, Write, Edit, Glob, Grep, Bash
 
 # Infrastructure as Code Skill
 
+## Quick Operations
+
+### plan — Preview infrastructure changes
+```bash
+# Navigate to module and run plan
+cd terraform/modules/{provider}
+tofu plan -var-file=../../../cluster/terraform.tfvars
+
+# Save plan to file for later apply
+tofu plan -var-file=../../../cluster/terraform.tfvars -out=tfplan
+
+# Plan with specific variables
+tofu plan -var-file=../../../cluster/terraform.tfvars -var="deployment_profile=medium"
+
+# Examples:
+cd terraform/modules/do-doks && tofu plan -var-file=../../../cluster/terraform.tfvars
+cd terraform/modules/aws-eks && tofu plan -var-file=../../../cluster/terraform.tfvars -out=tfplan
+```
+
+### apply — Apply infrastructure changes ⚠️ DESTRUCTIVE
+```bash
+# ⚠️ CONFIRM BEFORE EXECUTING - modifies cloud infrastructure and costs money
+
+# Apply with confirmation prompt
+cd terraform/modules/{provider}
+tofu apply -var-file=../../../cluster/terraform.tfvars
+
+# Apply saved plan (no additional confirmation needed)
+tofu apply tfplan
+
+# Auto-approve (DANGEROUS - use only in automation)
+tofu apply -var-file=../../../cluster/terraform.tfvars -auto-approve
+
+# Examples:
+cd terraform/modules/do-doks && tofu apply -var-file=../../../cluster/terraform.tfvars
+```
+
+### state — Inspect current Terraform state
+```bash
+# List all resources in state
+cd terraform/modules/{provider}
+tofu state list
+
+# Show specific resource
+tofu state show {resource_address}
+
+# Show all outputs
+tofu output
+
+# Show specific output
+tofu output -raw configure_kubectl
+
+# Examples:
+cd terraform/modules/do-doks
+tofu state list
+tofu state show digitalocean_kubernetes_cluster.main
+tofu output -raw configure_kubectl
+```
+
+### destroy — Destroy infrastructure ⚠️ VERY DESTRUCTIVE
+```bash
+# ⚠️ EXTREME CAUTION - destroys all cluster resources permanently
+
+# Destroy with confirmation prompt
+cd terraform/modules/{provider}
+tofu destroy -var-file=../../../cluster/terraform.tfvars
+
+# Or use the automated script (includes safety prompts):
+mise run teardown
+```
+
+### init — Initialize module (first time or after provider changes)
+```bash
+cd terraform/modules/{provider}
+tofu init
+
+# Upgrade providers
+tofu init -upgrade
+
+# Reconfigure backend
+tofu init -reconfigure
+```
+
+---
+
 ## Available Modules
 
 ```
