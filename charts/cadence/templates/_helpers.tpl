@@ -126,6 +126,16 @@ HapiHub JWKS URL - constructs internal URL for JWT validation
 {{- end }}
 
 {{/*
+Valkey URL - constructs internal URL for metadata backend
+*/}}
+{{- define "cadence.valkey.url" -}}
+{{- $serviceName := .Values.valkey.serviceName | default "valkey-master" -}}
+{{- $port := .Values.valkey.port | default 6379 -}}
+{{- $namespace := include "cadence.namespace" . -}}
+{{- printf "redis://%s.%s.svc.cluster.local:%v" $serviceName $namespace $port -}}
+{{- end }}
+
+{{/*
 Node Pool - returns the effective node pool name (component-level or global)
 Returns empty string if disabled or not configured
 */}}

@@ -588,7 +588,7 @@ mongodb:
 
 # ===== CACHE: Valkey (Redis) =====
 valkey:
-  enabled: false
+  enabled: true
 
   architecture: standalone
 
@@ -722,6 +722,10 @@ cadence:
     serviceName: postgresql
     auth:
       database: hapihub
+
+  valkey:
+    enabled: true
+    serviceName: "valkey-master"
 
   config:
     RUST_LOG: "info"

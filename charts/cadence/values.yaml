@@ -164,6 +164,8 @@ hapihub:
 # Valkey dependency configuration (optional metadata backend)
 valkey:
   enabled: false
+  serviceName: "valkey-master"  # Bitnami chart uses valkey-master for standalone
+  port: 6379
 
 # Service Monitor for Prometheus (if monitoring enabled)
 serviceMonitor:
