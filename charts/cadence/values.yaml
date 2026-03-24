@@ -131,6 +131,22 @@ cadenceConfig:
         facility: organization
         organization: organization
         warehouse: organization
+        account: organization
+        created_by: user
+    accounts:
+      strategy: lww
+      scope_columns:
+        user: id
+    personal_details:
+      strategy: lww
+      scope_columns:
+        user: id
+        organization: facility
+    personal_details_history:
+      strategy: lww
+      scope_columns:
+        user: id
+        organization: facility
   collectionsBlacklist:
     - "--drizzle-migrations"
     - "-migration-checkpoints"

@@ -21,6 +21,12 @@ data:
           {{ $k }}: {{ $v }}
           {{- end }}
         {{- end }}
+        {{- if $col.scope_columns }}
+        scope_columns:
+          {{- range $k, $v := $col.scope_columns }}
+          {{ $k }}: {{ $v }}
+          {{- end }}
+        {{- end }}
       {{- end }}
     {{- if .Values.cadenceConfig.collectionsBlacklist }}
     collections_blacklist:
