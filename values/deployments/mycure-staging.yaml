@@ -729,7 +729,7 @@ cadence:
 
   valkey:
     enabled: true
-    serviceName: "valkey-master"
+    serviceName: "valkey-primary"
 
   config:
     RUST_LOG: "info"
