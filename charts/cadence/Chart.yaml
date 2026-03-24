@@ -3,7 +3,7 @@ name: cadence
 description: Cadence - P2P sync engine for healthcare data synchronization
 type: application
 version: 1.0.0
-appVersion: "2.0.0"
+appVersion: "0.2.0"
 keywords:
   - cadence
   - p2p
