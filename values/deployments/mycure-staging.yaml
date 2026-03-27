@@ -606,14 +606,13 @@ valkey:
       enabled: true
       storageClass: ""
       size: 4Gi
-
-  resources:
-    requests:
-      cpu: 50m
-      memory: 128Mi
-    limits:
-      cpu: 250m
-      memory: 256Mi
+    resources:
+      requests:
+        cpu: 50m
+        memory: 256Mi
+      limits:
+        cpu: 250m
+        memory: 512Mi
 
 # ===== STORAGE: MinIO Object Storage =====
 minio:
