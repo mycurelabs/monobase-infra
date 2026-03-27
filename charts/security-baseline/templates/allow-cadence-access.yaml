@@ -1,0 +1,111 @@
+# Allow Cadence Network Access
+# Permits Cadence to connect to Valkey, external HTTPS (iroh relay), and receive gateway traffic
+
+---
+# Allow Gateway → Cadence API
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-gateway-to-cadence
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    security-policy: allow-ingress
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: cadence
+
+  policyTypes:
+    - Ingress
+
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: envoy-gateway-system
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: nginx-gateway-system
+      ports:
+        - protocol: TCP
+          port: 7890
+
+---
+# Allow Cadence → Valkey (ingress on Valkey from Cadence)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-cadence-to-valkey
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    security-policy: allow-ingress
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: valkey
+
+  policyTypes:
+    - Ingress
+
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: cadence
+      ports:
+        - protocol: TCP
+          port: 6379
+
+---
+# Egress from Cadence to Valkey, DNS, and external HTTPS (iroh relay)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-cadence-egress
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    security-policy: allow-egress
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: cadence
+
+  policyTypes:
+    - Egress
+
+  egress:
+    # To Valkey
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: valkey
+      ports:
+        - protocol: TCP
+          port: 6379
+
+    # To DNS (required for service discovery)
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+        - podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+
+    # To external HTTPS (iroh relay servers, JWKS endpoints)
+    # No 'to' selector = allows all destinations
+    - ports:
+        - protocol: TCP
+          port: 443
+
+---
+# Notes:
+# 1. Cadence uses Valkey as its metadata backend for change log tracking
+# 2. Cadence connects to iroh relay servers (use1-1.relay.iroh.network) for P2P sync
+# 3. Cadence validates JWTs via JWKS endpoints (needs HTTPS egress)
+# 4. Gateway access needed for WebSocket sync endpoint (/sync) and API
