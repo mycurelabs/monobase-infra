@@ -700,7 +700,7 @@ cadence:
 
   image:
     repository: ghcr.io/mycurelabs/cadence
-    tag: "0.2.3"
+    tag: "0.3.0"
     pullPolicy: IfNotPresent
 
   replicaCount: 1
