@@ -36,6 +36,7 @@ spec:
             storageClass: {{ .Values.valkey.master.persistence.storageClass | default "" }}
             size: {{ .Values.valkey.master.persistence.size | default "8Gi" }}
           {{- if .Values.valkey.master.resources }}
+          resourcesPreset: "none"
           resources: {{ .Values.valkey.master.resources | toYaml | nindent 12 }}
           {{- end }}
 
