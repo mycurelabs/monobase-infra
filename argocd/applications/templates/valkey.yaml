@@ -30,6 +30,11 @@ spec:
           repository: {{ .Values.valkey.image.repository | default "bitnamilegacy/valkey" }}
           tag: {{ .Values.valkey.image.tag | default "8.0.1-debian-12-r2" }}
         architecture: {{ .Values.valkey.architecture | default "standalone" }}
+        {{- if .Values.valkey.auth }}
+        auth:
+          enabled: true
+          existingSecret: {{ .Values.valkey.auth.existingSecret | default "valkey" }}
+        {{- end }}
         primary:
           persistence:
             enabled: {{ .Values.valkey.master.persistence.enabled | default false }}

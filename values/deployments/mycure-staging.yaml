@@ -595,6 +595,9 @@ valkey:
     security:
       allowInsecureImages: true
 
+  auth:
+    existingSecret: valkey
+
   architecture: standalone
 
   image:
