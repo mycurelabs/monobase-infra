@@ -603,10 +603,10 @@ mongodb:
   resources:
     requests:
       cpu: 1000m
-      memory: 5Gi
+      memory: 4Gi
     limits:
-      cpu: 2000m
-      memory: 5Gi
+      cpu: 3000m
+      memory: 6Gi
 
   podDisruptionBudget:
     enabled: false
