@@ -330,9 +330,28 @@ The **point of no return shifts from "first 11.x write" to "stopping reverse CDC
 - [x] Replayer started fresh (lastSeq=0), collector resumed from lastSeq=120795
 - [x] Replayer drained the ~120k-event backlog (most of it `inventory-trackers` updates from production's background tracker job)
 - [x] Lag stable at **<5 events / <1 second** in steady state, replayer keeping up with production's ~18 events/sec write rate
-- [ ] Wait 24+ hours of continued stable operation before declaring ready for Phase 6 cutover
+- [x] 24h+ stable-lag soak waived by user — proceeded directly to cutover
 - **Bug found and fixed during this phase**:
   - **Bug H** (v3.7.4) — replayer didn't dedupe events by primary key within a batch. Production hapihub writes hundreds of updates to the same `inventory-trackers` rows per minute, so every CDC batch contained many events for the same row, tripping PG's `ON CONFLICT DO UPDATE command cannot affect row a second time` error and falling back to per-row inserts at ~80 events/sec. Fix: dedup by PK before sending to `batchInsert`, keeping the latest event per PK (events are seq-sorted). Throughput jumped ~1000x.
+
+## 5.7 Phase 6 — Cutover ✅ DONE 2026-04-07
+
+Production cut over from `hapihub:10.11.15` (MongoDB) to `hapihub:11.2.8` (PostgreSQL).
+
+- [x] **Commit X** (`6baf8d7`) — froze production: `hapihub.replicaCount: 0`, `autoscaling.enabled: false`, `syncd.enabled: false` (permanently retired). Required a chart-side schema fix (commit `568f945`) to allow `replicaCount: 0`.
+- [x] **Commit Y** (`d0fd493`) — the actual cutover: `hapihub.image.tag: 10.11.15 → 11.2.8`, `replicaCount: 0 → 3`, `autoscaling.enabled: false → true`. New 11.x pods came up reading from `postgresql-primary` via the `DATABASE_URI` constructed from the K8s `postgresql` secret (Phase 5 prep).
+- [x] **Commit Z** (`321057b`) — switched migrator to `MODE=reverse-cdc`. 76 PG capture triggers installed on the allowlist; `_pg_changelog` is now recording every PG write atomically inside the source transaction.
+- [x] External `/health` and `/.well-known/jwks.json` both return HTTP 200
+- [x] Reverse-CDC verified firing in production (120+ `inventory_trackers` UPDATE captures within minutes of cutover)
+- **Issue caught + fixed during cutover**:
+  - **Private key SEC1 → PKCS#8** — `mycure-production-private-key` GCP secret was in SEC1 format (`BEGIN EC PRIVATE KEY`); hapihub 11.x's better-auth requires PKCS#8 (`BEGIN PRIVATE KEY`). JWKS endpoint returned `500 "pkcs8" must be PKCS#8 formatted string` immediately after cutover. This was flagged in Tier 4.1 and warned about explicitly but not pre-converted. Fix executed live: `openssl pkcs8 -topk8 -nocrypt -in old.pem -out new.pem`, pushed as version 2 of the GCP secret, force-synced ExternalSecret, rolling-restarted hapihub. JWKS now returns the EC public key correctly (`kid: hapihub-2025-01, alg: ES256`).
+- **Risks accepted by user (declined prerequisites)**:
+  - PG backups (Tier 4.2.1) — declined; if 11.x corrupts PG there is no recovery path other than re-running the migrator
+  - 24h+ stable-lag CDC soak — waived; proceeded with ~30 min of stable lag instead
+  - Investigation of 4 transformer field-drift WARNs (`accounts`, `export.requests`, `inventory-trackers`, `personal-details`) — deferred; one of them (`personal-details.createdAt`) is now visibly causing OpenAPI response validation warnings post-cutover but requests still return 200
+  - MongoDB snapshot at cutover moment — not taken; rollback would replay against whatever state MongoDB is in
+  - Stakeholder notification — not sent
+- **Total cutover downtime**: ~5 minutes (commit X drain → commit Y rollout → 11.x readiness)
 
 ## 5.6 Phase 5 — Production hapihub secrets prep ✅ DONE 2026-04-07
 
