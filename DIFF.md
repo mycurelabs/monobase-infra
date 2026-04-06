@@ -133,15 +133,16 @@ Affects production but no schema/architecture changes. Work needed but well-scop
 
 These prepare production to RECEIVE the new stack, but don't change hapihub yet. Reversible if needed.
 
-## 4.1 Create production GCP secrets for 11.x stack
+## 4.1 Create production GCP secrets for 11.x stack — DONE
 
-11.x needs new secret keys that staging already has but production doesn't.
+All 5 secrets verified in `mc-v4-prod` GCP Secret Manager (2026-04-06):
 
-- [ ] `mycure-production-auth-secret` (new — for legacy `AUTH_SECRET`)
-- [ ] `mycure-production-better-auth-secret` (new — better-auth signing key)
-- [ ] `mycure-production-postgresql-password` (new — for in-cluster or managed PG)
-- [ ] `mycure-production-valkey-password` (new — already needed by ExternalSecret)
-- [ ] Verify `mycure-production-private-key` exists and is the right key for 11.x JWKS
+- [x] `mycure-production-auth-secret` — created (64-char base64 random)
+- [x] `mycure-production-better-auth-secret` — created (64-char base64 random)
+- [x] `mycure-production-postgresql-password` — already existed (2025-11-19)
+- [x] `mycure-production-valkey-password` — created during Tier 2.1 (2026-04-06)
+- [x] `mycure-production-private-key` — already exists (2025-11-22)
+  - ⚠️ **Format check**: production key is `BEGIN EC PRIVATE KEY` (SEC1), staging key is `BEGIN PRIVATE KEY` (PKCS#8). Same EC key type, different wrapper. Verify hapihub 11.x accepts SEC1 — if not, convert via `openssl pkcs8 -topk8 -nocrypt -in old.pem -out new.pem` before migration cutover (Tier 5).
 
 ## 4.2 Provision PostgreSQL in production
 
