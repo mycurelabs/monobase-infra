@@ -32,21 +32,69 @@ spec:
               {{- if .Values.postgresql.auth.existingSecret }}
               existingSecret: {{ .Values.postgresql.auth.existingSecret }}
               {{- end }}
-        {{- if .Values.postgresql.auth.secretKeys }}
         auth:
+          {{- if .Values.postgresql.auth.replicationUsername }}
+          replicationUsername: {{ .Values.postgresql.auth.replicationUsername }}
+          {{- end }}
+          {{- if .Values.postgresql.auth.secretKeys }}
           secretKeys:
             adminPasswordKey: {{ .Values.postgresql.auth.secretKeys.adminPasswordKey | default "postgres-password" }}
-        {{- end }}
+            {{- if .Values.postgresql.auth.secretKeys.replicationPasswordKey }}
+            replicationPasswordKey: {{ .Values.postgresql.auth.secretKeys.replicationPasswordKey }}
+            {{- end }}
+          {{- end }}
         architecture: {{ .Values.postgresql.architecture | default "standalone" }}
-        persistence:
-          enabled: {{ .Values.postgresql.persistence.enabled | default true }}
-          storageClass: {{ .Values.postgresql.persistence.storageClass | default "" }}
-          size: {{ .Values.postgresql.persistence.size | default "20Gi" }}
-        {{- if or .Values.global.nodePool .Values.postgresql.resources }}
+
+        # Primary block — supports both legacy (.Values.postgresql.{persistence,resources})
+        # and new (.Values.postgresql.primary.*) value structures
         primary:
-          {{- if .Values.postgresql.resources }}
+          persistence:
+            {{- if .Values.postgresql.primary }}
+            {{- toYaml (.Values.postgresql.primary.persistence | default .Values.postgresql.persistence) | nindent 12 }}
+            {{- else }}
+            enabled: {{ .Values.postgresql.persistence.enabled | default true }}
+            storageClass: {{ .Values.postgresql.persistence.storageClass | default "" }}
+            size: {{ .Values.postgresql.persistence.size | default "20Gi" }}
+            {{- end }}
+          {{- if and .Values.postgresql.primary .Values.postgresql.primary.resources }}
+          resources:
+            {{- toYaml .Values.postgresql.primary.resources | nindent 12 }}
+          {{- else if .Values.postgresql.resources }}
           resources:
             {{- toYaml .Values.postgresql.resources | nindent 12 }}
+          {{- end }}
+          {{- if and .Values.postgresql.primary .Values.postgresql.primary.pgHbaConfiguration }}
+          pgHbaConfiguration: |
+            {{- .Values.postgresql.primary.pgHbaConfiguration | nindent 12 }}
+          {{- end }}
+          {{- if .Values.postgresql.podDisruptionBudget }}
+          podDisruptionBudget:
+            {{- toYaml .Values.postgresql.podDisruptionBudget | nindent 12 }}
+          {{- end }}
+          {{- if .Values.global.nodePool }}
+          nodeSelector:
+            node-pool: {{ .Values.global.nodePool }}
+          tolerations:
+            - key: "node-pool"
+              operator: "Equal"
+              value: {{ .Values.global.nodePool | quote }}
+              effect: "NoSchedule"
+          {{- end }}
+
+        {{- if .Values.postgresql.readReplicas }}
+        readReplicas:
+          replicaCount: {{ .Values.postgresql.readReplicas.replicaCount | default 1 }}
+          {{- if .Values.postgresql.readReplicas.persistence }}
+          persistence:
+            {{- toYaml .Values.postgresql.readReplicas.persistence | nindent 12 }}
+          {{- end }}
+          {{- if .Values.postgresql.readReplicas.resources }}
+          resources:
+            {{- toYaml .Values.postgresql.readReplicas.resources | nindent 12 }}
+          {{- end }}
+          {{- if .Values.postgresql.podDisruptionBudget }}
+          podDisruptionBudget:
+            {{- toYaml .Values.postgresql.podDisruptionBudget | nindent 12 }}
           {{- end }}
           {{- if .Values.global.nodePool }}
           nodeSelector:
@@ -69,6 +117,7 @@ spec:
       selfHeal: true
     syncOptions:
       - CreateNamespace=false
+      - ServerSideApply=true
     retry:
       limit: 5
       backoff:

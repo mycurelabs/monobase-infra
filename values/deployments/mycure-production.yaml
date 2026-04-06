@@ -561,13 +561,16 @@ syncd:
     username: root
     replicaSet: rs0
 
-# ===== DATABASE: PostgreSQL =====
+# ===== DATABASE: PostgreSQL (HA, Tier 4.2) =====
+# Replication mode: 1 primary + 1 read replica with streaming replication.
+# Sized for the migrated 11.x dataset (~35GB useful from MongoDB) plus
+# 18 months growth headroom. See plan: tier 4.2 in DIFF.md.
 postgresql:
-  enabled: false # Disabled - API application not in use
+  enabled: true
 
   fullnameOverride: "postgresql"
 
-  architecture: standalone
+  architecture: replication
 
   image:
     repository: bitnamilegacy/postgresql
@@ -575,25 +578,44 @@ postgresql:
 
   auth:
     enabled: true
+    database: hapihub
+    username: postgres
     existingSecret: postgresql
+    replicationUsername: repl_user
     secretKeys:
       adminPasswordKey: postgres-password
+      replicationPasswordKey: postgres-replication-password
 
-  persistence:
-    enabled: true
-    storageClass: ""
-    size: 20Gi
+  primary:
+    persistence:
+      enabled: true
+      storageClass: ""
+      size: 200Gi
+    resources:
+      requests:
+        cpu: 500m
+        memory: 4Gi
+      limits:
+        cpu: 2000m
+        memory: 8Gi
 
-  resources:
-    requests:
-      cpu: 50m
-      memory: 128Mi
-    limits:
-      cpu: 500m
-      memory: 1Gi
+  readReplicas:
+    replicaCount: 1
+    persistence:
+      enabled: true
+      storageClass: ""
+      size: 200Gi
+    resources:
+      requests:
+        cpu: 500m
+        memory: 4Gi
+      limits:
+        cpu: 2000m
+        memory: 8Gi
 
   podDisruptionBudget:
-    enabled: false
+    enabled: true
+    minAvailable: 1
 
 # ===== DATABASE: MongoDB =====
 mongodb:
