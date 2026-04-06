@@ -44,6 +44,15 @@ spec:
           resourcesPreset: "none"
           resources: {{ .Values.valkey.master.resources | toYaml | nindent 12 }}
           {{- end }}
+          {{- if .Values.global.nodePool }}
+          nodeSelector:
+            node-pool: {{ .Values.global.nodePool }}
+          tolerations:
+            - key: "node-pool"
+              operator: "Equal"
+              value: {{ .Values.global.nodePool | quote }}
+              effect: "NoSchedule"
+          {{- end }}
 
   destination:
     server: https://kubernetes.default.svc
