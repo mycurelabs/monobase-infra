@@ -398,6 +398,7 @@ mycurev8:
   config:
     API_URL: "https://hapihub.localfirsthealth.com"
     HAPIHUB_URL: "https://hapihub.localfirsthealth.com"
+    MYCURE_X_URL: "https://mycure.localfirsthealth.com"
 
   podDisruptionBudget:
     enabled: false

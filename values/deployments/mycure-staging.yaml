@@ -340,7 +340,7 @@ mycurev8:
 
   image:
     repository: ghcr.io/mycurelabs/mycureapp
-    tag: "8.24.5"
+    tag: "8.24.6"
     pullPolicy: IfNotPresent
 
   replicaCount: 1
@@ -360,6 +360,7 @@ mycurev8:
   config:
     API_URL: "https://hapihub.stg.localfirsthealth.com"
     HAPIHUB_URL: "https://hapihub.stg.localfirsthealth.com"
+    MYCURE_X_URL: "https://mycure.stg.localfirsthealth.com"
 
   podDisruptionBudget:
     enabled: false
