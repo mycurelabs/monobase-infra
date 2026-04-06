@@ -665,9 +665,16 @@ mongodb:
   podDisruptionBudget:
     enabled: false
 
-# ===== CACHE: Valkey (Redis) =====
+# ===== CACHE: Valkey (Redis) — Tier 4.3 =====
 valkey:
-  enabled: false
+  enabled: true
+
+  global:
+    security:
+      allowInsecureImages: true
+
+  auth:
+    existingSecret: valkey
 
   architecture: standalone
 
@@ -680,14 +687,17 @@ valkey:
       enabled: true
       storageClass: ""
       size: 4Gi
-
-  resources:
-    requests:
-      cpu: 50m
-      memory: 128Mi
-    limits:
-      cpu: 250m
-      memory: 256Mi
+    # Resource sizing inherited from staging (2026-04-06 lessons):
+    # 512Mi -> 277 restarts in 27h, 1Gi still OOMs during AOF replay,
+    # 2Gi gives real headroom. CPU bumped so initial replay doesn't
+    # starve the liveness probe.
+    resources:
+      requests:
+        cpu: 100m
+        memory: 1Gi
+      limits:
+        cpu: 500m
+        memory: 2Gi
 
 # ===== STORAGE: MinIO Object Storage =====
 minio:
@@ -766,6 +776,49 @@ mailpit:
   gateway:
     enabled: true
     hostname: ""
+
+# ===== P2P SYNC: Cadence — Tier 4.4 =====
+cadence:
+  enabled: true
+
+  image:
+    repository: ghcr.io/mycurelabs/cadence
+    tag: "0.4.0"
+    pullPolicy: Always
+
+  replicaCount: 1
+
+  # Resource sizing inherited from staging (2026-04-06 lessons):
+  # 0.4.0 OOMs at 2Gi during initial valkey state load (~425k metadata
+  # keys + 110-table watermark cache + iroh quic stack). 4Gi gives headroom.
+  resources:
+    requests:
+      cpu: 200m
+      memory: 1Gi
+    limits:
+      cpu: "2"
+      memory: 4Gi
+
+  gateway:
+    hostname: ""
+    sectionName: https-lfh # Use localfirsthealth.com HTTPS listener
+    snippetsPolicy:
+      enabled: true
+      proxyReadTimeout: "3600s"
+      clientMaxBodySize: "10m"
+
+  postgresql:
+    enabled: true
+    serviceName: postgresql-primary
+    auth:
+      database: hapihub
+
+  valkey:
+    enabled: true
+    serviceName: "valkey-primary"
+
+  config:
+    RUST_LOG: "info"
 
 # ===== BACKUP =====
 backup:
