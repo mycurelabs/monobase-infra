@@ -125,6 +125,7 @@ nginxGatewayResources:
         clusterIssuer: letsencrypt-nginx-http01  # HTTP-01 via NGINX Gateway
         dnsNames:
           - api.mycure.md
+          - find.mycure.md
 
 # EnvoyProxy Configuration - Cloud-specific LoadBalancer settings
 envoyProxyConfig:

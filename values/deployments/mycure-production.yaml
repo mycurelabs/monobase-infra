@@ -273,8 +273,11 @@ mycurelocal:
       memory: 128Mi
 
   gateway:
-    hostname: ""
-    sectionName: https-lfh # Use localfirsthealth.com HTTPS listener
+    hostnames:
+      - hostname: mycurelocal.localfirsthealth.com
+        sectionName: https-lfh
+      - hostname: find.mycure.md
+        sectionName: https-mycure
 
   podDisruptionBudget:
     enabled: false
