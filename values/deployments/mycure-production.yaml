@@ -137,6 +137,7 @@ hapihub:
     CORS_STRICT: "true"
     CORS_ALLOW_LOCAL_NETWORK: "false"
     CORS_ALLOW_MOBILE_APPS: "true"
+    ACCOUNTS_SERVICE_ACCOUNT_EMAILS: "service@mycure.md"
 
   env:
     - name: BETTER_AUTH_RATE_LIMIT_ENABLED
