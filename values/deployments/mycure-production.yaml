@@ -857,7 +857,7 @@ hapihubMigrator:
 
   image:
     repository: ghcr.io/mycurelabs/hapihub-migrator
-    tag: "3.7.1"
+    tag: "3.7.2"
     pullPolicy: IfNotPresent
 
   # bulk (Phase 3) → cdc (Phase 4) → reverse-cdc (Phase 6, post-cutover)
