@@ -90,49 +90,42 @@ Confirmed 2026-04-06 by user: all of these are intentionally disabled in product
 
 Affects production but no schema/architecture changes. Work needed but well-scoped.
 
-## 3.1 Long-term mycurelocal hostname strategy
+## 3.1 Long-term mycurelocal hostname strategy — SKIPPED
 
-Production has dual hostnames (`mycurelocal.localfirsthealth.com` + `find.mycure.md`). Staging should mirror this for parity.
+- [x] **Skipped per user (2026-04-06)**: prod-only multi-hostname routing for now. Staging will not mirror `find.mycure.md`.
 
-- [ ] Add `find.stg.mycure.md` (or similar) to staging mycurelocal
-- [ ] Issue TLS cert for `find.stg.mycure.md` via `nginx-gateway-tls-stg-mycure`
-- [ ] Verify multi-hostname HTTPRoute pattern works in staging
+## 3.2 `sync-logs` collection runaway growth — SKIPPED
 
-## 3.2 `sync-logs` collection runaway growth (production)
+- [x] **Skipped per user (2026-04-06)**: this collection will be migrated to the new PG-based system in Tier 5. No point in TTL/archival work on a collection that's about to be retired.
 
-156M docs / 99GB / 14GB indexes. Identified 2026-03-31 as the root cause of MongoDB CPU saturation.
+## 3.3 MongoDB production resource review — SKIPPED
 
-- [ ] Investigate syncd query patterns against `sync-logs`
-- [ ] Add TTL index to auto-expire old entries
-- [ ] Define retention policy (90 days? 30 days?)
-- [ ] One-time archive/purge of old documents
-- [ ] Monitor `db.currentOp()` for long-running ops post-cleanup
-
-## 3.3 MongoDB production resource review
-
-Bumped 2026-04-01 from `2/5Gi → 3/6Gi` after CPU saturation. Still hovering near limit.
-
-- [ ] Confirm `production-v2co9` node pool can sustain higher MongoDB limits
-- [ ] Consider migrating MongoDB to a dedicated node (taint + toleration)
-- [ ] Or scale node pool to a larger instance class
+- [x] **Skipped per user (2026-04-06)**: MongoDB will be migrated out as part of Tier 5 (HapiHub 11.x → PostgreSQL). The current 3/6Gi limits are sufficient until then.
 
 ## 3.4 Production node pool capacity
 
-`production-v2co9` was at **99% memory requests** when MongoDB issues started. Adding new pods (PG, Valkey, Cadence in future tiers) needs headroom.
+**Current state (2026-04-06):**
+- 4 nodes × `s-4vcpu-8gb` = **16 vCPU / 32 GB total**
+- Per-node memory requests: 38% / 79% / 9% / 40% (one node at ~80%)
+- Per-node memory limits: 79% / 165% / 5% / 135% (overcommitted)
+- Per-node CPU requests: 71% / 45% / 13% / 72%
+- Per-node CPU limits: 128% / 128% / 0% / 159% (overcommitted)
 
-- [ ] Audit per-node allocation: `kubectl describe nodes -l node-pool=production`
-- [ ] Decide: add node OR resize existing nodes
-- [ ] Plan resize/add-node maintenance window if needed
+**Recommended for Tier 4 (PG + Valkey + Cadence + 11.x hapihub HPA 3-5):**
+- Estimated additional load: ~2 vCPU + ~6 GB requests
+- **Option A**: Add 1-2 more `s-4vcpu-8gb` nodes (cheap, simple) → 5-6 nodes × 4/8 = 20-24 vCPU / 40-48 GB
+- **Option B**: Resize to `s-4vcpu-16gb` (8 GB → 16 GB per node, double memory) → 16 vCPU / 64 GB. Better for memory-heavy services like Postgres, Valkey, MongoDB (until migrated).
+- **Option C**: Migrate to `g-2vcpu-8gb` (general-purpose, dedicated CPU) for predictable performance
+- **Recommended**: **Option B (resize to 16GB nodes)** — handles memory pressure, costs roughly 2x the memory tier, no node count increase, and gives MongoDB headroom during the 11.x migration window.
+
+- [ ] Decide: Option A vs B vs C (deferred until Tier 4 actually needs the capacity)
+- [ ] Plan resize/add-node maintenance window when Tier 4 work begins
 
 ## 3.5 syncd replica strategy
 
-- **Staging**: `replicaCount: 1`
-- **Production**: `replicaCount: 5` with autoscaling
-
-5 replicas all hammering `sync-logs` was contributing to MongoDB load.
-
-- [ ] Verify if syncd autoscaling is necessary or if it can be capped lower
-- [ ] Document the rationale (load source, not just CPU)
+- [x] Production syncd reduced to `replicaCount: 1`, autoscaling `min=1, max=2` (2026-04-06)
+  - was: `replicaCount: 5`, autoscaling `max=5` — was contributing to MongoDB load
+  - Lower cap reduces sync-logs query pressure until syncd is migrated/retired in Tier 5/6
 
 ---
 
