@@ -288,13 +288,12 @@ The **point of no return shifts from "first 11.x write" to "stopping reverse CDC
 - [ ] Tier 4.2.1 PG backups in place (Velero + nightly pg_dump)
 - [ ] Migrator container image published to `ghcr.io/mycurelabs/hapihub-migrator:3.6.0` or newer
 
-## 5.1 Phase 0 — Verify migrator coverage against production MongoDB
+## 5.1 Phase 0 — Verify migrator coverage against production MongoDB ✅ DONE 2026-04-07
 
-- [ ] List all production MongoDB collections
-- [ ] Compare against `~/Projects/mycure/monobase/services/hapihub-migrator/src/collections.ts` (88 collections currently registered)
-- [ ] Specifically check for missing: `license.licenses`, `license.packages`, `billing.invoices` (note: different from `billing-invoices`), `hl7-messages`, `bir.logs`, `organization-partners`
-- [ ] Confirm `authentication`, `permissions`, `sync-logs` are intentionally NOT migrated (legacy auth + sync infra retired in 11.x)
-- [ ] If gaps found: add to `collections.ts`, ship a new migrator image, OR document and accept
+- [x] All 188 production collections enumerated against migrator's 83-collection registry
+- [x] All 105 uncovered collections confirmed intentionally NOT migrated by user
+- [x] Full intentional skip ledger documented in MIGRATION.md Phase 0 (with doc counts) for audit trail
+- [x] No `collections.ts` changes required; no migrator image rebuild needed for coverage reasons
 
 ## 5.2 Phase 1 — Build & publish migrator image
 

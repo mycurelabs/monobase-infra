@@ -94,24 +94,87 @@ Once 11.x is serving traffic, all writes go to PG. MongoDB stops being authorita
 
 ---
 
-## Phase 0 — Verify migrator coverage against production
+## Phase 0 — Verify migrator coverage against production ✅ DONE 2026-04-07
 
-Tasks (read-only, no production impact):
+Production MongoDB enumerated against `~/Projects/mycure/monobase/services/hapihub-migrator/src/collections.ts` (83 registered collections: 79 main + 4 better-auth).
 
-- [ ] Connect to production MongoDB (`mongodb-0` in `mycure-production`) and run `db.getCollectionNames()` to list all collections
-- [ ] Compare against `~/Projects/mycure/monobase/services/hapihub-migrator/src/collections.ts` (currently 88 collections registered)
-- [ ] Specifically check for collections that may be missing from the migrator:
-  - `license.licenses`
-  - `license.packages`
-  - `billing.invoices` (note: distinct from `billing-invoices`)
-  - `hl7-messages`
-  - `bir.logs`
-  - `organization-partners`
-- [ ] Confirm these are intentionally NOT migrated (legacy auth + sync infra retired in 11.x):
-  - `authentication`
-  - `permissions`
-  - `sync-logs`
-- [ ] If gaps found AND have data in production: blocker. Add to migrator's `collections.ts`, ship a new migrator image, OR document and accept the data loss.
+**Verdict**: production has 188 collections; migrator covers 83; the 105 uncovered collections are **all intentionally not migrated** (confirmed by user 2026-04-07). No `collections.ts` changes required, no migrator image rebuild required for coverage reasons.
+
+The intentional skip ledger below is the audit trail — every uncovered collection with non-zero document count is enumerated so the data-loss scope is explicit and reviewable.
+
+### Intentional skip ledger (collections NOT migrated, with prod doc counts)
+
+**Legacy auth + sync infra (retired in 11.x):**
+
+| Collection | Docs | Reason |
+|---|---:|---|
+| `authentication` | 5,848,603 | Replaced by better-auth |
+| `permissions` | 383,176 | Replaced by better-auth/authz |
+| `authz.permissions` | 0 | (empty) |
+| `sync-logs` | 183,200,580 | syncd retired; cadence is the replacement |
+| `sync-clients` | 58 | syncd retired |
+| `sync-instances` | 236 | syncd retired |
+| `sync.logsIncoming` | 0 | (empty) |
+| `sync.metrics` | 0 | (empty) |
+| `system-syncbases` | 23 | syncd retired |
+| `system-syncbase-markers` | 35 | syncd retired |
+
+**MongoDB internals (not application data):**
+
+| Collection | Docs | Reason |
+|---|---:|---|
+| `system.profile` | 659 | MongoDB diagnostic profiler |
+| `system.views` | n/a | MongoDB internal |
+
+**Substantial uncovered collections (intentional, accepting data loss):**
+
+| Collection | Docs | Notes |
+|---|---:|---|
+| `bir.logs` | 216,595 | PH BIR audit log — retained in MongoDB only / not needed in 11.x |
+| `bff.encounterServiceIndex` | 564,217 | Derived index, rebuildable from source data |
+| `issues` | 49,550 | Internal issue tracker, not needed in 11.x |
+| `metrics.metrics` | 312,908 | Legacy analytics, replaced/retired |
+| `metrics.metricsv2` | 31,096 | Legacy analytics |
+| `metrics.metricsRaw` | 8,546 | Legacy analytics |
+| `appointments` | 14,385 | Replaced by `booking.bookings` (which IS migrated) |
+| `system-counters` | 11,256 | Distinct from `counters` (which is migrated); legacy counters |
+
+**History tables not in 11.x:**
+
+| Collection | Docs |
+|---|---:|
+| `billing-invoices-history` | 103 |
+| `billing-items-history` | 75 |
+| `billing.creditAccounts-history` | 52 |
+
+(11.x keeps history for medical-records, personal-details, inventory-stocks, diagnostic-order-tests only.)
+
+**Smaller uncovered (all intentional):**
+
+`account-tasks` (44), `account-waitlist` (21), `agendaJobs` (1,945), `chat-messages` (563), `chat-rooms` (121), `chat-sessions` (5), `consultation-sessions` (70), `medical.organizations` (914), `unified.directory` (949), `metrics.customers` (459), `metrics.days` (146), `metrics.subscriptions` (4), `schedule-slots` (636), `sms` (754), `prm.groups` (1), `prm.workflows` (4), `pharmacy-accreditations` (1), `philhealth-configurations` (2), `subscription.products` (26), `billing-payment-gateways` (11), `billing-payment-intents` (26), `billing.products` (2), `developer.appConfigs` (2), `export.metrics` (9), `hl7-messages` (8), `license.products` (2), `rating.ratings` (8), `publishing.entries` (3), `file-links` (16), `twoFactor` (1), `medical-records-error` (1), `billing-invoices-error` (2), `bir-machines` (1), `bir.readings` (15), `booking.calendars` (21), `booking.eventTypes` (28), `booking.eventTypesDeleted` (5), `booking.schedules` (11), `booking.schedulesDeleted` (1), `comms.messages` (1), `comms.providers` (1), `comms.threads` (1), `organization.flat_address` (1,326)
+
+**GridFS files (intentional skip — production migrated to GCS):**
+
+| Collection | Docs |
+|---|---:|
+| `files.files` | 11 |
+| `files.chunks` | 11 |
+
+11 GridFS files are stale/orphaned residue from before the GCS cutover. Accepted loss.
+
+**Empty collections (0 docs — trivially intentional):**
+
+`hmo.*` (8 collections — entire HMO module unused), `ward-beds`, `ward-occupants`, `ward-rooms`, `visit-logs`, `tenants`, `reminders`, `request.orders`, `reviews`, `ratings`, `rewards.*` (3), `messaging.messages`, `email.emails`, `fares.*` (4), `mci.transactions`, `bookingv2.bookings`, `chat-bots`, `accounts.onboardingConfigurations`, `license.licenses`, `license.packages`, `subscription.events`, `billing-orders`, `billing-payouts`, `billing.invoices` (dotted variant — distinct from migrated `billing-invoices`), `billing.payouts`, `billing.subscriptions`, `billing.accountingTransactions`, `organization-affiliations`, `organization-partners`, `organization-vouchings`, `bir-accreditations`
+
+**Note on `public-profiles`:** registered in `collections.ts` but does not exist in production MongoDB. Harmless — migrator will simply skip it.
+
+### Phase 0 sign-off
+
+- [x] Collections enumerated (188 in production)
+- [x] Migrator coverage verified (83 collections in `collections.ts`)
+- [x] Gap analysis complete with doc counts
+- [x] All uncovered collections confirmed intentionally skipped (user, 2026-04-07)
+- [x] Intentional skip ledger documented above for audit trail
 
 ---
 
