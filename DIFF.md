@@ -326,11 +326,12 @@ The **point of no return shifts from "first 11.x write" to "stopping reverse CDC
 - [ ] Switch migrator to `MODE=cdc`
 - [ ] Verify lag <60s and stable for 24+ hours
 
-## 5.6 Phase 5 — Production hapihub secrets prep
+## 5.6 Phase 5 — Production hapihub secrets prep ✅ DONE 2026-04-07
 
-- [ ] Add `AUTH_SECRET`, `BETTER_AUTH_SECRET`, `DATABASE_URL` to hapihub ExternalSecret
-- [ ] **Keep all 10.x secrets** for rollback safety (cleanup in Tier 6)
-- [ ] Verify cold restart of hapihub 10.x still works
+- [x] `AUTH_SECRET`, `BETTER_AUTH_SECRET` added to `hapihub.externalSecrets.secrets` (commit `62faf84`); both keys present in `hapihub-secrets` K8s secret
+- [x] `hapihub.postgresql:` block added (commit `4180ce3`) — chart auto-builds `DATABASE_URI` from in-cluster `postgresql` K8s secret pointing at `postgresql-primary.mycure-production.svc.cluster.local:5432/hapihub`. No GCP secret indirection needed.
+- [x] All 10.x legacy keys preserved (`MONGO_URI`, `ENC_*`, `STORAGE_*`, `STRIPE_*`, `PRIVATE_KEY`, `PUBLIC_KEY`, `GOOGLE_*`) for rollback safety
+- [x] Cold restart of hapihub 10.x verified: rolling restart picked up new env vars cleanly, all 3 replicas 1/1 Ready 0 restarts, external `https://hapihub.localfirsthealth.com/health` returns 200
 
 ## 5.7 Phase 6 — Cutover (15–30 min downtime)
 
