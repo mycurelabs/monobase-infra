@@ -78,13 +78,11 @@ Confirmed 2026-04-06 by user: all of these are intentionally disabled in product
 - [x] `mailpit` — intentionally disabled in prod (replaced by real SMTP)
 - [x] `minio` — intentionally disabled in prod (uses GCS via `STORAGE_*` secrets)
 
-## 2.3 HapiHub config knobs — verify intent
+## 2.3 HapiHub config knobs — resolved
 
-Decisions only — these are flags that differ between envs:
-
-- [ ] `CLUSTER_INSTANCES: max` (staging only) — should this propagate to prod 11.x? (Bun cluster mode)
-- [ ] `BETTER_AUTH_SESSION_COOKIE_CACHE_ENABLED: false` (prod only) — document why; do we need it in staging too?
-- [x] `ACCOUNTS_SERVICE_ACCOUNT_EMAILS` — added to prod as `service@mycure.md` on 2026-04-06 (commit `33d7f33`); pending ApplicationSet pickup
+- [x] `CLUSTER_INSTANCES: max` — removed from staging (2026-04-06); will not propagate to prod
+- [x] `BETTER_AUTH_SESSION_COOKIE_CACHE_ENABLED: false` — added to staging (2026-04-06) to mirror prod
+- [x] `ACCOUNTS_SERVICE_ACCOUNT_EMAILS` — added to prod as `service@mycure.md` on 2026-04-06 (commit `33d7f33`)
 
 ---
 
