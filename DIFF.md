@@ -165,8 +165,56 @@ Deployed 2026-04-06 in `mycure-production` namespace using Bitnami PG chart in *
   - Cluster autoscaler added a 4th production node (`production-0w8sg`) automatically to fit the read replica
   - ExternalSecret `postgresql-credentials` reports `SecretSynced` with both keys
 - [x] Cleaned up orphan `data-postgresql-0` PVC (8 GiB, from previous abandoned deployment)
-- [ ] **Backup procedure**: not yet configured. Velero schedule + nightly `pg_dump` to GCS recommended — tracked separately, not blocking 11.x rollout (no production data yet)
-- [ ] **Auto-failover**: NOT configured. Manual `pg_promote` required on primary failure. `postgresql-ha` chart with repmgr/pgpool is the future upgrade path if needed.
+
+### 4.2.1 PostgreSQL backups (deferred)
+
+Not blocking 11.x rollout (no production PG data yet), but **must be in place before** Tier 5 cutover so the HapiHub 10→11 data migration is recoverable.
+
+Recommended approach: **both** layers, defense-in-depth.
+
+- [ ] **Velero schedule** for `mycure-production` namespace
+  - Weekly full + daily incremental of all resources + PVC snapshots
+  - Target: existing Velero backup location (verify it's configured)
+  - Pros: fast restore (PVC-level), crash-consistent (PG handles replay on startup)
+  - Cons: not portable across PG versions
+- [ ] **Nightly `pg_dump` CronJob** → GCS bucket
+  - Runs from inside the cluster as a Kubernetes CronJob using `bitnamilegacy/postgresql` image
+  - Auth via `postgresql` secret + GCP service account for GCS write
+  - Logical dump (`pg_dump -Fc -f /backup/hapihub-$(date).dump`) — portable across PG versions
+  - Retention: 30 days hot in GCS, lifecycle rule moves to coldline after 7d
+  - Reuses pattern from existing GCS storage secrets (`mycure-production-storage-*`)
+- [ ] Document restore procedure (both Velero and `pg_restore` paths) in a runbook
+- [ ] Test restore once into a staging-like namespace before relying on it
+
+**Owner**: should be in place before Tier 5.4 (HapiHub 10→11 cutover).
+
+### 4.2.2 PostgreSQL auto-failover (future upgrade path)
+
+Current setup is **manual failover** — if `postgresql-primary-0` fails, the read replica continues serving reads but writes are down until an operator runs `pg_promote` (or deletes the primary StatefulSet pod and lets Kubernetes reschedule it on a healthy node).
+
+Acceptable for the initial 11.x rollout. Upgrade path documented here for when downtime budget tightens.
+
+Two options:
+
+- [ ] **Option A** — switch to `bitnami/postgresql-ha` chart
+  - Bundles repmgr (auto-failover) + pgpool (connection routing) + PgBouncer
+  - Requires migrating data from `bitnami/postgresql` to `bitnami/postgresql-ha` (different chart, different StatefulSet names)
+  - Migration via `pg_dump`/`pg_restore` during a maintenance window
+  - More moving parts (4 components vs 1), more complex troubleshooting
+- [ ] **Option B** — add Patroni operator separately (e.g., Zalando postgres-operator or Crunchy PGO)
+  - Operators handle failover, backup, scaling, connection pooling
+  - More invasive change; new CRDs, new mental model
+  - Better long-term option if PG footprint grows beyond a single primary+replica
+- [ ] **Option C** — accept manual failover and just document the runbook
+  - Cheapest, no infra change
+  - Operator drill: `kubectl exec postgresql-read-0 -- pg_ctl promote` then update `postgresql-primary` Service selector to point at the promoted pod
+  - Requires monitoring/alerting on primary health (Prometheus + Alertmanager)
+
+**Recommended**: stay on **Option C** until Tier 5 ships and we have real production load metrics. Revisit if SLO incidents occur.
+
+- [ ] Decide between A/B/C **after** Tier 5 (HapiHub 11.x is stable in prod)
+- [ ] Until then: ensure monitoring alerts fire when `postgresql-primary` becomes unreachable
+- [ ] Write a manual-failover runbook (even Option C needs documented steps)
 
 ## 4.3 Enable Valkey in production
 
