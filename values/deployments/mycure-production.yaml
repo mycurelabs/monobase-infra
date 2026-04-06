@@ -232,6 +232,20 @@ hapihub:
     username: root
     replicaSet: rs0
 
+  # ===== 11.x PostgreSQL backend (Tier 5 Phase 5 prep) =====
+  # When postgresql.enabled: true and external: false, the hapihub chart
+  # constructs DATABASE_URI directly from the in-cluster `postgresql` K8s
+  # secret (charts/hapihub/templates/deployment.yaml:127-135). 10.x ignores
+  # this env var; 11.x reads it on cutover. Safe to land while still on 10.x.
+  postgresql:
+    enabled: true
+    external: false
+    serviceName: postgresql-primary
+    auth:
+      database: hapihub
+      username: postgres
+      existingSecret: postgresql
+
 # ===== HEALTHCARE: Frontend Application =====
 mycure:
   enabled: true
