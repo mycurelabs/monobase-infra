@@ -221,7 +221,7 @@ mycure:
 
 # ===== HEALTHCARE: MyCure Local Frontend Application =====
 mycurelocal:
-  enabled: true
+  enabled: false
 
   image:
     repository: ghcr.io/mycurelabs/mycurelocal
@@ -463,7 +463,7 @@ dentalemon:
 
 # ===== HEALTHCARE: SyncD Real-time Synchronization =====
 syncd:
-  enabled: true
+  enabled: false
 
   image:
     repository: ghcr.io/mycurelabs/syncd
@@ -543,7 +543,7 @@ postgresql:
 
 # ===== DATABASE: MongoDB =====
 mongodb:
-  enabled: true
+  enabled: false
 
   fullnameOverride: "mongodb"
 
