@@ -118,8 +118,8 @@ Affects production but no schema/architecture changes. Work needed but well-scop
 - **Option C**: Migrate to `g-2vcpu-8gb` (general-purpose, dedicated CPU) for predictable performance
 - **Recommended**: **Option B (resize to 16GB nodes)** — handles memory pressure, costs roughly 2x the memory tier, no node count increase, and gives MongoDB headroom during the 11.x migration window.
 
-- [ ] Decide: Option A vs B vs C (deferred until Tier 4 actually needs the capacity)
-- [ ] Plan resize/add-node maintenance window when Tier 4 work begins
+- [x] **Decided 2026-04-06: Option B** — resize to `s-4vcpu-16gb` nodes when Tier 4 begins. Doubles memory headroom without increasing node count, handles MongoDB pressure during the 11.x migration window.
+- [ ] Plan resize maintenance window when Tier 4 work begins (DOKS pool resize is rolling — drain one node at a time)
 
 ## 3.5 syncd replica strategy
 
