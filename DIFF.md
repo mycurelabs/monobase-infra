@@ -256,40 +256,109 @@ Deployed 2026-04-06 in `mycure-production`.
 
 # 🔴 TIER 5 — HapiHub 10 → 11 Migration
 
-The big one. Requires a runbook, downtime window or blue/green, data migration, and rollback plan.
+The big one. **Full executable runbook**: [MIGRATION.md](./MIGRATION.md).
 
-## 5.1 Pre-migration analysis
+## Architecture (corrected 2026-04-07)
 
-- [ ] Document complete env var diff between hapihub 10.11.15 and 11.2.8 (which legacy `ENC_*`, `STORAGE_*`, `MONGO_URI`, `PUBLIC_KEY`, `STRIPE_KEY` are still consumed?)
-- [ ] Identify which production data needs to migrate to PG vs stay in MongoDB
-- [ ] Identify schema differences in `account` / `accounts` / `personal_details` between versions
-- [ ] Verify the password sync script from 2026-04-01 covers all accounts (or refresh it)
+HapiHub 11.x is **PostgreSQL-only**. There's no MongoDB client in `~/Projects/mycure/monobase/services/hapihub/src/`. The Feathers-style model names (`accounts.accounts`) are now backed by Drizzle PG services. The migration moves the entire database from MongoDB to PG — it is **not** a dual-DB architecture.
 
-## 5.2 Migration runbook
+## Migration tooling
 
-- [ ] Draft step-by-step runbook with rollback steps
-- [ ] Define maintenance window (or blue/green strategy)
-- [ ] Define success/failure criteria (smoke tests, key user flows)
-- [ ] Identify stakeholders to notify
-- [ ] Prepare DB snapshots (Velero + MongoDB dump + PG dump pre-migration)
+The dedicated `~/Projects/mycure/monobase/services/hapihub-migrator` (v3.6.0+) tool is the migration engine. Already used for staging (proven by `_migration_checkpoints` table in staging PG). Modes:
+- `bulk` — initial full copy MongoDB → PG, encrypted-field aware
+- `cdc` — forward CDC (MongoDB → PG) for the gap window
+- `reverse-cdc` — reverse CDC (PG → MongoDB) per a separate plan, **assumed available before Tier 5 begins** — this is what makes the cutover reversible
+- `verify` — count + sample comparison
 
-## 5.3 Staging dress rehearsal
+## Reversibility story (with reverse CDC)
 
-Don't migrate prod blind — rehearse against a prod data clone in staging.
+| State | Rollback cost |
+|---|---|
+| Pre-cutover (forward CDC running, 10.x serving) | ✅ Zero cost |
+| Cutover window (traffic frozen) | ✅ Zero cost |
+| **Post-cutover with reverse CDC running** | ✅ Lag-window cost (~60s of writes) |
+| After reverse CDC stopped (Phase 9) | ❌ Moderate-high cost |
+| 24h+ after Phase 9 | ❌ Effectively non-reversible |
 
-- [ ] Restore latest production MongoDB snapshot to a parallel staging environment
-- [ ] Run migration scripts end-to-end
-- [ ] Smoke test login (better-auth + legacy users)
-- [ ] Smoke test billing, medical encounters, queue items
-- [ ] Smoke test sync-logs / cadence flows
-- [ ] Document any issues / edge cases discovered
+The **point of no return shifts from "first 11.x write" to "stopping reverse CDC"**. This decouples bake-in length from rollback risk — you can run hapihub 11.x for as long as needed to gain confidence, with reverse CDC continuously protecting the rollback path.
 
-## 5.4 Cutover
+## 5.0 Prerequisites
 
-- [ ] Execute runbook
-- [ ] Monitor health metrics during migration
-- [ ] Verify smoke tests post-cutover
-- [ ] Keep rollback path warm for 24-48h after
+- [ ] Reverse CDC mode (`MODE=reverse-cdc`) implemented and tested in the migrator (per separate plan)
+- [ ] Tier 4.2.1 PG backups in place (Velero + nightly pg_dump)
+- [ ] Migrator container image published to `ghcr.io/mycurelabs/hapihub-migrator:3.6.0` or newer
+
+## 5.1 Phase 0 — Verify migrator coverage against production MongoDB
+
+- [ ] List all production MongoDB collections
+- [ ] Compare against `~/Projects/mycure/monobase/services/hapihub-migrator/src/collections.ts` (88 collections currently registered)
+- [ ] Specifically check for missing: `license.licenses`, `license.packages`, `billing.invoices` (note: different from `billing-invoices`), `hl7-messages`, `bir.logs`, `organization-partners`
+- [ ] Confirm `authentication`, `permissions`, `sync-logs` are intentionally NOT migrated (legacy auth + sync infra retired in 11.x)
+- [ ] If gaps found: add to `collections.ts`, ship a new migrator image, OR document and accept
+
+## 5.2 Phase 1 — Build & publish migrator image
+
+- [ ] Run `~/Projects/mycure/monobase/services/hapihub-migrator/build-docker.sh --push` (existing script — reads version from package.json, tags + pushes to GHCR)
+- [ ] Smoke test container locally with `MODE=verify` against staging DBs
+
+## 5.3 Phase 2 — Deploy migrator chart in mycure-production
+
+- [ ] Create `charts/hapihub-migrator/` (Deployment + Service + ExternalSecret + optional HTTPRoute)
+- [ ] Create `argocd/applications/templates/hapihub-migrator.yaml`
+- [ ] Add `hapihubMigrator:` block to `values/deployments/mycure-production.yaml` with:
+  - Source: in-cluster mongodb
+  - Target: in-cluster `postgresql-primary`
+  - Encryption keys from existing GCP secrets (Tier 4.1)
+  - `MODE=bulk`, `EXIT_ON_BULK_END=false`, `RESUME_MIGRATION=true`
+- [ ] NetworkPolicies for migrator → mongodb (27017) and migrator → postgresql (5432)
+
+## 5.4 Phase 3 — Bulk migration run (zero impact on prod traffic)
+
+- [ ] Apply chart, watch dashboard at port 3000
+- [ ] Estimate: 24–48h for ~135 GB / 209 M docs
+- [ ] Verify all collections complete in `_migration_checkpoints`
+- [ ] Verify auto-verification report is clean
+
+## 5.5 Phase 4 — Forward CDC mode
+
+- [ ] Switch migrator to `MODE=cdc`
+- [ ] Verify lag <60s and stable for 24+ hours
+
+## 5.6 Phase 5 — Production hapihub secrets prep
+
+- [ ] Add `AUTH_SECRET`, `BETTER_AUTH_SECRET`, `DATABASE_URL` to hapihub ExternalSecret
+- [ ] **Keep all 10.x secrets** for rollback safety (cleanup in Tier 6)
+- [ ] Verify cold restart of hapihub 10.x still works
+
+## 5.7 Phase 6 — Cutover (15–30 min downtime)
+
+- [ ] Take MongoDB + PG snapshots (rollback baselines)
+- [ ] Scale hapihub 10.x to 0
+- [ ] Wait for forward CDC lag = 0
+- [ ] Stop forward CDC
+- [ ] Bump `hapihub.image.tag` to `11.2.8`
+- [ ] **Switch migrator to `MODE=reverse-cdc`** immediately after hapihub 11.x is healthy
+- [ ] Smoke test
+- [ ] Verify reverse CDC lag <60s
+
+## 5.9 Phase 8 — Bake-in (72h minimum, with reverse CDC running)
+
+- [ ] Monitor auth, PG, MongoDB reverse-CDC writes, cadence, error rates
+- [ ] Spot-check PG↔MongoDB parity via reverse CDC
+- [ ] Periodic verification jobs
+- [ ] Rollback runbook stays warm; on-call trained
+
+## 5.10 Phase 9 — Stop reverse CDC (THE actual point of no return)
+
+- [ ] Verify reverse CDC delta is empty
+- [ ] Stop migrator
+- [ ] Take final MongoDB snapshot (frozen rollback baseline)
+- [ ] Mark MongoDB as read-only in operational docs
+
+## 5.11 Phase 10 — Tier 5 closure
+
+- [ ] Update DIFF.md
+- [ ] Move to Tier 6 (cleanup)
 
 ---
 

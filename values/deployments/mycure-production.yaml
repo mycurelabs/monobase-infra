@@ -215,6 +215,14 @@ hapihub:
         remoteKey: mycure-production-stripe-checkout-success-url
       - secretKey: STRIPE_CHECKOUT_CANCEL_URL
         remoteKey: mycure-production-stripe-checkout-cancel-url
+      # ===== 11.x additions (Tier 5 Phase 5) =====
+      # Wired into the deployment template at hapihub/templates/deployment.yaml:248-260
+      # as `optional: true` env vars, so safe to land while still on 10.x.
+      # All 10.x secrets above are kept for rollback safety until Tier 6 cleanup.
+      - secretKey: AUTH_SECRET
+        remoteKey: mycure-production-auth-secret
+      - secretKey: BETTER_AUTH_SECRET
+        remoteKey: mycure-production-better-auth-secret
 
   mongodb:
     external: false # Use in-cluster MongoDB
@@ -819,6 +827,80 @@ cadence:
 
   config:
     RUST_LOG: "info"
+
+# ===== MIGRATION: HapiHub Migrator (Tier 5) =====
+# Long-lived MongoDB → PostgreSQL migration tool. NOT a Job — runs continuously
+# through bulk → cdc → reverse-cdc as MIGRATION.md phases progress.
+#
+# Default disabled. Flip enabled: true at MIGRATION.md Phase 2 (after the
+# image is published and ready to start the bulk run).
+#
+# ⚠️ MODE=reverse-cdc is referenced by MIGRATION.md but is NOT yet shipped in
+#    hapihub-migrator v3.6.0. Phase 6 cutover is BLOCKED until the migrator
+#    repo ships a release implementing it. Bump image.tag here when ready.
+hapihubMigrator:
+  enabled: false
+
+  image:
+    repository: ghcr.io/mycurelabs/hapihub-migrator
+    tag: "3.6.0" # MUST be ≥ the version that ships MODE=reverse-cdc before Phase 6 cutover
+    pullPolicy: IfNotPresent
+
+  # bulk (Phase 3) → cdc (Phase 4) → reverse-cdc (Phase 6, post-cutover)
+  mode: bulk
+
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      cpu: "2"
+      memory: 4Gi
+
+  # Connection details — both DB connection strings are assembled in-template
+  # from the existing in-cluster K8s secrets (no GCP secret indirection):
+  #   PG_TARGET_URI ← postgresql Secret (postgres-password)
+  #   MONGO_SOURCE_URI ← mongodb Secret (mongodb-root-password)
+  postgresql:
+    enabled: true
+    serviceName: postgresql-primary
+    port: 5432
+    auth:
+      database: hapihub
+      username: postgres
+      existingSecret: postgresql
+      passwordKey: postgres-password
+
+  mongodb:
+    enabled: true
+    serviceName: mongodb
+    port: 27017
+    database: hapihub
+    username: root
+    replicaSet: rs0
+    authSource: admin
+    existingSecret: mongodb
+    passwordKey: mongodb-root-password
+
+  # Encryption keys are required so the migrator can decrypt the encrypted
+  # MongoDB collections (medical-records, billing-*, personal-details) before
+  # writing to PG, AND re-encrypt during reverse CDC.
+  externalSecrets:
+    enabled: true
+    secretStore: gcp-secretstore
+    secretStoreKind: ClusterSecretStore
+    refreshInterval: 1h
+    secrets:
+      - secretKey: ENC_BILLING_INVOICES
+        remoteKey: mycure-production-enc-billing-invoices
+      - secretKey: ENC_BILLING_ITEMS
+        remoteKey: mycure-production-enc-billing-items
+      - secretKey: ENC_BILLING_PAYMENTS
+        remoteKey: mycure-production-enc-billing-payments
+      - secretKey: ENC_MEDICAL_RECORDS
+        remoteKey: mycure-production-enc-medical-records
+      - secretKey: ENC_PERSONAL_DETAILS
+        remoteKey: mycure-production-enc-personal-details
 
 # ===== BACKUP =====
 backup:

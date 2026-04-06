@@ -1,0 +1,21 @@
+apiVersion: v2
+name: hapihub-migrator
+description: HapiHub MongoDB→PostgreSQL migration tool (bulk + CDC + verify)
+type: application
+version: 0.1.0
+appVersion: "3.6.0"
+keywords:
+  - hapihub
+  - migration
+  - mongodb
+  - postgresql
+  - cdc
+home: https://github.com/monobaselabs/monobase-infra
+sources:
+  - https://github.com/monobaselabs/monobase
+maintainers:
+  - name: Your Organization
+    email: devops@example.com
+
+# Long-lived migration tool. Not a Job — runs continuously through bulk → cdc → reverse-cdc.
+# Dependencies (PostgreSQL, MongoDB) are deployed separately and merged in via the ArgoCD app template.

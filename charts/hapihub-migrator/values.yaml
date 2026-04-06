@@ -1,0 +1,153 @@
+# Default values for hapihub-migrator chart.
+# Override these in deployments/{env}.yaml under `hapihubMigrator:`.
+#
+# This is a long-lived migration process (NOT a Job). It progresses through
+# modes during the HapiHub 10→11 migration:
+#
+#   1. MODE=bulk        — initial full copy MongoDB → PG (24-48h for prod)
+#   2. MODE=cdc         — forward CDC, closes the gap during cutover prep
+#   3. MODE=reverse-cdc — PG → MongoDB CDC, keeps MongoDB warm post-cutover
+#                         ⚠️  Not yet implemented in v3.6.0 — see DIFF.md Tier 5
+#   4. MODE=verify      — on-demand parity check (also exposed via HTTP POST /verify)
+
+# Global configuration (shared across charts; overridden by ArgoCD app template)
+global:
+  domain: example.com
+  namespace: example-prod
+  environment: production
+
+# Disabled by default — flip to true in deployment values when starting MIGRATION.md Phase 2
+enabled: false
+
+replicaCount: 1
+
+image:
+  repository: ghcr.io/mycurelabs/hapihub-migrator
+  pullPolicy: IfNotPresent
+  tag: "3.6.0"
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+podAnnotations: {}
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  fsGroup: 1000
+  seccompProfile:
+    type: RuntimeDefault
+
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+  readOnlyRootFilesystem: false
+
+service:
+  type: ClusterIP
+  port: 3000
+  targetPort: 3000
+  annotations: {}
+
+# Migration mode: bulk | cdc | verify | reverse-cdc
+# (reverse-cdc is documented for the rollback story but not yet shipped in v3.6.0)
+mode: bulk
+
+# Resource sizing — bulk phase is CPU-bound on encryption + I/O bound on PG writes.
+# Tune in Phase 3 based on observed throughput.
+resources:
+  requests:
+    cpu: 500m
+    memory: 1Gi
+  limits:
+    cpu: "2"
+    memory: 4Gi
+
+# Liveness/readiness both hit /health (lightweight, always 200).
+# Do NOT use /cdc/health for readiness — it returns 503 on lag >60s,
+# which would NotReady the pod and break the dashboard during slow periods.
+# Lag is monitored via the dashboard, not k8s probes.
+livenessProbe:
+  enabled: true
+  httpGet:
+    path: /health
+    port: http
+  initialDelaySeconds: 30
+  periodSeconds: 30
+  timeoutSeconds: 5
+  failureThreshold: 5
+
+readinessProbe:
+  enabled: true
+  httpGet:
+    path: /health
+    port: http
+  initialDelaySeconds: 10
+  periodSeconds: 15
+  timeoutSeconds: 5
+  failureThreshold: 3
+
+# Non-secret env vars (injected via env: in the deployment, not a separate ConfigMap).
+# All values are stringified because k8s env values must be strings.
+config:
+  HTTP_PORT: "3000"
+  EXIT_ON_BULK_END: "false"   # keep alive for mode transitions
+  RESUME_MIGRATION: "true"
+  BATCH_SIZE: "1000"
+  COLLECTION_CONCURRENCY: "4"
+  MAX_ERROR_RATE: "0.01"
+  CDC_BATCH_SIZE: "100"
+  CDC_BATCH_WINDOW_MS: "500"
+  CDC_POLL_INTERVAL_MS: "1000"
+  CDC_SOFT_DELETE: "true"
+
+# Free-form additional env vars (list of {name, value, valueFrom}).
+env: []
+
+# Node pool scheduling (optional, inherits from global.nodePool)
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
+# PostgreSQL dependency (target). Connection URI is assembled in the deployment template
+# from the K8s `postgresql` Secret created by the bitnami chart, the same pattern cadence uses.
+postgresql:
+  enabled: true
+  serviceName: "postgresql-primary"
+  port: 5432
+  auth:
+    database: hapihub
+    username: postgres
+    existingSecret: "postgresql"
+    passwordKey: "postgres-password"
+
+# MongoDB dependency (source). Same pattern as PG — assembled in-template from the
+# K8s `mongodb` Secret created by the bitnami mongodb chart.
+mongodb:
+  enabled: true
+  serviceName: "mongodb"
+  port: 27017
+  database: hapihub
+  username: root
+  replicaSet: rs0
+  authSource: admin
+  existingSecret: "mongodb"
+  passwordKey: "mongodb-root-password"
+
+# External Secrets configuration — ONLY for things that aren't already in K8s secrets.
+# In production this is just the encryption keys (ENC_*).
+# DB connection strings are built from the existing postgres/mongodb K8s secrets.
+externalSecrets:
+  enabled: false
+  secretStore: ""
+  secretStoreKind: SecretStore
+  refreshInterval: 1h
+  secrets: []
