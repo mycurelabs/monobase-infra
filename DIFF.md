@@ -144,17 +144,29 @@ All 5 secrets verified in `mc-v4-prod` GCP Secret Manager (2026-04-06):
 - [x] `mycure-production-private-key` — already exists (2025-11-22)
   - ⚠️ **Format check**: production key is `BEGIN EC PRIVATE KEY` (SEC1), staging key is `BEGIN PRIVATE KEY` (PKCS#8). Same EC key type, different wrapper. Verify hapihub 11.x accepts SEC1 — if not, convert via `openssl pkcs8 -topk8 -nocrypt -in old.pem -out new.pem` before migration cutover (Tier 5).
 
-## 4.2 Provision PostgreSQL in production
+## 4.2 Provision PostgreSQL in production — DONE
 
-11.x requires PG for better-auth + cadence metadata.
+Deployed 2026-04-06 in `mycure-production` namespace using Bitnami PG chart in **replication mode**:
 
-- [ ] Decide: in-cluster Bitnami PG vs DigitalOcean Managed PG
-- [ ] If in-cluster: ensure PVC storage class supports growth, plan backup via Velero
-- [ ] If managed: provision instance, configure VPC peering, store URI in GCP secret
-- [ ] Create `database` and `username` for hapihub
-- [ ] Add `postgresql-credentials` ExternalSecret to `database-secrets` chart (already exists in staging)
-- [ ] Verify connectivity from hapihub namespace
-- [ ] Document backup/restore procedure
+- [x] **Decided**: in-cluster Bitnami PG with `architecture: replication` (1 primary + 1 read replica, manual failover)
+- [x] **Sized**: 200 GiB PVC per replica, 500m/4Gi req → 2000m/8Gi limit per pod (sized for migrated 11.x dataset of ~35 GB useful from MongoDB + 18mo growth headroom)
+- [x] Created `mycure-production-postgresql-replication-password` GCP secret
+- [x] Created matching `mycure-staging-postgresql-replication-password` GCP secret (so the existing staging app keeps working)
+- [x] Updated `charts/database-secrets/templates/postgresql-externalsecret.yaml` to sync both `postgres-password` and `postgres-replication-password`
+- [x] Extended `argocd/applications/templates/postgresql.yaml` to support `primary.*` / `readReplicas.*` blocks (backward-compat with staging legacy values)
+- [x] Added `postgresql:` block to `values/deployments/mycure-production.yaml` with `architecture: replication`, primary + readReplicas, PDB minAvailable: 1
+- [x] Added `ServerSideApply=true` to the postgresql ArgoCD app sync options
+- [x] **Verified**:
+  - `postgresql-primary-0` 1/1 Running, `pg_is_in_recovery: f`, version PG 16.4
+  - `postgresql-read-0` 1/1 Running, `pg_is_in_recovery: t`, replaying WAL
+  - `pg_stat_replication` shows `streaming` / `async` / no lag
+  - `hapihub` database created
+  - Both PVCs bound at 200 GiB on `do-block-storage`
+  - Cluster autoscaler added a 4th production node (`production-0w8sg`) automatically to fit the read replica
+  - ExternalSecret `postgresql-credentials` reports `SecretSynced` with both keys
+- [x] Cleaned up orphan `data-postgresql-0` PVC (8 GiB, from previous abandoned deployment)
+- [ ] **Backup procedure**: not yet configured. Velero schedule + nightly `pg_dump` to GCS recommended — tracked separately, not blocking 11.x rollout (no production data yet)
+- [ ] **Auto-failover**: NOT configured. Manual `pg_promote` required on primary failure. `postgresql-ha` chart with repmgr/pgpool is the future upgrade path if needed.
 
 ## 4.3 Enable Valkey in production
 
