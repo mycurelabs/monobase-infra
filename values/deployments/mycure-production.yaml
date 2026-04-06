@@ -103,7 +103,9 @@ hapihub:
     tag: "10.11.15"
     pullPolicy: IfNotPresent
 
-  replicaCount: 1
+  # CUTOVER: scaled to 0 to freeze MongoDB writes during the cutover window.
+  # Restored to 3 in the cutover commit (Commit Y) along with the 11.2.8 tag bump.
+  replicaCount: 0
 
   resources:
     requests:
@@ -158,8 +160,10 @@ hapihub:
   podDisruptionBudget:
     enabled: false
 
+  # CUTOVER: HPA disabled so replicaCount=0 actually sticks (HPA would otherwise
+  # scale back to minReplicas=3). Restored in cutover commit Y.
   autoscaling:
-    enabled: true
+    enabled: false
     minReplicas: 3
     maxReplicas: 5
 
@@ -519,7 +523,11 @@ dentalemon:
 
 # ===== HEALTHCARE: SyncD Real-time Synchronization =====
 syncd:
-  enabled: true
+  # Disabled at cutover (2026-04-07). syncd is the legacy sync engine being
+  # retired in favor of cadence. 11.x doesn't use syncd, and leaving it running
+  # would write to MongoDB after cutover causing PG/Mongo drift.
+  # Mirrors staging which has had `syncd.enabled: false` since the 11.x cutover.
+  enabled: false
 
   image:
     repository: ghcr.io/mycurelabs/syncd
