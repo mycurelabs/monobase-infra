@@ -5,9 +5,11 @@
 # modes during the HapiHub 10→11 migration:
 #
 #   1. MODE=bulk        — initial full copy MongoDB → PG (24-48h for prod)
-#   2. MODE=cdc         — forward CDC, closes the gap during cutover prep
-#   3. MODE=reverse-cdc — PG → MongoDB CDC, keeps MongoDB warm post-cutover
-#                         ⚠️  Not yet implemented in v3.6.0 — see DIFF.md Tier 5
+#   2. MODE=cdc         — forward CDC (MongoDB → PG), closes the gap during cutover prep
+#   3. MODE=reverse-cdc — PG-only capture mode. Installs PG triggers that record
+#                         every INSERT/UPDATE/DELETE on the allowlist into
+#                         `_pg_changelog`. Capture-only — no MongoDB replay.
+#                         The changelog is the rollback forensic trail.
 #   4. MODE=verify      — on-demand parity check (also exposed via HTTP POST /verify)
 
 # Global configuration (shared across charts; overridden by ArgoCD app template)
@@ -24,7 +26,7 @@ replicaCount: 1
 image:
   repository: ghcr.io/mycurelabs/hapihub-migrator
   pullPolicy: IfNotPresent
-  tag: "3.6.0"
+  tag: "3.7.0"
 
 imagePullSecrets: []
 nameOverride: ""
@@ -58,7 +60,6 @@ service:
   annotations: {}
 
 # Migration mode: bulk | cdc | verify | reverse-cdc
-# (reverse-cdc is documented for the rollback story but not yet shipped in v3.6.0)
 mode: bulk
 
 # Resource sizing — bulk phase is CPU-bound on encryption + I/O bound on PG writes.

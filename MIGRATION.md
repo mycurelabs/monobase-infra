@@ -13,77 +13,50 @@ Production runs HapiHub 10.11.15 (MongoDB only). Staging runs 11.2.8 (PostgreSQL
 
 The migration is performed by the dedicated `hapihub-migrator` tool at `~/Projects/mycure/monobase/services/hapihub-migrator` (v3.6.0+). It was already used for the staging migration.
 
-**Assumption**: The migrator has a `MODE=reverse-cdc` mode (PG → MongoDB CDC) implemented per a separate plan, available before this migration begins. This mode tails PG WAL and replays writes to MongoDB. Without this mode, the cutover is irreversible after the first 11.x write. With this mode, MongoDB stays in sync with PG during the bake-in, making rollback safe within the reverse-CDC lag window.
+**Reverse CDC is capture-only** in `hapihub-migrator` v3.7.0 (`MODE=reverse-cdc`). It installs PostgreSQL triggers on an allowlist of tables (computed from `collections.ts`, excludes history tables, better_auth tables, and PG-native tables) that record every INSERT/UPDATE/DELETE into a new `_pg_changelog` table — atomically inside the same PG transaction as the source write. It does **not** replay those records back to MongoDB; replay is explicit operator work if rollback is needed (or accept the drift). The `_pg_changelog` is the forensic trail that makes manual rollback possible.
 
 ---
 
-## ⚠️ Prerequisite: reverse-cdc mode not yet shipped
-
-As of 2026-04-07, `~/Projects/mycure/monobase/services/hapihub-migrator` v3.6.0
-implements only `bulk | cdc | verify` modes. The mode dispatcher in
-`src/config.ts:3` does not accept `reverse-cdc` yet, even though this runbook
-treats it as the foundation of the rollback story.
-
-**Phase 6 cutover MUST NOT proceed until** the migrator repo ships a release
-that:
-
-1. Adds `reverse-cdc` to the `MODE` union in `src/config.ts`
-2. Implements PG → MongoDB CDC with re-encryption of `ENC_*` collections
-3. Has a passing round-trip integration test (write to PG → assert in MongoDB)
-4. Is published to `ghcr.io/mycurelabs/hapihub-migrator` with a version > 3.6.0
-
-When that release is ready, bump `hapihubMigrator.image.tag` in
-`values/deployments/mycure-production.yaml` to the new version BEFORE starting
-Phase 6.
-
-The mono-infra IaC scaffolding (chart, ArgoCD app, secrets) is already in place
-and works for Phases 0–5. Phase 6 is the hard gate.
-
-If reverse CDC is not available by the time Phases 3/4 complete, see DIFF.md
-for the "proceed without reverse CDC" alternative — but treat that as a
-re-plan, not a continuation of this runbook.
-
----
-
-## Architecture (corrected understanding)
+## Architecture
 
 HapiHub 11.x is **PostgreSQL-only**. There is no `mongodb` package in `package.json`, no MongoDB client anywhere in `src/`. The Feathers-style model names like `accounts.accounts` are now backed by Drizzle PG services (`pg-service.ts`), not MongoDB. Production PG already has 117 tables seeded by the migrator's prior staging run, including `accounts`, `medical_records`, `billing_invoices`, `personal_details`, etc.
 
-Once 11.x is serving traffic, all writes go to PG. MongoDB stops being authoritative the moment the cutover happens. The reverse-CDC mode is what keeps MongoDB warm as a rollback target during the bake-in.
+Once 11.x is serving traffic, all writes go to PG. MongoDB stops being authoritative the moment the cutover happens. Reverse-CDC keeps a per-row audit trail of every PG write so an operator can reconstruct the delta if rollback is required.
 
 ---
 
-## Reversibility — the actual story (with reverse CDC)
+## Reversibility story
 
 | State | Rollback cost |
 |---|---|
 | Pre-cutover (forward CDC running, 10.x serving) | ✅ **Zero cost.** Stop migrator, throw away PG data, 10.x continues. |
 | Cutover window (traffic frozen, no writes happening) | ✅ **Zero cost.** Restart 10.x. |
-| **Post-cutover with reverse CDC running** | ✅ **Lag-window cost.** ~60s of writes potentially lost (whatever the reverse-CDC lag is at the moment of rollback). MongoDB is otherwise current. Restart 10.x against the current MongoDB. |
-| Post-cutover after reverse CDC is stopped (Phase 8) | ❌ **Moderate-high cost.** MongoDB freezes again. From this point forward, rollback means losing everything since reverse CDC was disabled. |
-| 24h+ after Phase 8 | ❌ **Effectively non-reversible.** Forward-fix only. |
+| **Post-cutover, reverse-cdc capture active** | ⚠️ **Manual replay cost.** All PG writes since cutover are in `_pg_changelog`. Operator either (a) replays them into MongoDB by hand, or (b) accepts the drift and restarts 10.x against the stale MongoDB. The cost is operator-time + whatever subset of writes can't be replayed. |
+| Post-cutover after reverse-cdc triggers torn down | ❌ **No forensic trail.** MongoDB is frozen, PG drift is unrecoverable from the migrator's records. Forward-fix only. |
+| 24h+ after teardown | ❌ **Effectively non-reversible.** |
 
-**The "point of no return" is defined by when you stop reverse CDC**, not by the cutover itself. This decouples cutover risk from bake-in length — you can run hapihub 11.x in production for as long as you need to gain confidence, with reverse CDC continuously protecting the rollback path.
+**The point of no return is teardown of the reverse-cdc triggers**, not the cutover itself. Bake-in length is decoupled from rollback feasibility — leave the triggers installed for as long as confidence in 11.x is being built up. The triggers run inside source PG transactions, so worst-case overhead is per-write trigger latency, not async lag.
 
-### Reverse CDC limitations to verify before relying on it
+### Reverse-cdc capture properties
 
-- **Schema gaps**: PG tables with no MongoDB equivalent (`cadence_*` tables, `_migration_*` metadata, better-auth's `passkey`/`api_key`/etc.) should be excluded from reverse CDC
-- **New columns**: PG columns that don't exist in MongoDB collections — reverse CDC needs a mapping or it'll either error or silently drop the field
-- **Encrypted fields**: medical, billing, personal-details — reverse CDC must re-encrypt with the same encryption keys before writing to MongoDB
-- **Conflict handling**: if a record exists in both PG (new write from 11.x) and MongoDB (stale 10.x copy), reverse CDC needs a tiebreaker (likely "PG wins")
-- **Idempotency**: reverse CDC must be idempotent so a restart doesn't double-apply
+- **Trigger-based** (NOT logical replication): no `wal_level` change, no superuser, atomic with the source write, survives MongoDB outages because MongoDB isn't in the loop.
+- **Allowlist** comes from `collections.ts` and excludes history tables, better_auth tables, and all PG-native tables (`_migration_*`, `_pg_changelog`, `__drizzle_migrations`, `pg-boss`, `cadence_*`).
+- **Delete events** capture only the PK — full OLD-row capture would inflate `_pg_changelog` significantly.
+- **Mutual exclusivity** with forward CDC: startup refuses if `_cdc_resume_tokens` was updated within 60s. Forward and reverse CDC cannot run concurrently against the same PG.
+- **Idempotent install**: `installMissing()` skips tables that already have a trigger. Operator teardown via `POST /reverse-cdc/triggers/teardown`.
+- **PG-only**: `MODE=reverse-cdc` does not connect to MongoDB at all. `MONGO_SOURCE_URI` is unused.
 
 ---
 
 ## The migration tool
 
-`hapihub-migrator` (v3.6.0+, Bun process with HTTP dashboard on :3000):
+`hapihub-migrator` v3.7.0 (Bun process with HTTP dashboard on :3000), image `ghcr.io/mycurelabs/hapihub-migrator:3.7.0`:
 
 | Mode | Purpose |
 |---|---|
-| `MODE=bulk` | Phase 1 batch copy. Reads 88 MongoDB collections, decrypts encrypted fields (medical/billing/personal-details), writes to PG via Drizzle. Idempotent (`ON CONFLICT DO UPDATE`). Tracks per-collection checkpoints in `_migration_checkpoints` so it's resumable. |
+| `MODE=bulk` | Phase 1 batch copy. Reads 83 MongoDB collections, decrypts encrypted fields (medical/billing/personal-details), writes to PG via Drizzle. Idempotent (`ON CONFLICT DO UPDATE`). Tracks per-collection checkpoints in `_migration_checkpoints` so it's resumable. |
 | `MODE=cdc` | Forward CDC (MongoDB → PG). Tails MongoDB change stream into a `_migration_changelog` table; replayer applies events to PG continuously. Closes the gap between bulk cutoff and cutover. **Requires MongoDB to be a replica set** (production already is — `rs0`). |
-| `MODE=reverse-cdc` | Reverse CDC (PG → MongoDB). Tails PG WAL or `_pg_changelog`, re-encrypts where needed, applies writes back to MongoDB. Used during the post-cutover bake-in. |
+| `MODE=reverse-cdc` | Reverse CDC capture (PG only). Installs PG triggers on the allowlist; every INSERT/UPDATE/DELETE writes to `_pg_changelog`. **Capture only** — no MongoDB replay. Used during the post-cutover bake-in as the rollback forensic trail. |
 | `MODE=verify` | Compares row counts and samples between MongoDB and PG. Auto-runs after bulk by default. Available on-demand via HTTP `POST /verify`. |
 
 **No-gap handoff**: the changelog collector starts BEFORE the bulk phase, so changes during bulk are captured into the changelog and replayed by Phase 2.
@@ -178,18 +151,20 @@ The intentional skip ledger below is the audit trail — every uncovered collect
 
 ---
 
-## Phase 1 — Build & publish migrator image
+## Phase 1 — Build & publish migrator image ✅ DONE 2026-04-07
 
-The migrator repo has a build/publish script at `~/Projects/mycure/monobase/services/hapihub-migrator/build-docker.sh`. It reads the version from `package.json`, tags as `ghcr.io/mycurelabs/hapihub-migrator:${VERSION}` and `:latest`, and pushes to GHCR with `--push`.
+- [x] v3.7.0 published to `ghcr.io/mycurelabs/hapihub-migrator:3.7.0` (also tagged `:latest`)
+- [x] Built on freyr.vanaheim from monobase HEAD `71b97d80`
+- [x] Image digest: `sha256:7ad117b2a0aa2690a63204e6c76bb8db5c3e7b27cf893de2fdbc9a62e568c111`
+- [x] Includes the v3.7.0 reverse-cdc capture feature (commit `d0133927`) and the bundled drizzle-pg migrations through `0009_pg_changelog`
 
-- [ ] Bump `package.json` version if needed (check current `version` field — `3.6.0` at time of writing)
-- [ ] Run from the migrator directory:
-  ```bash
-  cd ~/Projects/mycure/monobase/services/hapihub-migrator
-  ./build-docker.sh --push
-  ```
-- [ ] Verify the image is available: `docker pull ghcr.io/mycurelabs/hapihub-migrator:<version>`
-- [ ] Smoke test locally with `MODE=verify` against the staging DBs to confirm the binary works
+### Known issue (separate workstream)
+
+`services/hapihub-migrator/Dockerfile.dockerignore` is broken: it excludes `*` then re-includes paths under `services/hapihub-migrator/...`, which only resolves correctly when the build context is the monorepo root. `build-docker.sh` runs `docker build .` from inside the migrator directory, so the un-ignore patterns don't match anything and the build context is empty (`transferring context: 2B done`). The build fails at `COPY bins/hapihub-migrator-linux-*.tar.gz ./` with `lstat /bins: no such file or directory`.
+
+**Workaround used for v3.7.0**: temporarily move `Dockerfile.dockerignore` aside, run the build, restore it.
+
+**Permanent fix** (TODO in the migrator repo): either rewrite `Dockerfile.dockerignore` for migrator-relative paths, or change `build-docker.sh` to chdir to the monorepo root and pass `-f services/hapihub-migrator/Dockerfile`.
 
 ---
 
@@ -295,64 +270,68 @@ Update production hapihub's ExternalSecret to add the new 11.x keys, but keep th
 7. [ ] Commit, push, force ArgoCD pickup
 8. [ ] Watch the new pod come up. Drizzle migrations should be a no-op since the migrator already created all tables. Verify in logs: `Drizzle migrations: nothing to apply`
 9. [ ] Verify hapihub readiness probe is green
-10. [ ] **Switch the migrator to `MODE=reverse-cdc`** to start mirroring 11.x's PG writes back to MongoDB. Verify the dashboard shows reverse CDC lag <5s.
+10. [ ] **Switch the migrator to `MODE=reverse-cdc`** to install PG triggers that capture every 11.x write into `_pg_changelog`. Verify in logs: `Reverse-CDC mode active. Triggers capturing writes to _pg_changelog`.
+    - Reverse-cdc refuses to start if forward CDC was active in the last 60s — wait for the cursor to idle out, or this is a no-op.
+    - Triggers attach atomically; from this point forward, every write to an allowlisted table is also recorded in `_pg_changelog`.
 11. [ ] Smoke test from outside:
     - `https://hapihub.localfirsthealth.com/.well-known/jwks.json` returns JWKS
     - `/health` endpoint
     - Login with a known account
     - Password reset flow
     - Read a medical encounter, billing invoice, queue item
-    - **Create a new patient or encounter** — verify it shows up in MongoDB within the reverse-CDC lag window
+    - **Create a new patient or encounter** — verify the row appears in `_pg_changelog` (`SELECT * FROM _pg_changelog ORDER BY id DESC LIMIT 5`)
 12. [ ] Watch error logs for 30 minutes
-13. [ ] If green: declare cutover complete. **Leave the migrator running in reverse-CDC mode.** Move to Phase 7.
+13. [ ] If green: declare cutover complete. **Leave the reverse-cdc triggers installed.** Move to Phase 7.
 14. [ ] Announce "maintenance complete"
 
-### Rollback procedure (during cutover or anytime in the bake-in window while reverse CDC is running)
+### Rollback procedure (anytime while reverse-cdc triggers are still installed)
 
 1. [ ] `kubectl set image deployment/hapihub hapihub=ghcr.io/mycurelabs/hapihub:10.11.15 -n mycure-production` (faster than ArgoCD)
 2. [ ] Watch the rollback pod come up
-3. [ ] Wait for reverse CDC to drain pending events (dashboard shows lag — should hit 0 within seconds)
-4. [ ] Stop the migrator's reverse-CDC mode
-5. [ ] Verify 10.x is healthy and reading the up-to-date MongoDB
-6. [ ] git revert the cutover commit, push, let ArgoCD reconcile
-7. [ ] **Data loss = whatever was in flight in the reverse-CDC pipeline at the moment of rollback** (typically <60s of writes). Document them by querying the migrator's audit log for the rollback window.
+3. [ ] **Decide on the `_pg_changelog` delta**: query `SELECT collection, op, COUNT(*) FROM _pg_changelog GROUP BY 1, 2;` to see what 11.x wrote since cutover.
+   - **Option A — replay**: write a one-shot script that reads `_pg_changelog`, looks up each PK in the corresponding PG table, re-encrypts where needed using the same `ENC_*` keys the migrator uses, and upserts into MongoDB. This is operator work — there is no automatic replayer.
+   - **Option B — accept the drift**: skip the replay, restart 10.x against the stale MongoDB. Anything written between cutover and rollback is lost.
+4. [ ] Tear down the reverse-cdc triggers via `POST /reverse-cdc/triggers/teardown` once the decision is made (so PG isn't carrying trigger overhead during the rollback)
+5. [ ] Verify 10.x is healthy
+6. [ ] `git revert` the cutover commit, push, let ArgoCD reconcile
+7. [ ] Document the data-loss decision (which writes were replayed vs accepted as lost) — `_pg_changelog` is the audit trail.
 8. [ ] If you want to retry later: drop PG `hapihub` tables and re-run the bulk migration from scratch, OR delta-sync via forward CDC
 
 ---
 
-## Phase 7 — Bake-in (72h minimum, with reverse CDC running)
+## Phase 7 — Bake-in (72h minimum, reverse-cdc triggers capturing)
 
-After cutover succeeds. The migrator stays running in `reverse-cdc` mode for the entire bake-in. Bake-in length is now decoupled from rollback risk — you can run for days without losing rollback capability.
+After cutover succeeds. The reverse-cdc triggers stay installed for the entire bake-in. Bake-in length is decoupled from rollback feasibility — leave them in place for as long as confidence in 11.x is being built up. The triggers run inside source PG transactions, so worst case is per-write trigger latency, not async lag.
 
 - [ ] Monitor auth errors, login failures
-- [ ] Monitor PG resource usage (memory, CPU, disk growth)
-- [ ] Monitor MongoDB reverse-CDC writes — should track 11.x's PG write rate
-- [ ] Monitor reverse-CDC lag — alert if it grows beyond 60s
+- [ ] Monitor PG resource usage (memory, CPU, disk growth — `_pg_changelog` table size)
+- [ ] Monitor `_pg_changelog` write rate — should track 11.x's PG write rate
 - [ ] Monitor hapihub error rate, pod restarts
 - [ ] Monitor cadence — real users should generate sync activity now
-- [ ] Spot-check parity between PG and MongoDB:
-  - Create an encounter in 11.x → verify it appears in MongoDB
-  - Update a billing invoice → verify the change propagates to MongoDB
-- [ ] Run periodic verification jobs: `curl -X POST :3000/verify`
-- [ ] Keep the rollback runbook warm — train an on-call to execute it from memory
+- [ ] Periodically check `_pg_changelog` table size and consider truncating older rows once you're confident you won't need them for rollback (the changelog is operator-managed; the migrator does not auto-prune)
+- [ ] Run periodic verification jobs against backups: `curl -X POST :3000/verify`
+- [ ] Keep the rollback runbook warm — train an on-call to execute the manual replay path from memory
 
 ---
 
-## Phase 8 — Stop reverse CDC (the actual point of no return)
+## Phase 8 — Tear down reverse-cdc triggers (the actual point of no return)
 
-When you're ready to commit fully to 11.x and accept that rollback now means data loss.
+When you're ready to commit fully to 11.x and accept that rollback now means manual reconstruction without the changelog audit trail.
 
 ### Decision criteria
 
 - Bake-in clean for 72+ hours
 - No outstanding bug reports related to the migration
 - PG metrics within projections
+- `_pg_changelog` size is manageable; growth rate is known
 - Stakeholders signed off
 - A retry plan exists in case of catastrophic failure (full restore from PG backups)
 
 ### Steps
 
-- [ ] Final reverse-CDC verification: PG ↔ MongoDB delta is empty
+- [ ] Decide whether to archive `_pg_changelog` somewhere (S3/GCS) before teardown — once teardown happens you lose the per-row audit trail
+- [ ] Tear down triggers: `curl -X POST http://localhost:3000/reverse-cdc/triggers/teardown` (port-forward into the migrator pod)
+- [ ] Confirm via dashboard that triggers are gone
 - [ ] Stop the migrator: `kubectl scale deploy/hapihub-migrator --replicas=0 -n mycure-production`
 - [ ] Take a final MongoDB snapshot — this is now the "frozen rollback baseline" if anything ever goes wrong with PG
 - [ ] Mark MongoDB as read-only in operational docs (still queryable, but no longer authoritative)
@@ -420,13 +399,13 @@ That's it for IaC. Drizzle migrations are run by hapihub itself on startup (and 
 | 4 — Forward CDC mode | 24+ h | No |
 | 5 — Hapihub secrets prep | 30 min | No |
 | 6 — Cutover | **15–30 min downtime** | Yes |
-| 7 — Bake-in (with reverse CDC) | **72 h minimum** | No |
-| 8 — Stop reverse CDC | 30 min | No |
+| 7 — Bake-in (reverse-cdc capture) | **72 h minimum** | No |
+| 8 — Tear down reverse-cdc triggers | 30 min | No |
 | 9 — Closure | 30 min | No |
 
 **Total elapsed time: ~5–7 days** if everything goes smoothly.
 **Production downtime: ~15–30 minutes** during the cutover step itself.
-**Rollback safety**: maintained throughout phases 0–7 thanks to reverse CDC. Phase 8 is the actual point of no return.
+**Rollback safety**: maintained throughout phases 0–7 via the reverse-cdc forensic trail. Rollback after cutover requires manual replay (or accepting drift); Phase 8 teardown removes even that audit trail.
 
 ---
 
@@ -437,8 +416,8 @@ That's it for IaC. Drizzle migrations are run by hapihub itself on startup (and 
 - All smoke tests pass: login, password change, billing read, medical encounter read, new record creation
 - PG sizing within projections (memory, CPU, disk)
 - Forward CDC verification report shows all collections in pass/warn (no fails)
-- Reverse CDC operating with lag <60s consistently throughout bake-in
-- Spot-checked parity: writes in PG visible in MongoDB within the lag window
+- Reverse-cdc triggers installed on the full allowlist; `_pg_changelog` writes track 11.x's PG write rate
+- `_pg_changelog` table size growing within expected bounds (operator decides retention)
 - No clinician reports of data loss or login problems beyond the expected re-login window
 - 72h bake-in clean
-- Phase 8 sign-off received before stopping reverse CDC
+- Phase 8 sign-off received before tearing down the triggers

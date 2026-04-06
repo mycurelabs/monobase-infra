@@ -835,15 +835,15 @@ cadence:
 # Default disabled. Flip enabled: true at MIGRATION.md Phase 2 (after the
 # image is published and ready to start the bulk run).
 #
-# ⚠️ MODE=reverse-cdc is referenced by MIGRATION.md but is NOT yet shipped in
-#    hapihub-migrator v3.6.0. Phase 6 cutover is BLOCKED until the migrator
-#    repo ships a release implementing it. Bump image.tag here when ready.
+# v3.7.0 ships MODE=reverse-cdc as PG-only capture: PG triggers record every
+# write on the allowlist into `_pg_changelog`. Capture-only — no MongoDB
+# replay; the changelog is the rollback forensic trail.
 hapihubMigrator:
   enabled: false
 
   image:
     repository: ghcr.io/mycurelabs/hapihub-migrator
-    tag: "3.6.0" # MUST be ≥ the version that ships MODE=reverse-cdc before Phase 6 cutover
+    tag: "3.7.0"
     pullPolicy: IfNotPresent
 
   # bulk (Phase 3) → cdc (Phase 4) → reverse-cdc (Phase 6, post-cutover)

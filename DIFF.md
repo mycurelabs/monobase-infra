@@ -295,10 +295,13 @@ The **point of no return shifts from "first 11.x write" to "stopping reverse CDC
 - [x] Full intentional skip ledger documented in MIGRATION.md Phase 0 (with doc counts) for audit trail
 - [x] No `collections.ts` changes required; no migrator image rebuild needed for coverage reasons
 
-## 5.2 Phase 1 — Build & publish migrator image
+## 5.2 Phase 1 — Build & publish migrator image ✅ DONE 2026-04-07
 
-- [ ] Run `~/Projects/mycure/monobase/services/hapihub-migrator/build-docker.sh --push` (existing script — reads version from package.json, tags + pushes to GHCR)
-- [ ] Smoke test container locally with `MODE=verify` against staging DBs
+- [x] `ghcr.io/mycurelabs/hapihub-migrator:3.7.0` published from monobase HEAD `71b97d80` (built on freyr.vanaheim)
+- [x] Image digest `sha256:7ad117b2a0aa2690a63204e6c76bb8db5c3e7b27cf893de2fdbc9a62e568c111`
+- [x] v3.7.0 includes the `MODE=reverse-cdc` capture-only feature (commit `d0133927`) and bundles drizzle-pg migrations through `0009_pg_changelog`
+- [x] mono-infra `hapihubMigrator.image.tag` and `charts/hapihub-migrator/Chart.yaml` appVersion bumped to `3.7.0`
+- [ ] **Known issue**: `services/hapihub-migrator/Dockerfile.dockerignore` is broken (excludes everything because the un-ignore patterns assume monorepo-root context, but `build-docker.sh` runs `docker build .` from inside the migrator dir). Workaround: temporarily move the file aside before building. Permanent fix is a separate migrator-repo change.
 
 ## 5.3 Phase 2 — Deploy migrator chart in mycure-production
 
