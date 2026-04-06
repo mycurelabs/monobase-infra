@@ -230,7 +230,7 @@ mycure:
 
   image:
     repository: ghcr.io/mycurelabs/mycureapp
-    tag: "10.3.9"
+    tag: "10.3.47"
     pullPolicy: IfNotPresent
 
   replicaCount: 1
@@ -289,7 +289,7 @@ mycure-myaccount:
 
   image:
     repository: ghcr.io/mycurelabs/myaccount
-    tag: "1.0.0"
+    tag: "1.0.1"
     pullPolicy: IfNotPresent
 
   replicaCount: 1
@@ -379,7 +379,7 @@ mycurev8:
 
   image:
     repository: ghcr.io/mycurelabs/mycureapp
-    tag: "8.24.5"
+    tag: "8.24.6"
     pullPolicy: IfNotPresent
 
   replicaCount: 1
