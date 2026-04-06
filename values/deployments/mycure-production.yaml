@@ -404,6 +404,32 @@ mycurev8:
   podDisruptionBudget:
     enabled: false
 
+# ===== HEALTHCARE: HapiHub API Documentation =====
+hapihub-docs:
+  enabled: true
+
+  image:
+    repository: ghcr.io/mycurelabs/hapihub-docs
+    tag: "1.1.0"
+    pullPolicy: IfNotPresent
+
+  replicaCount: 1
+
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 128Mi
+
+  gateway:
+    hostname: "docs.localfirsthealth.com"
+    sectionName: https-lfh
+
+  podDisruptionBudget:
+    enabled: false
+
 # ===== HEALTHCARE: DentaLemon Website =====
 dentalemon-website:
   enabled: false

@@ -74,7 +74,7 @@ Confirmed 2026-04-06 by user: all of these are intentionally disabled in product
 - [x] `dentalemon` — intentionally disabled in prod
 - [x] `dentalemon-website` — intentionally disabled in prod
 - [x] `dentalemon-myaccount` — intentionally disabled in prod
-- [ ] `hapihub-docs` — TBD (not yet confirmed; should `docs.localfirsthealth.com` exist?)
+- [x] `hapihub-docs` — enabled in prod 2026-04-06 at `docs.localfirsthealth.com`
 - [x] `mailpit` — intentionally disabled in prod (replaced by real SMTP)
 - [x] `minio` — intentionally disabled in prod (uses GCS via `STORAGE_*` secrets)
 
