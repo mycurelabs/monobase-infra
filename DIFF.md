@@ -303,28 +303,36 @@ The **point of no return shifts from "first 11.x write" to "stopping reverse CDC
 - [x] mono-infra `hapihubMigrator.image.tag` and `charts/hapihub-migrator/Chart.yaml` appVersion bumped to `3.7.0`
 - [ ] **Known issue**: `services/hapihub-migrator/Dockerfile.dockerignore` is broken (excludes everything because the un-ignore patterns assume monorepo-root context, but `build-docker.sh` runs `docker build .` from inside the migrator dir). Workaround: temporarily move the file aside before building. Permanent fix is a separate migrator-repo change.
 
-## 5.3 Phase 2 — Deploy migrator chart in mycure-production
+## 5.3 Phase 2 — Deploy migrator chart in mycure-production ✅ DONE 2026-04-07
 
-- [ ] Create `charts/hapihub-migrator/` (Deployment + Service + ExternalSecret + optional HTTPRoute)
-- [ ] Create `argocd/applications/templates/hapihub-migrator.yaml`
-- [ ] Add `hapihubMigrator:` block to `values/deployments/mycure-production.yaml` with:
-  - Source: in-cluster mongodb
-  - Target: in-cluster `postgresql-primary`
-  - Encryption keys from existing GCP secrets (Tier 4.1)
-  - `MODE=bulk`, `EXIT_ON_BULK_END=false`, `RESUME_MIGRATION=true`
-- [ ] NetworkPolicies for migrator → mongodb (27017) and migrator → postgresql (5432)
+- [x] `charts/hapihub-migrator/` chart created (commit `62faf84`)
+- [x] `argocd/applications/templates/hapihub-migrator.yaml` created (commit `62faf84`)
+- [x] `hapihubMigrator:` block added to `values/deployments/mycure-production.yaml`
+- [x] NetworkPolicies inherited from `security-baseline` chart — migrator → mongodb-headless:27017 and migrator → postgresql-primary:5432 working
+- [x] Connection URIs assembled in-template from in-cluster K8s secrets (postgresql, mongodb), no GCP secret indirection for DB strings
 
-## 5.4 Phase 3 — Bulk migration run (zero impact on prod traffic)
+## 5.4 Phase 3 — Bulk migration run ✅ DONE 2026-04-07
 
-- [ ] Apply chart, watch dashboard at port 3000
-- [ ] Estimate: 24–48h for ~135 GB / 209 M docs
-- [ ] Verify all collections complete in `_migration_checkpoints`
-- [ ] Verify auto-verification report is clean
+- [x] Migrator deployed and bulk run completed: **85/85 collections, 0 failed**
+- [x] PG `hapihub` database now ~14 GB
+- [x] Auto-verification: 78 passed, 6 warned (4 transformer field-drift suspected verify-pass false positives, 2 expected dedup), 0 failed
+- [x] Estimated 24–48h became ~2h actual elapsed (incl. recovery rerun), thanks to fixes shipped along the way
+- **Bugs found and fixed during this phase** (all in `hapihub-migrator` repo):
+  - **Bug A** (v3.7.1) — `batch.ts` exceeded PG's 65535-parameter Bind limit on wide tables. Fix: column-aware proactive split + recursive halving fallback.
+  - **Bug B** (v3.7.1) — `RESUME_MIGRATION=true` didn't actually auto-resume; required explicit `RUN_ID` env var. Fix: `CheckpointManager.findLatestInProgressRunId()` + new `index.ts` resume branch.
+  - **Bug C** (v3.7.2) — `worker.ts` resume cursor wrapped `lastId` in `new ObjectId()` unconditionally; broke for collections storing `_id` as a string (e.g. `billing-items`). Fix: sample one doc at resume to detect `typeof _id`.
+  - **Bug D** (v3.7.3) — history tables of encrypted parents (`personal-details-history`, `medical-records-history`) silently dropped every doc with `_eh` set, because `collections.ts` didn't declare encryption metadata. Fix: declare same metadata as parent.
+  - **Bug E** (v3.7.3) — silently-dropped docs were not counted as errors; `processed` counter advanced through full batch length, letting collections "complete" with massive silent loss. Fix: count drops in errors total so `maxErrorRate` guard catches bulk-drop scenarios.
 
-## 5.5 Phase 4 — Forward CDC mode
+## 5.5 Phase 4 — Forward CDC mode ✅ DONE 2026-04-07
 
-- [ ] Switch migrator to `MODE=cdc`
-- [ ] Verify lag <60s and stable for 24+ hours
+- [x] Migrator switched to `MODE=cdc` (commit `f1428ba`)
+- [x] Replayer started fresh (lastSeq=0), collector resumed from lastSeq=120795
+- [x] Replayer drained the ~120k-event backlog (most of it `inventory-trackers` updates from production's background tracker job)
+- [x] Lag stable at **<5 events / <1 second** in steady state, replayer keeping up with production's ~18 events/sec write rate
+- [ ] Wait 24+ hours of continued stable operation before declaring ready for Phase 6 cutover
+- **Bug found and fixed during this phase**:
+  - **Bug H** (v3.7.4) — replayer didn't dedupe events by primary key within a batch. Production hapihub writes hundreds of updates to the same `inventory-trackers` rows per minute, so every CDC batch contained many events for the same row, tripping PG's `ON CONFLICT DO UPDATE command cannot affect row a second time` error and falling back to per-row inserts at ~80 events/sec. Fix: dedup by PK before sending to `batchInsert`, keeping the latest event per PK (events are seq-sorted). Throughput jumped ~1000x.
 
 ## 5.6 Phase 5 — Production hapihub secrets prep ✅ DONE 2026-04-07
 
