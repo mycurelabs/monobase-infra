@@ -46,12 +46,11 @@ The `MYCURE_X_URL` env var was added to both env files on 2026-04-06 (`mycure.lo
 
 - [x] Confirm production mycurev8 pod has `MYCURE_X_URL` env var set after next reconcile (verified post-rollout)
 
-## 1.4 Decide intent of staging-only test config
+## 1.4 Per-env config values
 
-These look like staging-only test data and should NOT be promoted as-is.
-
-- [ ] `ACCOUNTS_SERVICE_ACCOUNT_EMAILS: "service@test.com"` — confirm it's a test fixture, leave out of prod
-- [ ] `mycurev8 8.24.6` config check — already deployed in staging, no prod impact
+- [x] `ACCOUNTS_SERVICE_ACCOUNT_EMAILS` — different value per env (not a test fixture)
+  - staging: `service@test.com`
+  - production: `service@mycure.md` (added 2026-04-06, commit `33d7f33`)
 
 ---
 
@@ -63,23 +62,21 @@ Resolves operational noise. No deploys, no config changes — just decisions or 
 
 Currently throwing `UpdateFailed` events because secrets don't exist (valkey + minio are disabled in prod):
 - `valkey-credentials` → `mycure-production-valkey-password`
-- `minio-credentials` → `mycure-production-minio-root-user`
+- `minio-credentials` → `mycure-production-minio-root-user` + `mycure-production-minio-root-password`
 
-Pick one approach:
-- [ ] **Option A** (cleanest): conditionally render the ExternalSecret templates only when the related component is enabled in values
-- [ ] **Option B**: create empty/dummy GCP secrets to satisfy the lookup
-- [ ] Verify warnings are gone after fix
+- [x] Created proper GCP secrets (2026-04-06): `mycure-production-valkey-password` (random 30 chars), `mycure-production-minio-root-user` (`minioadmin`), `mycure-production-minio-root-password` (random 40 chars). Forward-looking — these will be reused when valkey/minio are enabled in Tier 4.
+- [x] All 6 production ExternalSecrets now report `SecretSynced`
 
-## 2.2 Disabled apps in production — confirm intent
+## 2.2 Disabled apps in production — confirmed intentional
 
-These are enabled in staging but disabled in production. Decide for each whether they should ever go to prod:
+Confirmed 2026-04-06 by user: all of these are intentionally disabled in production. No action required, but kept here for awareness.
 
-- [ ] `dentalemon` — DentaLemon dental app
-- [ ] `dentalemon-website` — marketing site
-- [ ] `dentalemon-myaccount` — account portal
-- [ ] `hapihub-docs` — should `docs.localfirsthealth.com` exist?
-- [ ] `mailpit` — confirm intentionally disabled in prod (replaced by real SMTP)
-- [ ] `minio` — confirm prod uses GCS instead via `STORAGE_*` secrets
+- [x] `dentalemon` — intentionally disabled in prod
+- [x] `dentalemon-website` — intentionally disabled in prod
+- [x] `dentalemon-myaccount` — intentionally disabled in prod
+- [ ] `hapihub-docs` — TBD (not yet confirmed; should `docs.localfirsthealth.com` exist?)
+- [x] `mailpit` — intentionally disabled in prod (replaced by real SMTP)
+- [x] `minio` — intentionally disabled in prod (uses GCS via `STORAGE_*` secrets)
 
 ## 2.3 HapiHub config knobs — verify intent
 
