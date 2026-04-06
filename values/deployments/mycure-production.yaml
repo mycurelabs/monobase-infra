@@ -865,7 +865,7 @@ hapihubMigrator:
     pullPolicy: IfNotPresent
 
   # bulk (Phase 3) → cdc (Phase 4) → reverse-cdc (Phase 6, post-cutover)
-  mode: cdc
+  mode: reverse-cdc
 
   resources:
     requests:
