@@ -134,7 +134,9 @@ postgresql:
 # K8s `mongodb` Secret created by the bitnami mongodb chart.
 mongodb:
   enabled: true
-  serviceName: "mongodb"
+  # Bitnami mongodb only creates a headless service (mongodb-headless), not a
+  # ClusterIP service. The headless service backs single-pod stable DNS.
+  serviceName: "mongodb-headless"
   port: 27017
   database: hapihub
   username: root

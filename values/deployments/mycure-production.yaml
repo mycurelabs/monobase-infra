@@ -873,7 +873,7 @@ hapihubMigrator:
 
   mongodb:
     enabled: true
-    serviceName: mongodb
+    serviceName: mongodb-headless # bitnami chart only creates the headless service
     port: 27017
     database: hapihub
     username: root

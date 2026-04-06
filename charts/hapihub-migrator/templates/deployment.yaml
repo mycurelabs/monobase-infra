@@ -91,7 +91,10 @@ spec:
               name: {{ .Values.mongodb.existingSecret | default "mongodb" }}
               key: {{ .Values.mongodb.passwordKey | default "mongodb-root-password" }}
         - name: MONGO_SOURCE_URI
-          value: "mongodb://$(MONGO_USER):$(MONGO_PASSWORD)@{{ include "hapihub-migrator.mongodb.host" . }}:{{ .Values.mongodb.port | default 27017 }}/{{ .Values.mongodb.database | default "hapihub" }}?authSource={{ .Values.mongodb.authSource | default "admin" }}&replicaSet={{ .Values.mongodb.replicaSet | default "rs0" }}"
+          # directConnection=true is required for bitnami mongodb in headless-only mode:
+          # without it, the driver does replica-set discovery, which returns member
+          # hostnames that may not resolve correctly in single-node replica sets.
+          value: "mongodb://$(MONGO_USER):$(MONGO_PASSWORD)@{{ include "hapihub-migrator.mongodb.host" . }}:{{ .Values.mongodb.port | default 27017 }}/{{ .Values.mongodb.database | default "hapihub" }}?authSource={{ .Values.mongodb.authSource | default "admin" }}&replicaSet={{ .Values.mongodb.replicaSet | default "rs0" }}&directConnection=true"
         {{- end }}
         # ===== Encryption keys + any other ExternalSecret-sourced env =====
         {{- if .Values.externalSecrets.enabled }}
