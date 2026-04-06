@@ -216,25 +216,41 @@ Two options:
 - [ ] Until then: ensure monitoring alerts fire when `postgresql-primary` becomes unreachable
 - [ ] Write a manual-failover runbook (even Option C needs documented steps)
 
-## 4.3 Enable Valkey in production
+## 4.3 Enable Valkey in production — DONE
 
-- [ ] Set `valkey.enabled: true` in `mycure-production.yaml`
-- [ ] Apply staging-tested resource sizing: `1Gi` request / `2Gi` limit (per the 2026-04-06 OOM lessons)
-- [ ] Apply `primary.resourcesPreset: none` chart fix (already merged 2026-03-29)
-- [ ] Use ServerSideApply (already in valkey ArgoCD app template)
-- [ ] Verify `valkey-credentials` ExternalSecret syncs successfully
-- [ ] Smoke test: `redis-cli` from hapihub namespace
+Deployed 2026-04-06 in `mycure-production`.
 
-## 4.4 Enable Cadence in production
+- [x] Set `valkey.enabled: true` in `mycure-production.yaml`
+- [x] Auth wired to `existingSecret: valkey` (synced from GCP via tier 2.1)
+- [x] Resource sizing inherited from staging: 100m/1Gi req → 500m/2Gi limit (per 2026-04-06 OOM lessons)
+- [x] `primary.resourcesPreset: none` chart fix in place
+- [x] `ServerSideApply=true` in valkey ArgoCD app template
+- [x] **Fixed**: valkey ArgoCD app template was missing `nodeSelector` + `tolerations` injection from `global.nodePool`. Without it, the pod couldn't schedule onto production-pool nodes (which have the `node-pool=production` taint). Patched in `argocd/applications/templates/valkey.yaml`.
+- [x] **Verified**: `valkey-primary-0` 1/1 Running on `production-03hu4`, ArgoCD app `Synced Healthy`
 
-Depends on 4.2 (PG) and 4.3 (Valkey).
+## 4.4 Enable Cadence in production — DONE
 
-- [ ] Add `cadence:` block to `mycure-production.yaml` (mirror staging structure)
-- [ ] Use `0.4.0` image with `--primary-db` CLI workaround (already in chart from 2026-03-27)
-- [ ] Apply scope rules + explicit `accounts`/`personal_details` collections (already in chart values)
-- [ ] Verify NetworkPolicies are deployed (allow-gateway-to-cadence, allow-cadence-to-valkey, allow-cadence-egress)
-- [ ] Smoke test: `/status` endpoint, JWKS validation, change log polling
-- [ ] Decide: cadence stays alongside syncd, or replaces it eventually?
+Deployed 2026-04-06 in `mycure-production`.
+
+- [x] Added `cadence:` block to `mycure-production.yaml` (mirrors staging structure)
+- [x] Image `0.4.0` (pullPolicy: Always), resources 200m/1Gi req → 2/4Gi limit
+- [x] Points at PG primary service: `postgresql-primary` (the new HA primary from tier 4.2)
+- [x] Points at valkey: `valkey-primary`
+- [x] Gateway/HTTPRoute on `cadence.localfirsthealth.com` via `https-lfh` listener
+- [x] Scope rules + explicit `accounts`/`personal_details` collections inherited from chart values
+- [x] NetworkPolicies (`allow-gateway-to-cadence`, `allow-cadence-to-valkey`, `allow-cadence-egress`) deployed via security-baseline chart
+- [x] **Fixed**: Production PG password originally had `/`, `=`, and trailing `\n` characters (created 2025-11-19 with a non-URL-safe random). Cadence builds the connection URL via `${POSTGRESQL_PASSWORD}` substitution in `--primary-db`, which fails URL parsing on those characters. Replaced with a 48-char hex (URL-safe) value (`mycure-production-postgresql-password` v3), ALTER USER on the running primary, force-synced ExternalSecret, restarted cadence.
+- [x] **Verified**:
+  - `cadence` deployment 1/1 Available
+  - PG connection: `Auto-discovered 0 tables from wildcard` (correct — empty `hapihub` DB)
+  - Valkey connection: `Using Valkey metadata backend`
+  - PG applier: `connected to primary database, applying changes`
+  - JWKS validation: enabled (1 endpoint)
+  - WebSocket sync at `/sync`
+  - API listening on port 7890
+  - External endpoint `https://cadence.localfirsthealth.com/health` returns `{"status":"pass"}`
+  - External endpoint `https://cadence.localfirsthealth.com/status` returns peer status
+- [ ] **Decision deferred**: cadence vs syncd coexistence vs replacement. Tracked in tier 6.1.
 
 ---
 
