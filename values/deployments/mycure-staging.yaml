@@ -610,13 +610,17 @@ valkey:
       enabled: true
       storageClass: ""
       size: 4Gi
+    # Bumped 2026-04-06: the primary OOM-kills during AOF/RDB load (RDB ≈ 376Mi
+    # with ~425k keys, plus cadence working set), leading to 277 restarts in 27h
+    # and a dead cadence metadata backend. 512Mi → 1Gi gives headroom; CPU
+    # limit raised so the initial AOF replay doesn't starve the liveness probe.
     resources:
       requests:
-        cpu: 50m
-        memory: 256Mi
-      limits:
-        cpu: 250m
+        cpu: 100m
         memory: 512Mi
+      limits:
+        cpu: 500m
+        memory: 1Gi
 
 # ===== STORAGE: MinIO Object Storage =====
 minio:
