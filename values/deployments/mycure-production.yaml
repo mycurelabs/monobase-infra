@@ -839,7 +839,7 @@ cadence:
 # write on the allowlist into `_pg_changelog`. Capture-only — no MongoDB
 # replay; the changelog is the rollback forensic trail.
 hapihubMigrator:
-  enabled: false
+  enabled: true # Phase 2 — bulk migration started 2026-04-07
 
   image:
     repository: ghcr.io/mycurelabs/hapihub-migrator
