@@ -604,7 +604,7 @@ mongodb:
 
 # ===== CACHE: Valkey (Redis) =====
 valkey:
-  enabled: true
+  enabled: false  # disabled 2026-04-07 (incident)
 
   global:
     security:
@@ -720,7 +720,7 @@ mailpit:
 
 # ===== P2P SYNC: Cadence =====
 cadence:
-  enabled: true
+  enabled: false  # disabled 2026-04-07 (incident)
 
   image:
     repository: ghcr.io/mycurelabs/cadence
