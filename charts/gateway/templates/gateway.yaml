@@ -44,9 +44,12 @@ spec:
       tls:
         mode: Terminate
         certificateRefs:
-          # Certificate managed by cert-manager
-          - name: {{ include "gateway.tlsSecretName" . }}
+          # Certificate managed by cert-manager.
+          # group: "" is the core API group default — the API server adds it
+          # on apply, so omitting it here causes a permanent ArgoCD diff.
+          - group: ""
             kind: Secret
+            name: {{ include "gateway.tlsSecretName" . }}
       {{- end }}
     {{- end }}
 
@@ -79,8 +82,9 @@ spec:
       tls:
         mode: Terminate
         certificateRefs:
-          - name: {{ $.Values.tls.secretName | default "gateway-tls" }}
+          - group: ""
             kind: Secret
+            name: {{ $.Values.tls.secretName | default "gateway-tls" }}
       {{- end }}
     {{- end }}
     {{- end }}

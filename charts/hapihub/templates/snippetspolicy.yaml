@@ -2,7 +2,11 @@
 apiVersion: gateway.nginx.org/v1alpha1
 kind: SnippetsPolicy
 metadata:
-  name: {{ include "hapihub.fullname" . }}-proxy-timeout
+  # Name includes the release namespace so staging and production releases
+  # can co-exist in the same gateway namespace without an Argo
+  # SharedResourceWarning. NGF allows multiple SnippetsPolicies targeting
+  # the same Gateway.
+  name: {{ include "hapihub.fullname" . }}-{{ .Release.Namespace }}-proxy-timeout
   namespace: {{ include "hapihub.gateway.namespace" . }}
 spec:
   targetRefs:
