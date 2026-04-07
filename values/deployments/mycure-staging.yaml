@@ -176,6 +176,17 @@ hapihub:
         remoteKey: mycure-staging-better-auth-secret
       - secretKey: PRIVATE_KEY
         remoteKey: mycure-staging-private-key
+      # Encryption keys (synced from production for data clone)
+      - secretKey: ENC_BILLING_INVOICES
+        remoteKey: mycure-staging-enc-billing-invoices
+      - secretKey: ENC_BILLING_ITEMS
+        remoteKey: mycure-staging-enc-billing-items
+      - secretKey: ENC_BILLING_PAYMENTS
+        remoteKey: mycure-staging-enc-billing-payments
+      - secretKey: ENC_MEDICAL_RECORDS
+        remoteKey: mycure-staging-enc-medical-records
+      - secretKey: ENC_PERSONAL_DETAILS
+        remoteKey: mycure-staging-enc-personal-details
 
   postgresql:
     enabled: true
