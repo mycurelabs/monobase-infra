@@ -45,15 +45,17 @@ spec:
               limits:
                 memory: 1Gi
           pod:
+            # Required (not preferred): with `preferred`, the scheduler placed
+            # both replicas on the same node when the BestEffort pods were still
+            # cleaning up — defeating the HA goal. We have 3 general nodes, so
+            # `required` only fails if 2 of 3 are full, which is acceptable.
             affinity:
               podAntiAffinity:
-                preferredDuringSchedulingIgnoredDuringExecution:
-                  - weight: 100
-                    podAffinityTerm:
-                      topologyKey: kubernetes.io/hostname
-                      labelSelector:
-                        matchLabels:
-                          app.kubernetes.io/name: nginx-shared-gateway-nginx
+                requiredDuringSchedulingIgnoredDuringExecution:
+                  - topologyKey: kubernetes.io/hostname
+                    labelSelector:
+                      matchLabels:
+                        app.kubernetes.io/name: nginx-shared-gateway-nginx
 
   destination:
     server: https://kubernetes.default.svc
