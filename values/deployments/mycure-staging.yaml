@@ -104,7 +104,7 @@ hapihub:
     tag: "11.2.9"
     pullPolicy: IfNotPresent
 
-  replicaCount: 3
+  replicaCount: 1
 
   resources:
     requests:
@@ -156,9 +156,9 @@ hapihub:
     enabled: false
 
   autoscaling:
-    enabled: true
-    minReplicas: 3
-    maxReplicas: 5
+    enabled: false
+    minReplicas: 1
+    maxReplicas: 1
 
   externalSecrets:
     enabled: true
