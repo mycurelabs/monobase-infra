@@ -101,6 +101,7 @@ affinity: {}
 config:
   API_URL: ""  # Set to HapiHub public URL (e.g., https://hapihub.example.com)
   HAPIHUB_URL: ""  # Set to HapiHub public URL (e.g., https://hapihub.example.com)
+  MYCURE_X_URL: ""  # Set to v10 mycure app URL (e.g., https://mycure.example.com)
 
 networkPolicy:
   enabled: true

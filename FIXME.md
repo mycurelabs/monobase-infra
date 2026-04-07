@@ -1,137 +1,120 @@
-# FIXME: api.mycure.md TLS certificate not yet provisioned
+# FIXME tracker
 
-## Problem
+## RESOLVED: api.mycure.md TLS certificate
 
-The `https-mycure` Gateway listener for `*.mycure.md` requires a TLS secret
-(`gateway-tls-mycure-md`) that does not exist yet. Without it:
+**Status**: Resolved on 2026-04-06 by migrating `*.mycure.md` routing to NGINX Gateway.
 
-- The listener has `InvalidCertificateRef` and is not programmed in the Envoy data plane
-- The `api.mycure.md` hostname on the hapihub HTTPRoute only works on the HTTPS listener
-  once the certificate is provisioned
-- The EnvoyPatchPolicy for max request headers cannot be applied to `https-mycure`
+### Original problem (kept for context)
 
-### Why HTTP-01 doesn't work
+The `https-mycure` listener on the **Envoy** `gateway-system/shared-gateway` had
+`InvalidCertificateRef` because Envoy Gateway v1.2.0 has an HTTP listener merging
+bug that prevents cert-manager's HTTP-01 solver from serving the ACME challenge
+on port 80 for `api.mycure.md`. The proposed solutions were either Cloudflare DNS-01
+or upgrading Envoy Gateway.
 
-Envoy Gateway v1.2.0 has a limitation where additional HTTP listeners (port 80) with
-different hostnames are not properly programmed in the Envoy data plane. Routes attached
-to the `http-mycure` listener are accepted by the Gateway API controller but never
-translated into Envoy route configs. This means cert-manager's HTTP-01 solver route
-cannot serve the ACME challenge on port 80 for `api.mycure.md`.
+### How it was actually resolved
 
-## Solution 1: Add mycure.md to Cloudflare (recommended)
+`*.mycure.md` traffic was moved off Envoy Gateway and onto NGINX Gateway Fabric
+(`nginx-gateway-system/nginx-shared-gateway`). NGINX Gateway doesn't have the
+listener-merging bug, so HTTP-01 works directly.
 
-Add the `mycure.md` zone to the Cloudflare account used by the
-`letsencrypt-mycure-cloudflare-prod` ClusterIssuer. This allows DNS-01 validation
-without needing HTTP-01.
+Verified live state:
 
-### Steps
+- Cert `nginx-gateway-tls-prod-mycure` is valid (Let's Encrypt R12, SAN includes
+  `api.mycure.md` and `find.mycure.md`)
+- NGINX `https-mycure` listener: `Accepted=True`, `Programmed=True`,
+  `ResolvedRefs=True`
+- `curl https://api.mycure.md/` returns HTTP from the hapihub backend (TLS
+  handshake succeeds, route is programmed end-to-end)
+- All `*.mycure.md` HTTPRoutes now reference the NGINX gateway (mycurelocal,
+  hapihub, etc.)
 
-1. Add `mycure.md` as a zone in Cloudflare (does not need to be the authoritative DNS;
-   Cloudflare only needs to manage the `_acme-challenge` TXT records)
+### Loose end (low priority cleanup)
 
-2. Revert the certificate config to use `additionalDomains` instead of
-   `additionalCertificates` in `values/infrastructure/main.yaml`:
+The dead Envoy listeners on `gateway-system/shared-gateway` are still misconfigured
+and harmless but noisy:
 
-   ```yaml
-   # Under tls.certManager:
-   additionalDomains:
-     # ... existing domains ...
-     - api.mycure.md
-   ```
+- `https-mycure` — `Programmed=False`, `InvalidCertificateRef`
+- `https-stg-mycure` — same
+- `http-mycure` and `http-stg-mycure` — programmed but unused
 
-3. Remove `tlsSecretName` from the `https-mycure` listener so it uses the shared
-   `gateway-tls` secret:
+Cleanup task: remove these listeners from the Envoy `shared-gateway` config since
+nothing routes through Envoy for `*.mycure.md` anymore. Files involved:
 
-   ```yaml
-   - name: https-mycure
-     port: 443
-     protocol: HTTPS
-     hostname: "*.mycure.md"
-     # no tlsSecretName — uses gateway-tls
-   ```
-
-4. Revert the gateway chart template change (remove per-listener `tlsSecretName`
-   support) since all listeners can share the same certificate.
-
-5. Add `https-mycure` back to the `envoyPatchPolicy.listeners` list.
-
-6. Remove `additionalCertificates` section and the
-   `charts/gateway/templates/additional-certificates.yaml` template.
-
-7. Commit, push, and verify ArgoCD syncs the certificate with `api.mycure.md` included.
-
-## Solution 2: Upgrade Envoy Gateway
-
-Upgrade Envoy Gateway to a version that fixes HTTP listener merging for additional
-listeners. This would allow cert-manager's HTTP-01 solver to work on port 80 for
-`api.mycure.md`.
-
-### Steps
-
-1. Check the Envoy Gateway changelog for fixes related to HTTP listener merging or
-   multi-hostname HTTP listener support. The current version is v1.2.0.
-
-2. Update the Envoy Gateway version in `values/infrastructure/main.yaml`:
-
-   ```yaml
-   envoyGateway:
-     enabled: true
-     version: <new-version>
-   ```
-
-3. After upgrading, test that HTTP routes on additional listeners (e.g., `http-mycure`)
-   are properly programmed in the Envoy data plane.
-
-4. Once confirmed working, the `additionalCertificates` config and
-   `additional-certificates.yaml` template will work as designed — cert-manager will
-   use the `letsencrypt-prod` HTTP-01 ClusterIssuer to provision `gateway-tls-mycure-md`.
-
-5. Add `https-mycure` back to the `envoyPatchPolicy.listeners` list.
-
-## Current state of uncommitted changes
-
-The following files have uncommitted changes related to this issue:
-
-- `charts/gateway/templates/gateway.yaml` — per-listener `tlsSecretName` support
-- `charts/gateway/templates/additional-certificates.yaml` — new template (untracked)
-- `values/infrastructure/main.yaml` — `tlsSecretName`, `additionalCertificates`,
-  `https-mycure` removed from envoyPatchPolicy
-
-These changes are correct but inert until a TLS secret is provisioned.
+- `values/infrastructure/main.yaml` — `envoyGatewayResources.gateway.listeners`
+- `charts/gateway/templates/gateway.yaml` if any per-listener config remains
 
 ---
 
-# FIXME: Gateway NetworkPolicies in security-baseline should move to app charts
+## OPEN: Migrate Gateway NetworkPolicies from security-baseline to per-app charts
 
-## Problem
+**Status**: Partial — 4 of 6 FIXME-listed apps have per-app NetworkPolicy templates,
+but the centralized policies in `allow-gateway-to-apps.yaml` were never removed,
+so the apps now have duplicate NetworkPolicies (additive — works, but defeats the
+migration).
 
-Gateway ingress NetworkPolicies are centralized in
-`charts/security-baseline/templates/allow-gateway-to-apps.yaml` with a hardcoded
-list of apps and ports. This has two issues:
+### Original problem
 
-1. **Doesn't scale** — adding a new app requires editing the security-baseline chart
-   instead of the app's own chart. `dentalemon-website` was missing entirely.
-2. **Single gateway assumption** — all policies hardcode
-   `kubernetes.io/metadata.name: envoy-gateway-system`. Apps routed through a
-   different gateway (e.g., NGINX Gateway Fabric in `nginx-gateway-system`) need
-   separate policies.
+Gateway ingress NetworkPolicies were centralized in
+`charts/security-baseline/templates/allow-gateway-to-apps.yaml` with hardcoded
+app names, ports, and a hardcoded `envoy-gateway-system` namespace selector. This
+broke when `dentalemon-website` was added (missing entirely) and when apps moved
+to NGINX Gateway (wrong namespace selector).
 
-## Current state
+### Current state
 
-- `dentalemon-website` now has its own `networkpolicy.yaml` template that derives
-  the gateway namespace from `gateway.gatewayNamespace` (works for both Envoy and
-  NGINX gateways).
-- All other apps (`api`, `hapihub`, `mycure`, `account`, `minio`, `api-worker`)
-  still rely on the centralized `allow-gateway-to-apps.yaml`.
+**Per-app `templates/networkpolicy.yaml` files now exist** in 11 charts:
 
-## Fix
+| Chart | Was in original FIXME? |
+|---|---|
+| `charts/api/templates/networkpolicy.yaml` | ✅ FIXME target |
+| `charts/account/templates/networkpolicy.yaml` | ✅ FIXME target |
+| `charts/hapihub/templates/networkpolicy.yaml` | ✅ FIXME target |
+| `charts/mycure/templates/networkpolicy.yaml` | ✅ FIXME target |
+| `charts/dentalemon-website/templates/networkpolicy.yaml` | (already done at FIXME time) |
+| `charts/dentalemon/templates/networkpolicy.yaml` | bonus |
+| `charts/hapihub-docs/templates/networkpolicy.yaml` | bonus |
+| `charts/mycurelocal/templates/networkpolicy.yaml` | bonus |
+| `charts/mycurev8/templates/networkpolicy.yaml` | bonus |
+| `charts/syncd/templates/networkpolicy.yaml` | bonus |
+| `charts/external-dns/templates/networkpolicy.yaml` | bonus |
 
-For each app in `allow-gateway-to-apps.yaml`:
+**`allow-gateway-to-apps.yaml` still contains all 6 original entries**, now
+duplicating the per-app policies for `api`, `account`, `hapihub`, `mycure`:
 
-1. Add a `templates/networkpolicy.yaml` to the app's chart (use
-   `charts/dentalemon-website/templates/networkpolicy.yaml` as the pattern)
-2. Use the app's gateway namespace helper (or `global.gateway.namespace`) for
-   the `namespaceSelector` so it works regardless of which gateway routes to it
-3. Enable `networkPolicy.enabled: true` in the deployment values
-4. Remove the app's entry from `allow-gateway-to-apps.yaml`
-5. Once all apps are migrated, delete `allow-gateway-to-apps.yaml`
+- `allow-gateway-to-api`
+- `allow-gateway-to-api-worker`
+- `allow-gateway-to-account`
+- `allow-gateway-to-hapihub`
+- `allow-gateway-to-mycure`
+- `allow-gateway-to-minio`
+
+**Edge cases** — neither `minio` nor `api-worker` has a local chart:
+
+- `charts/minio/` does not exist — MinIO is a Bitnami subchart of `hapihub` (and
+  others). It cannot host its own NetworkPolicy template the same way.
+- `charts/api-worker/` does not exist — verify whether `api-worker` is still
+  deployed anywhere; if not, the entry should be dropped entirely.
+
+### Remaining work
+
+1. Remove the duplicated entries from
+   `charts/security-baseline/templates/allow-gateway-to-apps.yaml`:
+   - `allow-gateway-to-api`
+   - `allow-gateway-to-account`
+   - `allow-gateway-to-hapihub`
+   - `allow-gateway-to-mycure`
+2. Verify `networkPolicy.enabled: true` in deployment values for those four apps
+   so the per-chart policies actually render.
+3. Decide on `api-worker`:
+   - If still deployed: create a chart (or its own NetworkPolicy template) and
+     migrate
+   - If retired: drop the entry from `allow-gateway-to-apps.yaml` entirely
+4. Decide on `minio`:
+   - Option A: keep `allow-gateway-to-minio` in the centralized file as a special
+     case for the Bitnami subchart
+   - Option B: add the NetworkPolicy as part of the parent chart (e.g.,
+     `charts/hapihub/templates/networkpolicy-minio.yaml`) where minio is exposed
+5. Once 1-4 are done and the centralized file only contains residual edge cases
+   (or is empty), either delete `allow-gateway-to-apps.yaml` or keep it solely
+   for documented exceptions

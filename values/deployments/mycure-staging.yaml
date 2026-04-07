@@ -101,7 +101,7 @@ hapihub:
 
   image:
     repository: ghcr.io/mycurelabs/hapihub
-    tag: "11.2.1"
+    tag: "11.2.8"
     pullPolicy: IfNotPresent
 
   replicaCount: 1
@@ -130,7 +130,6 @@ hapihub:
       rpId: "localfirsthealth.com"
 
   config:
-    CLUSTER_INSTANCES: "max"
     CORS_ORIGINS: "https://mycure.stg.localfirsthealth.com,https://mycurev8.stg.localfirsthealth.com,https://mycurelocal.stg.localfirsthealth.com,https://mycure-myaccount.stg.localfirsthealth.com,https://mycure-deploydash.stg.localfirsthealth.com,https://dentalemon.stg.localfirsthealth.com,https://dentalemon-myaccount.stg.localfirsthealth.com,https://dentalemon-website.stg.localfirsthealth.com,https://dentalemon.stg.mycure.md,https://mycure-pr--*.web.app"
     CORS_STRICT: "true"
     CORS_ALLOW_LOCAL_NETWORK: "false"
@@ -144,6 +143,8 @@ hapihub:
       value: "60"
     - name: BETTER_AUTH_RATE_LIMIT_MAX
       value: "300"
+    - name: BETTER_AUTH_SESSION_COOKIE_CACHE_ENABLED
+      value: "false"
 
   livenessProbe:
     enabled: true
@@ -175,6 +176,17 @@ hapihub:
         remoteKey: mycure-staging-better-auth-secret
       - secretKey: PRIVATE_KEY
         remoteKey: mycure-staging-private-key
+      # Encryption keys (synced from production for data clone)
+      - secretKey: ENC_BILLING_INVOICES
+        remoteKey: mycure-staging-enc-billing-invoices
+      - secretKey: ENC_BILLING_ITEMS
+        remoteKey: mycure-staging-enc-billing-items
+      - secretKey: ENC_BILLING_PAYMENTS
+        remoteKey: mycure-staging-enc-billing-payments
+      - secretKey: ENC_MEDICAL_RECORDS
+        remoteKey: mycure-staging-enc-medical-records
+      - secretKey: ENC_PERSONAL_DETAILS
+        remoteKey: mycure-staging-enc-personal-details
 
   postgresql:
     enabled: true
@@ -220,11 +232,11 @@ mycure:
 
 # ===== HEALTHCARE: MyCure Local Frontend Application =====
 mycurelocal:
-  enabled: true
+  enabled: false
 
   image:
     repository: ghcr.io/mycurelabs/mycurelocal
-    tag: "1.1.2"
+    tag: "1.4.0"
     pullPolicy: IfNotPresent
 
   replicaCount: 1
@@ -340,7 +352,7 @@ mycurev8:
 
   image:
     repository: ghcr.io/mycurelabs/mycureapp
-    tag: "8.24.5"
+    tag: "8.24.6"
     pullPolicy: IfNotPresent
 
   replicaCount: 1
@@ -360,6 +372,7 @@ mycurev8:
   config:
     API_URL: "https://hapihub.stg.localfirsthealth.com"
     HAPIHUB_URL: "https://hapihub.stg.localfirsthealth.com"
+    MYCURE_X_URL: "https://mycure.stg.localfirsthealth.com"
 
   podDisruptionBudget:
     enabled: false
@@ -461,7 +474,7 @@ dentalemon:
 
 # ===== HEALTHCARE: SyncD Real-time Synchronization =====
 syncd:
-  enabled: true
+  enabled: false
 
   image:
     repository: ghcr.io/mycurelabs/syncd
@@ -541,7 +554,7 @@ postgresql:
 
 # ===== DATABASE: MongoDB =====
 mongodb:
-  enabled: true
+  enabled: false
 
   fullnameOverride: "mongodb"
 
@@ -595,6 +608,9 @@ valkey:
     security:
       allowInsecureImages: true
 
+  auth:
+    existingSecret: valkey
+
   architecture: standalone
 
   image:
@@ -606,13 +622,19 @@ valkey:
       enabled: true
       storageClass: ""
       size: 4Gi
+    # Bumped 2026-04-06: the primary OOM-kills during AOF/RDB load (RDB ≈ 376Mi
+    # base with ~425k keys, plus AOF incr replay and cadence working set).
+    # 512Mi was causing 277 restarts in 27h and a dead cadence metadata backend;
+    # 1Gi was still not enough — valkey peaked during AOF replay and tripped
+    # the same OOM. 2Gi gives real headroom. CPU bumped so the initial replay
+    # doesn't starve the liveness probe.
     resources:
       requests:
-        cpu: 50m
-        memory: 256Mi
+        cpu: 100m
+        memory: 1Gi
       limits:
-        cpu: 250m
-        memory: 512Mi
+        cpu: 500m
+        memory: 2Gi
 
 # ===== STORAGE: MinIO Object Storage =====
 minio:
@@ -700,18 +722,20 @@ cadence:
 
   image:
     repository: ghcr.io/mycurelabs/cadence
-    tag: "0.3.0"
-    pullPolicy: IfNotPresent
+    tag: "0.4.1"
+    pullPolicy: Always
 
   replicaCount: 1
 
+  # Bumped 2026-04-06: 0.4.0 OOMs at 2Gi during initial valkey state load
+  # (~425k metadata keys + 110-table watermark cache + iroh quic stack).
   resources:
     requests:
-      cpu: 100m
-      memory: 512Mi
+      cpu: 200m
+      memory: 1Gi
     limits:
-      cpu: "1"
-      memory: 2Gi
+      cpu: "2"
+      memory: 4Gi
 
   gateway:
     hostname: ""

@@ -103,7 +103,7 @@ hapihub:
     tag: "10.11.15"
     pullPolicy: IfNotPresent
 
-  replicaCount: 1
+  replicaCount: 3
 
   resources:
     requests:
@@ -137,6 +137,7 @@ hapihub:
     CORS_STRICT: "true"
     CORS_ALLOW_LOCAL_NETWORK: "false"
     CORS_ALLOW_MOBILE_APPS: "true"
+    ACCOUNTS_SERVICE_ACCOUNT_EMAILS: "service@mycure.md"
 
   env:
     - name: BETTER_AUTH_RATE_LIMIT_ENABLED
@@ -214,6 +215,14 @@ hapihub:
         remoteKey: mycure-production-stripe-checkout-success-url
       - secretKey: STRIPE_CHECKOUT_CANCEL_URL
         remoteKey: mycure-production-stripe-checkout-cancel-url
+      # ===== 11.x additions (Tier 5 Phase 5) =====
+      # Wired into the deployment template at hapihub/templates/deployment.yaml:248-260
+      # as `optional: true` env vars, so safe to land while still on 10.x.
+      # All 10.x secrets above are kept for rollback safety until Tier 6 cleanup.
+      - secretKey: AUTH_SECRET
+        remoteKey: mycure-production-auth-secret
+      - secretKey: BETTER_AUTH_SECRET
+        remoteKey: mycure-production-better-auth-secret
 
   mongodb:
     external: false # Use in-cluster MongoDB
@@ -223,9 +232,23 @@ hapihub:
     username: root
     replicaSet: rs0
 
+  # ===== 11.x PostgreSQL backend (Tier 5 Phase 5 prep) =====
+  # When postgresql.enabled: true and external: false, the hapihub chart
+  # constructs DATABASE_URI directly from the in-cluster `postgresql` K8s
+  # secret (charts/hapihub/templates/deployment.yaml:127-135). 10.x ignores
+  # this env var; 11.x reads it on cutover. Safe to land while still on 10.x.
+  postgresql:
+    enabled: true
+    external: false
+    serviceName: postgresql-primary
+    auth:
+      database: hapihub
+      username: postgres
+      existingSecret: postgresql
+
 # ===== HEALTHCARE: Frontend Application =====
 mycure:
-  enabled: true
+  enabled: false
 
   image:
     repository: ghcr.io/mycurelabs/mycureapp
@@ -259,7 +282,7 @@ mycurelocal:
 
   image:
     repository: ghcr.io/mycurelabs/mycurelocal
-    tag: "1.1.2"
+    tag: "1.4.0"
     pullPolicy: IfNotPresent
 
   replicaCount: 1
@@ -273,8 +296,11 @@ mycurelocal:
       memory: 128Mi
 
   gateway:
-    hostname: ""
-    sectionName: https-lfh # Use localfirsthealth.com HTTPS listener
+    hostnames:
+      - hostname: mycurelocal.localfirsthealth.com
+        sectionName: https-lfh
+      - hostname: find.mycure.md
+        sectionName: https-mycure
 
   podDisruptionBudget:
     enabled: false
@@ -285,7 +311,7 @@ mycure-myaccount:
 
   image:
     repository: ghcr.io/mycurelabs/myaccount
-    tag: "1.0.0"
+    tag: "1.0.1"
     pullPolicy: IfNotPresent
 
   replicaCount: 1
@@ -375,7 +401,7 @@ mycurev8:
 
   image:
     repository: ghcr.io/mycurelabs/mycureapp
-    tag: "8.24.5"
+    tag: "8.24.6"
     pullPolicy: IfNotPresent
 
   replicaCount: 1
@@ -395,6 +421,33 @@ mycurev8:
   config:
     API_URL: "https://hapihub.localfirsthealth.com"
     HAPIHUB_URL: "https://hapihub.localfirsthealth.com"
+    MYCURE_X_URL: "https://mycure.localfirsthealth.com"
+
+  podDisruptionBudget:
+    enabled: false
+
+# ===== HEALTHCARE: HapiHub API Documentation =====
+hapihub-docs:
+  enabled: true
+
+  image:
+    repository: ghcr.io/mycurelabs/hapihub-docs
+    tag: "1.1.0"
+    pullPolicy: IfNotPresent
+
+  replicaCount: 1
+
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 128Mi
+
+  gateway:
+    hostname: "docs.localfirsthealth.com"
+    sectionName: https-lfh
 
   podDisruptionBudget:
     enabled: false
@@ -466,14 +519,18 @@ dentalemon:
 
 # ===== HEALTHCARE: SyncD Real-time Synchronization =====
 syncd:
-  enabled: true
+  # Disabled at cutover (2026-04-07). syncd is the legacy sync engine being
+  # retired in favor of cadence. 11.x doesn't use syncd, and leaving it running
+  # would write to MongoDB after cutover causing PG/Mongo drift.
+  # Mirrors staging which has had `syncd.enabled: false` since the 11.x cutover.
+  enabled: false
 
   image:
     repository: ghcr.io/mycurelabs/syncd
     tag: "5.130.36"
     pullPolicy: IfNotPresent
 
-  replicaCount: 5
+  replicaCount: 1
 
   resources:
     requests:
@@ -498,7 +555,8 @@ syncd:
 
   autoscaling:
     enabled: true
-    maxReplicas: 5
+    minReplicas: 1
+    maxReplicas: 2
 
   externalSecrets:
     enabled: true
@@ -529,13 +587,16 @@ syncd:
     username: root
     replicaSet: rs0
 
-# ===== DATABASE: PostgreSQL =====
+# ===== DATABASE: PostgreSQL (HA, Tier 4.2) =====
+# Replication mode: 1 primary + 1 read replica with streaming replication.
+# Sized for the migrated 11.x dataset (~35GB useful from MongoDB) plus
+# 18 months growth headroom. See plan: tier 4.2 in DIFF.md.
 postgresql:
-  enabled: false # Disabled - API application not in use
+  enabled: true
 
   fullnameOverride: "postgresql"
 
-  architecture: standalone
+  architecture: replication
 
   image:
     repository: bitnamilegacy/postgresql
@@ -543,25 +604,44 @@ postgresql:
 
   auth:
     enabled: true
+    database: hapihub
+    username: postgres
     existingSecret: postgresql
+    replicationUsername: repl_user
     secretKeys:
       adminPasswordKey: postgres-password
+      replicationPasswordKey: postgres-replication-password
 
-  persistence:
-    enabled: true
-    storageClass: ""
-    size: 20Gi
+  primary:
+    persistence:
+      enabled: true
+      storageClass: ""
+      size: 200Gi
+    resources:
+      requests:
+        cpu: 500m
+        memory: 4Gi
+      limits:
+        cpu: 2000m
+        memory: 8Gi
 
-  resources:
-    requests:
-      cpu: 50m
-      memory: 128Mi
-    limits:
-      cpu: 500m
-      memory: 1Gi
+  readReplicas:
+    replicaCount: 1
+    persistence:
+      enabled: true
+      storageClass: ""
+      size: 200Gi
+    resources:
+      requests:
+        cpu: 500m
+        memory: 4Gi
+      limits:
+        cpu: 2000m
+        memory: 8Gi
 
   podDisruptionBudget:
-    enabled: false
+    enabled: true
+    minAvailable: 1
 
 # ===== DATABASE: MongoDB =====
 mongodb:
@@ -603,17 +683,24 @@ mongodb:
   resources:
     requests:
       cpu: 1000m
-      memory: 5Gi
+      memory: 4Gi
     limits:
-      cpu: 2000m
-      memory: 5Gi
+      cpu: 3000m
+      memory: 6Gi
 
   podDisruptionBudget:
     enabled: false
 
-# ===== CACHE: Valkey (Redis) =====
+# ===== CACHE: Valkey (Redis) — Tier 4.3 =====
 valkey:
-  enabled: false
+  enabled: true
+
+  global:
+    security:
+      allowInsecureImages: true
+
+  auth:
+    existingSecret: valkey
 
   architecture: standalone
 
@@ -626,14 +713,17 @@ valkey:
       enabled: true
       storageClass: ""
       size: 4Gi
-
-  resources:
-    requests:
-      cpu: 50m
-      memory: 128Mi
-    limits:
-      cpu: 250m
-      memory: 256Mi
+    # Resource sizing inherited from staging (2026-04-06 lessons):
+    # 512Mi -> 277 restarts in 27h, 1Gi still OOMs during AOF replay,
+    # 2Gi gives real headroom. CPU bumped so initial replay doesn't
+    # starve the liveness probe.
+    resources:
+      requests:
+        cpu: 100m
+        memory: 1Gi
+      limits:
+        cpu: 500m
+        memory: 2Gi
 
 # ===== STORAGE: MinIO Object Storage =====
 minio:
@@ -712,6 +802,123 @@ mailpit:
   gateway:
     enabled: true
     hostname: ""
+
+# ===== P2P SYNC: Cadence — Tier 4.4 =====
+cadence:
+  enabled: true
+
+  image:
+    repository: ghcr.io/mycurelabs/cadence
+    tag: "0.4.0"
+    pullPolicy: Always
+
+  replicaCount: 1
+
+  # Resource sizing inherited from staging (2026-04-06 lessons):
+  # 0.4.0 OOMs at 2Gi during initial valkey state load (~425k metadata
+  # keys + 110-table watermark cache + iroh quic stack). 4Gi gives headroom.
+  resources:
+    requests:
+      cpu: 200m
+      memory: 1Gi
+    limits:
+      cpu: "2"
+      memory: 4Gi
+
+  gateway:
+    hostname: ""
+    sectionName: https-lfh # Use localfirsthealth.com HTTPS listener
+    snippetsPolicy:
+      enabled: true
+      proxyReadTimeout: "3600s"
+      clientMaxBodySize: "10m"
+
+  postgresql:
+    enabled: true
+    serviceName: postgresql-primary
+    auth:
+      database: hapihub
+
+  valkey:
+    enabled: true
+    serviceName: "valkey-primary"
+
+  config:
+    RUST_LOG: "info"
+
+# ===== MIGRATION: HapiHub Migrator (Tier 5) =====
+# Long-lived MongoDB → PostgreSQL migration tool. NOT a Job — runs continuously
+# through bulk → cdc → reverse-cdc as MIGRATION.md phases progress.
+#
+# Default disabled. Flip enabled: true at MIGRATION.md Phase 2 (after the
+# image is published and ready to start the bulk run).
+#
+# v3.7.0 ships MODE=reverse-cdc as PG-only capture: PG triggers record every
+# write on the allowlist into `_pg_changelog`. Capture-only — no MongoDB
+# replay; the changelog is the rollback forensic trail.
+hapihubMigrator:
+  enabled: true # Phase 2 — bulk migration started 2026-04-07
+
+  image:
+    repository: ghcr.io/mycurelabs/hapihub-migrator
+    tag: "3.7.4"
+    pullPolicy: IfNotPresent
+
+  # bulk (Phase 3) → cdc (Phase 4) → reverse-cdc (Phase 6, post-cutover)
+  mode: reverse-cdc
+
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      cpu: "2"
+      memory: 4Gi
+
+  # Connection details — both DB connection strings are assembled in-template
+  # from the existing in-cluster K8s secrets (no GCP secret indirection):
+  #   PG_TARGET_URI ← postgresql Secret (postgres-password)
+  #   MONGO_SOURCE_URI ← mongodb Secret (mongodb-root-password)
+  postgresql:
+    enabled: true
+    serviceName: postgresql-primary
+    port: 5432
+    auth:
+      database: hapihub
+      username: postgres
+      existingSecret: postgresql
+      passwordKey: postgres-password
+
+  mongodb:
+    enabled: true
+    serviceName: mongodb-headless # bitnami chart only creates the headless service
+    port: 27017
+    database: hapihub
+    username: root
+    replicaSet: rs0
+    authSource: admin
+    existingSecret: mongodb
+    passwordKey: mongodb-root-password
+
+  # Encryption keys are required so the migrator can decrypt the encrypted
+  # MongoDB collections (medical-records, billing-*, personal-details) before
+  # writing to PG, AND re-encrypt during reverse CDC.
+  externalSecrets:
+    enabled: true
+    secretStore: gcp-secretstore
+    secretStoreKind: ClusterSecretStore
+    refreshInterval: 1h
+    secrets:
+      - secretKey: ENC_BILLING_INVOICES
+        remoteKey: mycure-production-enc-billing-invoices
+      - secretKey: ENC_BILLING_ITEMS
+        remoteKey: mycure-production-enc-billing-items
+      - secretKey: ENC_BILLING_PAYMENTS
+        remoteKey: mycure-production-enc-billing-payments
+      - secretKey: ENC_MEDICAL_RECORDS
+        remoteKey: mycure-production-enc-medical-records
+      - secretKey: ENC_PERSONAL_DETAILS
+        remoteKey: mycure-production-enc-personal-details
 
 # ===== BACKUP =====
 backup:

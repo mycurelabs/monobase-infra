@@ -1,0 +1,139 @@
+{{- if .Values.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "hapihub-migrator.fullname" . }}
+  namespace: {{ include "hapihub-migrator.namespace" . }}
+  labels:
+    {{- include "hapihub-migrator.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  # Single replica only — checkpoints in PG ensure resumability across restarts,
+  # but two pods would race on the changelog collector and CDC replayer.
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "hapihub-migrator.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      labels:
+        {{- include "hapihub-migrator.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "hapihub-migrator.serviceAccountName" . }}
+      enableServiceLinks: false
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+      - name: {{ .Chart.Name }}
+        securityContext:
+          {{- toYaml .Values.securityContext | nindent 12 }}
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        ports:
+        - name: http
+          containerPort: {{ .Values.service.targetPort }}
+          protocol: TCP
+        {{- if .Values.livenessProbe.enabled }}
+        livenessProbe:
+          httpGet:
+            path: {{ .Values.livenessProbe.httpGet.path }}
+            port: {{ .Values.livenessProbe.httpGet.port | default "http" }}
+          initialDelaySeconds: {{ .Values.livenessProbe.initialDelaySeconds }}
+          periodSeconds: {{ .Values.livenessProbe.periodSeconds }}
+          timeoutSeconds: {{ .Values.livenessProbe.timeoutSeconds }}
+          failureThreshold: {{ .Values.livenessProbe.failureThreshold }}
+        {{- end }}
+        {{- if .Values.readinessProbe.enabled }}
+        readinessProbe:
+          httpGet:
+            path: {{ .Values.readinessProbe.httpGet.path }}
+            port: {{ .Values.readinessProbe.httpGet.port | default "http" }}
+          initialDelaySeconds: {{ .Values.readinessProbe.initialDelaySeconds }}
+          periodSeconds: {{ .Values.readinessProbe.periodSeconds }}
+          timeoutSeconds: {{ .Values.readinessProbe.timeoutSeconds }}
+          failureThreshold: {{ .Values.readinessProbe.failureThreshold }}
+        {{- end }}
+        resources:
+          {{- toYaml .Values.resources | nindent 12 }}
+        envFrom:
+        - configMapRef:
+            name: {{ include "hapihub-migrator.fullname" . }}
+        env:
+        # ===== PostgreSQL target =====
+        {{- if .Values.postgresql.enabled }}
+        - name: PG_USER
+          value: {{ .Values.postgresql.auth.username | default "postgres" | quote }}
+        - name: PG_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.postgresql.auth.existingSecret | default "postgresql" }}
+              key: {{ .Values.postgresql.auth.passwordKey | default "postgres-password" }}
+        - name: PG_TARGET_URI
+          value: "postgres://$(PG_USER):$(PG_PASSWORD)@{{ include "hapihub-migrator.postgresql.host" . }}:{{ .Values.postgresql.port | default 5432 }}/{{ .Values.postgresql.auth.database | default "hapihub" }}"
+        {{- end }}
+        # ===== MongoDB source =====
+        {{- if .Values.mongodb.enabled }}
+        - name: MONGO_USER
+          value: {{ .Values.mongodb.username | default "root" | quote }}
+        - name: MONGO_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.mongodb.existingSecret | default "mongodb" }}
+              key: {{ .Values.mongodb.passwordKey | default "mongodb-root-password" }}
+        - name: MONGO_SOURCE_URI
+          # directConnection=true is required for bitnami mongodb in headless-only mode:
+          # without it, the driver does replica-set discovery, which returns member
+          # hostnames that may not resolve correctly in single-node replica sets.
+          value: "mongodb://$(MONGO_USER):$(MONGO_PASSWORD)@{{ include "hapihub-migrator.mongodb.host" . }}:{{ .Values.mongodb.port | default 27017 }}/{{ .Values.mongodb.database | default "hapihub" }}?authSource={{ .Values.mongodb.authSource | default "admin" }}&replicaSet={{ .Values.mongodb.replicaSet | default "rs0" }}&directConnection=true"
+        {{- end }}
+        # ===== Encryption keys + any other ExternalSecret-sourced env =====
+        {{- if .Values.externalSecrets.enabled }}
+        {{- range .Values.externalSecrets.secrets }}
+        - name: {{ .secretKey }}
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "hapihub-migrator.fullname" $ }}-secrets
+              key: {{ .secretKey }}
+        {{- end }}
+        {{- end }}
+        # ===== Custom env (free-form) =====
+        {{- with .Values.env }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      {{- $nodePool := include "hapihub-migrator.nodePool" . -}}
+      {{- if or $nodePool .Values.nodeSelector }}
+      nodeSelector:
+        {{- if $nodePool }}
+        node-pool: {{ $nodePool }}
+        {{- end }}
+        {{- with .Values.nodeSelector }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- if or $nodePool .Values.tolerations }}
+      tolerations:
+        {{- if $nodePool }}
+        - key: "node-pool"
+          operator: "Equal"
+          value: {{ $nodePool | quote }}
+          effect: "NoSchedule"
+        {{- end }}
+        {{- with .Values.tolerations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      {{- end }}
+{{- end }}
