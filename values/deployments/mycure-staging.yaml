@@ -731,13 +731,18 @@ cadence:
 
   # Bumped 2026-04-06: 0.4.0 OOMs at 2Gi during initial valkey state load
   # (~425k metadata keys + 110-table watermark cache + iroh quic stack).
+  # Bumped 2026-04-07: 4Gi still OOMs at startup — the applier's primary-DB
+  # catch-up scans all ~118 watched tables in parallel, several of which
+  # (personal_details_history, medical_records_history, activity_logs)
+  # return large result sets before LIMIT kicks in. 8Gi stabilizes the
+  # cold start; revisit if further OOMs show up after a sync-backlog.
   resources:
     requests:
       cpu: 200m
-      memory: 1Gi
+      memory: 2Gi
     limits:
       cpu: "2"
-      memory: 4Gi
+      memory: 8Gi
 
   gateway:
     hostname: ""
