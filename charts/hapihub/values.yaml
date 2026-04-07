@@ -67,12 +67,12 @@ gateway:
       namespace: gateway-system
   
   # HTTPRoute timeout configuration
-  timeouts:
-    # Request timeout - total time for client request/response
-    # Increase from default 15s to handle OAuth callbacks
-    request: "60s"
-    # Optional: Backend request timeout (must be <= request timeout)
-    # backendRequest: "30s"
+  # Disabled by default — nginx-shared-gateway (NGF 2.4.1) doesn't
+  # implement spec.rules[].timeouts and reports UnsupportedField, which
+  # propagates as Degraded health in ArgoCD. Use snippetsPolicy below
+  # to apply proxy_read_timeout via NGF SnippetsPolicy instead.
+  # If you re-enable, set timeouts.request and/or timeouts.backendRequest.
+  timeouts: null
   
   # BackendTrafficPolicy configuration for connection settings
   backendTrafficPolicy:
