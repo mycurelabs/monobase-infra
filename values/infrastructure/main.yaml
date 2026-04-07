@@ -193,24 +193,14 @@ gateway:
         port: 80
         protocol: HTTP
         hostname: "*.stg.localfirsthealth.com"
-      # Production mycure.md
-      - name: https-mycure
-        port: 443
-        protocol: HTTPS
-        hostname: "*.mycure.md"
-      - name: http-mycure
-        port: 80
-        protocol: HTTP
-        hostname: "*.mycure.md"
-      # Staging mycure.md
-      - name: https-stg-mycure
-        port: 443
-        protocol: HTTPS
-        hostname: "*.stg.mycure.md"
-      - name: http-stg-mycure
-        port: 80
-        protocol: HTTP
-        hostname: "*.stg.mycure.md"
+      # Removed: *.mycure.md and *.stg.mycure.md envoy listeners.
+      # These were unused — every mycure.md HTTPRoute attaches to
+      # nginx-shared-gateway (different gateway, different cert), and
+      # the gateway-tls certificate doesn't include the *.mycure.md
+      # wildcards, so envoy reported InvalidCertificateRef and the
+      # listeners stayed Programmed=False, dragging gateway-resources
+      # to Degraded health in ArgoCD. (See `kubectl get httproutes -A` —
+      # only monitoring/grafana attaches to envoy shared-gateway.)
 
   # TLS/Certificate configuration
   tls:
