@@ -41,21 +41,31 @@ spec:
             resources:
               requests:
                 cpu: 100m
-                memory: 384Mi
+                # 192Mi is ~2.3x the observed steady-state RSS (~85Mi) and is
+                # the largest request that fits on the current general node
+                # pool: nodes are 3Gi each, two of three were ≥90% requested
+                # at the time of the incident, so 384Mi made the second
+                # replica Pending. Promotes the pod to Burstable QoS (the
+                # original eviction-prevention goal); the 1Gi limit still
+                # absorbs growth. TODO(infra): grow the general node pool
+                # so this can be raised back to 384Mi.
+                memory: 192Mi
               limits:
                 memory: 1Gi
           pod:
-            # Required (not preferred): with `preferred`, the scheduler placed
-            # both replicas on the same node when the BestEffort pods were still
-            # cleaning up — defeating the HA goal. We have 3 general nodes, so
-            # `required` only fails if 2 of 3 are full, which is acceptable.
-            affinity:
-              podAntiAffinity:
-                requiredDuringSchedulingIgnoredDuringExecution:
-                  - topologyKey: kubernetes.io/hostname
-                    labelSelector:
-                      matchLabels:
-                        app.kubernetes.io/name: nginx-shared-gateway-nginx
+            # Best-effort spread across hosts. Required anti-affinity is too
+            # strict for the current general node pool size — when 2 of 3
+            # nodes are saturated, requiredDuringScheduling leaves the second
+            # replica Pending. ScheduleAnyway lets the scheduler place both
+            # on the same node as a last resort while still preferring
+            # spread when capacity exists.
+            topologySpreadConstraints:
+              - maxSkew: 1
+                topologyKey: kubernetes.io/hostname
+                whenUnsatisfiable: ScheduleAnyway
+                labelSelector:
+                  matchLabels:
+                    app.kubernetes.io/name: nginx-shared-gateway-nginx
 
   destination:
     server: https://kubernetes.default.svc
