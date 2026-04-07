@@ -248,7 +248,7 @@ hapihub:
 
 # ===== HEALTHCARE: Frontend Application =====
 mycure:
-  enabled: true
+  enabled: false
 
   image:
     repository: ghcr.io/mycurelabs/mycureapp
