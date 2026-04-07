@@ -119,11 +119,13 @@ hapihub:
     sectionName: https-stg-lfh
     # timeouts removed: nginx-shared-gateway doesn't support
     # spec.rules[].timeouts and was logging UnsupportedField warnings.
-    # The same effect is achieved via snippetsPolicy.proxyReadTimeout below.
+    # The proxy_read_timeout/client_max_body_size snippet now lives in
+    # nginxGatewayResources.snippetsPolicies in values/infrastructure/main.yaml
+    # so it's owned once at the cluster level (avoids "directive is duplicate"
+    # errors when both staging and production hapihub releases tried to own
+    # identical snippets on the same shared Gateway).
     snippetsPolicy:
-      enabled: true
-      proxyReadTimeout: "3600s"
-      clientMaxBodySize: "50m"
+      enabled: false
 
   betterAuth:
     passkey:

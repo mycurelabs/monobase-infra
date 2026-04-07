@@ -20,6 +20,19 @@ gateway:
   #   protocol: HTTP
   #   hostname: "*.stg.localfirsthealth.com"
 
+# Cluster-wide SnippetsPolicies attached to the shared Gateway.
+# Owned here (not per-app chart) so two releases can never inject the
+# same directive into the same nginx context — that triggers
+# "directive is duplicate" and breaks config reload.
+snippetsPolicies: []
+# Example:
+# - name: hapihub-proxy-timeout
+#   snippets:
+#     - context: http.server.location
+#       value: |
+#         proxy_read_timeout 3600s;
+#         client_max_body_size 50m;
+
 tls:
   # List of certificates — each can use a different ClusterIssuer
   certificates: []

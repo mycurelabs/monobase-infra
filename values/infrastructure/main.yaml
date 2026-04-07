@@ -127,6 +127,18 @@ nginxGatewayResources:
           - api.mycure.md
           - find.mycure.md
 
+  # Cluster-wide SnippetsPolicies for the shared nginx Gateway.
+  # Owned here (not per-app) so two releases can never inject the same
+  # directive into the same nginx context — that triggers
+  # "directive is duplicate" and breaks config reload.
+  snippetsPolicies:
+    - name: hapihub-proxy-timeout
+      snippets:
+        - context: http.server.location
+          value: |
+            proxy_read_timeout 3600s;
+            client_max_body_size 50m;
+
 # EnvoyProxy Configuration - Cloud-specific LoadBalancer settings
 envoyProxyConfig:
   enabled: false  # Override per deployment
@@ -258,10 +270,13 @@ gateway:
         - mail.stg.localfirsthealth.com
         - storage.stg.localfirsthealth.com
         - sync.stg.localfirsthealth.com
-        # Production mycure.md
-        - api.mycure.md
-        # Staging mycure.md
-        - dentalemon.stg.mycure.md
+        # *.mycure.md / *.stg.mycure.md removed: the envoy shared-gateway
+        # no longer has mycure.md listeners (see additionalListeners above),
+        # and the cert-manager Cloudflare DNS-01 issuer cannot resolve the
+        # mycure.md zone in this account, so these challenges hang forever
+        # ("Found no Zones for domain _acme-challenge.api.mycure.md").
+        # The real *.mycure.md routes terminate TLS on nginx-shared-gateway
+        # using separate nginx-gateway-tls-prod-mycure / -stg-mycure certs.
 
   # HTTP to HTTPS redirect
   httpRedirect:
