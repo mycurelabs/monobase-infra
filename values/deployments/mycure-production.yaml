@@ -120,8 +120,9 @@ hapihub:
     sectionName: https-lfh # Use localfirsthealth.com HTTPS listener
     additionalSectionNames:
       - https-mycure
-    timeouts:
-      request: "60s"
+    # timeouts removed: nginx-shared-gateway doesn't support
+    # spec.rules[].timeouts and was logging UnsupportedField warnings.
+    # The same effect is achieved via snippetsPolicy.proxyReadTimeout below.
     snippetsPolicy:
       enabled: true
       proxyReadTimeout: "3600s"
