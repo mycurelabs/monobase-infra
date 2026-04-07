@@ -101,7 +101,7 @@ hapihub:
 
   image:
     repository: ghcr.io/mycurelabs/hapihub
-    tag: "11.2.8"
+    tag: "11.2.9"
     pullPolicy: IfNotPresent
 
   replicaCount: 3
