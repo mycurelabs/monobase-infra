@@ -242,7 +242,7 @@ hapihub:
   postgresql:
     enabled: true
     external: false
-    serviceName: postgresql-primary
+    serviceName: postgresql
     auth:
       database: hapihub
       username: postgres
@@ -581,13 +581,18 @@ syncd:
     username: root
     replicaSet: rs0
 
-# ===== DATABASE: PostgreSQL (HA, mirrors prod) =====
+# ===== DATABASE: PostgreSQL =====
+# Standalone (no read replica) in preprod: prod node pool can't fit a
+# second 4Gi PG pod alongside HA Postgres + existing prod workloads.
+# Replication failover testing is the only thing lost — schema, query,
+# migration, and index rehearsals all still work on a single primary.
+# Re-enable architecture=replication only after the prod pool is bumped.
 postgresql:
   enabled: true
 
   fullnameOverride: "postgresql"
 
-  architecture: replication
+  architecture: standalone
 
   image:
     repository: bitnamilegacy/postgresql
@@ -598,10 +603,6 @@ postgresql:
     database: hapihub
     username: postgres
     existingSecret: postgresql
-    replicationUsername: repl_user
-    secretKeys:
-      adminPasswordKey: postgres-password
-      replicationPasswordKey: postgres-replication-password
 
   primary:
     persistence:
@@ -616,23 +617,8 @@ postgresql:
         cpu: 2000m
         memory: 8Gi
 
-  readReplicas:
-    replicaCount: 1
-    persistence:
-      enabled: true
-      storageClass: ""
-      size: 200Gi
-    resources:
-      requests:
-        cpu: 500m
-        memory: 4Gi
-      limits:
-        cpu: 2000m
-        memory: 8Gi
-
   podDisruptionBudget:
-    enabled: true
-    minAvailable: 1
+    enabled: false
 
 # ===== DATABASE: MongoDB =====
 # Disabled in preprod: hapihub 11.x runs on Postgres-only, and the prod
@@ -825,7 +811,7 @@ cadence:
 
   postgresql:
     enabled: true
-    serviceName: postgresql-primary
+    serviceName: postgresql
     auth:
       database: hapihub
 
@@ -861,7 +847,7 @@ hapihubMigrator:
 
   postgresql:
     enabled: true
-    serviceName: postgresql-primary
+    serviceName: postgresql
     port: 5432
     auth:
       database: hapihub
