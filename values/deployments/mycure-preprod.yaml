@@ -305,7 +305,7 @@ mycurelocal:
 
 # ===== HEALTHCARE: MyCure MyAccount Application =====
 mycure-myaccount:
-  enabled: true
+  enabled: false
 
   image:
     repository: ghcr.io/mycurelabs/myaccount
@@ -426,7 +426,7 @@ mycurev8:
 
 # ===== HEALTHCARE: HapiHub API Documentation =====
 hapihub-docs:
-  enabled: true
+  enabled: false
 
   image:
     repository: ghcr.io/mycurelabs/hapihub-docs
