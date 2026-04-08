@@ -86,6 +86,16 @@ nginxGatewayResources:
         port: 80
         protocol: HTTP
         hostname: "*.stg.mycure.md"
+      # Preprod localfirsthealth.com (ephemeral prod-mirror env)
+      - name: https-preprod-lfh
+        port: 443
+        protocol: HTTPS
+        hostname: "*.preprod.localfirsthealth.com"
+        tlsSecretName: nginx-gateway-tls-preprod
+      - name: http-preprod-lfh
+        port: 80
+        protocol: HTTP
+        hostname: "*.preprod.localfirsthealth.com"
       # Production localfirsthealth.com
       - name: https-lfh
         port: 443
@@ -117,6 +127,10 @@ nginxGatewayResources:
         clusterIssuer: letsencrypt-nginx-http01  # HTTP-01 via NGINX Gateway
         dnsNames:
           - dentalemon.stg.mycure.md
+      - secretName: nginx-gateway-tls-preprod
+        clusterIssuer: letsencrypt-mycure-cloudflare-prod  # DNS-01, wildcard
+        dnsNames:
+          - "*.preprod.localfirsthealth.com"
       - secretName: nginx-gateway-tls-prod
         clusterIssuer: letsencrypt-mycure-cloudflare-prod  # DNS-01
         dnsNames:

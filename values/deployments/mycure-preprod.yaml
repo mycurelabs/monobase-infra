@@ -1,0 +1,906 @@
+# MyCure Pre-Production Configuration
+# Ephemeral pre-prod rehearsal env on DigitalOcean Kubernetes (DOKS).
+# Mirrors mycure-production in component shape (HA Postgres, replicaset Mongo,
+# autoscaling, resource sizing) so major changes can be rehearsed against a
+# real cloned prod dataset. GCP secrets are REUSED from mycure-production so
+# restored data remains decryptable — this means prod Stripe / OAuth / auth
+# credentials resolve in this namespace too, and the only thing keeping the
+# env from producing real side-effects is the safety overrides below
+# (mailpit, no public linking, short-lived). Tear down with
+# `kubectl delete ns mycure-preprod` when the rehearsal is done.
+
+global:
+  domain: preprod.localfirsthealth.com
+  namespace: mycure-preprod
+  environment: preprod
+
+  # Reuse prod node pool so scheduling/perf characteristics match prod.
+  nodePool: "production"
+
+  gateway:
+    name: nginx-shared-gateway
+    namespace: nginx-gateway-system
+
+  storage:
+    provider: ""
+    className: ""
+
+# ===== CORE: Monobase API =====
+api:
+  enabled: false
+
+  image:
+    repository: ghcr.io/monobaselabs/api
+    tag: "0.1.4"
+    pullPolicy: IfNotPresent
+
+  replicaCount: 1
+
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+  gateway:
+    hostname: ""
+
+  livenessProbe:
+    enabled: true
+
+  readinessProbe:
+    enabled: true
+
+  podDisruptionBudget:
+    enabled: false
+
+  autoscaling:
+    enabled: false
+
+  backup:
+    enabled: false
+
+  externalSecrets:
+    enabled: false
+
+  postgresql:
+    serviceName: postgresql
+    architecture: standalone
+    auth:
+      database: postgres
+      username: postgres
+
+  mailpit:
+    enabled: true
+
+# ===== CORE: Monobase Account Frontend =====
+account:
+  enabled: false
+
+  image:
+    repository: ghcr.io/monobaselabs/accountapp
+    tag: "1.0.2"
+    pullPolicy: IfNotPresent
+
+  replicaCount: 1
+
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 128Mi
+
+  gateway:
+    hostname: ""
+
+  config:
+    API_URL: "https://hapihub.preprod.localfirsthealth.com"
+
+  podDisruptionBudget:
+    enabled: false
+
+# ===== HEALTHCARE: HapiHub API =====
+hapihub:
+  enabled: true
+
+  image:
+    repository: ghcr.io/mycurelabs/hapihub
+    tag: "11.2.9"
+    pullPolicy: IfNotPresent
+
+  replicaCount: 3
+
+  resources:
+    requests:
+      cpu: 1000m
+      memory: 768Mi
+    limits:
+      cpu: "2"
+      memory: 2Gi
+
+  gateway:
+    hostnames:
+      - hapihub.preprod.localfirsthealth.com
+    sectionName: https-preprod-lfh
+    # No mycure.md hostnames in preprod — we only route *.preprod.localfirsthealth.com.
+    snippetsPolicy:
+      enabled: false
+
+  betterAuth:
+    passkey:
+      rpName: "Mycure (preprod)"
+      rpId: "preprod.localfirsthealth.com"
+
+  config:
+    CORS_ORIGINS: "https://mycure.preprod.localfirsthealth.com,https://mycurev8.preprod.localfirsthealth.com,https://mycurelocal.preprod.localfirsthealth.com,https://mycure-myaccount.preprod.localfirsthealth.com,https://mycure-deploydash.preprod.localfirsthealth.com,https://dentalemon.preprod.localfirsthealth.com,https://dentalemon-myaccount.preprod.localfirsthealth.com,https://dentalemon-website.preprod.localfirsthealth.com"
+    CORS_STRICT: "true"
+    CORS_ALLOW_LOCAL_NETWORK: "false"
+    CORS_ALLOW_MOBILE_APPS: "true"
+    ACCOUNTS_SERVICE_ACCOUNT_EMAILS: "service@mycure.md"
+
+  env:
+    - name: BETTER_AUTH_RATE_LIMIT_ENABLED
+      value: "true"
+    - name: BETTER_AUTH_RATE_LIMIT_WINDOW
+      value: "60"
+    - name: BETTER_AUTH_RATE_LIMIT_MAX
+      value: "300"
+    - name: BETTER_AUTH_SESSION_COOKIE_CACHE_ENABLED
+      value: "false"
+
+  livenessProbe:
+    enabled: true
+
+  readinessProbe:
+    enabled: true
+
+  podDisruptionBudget:
+    enabled: false
+
+  autoscaling:
+    enabled: true
+    minReplicas: 3
+    maxReplicas: 5
+
+  # Secrets REUSE the existing mycure-production-* GCP keys. This is
+  # required so that data cloned from prod (MongoDB/Postgres) remains
+  # decryptable in preprod — the ENC_* keys must be byte-identical.
+  # Consequence: Stripe/OAuth/auth secrets are also the prod ones.
+  # Isolation relies on the mailpit/host overrides below + the fact that
+  # this env is short-lived and not publicly linked.
+  externalSecrets:
+    enabled: true
+    secretStore: gcp-secretstore
+    secretStoreKind: ClusterSecretStore
+    refreshInterval: 1h
+    secrets:
+      # Google OAuth
+      - secretKey: GOOGLE_CLIENT_ID
+        remoteKey: mycure-production-google-oauth-client-id
+      - secretKey: GOOGLE_CLIENT_SECRET
+        remoteKey: mycure-production-google-oauth-client-secret
+      - secretKey: STRIPE_SECRET_KEY
+        remoteKey: mycure-production-stripe-secret-key
+      # Encryption keys
+      - secretKey: ENC_BILLING_INVOICES
+        remoteKey: mycure-production-enc-billing-invoices
+      - secretKey: ENC_BILLING_ITEMS
+        remoteKey: mycure-production-enc-billing-items
+      - secretKey: ENC_BILLING_PAYMENTS
+        remoteKey: mycure-production-enc-billing-payments
+      - secretKey: ENC_MEDICAL_RECORDS
+        remoteKey: mycure-production-enc-medical-records
+      - secretKey: ENC_PERSONAL_DETAILS
+        remoteKey: mycure-production-enc-personal-details
+      # MongoDB URI (managed DigitalOcean)
+      - secretKey: MONGO_URI
+        remoteKey: mycure-production-mongo-uri
+      # JWT/Auth keys
+      - secretKey: PRIVATE_KEY
+        remoteKey: mycure-production-private-key
+      - secretKey: PUBLIC_KEY
+        remoteKey: mycure-production-public-key
+      # Storage configuration (GCP)
+      - secretKey: STORAGE_BUCKET
+        remoteKey: mycure-production-storage-bucket
+      - secretKey: STORAGE_CLIENT_EMAIL
+        remoteKey: mycure-production-storage-client-email
+      - secretKey: STORAGE_DIRECTORY
+        remoteKey: mycure-production-storage-directory
+      - secretKey: STORAGE_PRIVATE_KEY
+        remoteKey: mycure-production-storage-private-key
+      - secretKey: STORAGE_PROJECT_ID
+        remoteKey: mycure-production-storage-project-id
+      - secretKey: STORAGE_TYPE
+        remoteKey: mycure-production-storage-type
+      # Stripe configuration
+      - secretKey: STRIPE_KEY
+        remoteKey: mycure-production-stripe-key
+      - secretKey: STRIPE_CHECKOUT_SUCCESS_URL
+        remoteKey: mycure-production-stripe-checkout-success-url
+      - secretKey: STRIPE_CHECKOUT_CANCEL_URL
+        remoteKey: mycure-production-stripe-checkout-cancel-url
+      - secretKey: AUTH_SECRET
+        remoteKey: mycure-production-auth-secret
+      - secretKey: BETTER_AUTH_SECRET
+        remoteKey: mycure-production-better-auth-secret
+
+  mongodb:
+    external: false # Use in-cluster MongoDB
+    enabled: true
+    serviceName: mongodb
+    database: hapihub
+    username: root
+    replicaSet: rs0
+
+  postgresql:
+    enabled: true
+    external: false
+    serviceName: postgresql-primary
+    auth:
+      database: hapihub
+      username: postgres
+      existingSecret: postgresql
+
+# ===== HEALTHCARE: Frontend Application =====
+mycure:
+  enabled: true
+
+  image:
+    repository: ghcr.io/mycurelabs/mycureapp
+    tag: "10.4.2"
+    pullPolicy: IfNotPresent
+
+  replicaCount: 1
+
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 128Mi
+
+  gateway:
+    hostname: ""
+    sectionName: https-preprod-lfh
+
+  config:
+    API_URL: "https://hapihub.preprod.localfirsthealth.com"
+    HAPIHUB_URL: "https://hapihub.preprod.localfirsthealth.com"
+
+  podDisruptionBudget:
+    enabled: false
+
+# ===== HEALTHCARE: MyCure Local Frontend Application =====
+mycurelocal:
+  enabled: false
+
+  image:
+    repository: ghcr.io/mycurelabs/mycurelocal
+    tag: "1.4.0"
+    pullPolicy: IfNotPresent
+
+  replicaCount: 1
+
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 128Mi
+
+  gateway:
+    hostnames:
+      - hostname: mycurelocal.preprod.localfirsthealth.com
+        sectionName: https-preprod-lfh
+
+  podDisruptionBudget:
+    enabled: false
+
+# ===== HEALTHCARE: MyCure MyAccount Application =====
+mycure-myaccount:
+  enabled: true
+
+  image:
+    repository: ghcr.io/mycurelabs/myaccount
+    tag: "1.0.1"
+    pullPolicy: IfNotPresent
+
+  replicaCount: 1
+
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 128Mi
+
+  gateway:
+    hostname: ""
+    sectionName: https-preprod-lfh
+
+  config:
+    API_URL: "https://hapihub.preprod.localfirsthealth.com"
+    HAPIHUB_URL: "https://hapihub.preprod.localfirsthealth.com"
+
+  podDisruptionBudget:
+    enabled: false
+
+# ===== HEALTHCARE: DentaLemon MyAccount Application =====
+dentalemon-myaccount:
+  enabled: false
+
+  image:
+    repository: ghcr.io/mycurelabs/dentalemon-myaccount
+    tag: "1.0.14"
+    pullPolicy: IfNotPresent
+
+  replicaCount: 1
+
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 128Mi
+
+  gateway:
+    hostname: ""
+    sectionName: https-preprod-lfh
+
+  config:
+    API_URL: "https://hapihub.preprod.localfirsthealth.com"
+    HAPIHUB_URL: "https://hapihub.preprod.localfirsthealth.com"
+
+  podDisruptionBudget:
+    enabled: false
+
+# ===== HEALTHCARE: MyCure DeployDash Application =====
+mycure-deploydash:
+  enabled: true
+
+  image:
+    repository: ghcr.io/mycurelabs/deploydash
+    tag: "10.0.5"
+    pullPolicy: IfNotPresent
+
+  replicaCount: 1
+
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 128Mi
+
+  gateway:
+    hostname: ""
+    sectionName: https-preprod-lfh
+
+  config:
+    API_URL: "https://hapihub.preprod.localfirsthealth.com"
+    HAPIHUB_URL: "https://hapihub.preprod.localfirsthealth.com"
+
+  podDisruptionBudget:
+    enabled: false
+
+# ===== HEALTHCARE: Frontend Application (v8 Legacy) =====
+mycurev8:
+  enabled: true
+
+  image:
+    repository: ghcr.io/mycurelabs/mycureapp
+    tag: "8.24.7"
+    pullPolicy: IfNotPresent
+
+  replicaCount: 1
+
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 128Mi
+
+  gateway:
+    hostname: ""
+    sectionName: https-preprod-lfh
+
+  config:
+    API_URL: "https://hapihub.preprod.localfirsthealth.com"
+    HAPIHUB_URL: "https://hapihub.preprod.localfirsthealth.com"
+    MYCURE_X_URL: "https://mycure.preprod.localfirsthealth.com"
+
+  podDisruptionBudget:
+    enabled: false
+
+# ===== HEALTHCARE: HapiHub API Documentation =====
+hapihub-docs:
+  enabled: true
+
+  image:
+    repository: ghcr.io/mycurelabs/hapihub-docs
+    tag: "1.1.0"
+    pullPolicy: IfNotPresent
+
+  replicaCount: 1
+
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 128Mi
+
+  gateway:
+    hostname: "docs.preprod.localfirsthealth.com"
+    sectionName: https-preprod-lfh
+
+  podDisruptionBudget:
+    enabled: false
+
+# ===== HEALTHCARE: DentaLemon Website =====
+dentalemon-website:
+  enabled: false
+
+  image:
+    repository: ghcr.io/mycurelabs/dentalemon-website
+    tag: "0.3.1"
+    pullPolicy: IfNotPresent
+
+  replicaCount: 1
+
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 128Mi
+
+  gateway:
+    hostname: ""
+    sectionName: https-preprod-lfh
+    gatewayName: nginx-shared-gateway
+    gatewayNamespace: nginx-gateway-system
+
+  networkPolicy:
+    enabled: true
+
+  config:
+    API_URL: "https://hapihub.preprod.localfirsthealth.com"
+    ACCOUNT_URL: "https://dentalemon-myaccount.preprod.localfirsthealth.com"
+
+  podDisruptionBudget:
+    enabled: false
+
+# ===== HEALTHCARE: DentaLemon Dental Application =====
+dentalemon:
+  enabled: false
+
+  image:
+    repository: ghcr.io/mycurelabs/dentalemonapp
+    tag: "10.9.1"
+    pullPolicy: IfNotPresent
+
+  replicaCount: 1
+
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 128Mi
+
+  gateway:
+    hostname: ""
+    sectionName: https-preprod-lfh
+
+  config:
+    API_URL: "https://hapihub.preprod.localfirsthealth.com"
+    HAPIHUB_URL: "https://hapihub.preprod.localfirsthealth.com"
+
+  podDisruptionBudget:
+    enabled: false
+
+# ===== HEALTHCARE: SyncD Real-time Synchronization =====
+syncd:
+  enabled: false
+
+  image:
+    repository: ghcr.io/mycurelabs/syncd
+    tag: "5.130.36"
+    pullPolicy: IfNotPresent
+
+  replicaCount: 1
+
+  resources:
+    requests:
+      cpu: 250m
+      memory: 384Mi
+    limits:
+      cpu: "2"
+      memory: 4Gi
+
+  gateway:
+    hostname: ""
+    sectionName: https-preprod-lfh
+
+  livenessProbe:
+    enabled: true
+
+  readinessProbe:
+    enabled: true
+
+  podDisruptionBudget:
+    enabled: false
+
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 3
+
+  externalSecrets:
+    enabled: true
+    secretStore: gcp-secretstore
+    secretStoreKind: ClusterSecretStore
+    refreshInterval: 1h
+    secrets:
+      - secretKey: MONGO_URI
+        remoteKey: mycure-production-mongo-uri
+      - secretKey: ENC_BILLING_INVOICES
+        remoteKey: mycure-production-enc-billing-invoices
+      - secretKey: ENC_BILLING_ITEMS
+        remoteKey: mycure-production-enc-billing-items
+      - secretKey: ENC_BILLING_PAYMENTS
+        remoteKey: mycure-production-enc-billing-payments
+      - secretKey: ENC_MEDICAL_RECORDS
+        remoteKey: mycure-production-enc-medical-records
+      - secretKey: ENC_PERSONAL_DETAILS
+        remoteKey: mycure-production-enc-personal-details
+
+  mongodb:
+    external: false # Use in-cluster MongoDB
+    enabled: true
+    serviceName: mongodb
+    database: hapihub
+    username: root
+    replicaSet: rs0
+
+# ===== DATABASE: PostgreSQL (HA, mirrors prod) =====
+postgresql:
+  enabled: true
+
+  fullnameOverride: "postgresql"
+
+  architecture: replication
+
+  image:
+    repository: bitnamilegacy/postgresql
+    tag: 16.4.0-debian-12-r13
+
+  auth:
+    enabled: true
+    database: hapihub
+    username: postgres
+    existingSecret: postgresql
+    replicationUsername: repl_user
+    secretKeys:
+      adminPasswordKey: postgres-password
+      replicationPasswordKey: postgres-replication-password
+
+  primary:
+    persistence:
+      enabled: true
+      storageClass: ""
+      size: 200Gi
+    resources:
+      requests:
+        cpu: 500m
+        memory: 4Gi
+      limits:
+        cpu: 2000m
+        memory: 8Gi
+
+  readReplicas:
+    replicaCount: 1
+    persistence:
+      enabled: true
+      storageClass: ""
+      size: 200Gi
+    resources:
+      requests:
+        cpu: 500m
+        memory: 4Gi
+      limits:
+        cpu: 2000m
+        memory: 8Gi
+
+  podDisruptionBudget:
+    enabled: true
+    minAvailable: 1
+
+# ===== DATABASE: MongoDB =====
+mongodb:
+  enabled: true
+
+  fullnameOverride: "mongodb"
+
+  architecture: replicaset
+  replicaCount: 1
+
+  image:
+    repository: bitnamilegacy/mongodb
+    tag: 7.0.15-debian-12-r0
+
+  auth:
+    rootUser: root
+    existingSecret: mongodb
+
+  arbiter:
+    enabled: false
+
+  livenessProbe:
+    enabled: true
+    timeoutSeconds: 30
+    periodSeconds: 30
+    failureThreshold: 10
+
+  readinessProbe:
+    enabled: true
+    timeoutSeconds: 20
+    periodSeconds: 20
+    failureThreshold: 10
+
+  persistence:
+    enabled: true
+    storageClass: ""
+    size: 100Gi
+
+  resources:
+    requests:
+      cpu: 1000m
+      memory: 4Gi
+    limits:
+      cpu: 3000m
+      memory: 6Gi
+
+  podDisruptionBudget:
+    enabled: false
+
+# ===== CACHE: Valkey (Redis) =====
+valkey:
+  enabled: false  # mirrors prod (disabled 2026-04-07 incident)
+
+  global:
+    security:
+      allowInsecureImages: true
+
+  auth:
+    existingSecret: valkey
+
+  architecture: standalone
+
+  image:
+    repository: bitnamilegacy/valkey
+    tag: 8.0.1-debian-12-r2
+
+  master:
+    persistence:
+      enabled: true
+      storageClass: ""
+      size: 4Gi
+    resources:
+      requests:
+        cpu: 100m
+        memory: 1Gi
+      limits:
+        cpu: 500m
+        memory: 2Gi
+
+# ===== STORAGE: MinIO Object Storage =====
+minio:
+  enabled: false
+
+  fullnameOverride: "minio"
+
+  image:
+    repository: bitnamilegacy/minio
+    tag: "2025.7.23-debian-12-r3"
+
+  mode: standalone
+
+  statefulset:
+    replicaCount: 1
+
+  auth:
+    existingSecret: minio
+
+  persistence:
+    enabled: true
+    storageClass: ""
+    size: 10Gi
+
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+  defaultBuckets: "monobase-files"
+
+  buckets:
+    - name: "monobase-files"
+  region: "us-east-1"
+
+  podSecurityContext:
+    enabled: true
+    fsGroup: 1001
+    fsGroupChangePolicy: "OnRootMismatch"
+
+  containerSecurityContext:
+    enabled: true
+    runAsUser: 1001
+    runAsGroup: 1001
+    runAsNonRoot: true
+    privileged: false
+    readOnlyRootFilesystem: true
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop:
+        - ALL
+    seccompProfile:
+      type: RuntimeDefault
+
+  gateway:
+    enabled: true
+    hostname: ""
+    rateLimit:
+      enabled: false
+
+# ===== EMAIL TESTING: Mailpit =====
+# Safety override: enabled in preprod so cloned prod user rows cannot
+# trigger real outbound email on reset/notification flows. HapiHub SMTP
+# should be pointed at the in-cluster mailpit service.
+mailpit:
+  enabled: true
+
+  resources:
+    requests:
+      cpu: 25m
+      memory: 32Mi
+    limits:
+      cpu: 100m
+      memory: 64Mi
+
+  gateway:
+    enabled: true
+    hostname: "mail.preprod.localfirsthealth.com"
+
+# ===== P2P SYNC: Cadence =====
+cadence:
+  enabled: false  # mirrors prod (disabled 2026-04-07 incident)
+
+  image:
+    repository: ghcr.io/mycurelabs/cadence
+    tag: "0.4.1"
+    pullPolicy: Always
+
+  replicaCount: 1
+
+  resources:
+    requests:
+      cpu: 200m
+      memory: 1Gi
+    limits:
+      cpu: "2"
+      memory: 4Gi
+
+  gateway:
+    hostname: ""
+    sectionName: https-preprod-lfh
+    snippetsPolicy:
+      enabled: true
+      proxyReadTimeout: "3600s"
+      clientMaxBodySize: "10m"
+
+  postgresql:
+    enabled: true
+    serviceName: postgresql-primary
+    auth:
+      database: hapihub
+
+  valkey:
+    enabled: true
+    serviceName: "valkey-primary"
+
+  config:
+    RUST_LOG: "info"
+
+# ===== MIGRATION: HapiHub Migrator =====
+# Disabled in preprod by default. The migrator is a prod-only long-lived
+# process driving the MongoDB → PostgreSQL cutover; running it in an
+# ephemeral env against cloned data would race with prod's own reverse-cdc
+# capture state. Flip enabled: true only if a specific rehearsal requires it.
+hapihubMigrator:
+  enabled: false
+
+  image:
+    repository: ghcr.io/mycurelabs/hapihub-migrator
+    tag: "3.7.4"
+    pullPolicy: IfNotPresent
+
+  mode: reverse-cdc
+
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      cpu: "2"
+      memory: 4Gi
+
+  postgresql:
+    enabled: true
+    serviceName: postgresql-primary
+    port: 5432
+    auth:
+      database: hapihub
+      username: postgres
+      existingSecret: postgresql
+      passwordKey: postgres-password
+
+  mongodb:
+    enabled: true
+    serviceName: mongodb-headless
+    port: 27017
+    database: hapihub
+    username: root
+    replicaSet: rs0
+    authSource: admin
+    existingSecret: mongodb
+    passwordKey: mongodb-root-password
+
+  externalSecrets:
+    enabled: true
+    secretStore: gcp-secretstore
+    secretStoreKind: ClusterSecretStore
+    refreshInterval: 1h
+    secrets:
+      - secretKey: ENC_BILLING_INVOICES
+        remoteKey: mycure-production-enc-billing-invoices
+      - secretKey: ENC_BILLING_ITEMS
+        remoteKey: mycure-production-enc-billing-items
+      - secretKey: ENC_BILLING_PAYMENTS
+        remoteKey: mycure-production-enc-billing-payments
+      - secretKey: ENC_MEDICAL_RECORDS
+        remoteKey: mycure-production-enc-medical-records
+      - secretKey: ENC_PERSONAL_DETAILS
+        remoteKey: mycure-production-enc-personal-details
+
+# ===== BACKUP =====
+backup:
+  enabled: false
+
+# ===== SECURITY =====
+podSecurityStandards:
+  enabled: true
+  level: restricted
+
+# ===== RESOURCE QUOTAS =====
+resourceQuotas:
+  enabled: false
