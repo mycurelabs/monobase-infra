@@ -201,9 +201,6 @@ hapihub:
         remoteKey: mycure-production-enc-medical-records
       - secretKey: ENC_PERSONAL_DETAILS
         remoteKey: mycure-production-enc-personal-details
-      # MongoDB URI (managed DigitalOcean)
-      - secretKey: MONGO_URI
-        remoteKey: mycure-production-mongo-uri
       # JWT/Auth keys
       - secretKey: PRIVATE_KEY
         remoteKey: mycure-production-private-key
@@ -638,8 +635,11 @@ postgresql:
     minAvailable: 1
 
 # ===== DATABASE: MongoDB =====
+# Disabled in preprod: hapihub 11.x runs on Postgres-only, and the prod
+# node pool can't fit a third stateful workload alongside the HA Postgres
+# pair. Re-enable only if a rehearsal specifically needs Mongo.
 mongodb:
-  enabled: true
+  enabled: false
 
   fullnameOverride: "mongodb"
 
