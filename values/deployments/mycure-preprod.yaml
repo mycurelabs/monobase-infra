@@ -117,7 +117,7 @@ hapihub:
     tag: "11.2.9"
     pullPolicy: IfNotPresent
 
-  replicaCount: 3
+  replicaCount: 1
 
   resources:
     requests:
@@ -167,9 +167,7 @@ hapihub:
     enabled: false
 
   autoscaling:
-    enabled: true
-    minReplicas: 3
-    maxReplicas: 5
+    enabled: false
 
   # Secrets REUSE the existing mycure-production-* GCP keys. This is
   # required so that data cloned from prod (MongoDB/Postgres) remains
