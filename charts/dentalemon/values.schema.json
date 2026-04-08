@@ -10,7 +10,7 @@
       "properties": {
         "domain": {"type": "string"},
         "namespace": {"type": "string"},
-        "environment": {"type": "string", "enum": ["development", "staging", "production"]},
+        "environment": {"type": "string", "enum": ["development", "staging", "preprod", "production"]},
         "gateway": {
           "type": "object",
           "properties": {

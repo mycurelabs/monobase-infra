@@ -11,7 +11,7 @@
       "properties": {
         "domain": {"type": "string", "pattern": "^[a-z0-9.-]+\\.[a-z]{2,}$"},
         "namespace": {"type": "string", "pattern": "^[a-z0-9-]+$"},
-        "environment": {"type": "string", "enum": ["development", "staging", "production"]},
+        "environment": {"type": "string", "enum": ["development", "staging", "preprod", "production"]},
         "gateway": {
           "type": "object",
           "required": ["name", "namespace"],
