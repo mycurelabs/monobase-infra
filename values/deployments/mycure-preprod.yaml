@@ -17,6 +17,11 @@ global:
   # Reuse prod node pool so scheduling/perf characteristics match prod.
   nodePool: "production"
 
+  # Point the database-secrets chart at the mycure-production-* GCP keys so
+  # Postgres/Mongo/Minio/Valkey K8s secrets carry prod credentials. Required
+  # for Velero-restored PVCs (bitnami init was done with prod passwords).
+  secretPrefix: "mycure-production"
+
   gateway:
     name: nginx-shared-gateway
     namespace: nginx-gateway-system

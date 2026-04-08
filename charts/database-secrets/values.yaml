@@ -5,3 +5,9 @@ global:
   namespace: example
   domain: example.com
   environment: production
+  # GCP Secret Manager key prefix. Defaults to the namespace so keys look like
+  # "{namespace}-postgresql-password". Override (e.g. to "mycure-production")
+  # when a deployment needs to reuse another environment's DB secrets — useful
+  # for ephemeral prod-mirror envs that restore real data and must decrypt it
+  # with the original credentials.
+  secretPrefix: ""
