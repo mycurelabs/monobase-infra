@@ -603,6 +603,8 @@ postgresql:
     database: hapihub
     username: postgres
     existingSecret: postgresql
+    secretKeys:
+      adminPasswordKey: postgres-password
 
   primary:
     persistence:
