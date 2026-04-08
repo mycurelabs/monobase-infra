@@ -8,17 +8,47 @@ allowed-tools: Read, Write, Edit, Glob, Grep, Bash
 
 ## Kubeconfig Resolution
 
-All kubectl/argocd commands use this priority order:
-1. Explicit `--kubeconfig` flag (if provided)
-2. `KUBECONFIG` environment variable
-3. **Default:** `~/.kube/mycure-doks-main` (if exists)
-4. Interactive selection (if multiple configs in `~/.kube/`)
-5. Fall back to `~/.kube/config`
+**Always run the `kubectl-access` skill first** to resolve `--kubeconfig` and `--context`. Every `kubectl` / `argocd` command in this skill assumes those flags are passed explicitly; they are omitted below for readability. Do **not** `export KUBECONFIG` and do **not** `kubectl config use-context`.
 
-Set kubeconfig before running commands:
+---
+
+## The hard rule: Health > Sync
+
+**"Healthy + OutOfSync" is a normal steady state** for cert-manager, gateway controllers, external-secrets, and other apps with controller-managed resources. ArgoCD has known bugs (#21308, #18344, #9678) where `ignoreDifferences` doesn't fully suppress drift on these.
+
+Therefore:
+
+- **Always report Health first, Sync second.**
+- **Never** suggest a force-sync just because something is `OutOfSync`. Only suggest sync when:
+  - Health is `Degraded` or `Missing`, **or**
+  - The user explicitly wants to apply a fresh git commit (i.e. they pushed and want it live now).
+- When listing apps, group by Health, not by Sync.
+
+## Refresh vs Sync
+
+A **refresh** is cheap: it re-reads manifests from git and does **not** touch the cluster. It is the right first move 90% of the time — especially when someone just pushed.
+
 ```bash
-export KUBECONFIG=~/.kube/mycure-doks-main
+# Normal refresh — re-fetches manifests from git
+kubectl -n argocd annotate app <name> argocd.argoproj.io/refresh=normal --overwrite
+
+# Hard refresh — also busts the manifest cache. Use when you suspect cache poisoning
+# or after a chart dependency update that ArgoCD didn't notice.
+kubectl -n argocd annotate app <name> argocd.argoproj.io/refresh=hard --overwrite
 ```
+
+A **sync** applies to the cluster. Do not reach for it until a refresh has been attempted or the user explicitly asks.
+
+## Sync safety preamble
+
+Before issuing any sync, check the app name. If it matches any of these, **stop and confirm with the user** before proceeding:
+
+- `*-namespace` (Wave -1)
+- `*-security-baseline` (Wave 0)
+- `cert-manager`, `external-secrets`, `external-dns`, `gateway-resources` (Wave 0 infra)
+- `infrastructure` (the cluster-wide root)
+
+These have `PruneLast=true` / `preserveResourcesOnDeletion: true` protections for good reason; an unintended sync can cascade.
 
 ---
 
@@ -84,6 +114,8 @@ argocd app rollback {app-name} {revision}
 argocd app history mycure-staging-root
 argocd app rollback mycure-staging-root 5
 ```
+
+**Stateful safety:** Rollback only undoes the manifest sync, not data migrations. Before rolling back any app whose name matches `*mongodb*`, `*postgres*`, `*valkey*`, `*minio*`, or `*migrator*`, **stop and confirm with the user** that they understand a schema/data migration may have already run forward and will not be reversed.
 
 ### pause — Pause/resume auto-sync for maintenance
 ```bash
@@ -254,3 +286,45 @@ mise run bootstrap
 - `values/infrastructure/main.yaml` — Cluster-wide infrastructure config (cert-manager, gateway, monitoring, etc.)
 - `values/deployments/*.yaml` — Per-client/environment application config
 - Infrastructure is managed by `infrastructure` Application (separate from per-deployment apps)
+
+## Verify a deployment is *actually* done
+
+A deploy is "done" only when **all five** of these are true. Run the composite block below and report each line:
+
+```bash
+APP=<app-name>         # e.g. mycure-staging-hapihub
+NS=<target-namespace>  # e.g. mycure-staging
+
+# 1. Health status
+kubectl -n argocd get app "$APP" -o jsonpath='{.status.health.status}{"\n"}'
+
+# 2. Synced revision matches what the Application targets
+kubectl -n argocd get app "$APP" -o jsonpath='target={.spec.source.targetRevision} synced={.status.sync.revision}{"\n"}'
+
+# 3. All Deployments + StatefulSets fully available
+kubectl -n "$NS" get deploy,statefulset \
+  -o custom-columns=KIND:.kind,NAME:.metadata.name,DESIRED:.spec.replicas,READY:.status.readyReplicas,AVAILABLE:.status.availableReplicas
+
+# 4. No Warning events in the last few minutes
+kubectl -n "$NS" get events --field-selector type=Warning --sort-by=.lastTimestamp | tail -20
+
+# 5. HTTPRoutes accepted (only if the app exposes one)
+kubectl -n "$NS" get httproute -o json 2>/dev/null \
+  | jq -r '.items[] | "\(.metadata.name): " + ([.status.parents[].conditions[] | select(.type=="Accepted") | .status] | join(","))'
+```
+
+A "Healthy" app whose `synced revision` is **older** than the `targetRevision` means the deploy is still in flight, not done — keep watching.
+
+## Decision recipes
+
+| User says | Do |
+|---|---|
+| "is mycure-staging healthy?" | `kubectl -n argocd get app ...` grouped by Health first, Sync second |
+| "X is OutOfSync, fix it" | First check Health. If Healthy, explain the Health>Sync rule and ask whether they actually want a sync. |
+| "I just pushed, deploy it" | `refresh=normal` annotation, then watch with `kubectl -n argocd get app <name> -w` |
+| "the chart cache is stale" | `refresh=hard` annotation |
+| "force-sync X" | Apply the sync safety preamble (Wave -1/0 confirm), then `argocd app sync` |
+| "is the deploy done?" | Run the 5-check block above |
+| "I rotated the DB password" | Annotate the relevant ExternalSecret with `force-sync=$(date +%s)` (see `k8s` skill) |
+| "rollback X" | `argocd app history` + `argocd app rollback`, with stateful-safety check for db/migrator apps |
+| "bring up a fresh cluster" | `mise run bootstrap` |

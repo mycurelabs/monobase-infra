@@ -8,17 +8,7 @@ allowed-tools: Bash, Read, Grep, Glob
 
 ## Kubeconfig Resolution
 
-All kubectl commands use this priority order:
-1. Explicit `--kubeconfig` flag (if provided)
-2. `KUBECONFIG` environment variable
-3. **Default:** `~/.kube/mycure-doks-main` (if exists)
-4. Interactive selection (if multiple configs in `~/.kube/`)
-5. Fall back to `~/.kube/config`
-
-Set kubeconfig before running commands:
-```bash
-export KUBECONFIG=~/.kube/mycure-doks-main
-```
+**Always run the `kubectl-access` skill first** to resolve `--kubeconfig` and `--context`. Every `kubectl` command in this skill assumes those flags are passed explicitly; they are omitted below for readability. Do **not** `export KUBECONFIG` and do **not** `kubectl config use-context` — keep the user's shell hermetic.
 
 ---
 
