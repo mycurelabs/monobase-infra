@@ -108,7 +108,7 @@ hapihub:
 
   resources:
     requests:
-      cpu: 1000m
+      cpu: 500m
       memory: 768Mi
     limits:
       cpu: "2"
@@ -549,7 +549,7 @@ postgresql:
   resources:
     requests:
       cpu: 500m
-      memory: 4Gi
+      memory: 512Mi
     limits:
       cpu: 2000m
       memory: 8Gi

@@ -15,7 +15,7 @@ global:
   environment: preprod
 
   # Reuse prod node pool so scheduling/perf characteristics match prod.
-  nodePool: "production"
+  nodePool: "staging"
 
   # Point the database-secrets chart at the mycure-production-* GCP keys so
   # Postgres/Mongo/Minio/Valkey K8s secrets carry prod credentials. Required
@@ -612,7 +612,7 @@ postgresql:
     resources:
       requests:
         cpu: 500m
-        memory: 4Gi
+        memory: 2Gi
       limits:
         cpu: 2000m
         memory: 8Gi
