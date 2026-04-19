@@ -141,7 +141,7 @@ hapihub:
       rpId: "preprod.localfirsthealth.com"
 
   config:
-    CORS_ORIGINS: "https://mycure.preprod.localfirsthealth.com,https://mycurev8.preprod.localfirsthealth.com,https://mycurelocal.preprod.localfirsthealth.com,https://mycure-myaccount.preprod.localfirsthealth.com,https://mycure-deploydash.preprod.localfirsthealth.com,https://dentalemon.preprod.localfirsthealth.com,https://dentalemon-myaccount.preprod.localfirsthealth.com,https://dentalemon-website.preprod.localfirsthealth.com"
+    CORS_ORIGINS: "https://hapihub.preprod.localfirsthealth.com,https://mycure.preprod.localfirsthealth.com,https://mycurev8.preprod.localfirsthealth.com,https://mycurelocal.preprod.localfirsthealth.com,https://mycure-myaccount.preprod.localfirsthealth.com,https://mycure-deploydash.preprod.localfirsthealth.com,https://dentalemon.preprod.localfirsthealth.com,https://dentalemon-myaccount.preprod.localfirsthealth.com,https://dentalemon-website.preprod.localfirsthealth.com,https://mycure-pr--*.web.app"
     CORS_STRICT: "true"
     CORS_ALLOW_LOCAL_NETWORK: "false"
     CORS_ALLOW_MOBILE_APPS: "true"
