@@ -1,0 +1,68 @@
+{{- /*
+  Gated on hapihubLegacy.enabled. Safe on deployments that omit the
+  hapihubLegacy: block entirely — `(default dict)` coerces the nil
+  case and the `.enabled` lookup returns empty.
+*/ -}}
+{{- if (.Values.hapihubLegacy | default dict).enabled }}
+# ArgoCD Application: HapiHub Legacy (v10 alongside v11 for cutover)
+#
+# Transitional second Helm release of the hapihub chart, using the same
+# templates as the main `hapihub:` block but a different `releaseName`
+# so Kubernetes resource names do not collide. Purpose:
+#
+#   - mycurev8 (legacy v8 frontend) keeps calling a v10 hapihub backend
+#     while mycure (new v10 frontend) migrates to v11.
+#   - Canonical hapihub.{domain} is served by v11 (the main `hapihub:`
+#     release); this legacy release is exposed on a sibling hostname
+#     (e.g. hapihub-v10.{domain}) for mycurev8.
+#
+# Sync wave 3 so it deploys alongside the main hapihub release after
+# databases (wave 2) are up.
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ .Values.global.namespace }}-hapihub-legacy
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+
+  source:
+    # Same chart as the main hapihub release — the difference is only
+    # the Helm releaseName, which flows through to hapihub.fullname
+    # (= "hapihub-legacy") and gives the Deployment, Service, HTTPRoute,
+    # ConfigMap, etc. distinct names from the v11 release.
+    path: charts/hapihub
+    repoURL: {{ .Values.argocd.repoURL }}
+    targetRevision: {{ .Values.argocd.targetRevision | default "main" }}
+    helm:
+      releaseName: hapihub-legacy
+      valuesObject:
+        {{- $legacyValues := omit .Values.hapihubLegacy "mongodb" "minio" "valkey" "mailpit" }}
+        {{- toYaml $legacyValues | nindent 8 }}
+        global: {{ .Values.global | toYaml | nindent 10 }}
+        minio: {{ mergeOverwrite (deepCopy .Values.minio) (.Values.hapihubLegacy.minio | default dict) | toYaml | nindent 10 }}
+        mongodb: {{ mergeOverwrite (deepCopy .Values.mongodb) (.Values.hapihubLegacy.mongodb | default dict) | toYaml | nindent 10 }}
+        valkey: {{ mergeOverwrite (deepCopy .Values.valkey) (.Values.hapihubLegacy.valkey | default dict) | toYaml | nindent 10 }}
+        mailpit: {{ mergeOverwrite (deepCopy .Values.mailpit) (.Values.hapihubLegacy.mailpit | default dict) | toYaml | nindent 10 }}
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: {{ .Values.global.namespace }}
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false
+    retry:
+      limit: 5
+      backoff:
+        duration: 10s
+        maxDuration: 5m
+{{- end }}
