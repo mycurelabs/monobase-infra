@@ -117,7 +117,7 @@ hapihub:
     tag: "11.2.18"
     pullPolicy: IfNotPresent
 
-  replicaCount: 0
+  replicaCount: 1
 
   resources:
     requests:
@@ -791,7 +791,7 @@ cadence:
     tag: "0.4.1"
     pullPolicy: Always
 
-  replicaCount: 0
+  replicaCount: 1
 
   resources:
     requests:
