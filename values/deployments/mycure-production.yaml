@@ -249,163 +249,13 @@ hapihub:
       username: postgres
       existingSecret: postgresql
 
-# ===== HEALTHCARE: HapiHub API (v11 — temporary cutover sibling) =====
-# Second Helm release of the hapihub chart, deployed via the
-# hapihub-next ArgoCD app template (releaseName: hapihub-next).
-# Resources end up named `hapihub-next` (Deployment, Service, HTTPRoute,
-# ConfigMap), distinct from the main `hapihub` release above.
-#
-# Purpose: expose v11 on a temp hostname so the new mycure frontend can
-# exercise it while mycurev8 continues to call the canonical v10.
-# A later phase will swap HTTPRoute hostnames so v11 takes canonical.
-# See RCA-2026-04-22-HAPIHUB-0014-MIGRATION-BLOCKING-INDEX-BUILD.md
-# for the migration safety context.
-hapihubNext:
-  enabled: true
-
-  image:
-    repository: ghcr.io/mycurelabs/hapihub
-    tag: "11.2.20"
-    pullPolicy: IfNotPresent
-
-  replicaCount: 3
-
-  resources:
-    requests:
-      cpu: 1000m
-      memory: 768Mi
-    limits:
-      cpu: "2"
-      memory: 2Gi
-
-  gateway:
-    hostnames:
-      - hapihub-next.localfirsthealth.com
-    sectionName: https-lfh # Use localfirsthealth.com HTTPS listener
-    # No additionalSectionNames: v11 is not on api.mycure.md yet. The
-    # main hapihub release owns that hostname; Phase B can decide
-    # whether to move it here or keep it on the legacy side.
-    snippetsPolicy:
-      enabled: false
-
-  betterAuth:
-    passkey:
-      rpName: "Mycure"
-      rpId: "localfirsthealth.com"
-
-  config:
-    CORS_ORIGINS: "https://mycure.localfirsthealth.com,https://mycurev8.localfirsthealth.com,https://mycurelocal.localfirsthealth.com,https://mycure-myaccount.localfirsthealth.com,https://mycure-deploydash.localfirsthealth.com,https://dentalemon.localfirsthealth.com,https://dentalemon-myaccount.localfirsthealth.com,https://dentalemon-website.localfirsthealth.com"
-    CORS_STRICT: "true"
-    CORS_ALLOW_LOCAL_NETWORK: "false"
-    CORS_ALLOW_MOBILE_APPS: "true"
-    ACCOUNTS_SERVICE_ACCOUNT_EMAILS: "service@mycure.md"
-
-  env:
-    - name: BETTER_AUTH_RATE_LIMIT_ENABLED
-      value: "true"
-    - name: BETTER_AUTH_RATE_LIMIT_WINDOW
-      value: "60"
-    - name: BETTER_AUTH_RATE_LIMIT_MAX
-      value: "300"
-    - name: BETTER_AUTH_SESSION_COOKIE_CACHE_ENABLED
-      value: "false"
-
-  livenessProbe:
-    enabled: true
-
-  readinessProbe:
-    enabled: true
-
-  podDisruptionBudget:
-    enabled: false
-
-  autoscaling:
-    enabled: true
-    minReplicas: 3
-    maxReplicas: 5
-
-  externalSecrets:
-    enabled: true
-    secretStore: gcp-secretstore
-    secretStoreKind: ClusterSecretStore
-    refreshInterval: 1h
-    secrets:
-      # Google OAuth
-      - secretKey: GOOGLE_CLIENT_ID
-        remoteKey: mycure-production-google-oauth-client-id
-      - secretKey: GOOGLE_CLIENT_SECRET
-        remoteKey: mycure-production-google-oauth-client-secret
-      - secretKey: STRIPE_SECRET_KEY
-        remoteKey: mycure-production-stripe-secret-key
-      # Encryption keys
-      - secretKey: ENC_BILLING_INVOICES
-        remoteKey: mycure-production-enc-billing-invoices
-      - secretKey: ENC_BILLING_ITEMS
-        remoteKey: mycure-production-enc-billing-items
-      - secretKey: ENC_BILLING_PAYMENTS
-        remoteKey: mycure-production-enc-billing-payments
-      - secretKey: ENC_MEDICAL_RECORDS
-        remoteKey: mycure-production-enc-medical-records
-      - secretKey: ENC_PERSONAL_DETAILS
-        remoteKey: mycure-production-enc-personal-details
-      # MongoDB URI (kept for parity with the main hapihub block; v11 will
-      # not read it because mongodb.enabled: false below makes the chart
-      # skip MONGODB_* env injection. Harmless to leave in the Secret.)
-      - secretKey: MONGO_URI
-        remoteKey: mycure-production-mongo-uri
-      # JWT/Auth keys
-      - secretKey: PRIVATE_KEY
-        remoteKey: mycure-production-private-key
-      - secretKey: PUBLIC_KEY
-        remoteKey: mycure-production-public-key
-      # Storage configuration (GCP)
-      - secretKey: STORAGE_BUCKET
-        remoteKey: mycure-production-storage-bucket
-      - secretKey: STORAGE_CLIENT_EMAIL
-        remoteKey: mycure-production-storage-client-email
-      - secretKey: STORAGE_DIRECTORY
-        remoteKey: mycure-production-storage-directory
-      - secretKey: STORAGE_PRIVATE_KEY
-        remoteKey: mycure-production-storage-private-key
-      - secretKey: STORAGE_PROJECT_ID
-        remoteKey: mycure-production-storage-project-id
-      - secretKey: STORAGE_TYPE
-        remoteKey: mycure-production-storage-type
-      # Stripe configuration
-      - secretKey: STRIPE_KEY
-        remoteKey: mycure-production-stripe-key
-      - secretKey: STRIPE_CHECKOUT_SUCCESS_URL
-        remoteKey: mycure-production-stripe-checkout-success-url
-      - secretKey: STRIPE_CHECKOUT_CANCEL_URL
-        remoteKey: mycure-production-stripe-checkout-cancel-url
-      - secretKey: AUTH_SECRET
-        remoteKey: mycure-production-auth-secret
-      - secretKey: BETTER_AUTH_SECRET
-        remoteKey: mycure-production-better-auth-secret
-
-  mongodb:
-    # v11 is Postgres-only. Disabling Mongo here makes the chart skip
-    # MONGODB_* env injection for the hapihub-next Deployment. The
-    # top-level `mongodb:` StatefulSet is unchanged — the main hapihub
-    # v10 release still needs it.
-    enabled: false
-
-  postgresql:
-    enabled: true
-    external: false
-    serviceName: postgresql-primary
-    auth:
-      database: hapihub
-      username: postgres
-      existingSecret: postgresql
-
 # ===== HEALTHCARE: Frontend Application =====
 mycure:
   enabled: true
 
   image:
     repository: ghcr.io/mycurelabs/mycureapp
-    tag: "10.6.5"
+    tag: "1.0.0-offline"
     pullPolicy: IfNotPresent
 
   replicaCount: 1
@@ -423,12 +273,8 @@ mycure:
     sectionName: https-lfh # Use localfirsthealth.com HTTPS listener
 
   config:
-    # Points at the v11 cutover sibling (hapihubNext release). Canonical
-    # hapihub.localfirsthealth.com stays on v10 for mycurev8 during the
-    # transition. Phase B will flip this back to the canonical URL when
-    # v11 takes over hapihub.localfirsthealth.com.
-    API_URL: "https://hapihub-next.localfirsthealth.com"
-    HAPIHUB_URL: "https://hapihub-next.localfirsthealth.com"
+    API_URL: "https://hapihub.localfirsthealth.com"
+    HAPIHUB_URL: "https://hapihub.localfirsthealth.com"
 
   podDisruptionBudget:
     enabled: false
