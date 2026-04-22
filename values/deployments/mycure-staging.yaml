@@ -723,7 +723,7 @@ mailpit:
 
 # ===== P2P SYNC: Cadence =====
 cadence:
-  enabled: false  # disabled 2026-04-07 (incident)
+  enabled: true
 
   image:
     repository: ghcr.io/mycurelabs/cadence
