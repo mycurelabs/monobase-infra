@@ -607,7 +607,7 @@ mongodb:
 
 # ===== CACHE: Valkey (Redis) =====
 valkey:
-  enabled: false  # disabled 2026-04-07 (incident)
+  enabled: true
 
   global:
     security:
