@@ -21,10 +21,7 @@ spec:
     helm:
       releaseName: velero
       values: |
-        kubectl:
-          image:
-            repository: alpine/k8s
-            tag: "1.32.13"
+        upgradeCRDs: false
         configuration:
           defaultBackupTTL: 720h
           defaultVolumesToFsBackup: true
