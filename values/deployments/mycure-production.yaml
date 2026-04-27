@@ -163,8 +163,8 @@ hapihub:
 
   autoscaling:
     enabled: true
-    minReplicas: 3
-    maxReplicas: 5
+    minReplicas: 1
+    maxReplicas: 3
 
   externalSecrets:
     enabled: true
@@ -321,8 +321,8 @@ hapihubNext:
 
   autoscaling:
     enabled: true
-    minReplicas: 3
-    maxReplicas: 5
+    minReplicas: 1
+    maxReplicas: 3
 
   externalSecrets:
     enabled: true
@@ -708,7 +708,7 @@ syncd:
 
   autoscaling:
     enabled: true
-    minReplicas: 2
+    minReplicas: 1
     maxReplicas: 3
 
   externalSecrets:
