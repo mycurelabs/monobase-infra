@@ -846,7 +846,7 @@ mongodb:
 
 # ===== CACHE: Valkey (Redis) — Tier 4.3 =====
 valkey:
-  enabled: false  # disabled 2026-04-07 (incident)
+  enabled: true
 
   global:
     security:
@@ -958,25 +958,25 @@ mailpit:
 
 # ===== P2P SYNC: Cadence — Tier 4.4 =====
 cadence:
-  enabled: false  # disabled 2026-04-07 (incident)
+  enabled: true
 
   image:
     repository: ghcr.io/mycurelabs/cadence
-    tag: "0.4.0"
+    tag: "0.4.1"
     pullPolicy: Always
 
   replicaCount: 1
 
-  # Resource sizing inherited from staging (2026-04-06 lessons):
-  # 0.4.0 OOMs at 2Gi during initial valkey state load (~425k metadata
-  # keys + 110-table watermark cache + iroh quic stack). 4Gi gives headroom.
+  # Resource sizing from staging lessons:
+  # 0.4.0 OOMs at 2Gi, 4Gi still OOMs at startup — applier's primary-DB
+  # catch-up scans large tables in parallel. 8Gi stabilizes cold start.
   resources:
     requests:
       cpu: 200m
-      memory: 1Gi
+      memory: 2Gi
     limits:
       cpu: "2"
-      memory: 4Gi
+      memory: 8Gi
 
   gateway:
     hostname: ""
