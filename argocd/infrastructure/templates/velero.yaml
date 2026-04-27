@@ -39,6 +39,13 @@ spec:
               - mountPath: /target
                 name: plugins
 {{- end }}
+{{- if eq .Values.velero.provider "digitalocean" }}
+          - name: velero-plugin-for-digitalocean
+            image: digitalocean/velero-plugin:v1.1.0
+            volumeMounts:
+              - mountPath: /target
+                name: plugins
+{{- end }}
 {{- if eq .Values.velero.provider "azure" }}
           - name: velero-plugin-for-microsoft-azure
             image: velero/velero-plugin-for-microsoft-azure:v1.10.0

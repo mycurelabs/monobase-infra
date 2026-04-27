@@ -121,6 +121,52 @@ spec:
       backup-type: cluster-resources
       backup-scope: cluster
 
+---
+# Daily Production Workloads Backup Schedule
+# Backs up mycure-production namespace daily at 2 AM
+
+apiVersion: velero.io/v1
+kind: Schedule
+metadata:
+  name: production-daily
+  namespace: velero
+  labels:
+    app.kubernetes.io/name: velero
+    app.kubernetes.io/component: backup-schedule
+    backup-tier: production-daily
+    backup-scope: workloads
+spec:
+  schedule: "0 2 * * *"
+  template:
+    includedNamespaces:
+      - mycure-production
+
+    includeClusterResources: false
+    storageLocation: default
+    ttl: 720h  # 30 days
+
+    snapshotVolumes: true
+    defaultVolumesToFsBackup: true
+    snapshotMoveData: true
+
+    orderedResources:
+      - namespaces
+      - persistentvolumes
+      - persistentvolumeclaims
+      - secrets
+      - configmaps
+      - serviceaccounts
+      - services
+      - deployments.apps
+      - statefulsets.apps
+      - jobs.batch
+      - cronjobs.batch
+
+    labels:
+      backup-schedule: production-daily
+      backup-type: workloads
+      backup-scope: production
+
 {{- if .Values.velero.schedules.infrastructure.hourly.enabled }}
 ---
 # Hourly Infrastructure Backup Schedule (Optional - for critical infrastructure)

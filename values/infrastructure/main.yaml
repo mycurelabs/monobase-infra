@@ -351,9 +351,9 @@ kyverno:
 
 # Velero - Backup and disaster recovery
 velero:
-  enabled: false  # Enable for production clusters with backup requirements
+  enabled: true
   version: 7.1.4
-  provider: gcp  # Options: aws, azure, gcp, digitalocean, minio
+  provider: digitalocean
   
   # AWS S3 configuration
   aws:
@@ -378,10 +378,10 @@ velero:
   
   # DigitalOcean Spaces configuration
   digitalocean:
-    bucket: ""  # Set to Spaces bucket name
-    region: nyc3  # Spaces region: nyc3, sfo3, sgp1, fra1, ams3
-    accessKey: ""  # Via External Secrets or manual secret
-    secretKey: ""  # Via External Secrets or manual secret
+    bucket: mycure-doks-velero-backups
+    region: sgp1
+    accessKey: ""  # Via External Secrets
+    secretKey: ""  # Via External Secrets
   
   # MinIO configuration (for K3D/local development)
   minio:
