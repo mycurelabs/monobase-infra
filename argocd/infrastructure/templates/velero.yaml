@@ -23,8 +23,8 @@ spec:
       values: |
         kubectl:
           image:
-            repository: docker.io/bitnami/kubectl
-            tag: latest
+            repository: registry.k8s.io/kubectl
+            tag: v1.32.4
         configuration:
           defaultBackupTTL: 720h
           defaultVolumesToFsBackup: true
