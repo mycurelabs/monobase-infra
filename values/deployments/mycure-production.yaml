@@ -79,7 +79,7 @@ account:
 
   resources:
     requests:
-      cpu: 50m
+      cpu: 10m
       memory: 64Mi
     limits:
       cpu: 200m
@@ -412,7 +412,7 @@ mycure:
 
   resources:
     requests:
-      cpu: 50m
+      cpu: 10m
       memory: 64Mi
     limits:
       cpu: 200m
@@ -446,7 +446,7 @@ mycurelocal:
 
   resources:
     requests:
-      cpu: 50m
+      cpu: 10m
       memory: 64Mi
     limits:
       cpu: 200m
@@ -475,7 +475,7 @@ mycure-myaccount:
 
   resources:
     requests:
-      cpu: 50m
+      cpu: 10m
       memory: 64Mi
     limits:
       cpu: 200m
@@ -505,7 +505,7 @@ dentalemon-myaccount:
 
   resources:
     requests:
-      cpu: 50m
+      cpu: 10m
       memory: 64Mi
     limits:
       cpu: 200m
@@ -535,7 +535,7 @@ mycure-deploydash:
 
   resources:
     requests:
-      cpu: 50m
+      cpu: 10m
       memory: 64Mi
     limits:
       cpu: 200m
@@ -565,7 +565,7 @@ mycurev8:
 
   resources:
     requests:
-      cpu: 50m
+      cpu: 10m
       memory: 64Mi
     limits:
       cpu: 200m
@@ -596,7 +596,7 @@ hapihub-docs:
 
   resources:
     requests:
-      cpu: 50m
+      cpu: 10m
       memory: 64Mi
     limits:
       cpu: 200m
@@ -622,7 +622,7 @@ dentalemon-website:
 
   resources:
     requests:
-      cpu: 50m
+      cpu: 10m
       memory: 64Mi
     limits:
       cpu: 200m
@@ -657,7 +657,7 @@ dentalemon:
 
   resources:
     requests:
-      cpu: 50m
+      cpu: 10m
       memory: 64Mi
     limits:
       cpu: 200m
@@ -687,7 +687,7 @@ syncd:
 
   resources:
     requests:
-      cpu: 250m
+      cpu: 150m
       memory: 384Mi
     limits:
       cpu: "2"
@@ -772,7 +772,7 @@ postgresql:
       size: 200Gi
     resources:
       requests:
-        cpu: 500m
+        cpu: 250m
         memory: 4Gi
       limits:
         cpu: 2000m
@@ -786,7 +786,7 @@ postgresql:
       size: 200Gi
     resources:
       requests:
-        cpu: 500m
+        cpu: 100m
         memory: 4Gi
       limits:
         cpu: 2000m
@@ -971,7 +971,7 @@ cadence:
   # and batched change-log queries reduce peak RSS from 22+ GB to <500 MB.
   resources:
     requests:
-      cpu: 200m
+      cpu: 250m
       memory: 512Mi
     limits:
       cpu: "2"
@@ -1021,8 +1021,8 @@ hapihubMigrator:
 
   resources:
     requests:
-      cpu: 500m
-      memory: 1Gi
+      cpu: 50m
+      memory: 256Mi
     limits:
       cpu: "2"
       memory: 4Gi
