@@ -411,6 +411,15 @@ velero:
         schedule: "0 4 * * 0"  # 4 AM Sunday
         retention: 2160h  # 90 days
 
+    # Production workload backups
+    production:
+      daily:
+        enabled: true
+        schedule: "0 2 * * *"  # 2 AM daily
+        retention: 720h  # 30 days
+        namespaces:
+          - mycure-production
+
 # Falco - Runtime security monitoring
 falco:
   enabled: false  # Optional, enable for runtime threat detection
