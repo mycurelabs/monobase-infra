@@ -967,16 +967,16 @@ cadence:
 
   replicaCount: 1
 
-  # Resource sizing from staging lessons:
-  # 0.4.0 OOMs at 2Gi, 4Gi still OOMs at startup — applier's primary-DB
-  # catch-up scans large tables in parallel. 8Gi stabilizes cold start.
+  # 8Gi OOMs in production (larger dataset than staging). Baseline scan
+  # pulls all ~118 watched tables in parallel; production tables are
+  # significantly larger. 16Gi gives headroom for cold start.
   resources:
     requests:
       cpu: 200m
-      memory: 2Gi
+      memory: 4Gi
     limits:
       cpu: "2"
-      memory: 8Gi
+      memory: 16Gi
 
   gateway:
     hostname: ""
