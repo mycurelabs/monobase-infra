@@ -1,0 +1,5 @@
+apiVersion: v2
+name: velero-resources
+description: Velero backup storage locations, volume snapshot locations, and schedules
+type: application
+version: 0.1.0
