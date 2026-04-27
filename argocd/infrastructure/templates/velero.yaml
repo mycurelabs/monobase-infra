@@ -24,7 +24,7 @@ spec:
         kubectl:
           image:
             repository: docker.io/bitnami/kubectl
-            tag: "1.32"
+            tag: latest
         configuration:
           defaultBackupTTL: 720h
           defaultVolumesToFsBackup: true
