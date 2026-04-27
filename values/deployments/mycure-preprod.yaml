@@ -121,7 +121,7 @@ hapihub:
 
   resources:
     requests:
-      cpu: 1000m
+      cpu: 500m
       memory: 768Mi
     limits:
       cpu: "2"
