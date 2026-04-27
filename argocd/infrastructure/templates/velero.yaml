@@ -23,8 +23,8 @@ spec:
       values: |
         kubectl:
           image:
-            repository: registry.k8s.io/kubectl
-            tag: v1.32.4
+            repository: alpine/k8s
+            tag: "1.32.13"
         configuration:
           defaultBackupTTL: 720h
           defaultVolumesToFsBackup: true
