@@ -21,6 +21,10 @@ spec:
     helm:
       releaseName: velero
       values: |
+        kubectl:
+          image:
+            repository: docker.io/bitnami/kubectl
+            tag: "1.32"
         configuration:
           defaultBackupTTL: 720h
           defaultVolumesToFsBackup: true
