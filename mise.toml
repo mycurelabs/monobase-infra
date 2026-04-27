@@ -210,6 +210,10 @@ run = 'bun scripts/resize.ts "$@"'
 description = "Destroy cluster infrastructure - REQUIRES CONFIRMATION"
 run = 'bun scripts/provision.ts --destroy "$@"'
 
+[tasks.seed]
+description = "Seed demo data (users, org) into an environment"
+run = 'bun scripts/seed.ts "$@"'
+
 [tasks.unbootstrap]
 description = "Unbootstrap cluster (destroy ArgoCD/Applications) - REQUIRES CONFIRMATION"
 run = 'bun scripts/bootstrap.ts --destroy "$@"'
