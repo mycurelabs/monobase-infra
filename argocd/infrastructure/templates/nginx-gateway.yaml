@@ -52,6 +52,15 @@ spec:
                 memory: 192Mi
               limits:
                 memory: 1Gi
+            # njs script delivered by the nginx-njs-security-headers ConfigMap
+            # (charts/nginx-gateway/templates/njs-security-headers-cm.yaml).
+            # Wired into every server block by the nginx-strip-server-header
+            # SnippetsPolicy (values/infrastructure/main.yaml). Closes
+            # vapt-2025#10 L-001 by deleting the `Server` response header.
+            volumeMounts:
+              - name: njs-security-headers
+                mountPath: /etc/nginx/njs-security
+                readOnly: true
           pod:
             # Best-effort spread across hosts. Required anti-affinity is too
             # strict for the current general node pool size — when 2 of 3
@@ -66,6 +75,10 @@ spec:
                 labelSelector:
                   matchLabels:
                     app.kubernetes.io/name: nginx-shared-gateway-nginx
+            volumes:
+              - name: njs-security-headers
+                configMap:
+                  name: nginx-njs-security-headers
 
   destination:
     server: https://kubernetes.default.svc

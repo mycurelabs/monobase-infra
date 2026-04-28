@@ -1,0 +1,20 @@
+{{- /*
+ConfigMap that delivers the njs script into the NGF data-plane pod. The
+script is mounted at /etc/nginx/njs-security/ via volume entries set on the
+upstream nginx-gateway-fabric chart in argocd/infrastructure/templates/nginx-gateway.yaml,
+and is registered as a header filter via the `nginx-strip-server-header`
+SnippetsPolicy in values/infrastructure/main.yaml.
+
+vapt-2025#10 L-001: removes the `Server` response header, which OSS NGINX
+cannot suppress with `server_tokens` alone.
+*/ -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nginx-njs-security-headers
+  namespace: {{ include "nginx-gateway.namespace" . }}
+  labels:
+    {{- include "nginx-gateway.labels" . | nindent 4 }}
+data:
+  security-headers.js: |-
+    {{- .Files.Get "files/security-headers.js" | nindent 4 }}

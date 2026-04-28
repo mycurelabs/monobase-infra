@@ -152,6 +152,20 @@ nginxGatewayResources:
           value: |
             proxy_read_timeout 3600s;
             client_max_body_size 50m;
+    # vapt-2025#10 L-001: OSS NGINX cannot suppress the `Server` response
+    # header via `server_tokens` (only hides the version) and the data-plane
+    # image does not bundle `headers-more`. Use the bundled njs module
+    # (ngx_http_js_module) to delete the header in the response-header phase.
+    # Script: charts/nginx-gateway/files/security-headers.js
+    # Mount:  argocd/infrastructure/templates/nginx-gateway.yaml
+    - name: nginx-strip-server-header
+      snippets:
+        - context: http
+          value: |
+            js_import securityHeaders from /etc/nginx/njs-security/security-headers.js;
+        - context: http.server
+          value: |
+            js_header_filter securityHeaders.clearServer;
 
 # EnvoyProxy Configuration - Cloud-specific LoadBalancer settings
 envoyProxyConfig:
