@@ -163,7 +163,7 @@ nginxGatewayResources:
         - context: http
           value: |
             js_import securityHeaders from /etc/nginx/njs-security/security-headers.js;
-        - context: http.server
+        - context: http.server.location
           value: |
             js_header_filter securityHeaders.clearServer;
 
