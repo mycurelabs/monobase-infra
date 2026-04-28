@@ -10,7 +10,7 @@
 // plane image (which would otherwise need `headers-more`).
 
 function clearServer(r) {
-  r.headersOut['Server'] = '';
+  r.headersOut['Server'] = 'redacted';
 }
 
 export default { clearServer };
