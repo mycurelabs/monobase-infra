@@ -761,7 +761,7 @@ cadence:
     serviceName: "valkey-primary"
 
   config:
-    RUST_LOG: "info,cadence::sync=debug"
+    RUST_LOG: "info"
 
 # ===== BACKUP =====
 backup:
