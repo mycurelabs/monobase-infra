@@ -673,7 +673,7 @@ mongodb:
 
 # ===== CACHE: Valkey (Redis) =====
 valkey:
-  enabled: false  # mirrors prod (disabled 2026-04-07 incident)
+  enabled: true  # re-enabled 2026-04-29 alongside cadence (root cause fixed in 0.5.x)
 
   global:
     security:
