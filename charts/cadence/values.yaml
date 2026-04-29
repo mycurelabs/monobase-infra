@@ -150,6 +150,63 @@ cadenceConfig:
   collectionsBlacklist:
     - "--drizzle-migrations"
     - "-migration-checkpoints"
+  # Per-collection sync priority (higher = sent first during catch-up).
+  # "*" is the default for unlisted collections. Mirror of
+  # services/hapihub/cadence.yml in monobase-mycure — keep in sync.
+  priorities:
+    "*": 50
+    user: 200
+    account: 200
+    session: 200
+    accounts: 200
+    account-configurations: 190
+    account_configurations: 190
+    organization: 180
+    organizations: 180
+    organization-members: 170
+    organization_members: 170
+    personal_details: 180
+    personal_details_history: 170
+    personal-details: 180
+    personal-details-history: 170
+    medical-patients: 150
+    medical_patients: 150
+    medical-encounters: 140
+    medical_encounters: 140
+    medical-records: 140
+    medical_records: 140
+    medical-records-history: 130
+    medical_records_history: 130
+    diagnostic-orders: 130
+    diagnostic_orders: 130
+    diagnostic-order-tests: 130
+    diagnostic_order_tests: 130
+    billing-invoices: 120
+    billing_invoices: 120
+    billing-items: 110
+    billing_items: 110
+    billing-payments: 110
+    billing_payments: 110
+    billing-customers: 110
+    billing_customers: 110
+    bookings: 90
+    queue-items: 90
+    queue_items: 90
+    queues: 90
+    services: 80
+    services-performeds: 80
+    services_performeds: 80
+    notifications: 30
+    prm-conversations: 30
+    prm_conversations: 30
+    prm-messages: 30
+    prm_messages: 30
+    webhook-deliveries: 20
+    webhook_deliveries: 20
+    webhook-subscriptions: 20
+    webhook_subscriptions: 20
+    activity-logs: 0
+    activity_logs: 0
 
 # Application configuration (ConfigMap env vars)
 config:

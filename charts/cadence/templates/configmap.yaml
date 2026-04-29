@@ -34,4 +34,10 @@ data:
       - {{ . | quote }}
       {{- end }}
     {{- end }}
+    {{- if .Values.cadenceConfig.priorities }}
+    priorities:
+      {{- range $name, $prio := .Values.cadenceConfig.priorities }}
+      {{ $name | quote }}: {{ $prio }}
+      {{- end }}
+    {{- end }}
 {{- end }}
