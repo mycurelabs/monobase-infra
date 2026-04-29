@@ -95,7 +95,7 @@ if (args["api-url"]) {
   process.exit(1);
 }
 
-const PASSWORD = "123123123";
+const PASSWORD = "Mycure123";
 
 // ---------------------------------------------------------------------------
 // Role → privilege mapping (from @lfh/sdk organizations/constants)
