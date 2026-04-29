@@ -784,22 +784,24 @@ mailpit:
 
 # ===== P2P SYNC: Cadence =====
 cadence:
-  enabled: false  # mirrors prod (disabled 2026-04-07 incident)
+  enabled: true  # re-enabled 2026-04-29 to match staging (incident root cause fixed in 0.5.x line)
 
   image:
     repository: ghcr.io/mycurelabs/cadence
-    tag: "0.5.8"
+    tag: "0.5.10"
     pullPolicy: Always
 
   replicaCount: 1
 
+  # Resources matched to staging — the 0.5.x line's cursor-based baseline scan
+  # + paginated catch-up + batched change-log queries cap peak RSS <500MB.
   resources:
     requests:
       cpu: 200m
-      memory: 1Gi
+      memory: 512Mi
     limits:
       cpu: "2"
-      memory: 4Gi
+      memory: 2Gi
 
   gateway:
     hostname: ""

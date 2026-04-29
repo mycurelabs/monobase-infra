@@ -962,16 +962,16 @@ cadence:
 
   image:
     repository: ghcr.io/mycurelabs/cadence
-    tag: "0.5.8"
+    tag: "0.5.10"
     pullPolicy: Always
 
   replicaCount: 1
 
-  # 0.5.1 fixes OOM: cursor-based baseline scan, paginated catch-up,
-  # and batched change-log queries reduce peak RSS from 22+ GB to <500 MB.
+  # Resources matched to staging — the 0.5.x line's cursor-based baseline scan
+  # + paginated catch-up + batched change-log queries cap peak RSS <500MB.
   resources:
     requests:
-      cpu: 250m
+      cpu: 200m
       memory: 512Mi
     limits:
       cpu: "2"
