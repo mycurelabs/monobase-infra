@@ -727,7 +727,7 @@ cadence:
 
   image:
     repository: ghcr.io/mycurelabs/cadence
-    tag: "0.5.10"
+    tag: "0.5.11"
     pullPolicy: Always
 
   replicaCount: 1
@@ -761,7 +761,7 @@ cadence:
     serviceName: "valkey-primary"
 
   config:
-    RUST_LOG: "info"
+    RUST_LOG: "info,cadence::sync=debug"
 
 # ===== BACKUP =====
 backup:
