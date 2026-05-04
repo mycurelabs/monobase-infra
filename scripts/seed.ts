@@ -4,7 +4,6 @@
  * Creates a demo organization with 7 role-based user accounts.
  *
  * Usage:
- *   bun scripts/seed.ts --env staging
  *   bun scripts/seed.ts --env preprod
  *   bun scripts/seed.ts --env production --confirm
  *   bun scripts/seed.ts --api-url https://custom-url.example.com
@@ -19,10 +18,6 @@ import { parseArgs } from "util";
 // ---------------------------------------------------------------------------
 
 const ENVS: Record<string, { api: string; cms: string }> = {
-  staging: {
-    api: "https://hapihub.stg.localfirsthealth.com",
-    cms: "https://mycure.stg.localfirsthealth.com",
-  },
   preprod: {
     api: "https://hapihub.preprod.localfirsthealth.com",
     cms: "https://mycure.preprod.localfirsthealth.com",
@@ -149,7 +144,7 @@ ${chalk.yellow("Options:")}
   --help      Show this help message
 
 ${chalk.yellow("Examples:")}
-  bun scripts/seed.ts --env staging
+  bun scripts/seed.ts --env preprod
   bun scripts/seed.ts --env production --confirm
   bun scripts/seed.ts --api-url http://localhost:7500 --reset
   bun scripts/seed.ts --api-url http://localhost:7500 --patients 25
@@ -647,7 +642,7 @@ async function createOrganization(
     ...(types && types.length > 0 ? { types } : {}),
     description: parent
       ? "MyCure demo branch (child facility for hierarchy testing)"
-      : "MyCure demo clinic for staging verification",
+      : "MyCure demo clinic for environment verification",
     ...(parent ? { parent } : {}),
   })) as { id?: string };
 }

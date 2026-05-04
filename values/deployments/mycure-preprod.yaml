@@ -141,7 +141,7 @@ hapihub:
       rpId: "preprod.localfirsthealth.com"
 
   config:
-    CORS_ORIGINS: "https://hapihub.preprod.localfirsthealth.com,https://mycure.preprod.localfirsthealth.com,https://mycurev8.preprod.localfirsthealth.com,https://mycurelocal.preprod.localfirsthealth.com,https://mycure-myaccount.preprod.localfirsthealth.com,https://mycure-deploydash.preprod.localfirsthealth.com,https://dentalemon.preprod.localfirsthealth.com,https://dentalemon-myaccount.preprod.localfirsthealth.com,https://dentalemon-website.preprod.localfirsthealth.com,https://mycure-pr--*.web.app"
+    CORS_ORIGINS: "https://hapihub.preprod.localfirsthealth.com,https://mycure.preprod.localfirsthealth.com,https://mycurelocal.preprod.localfirsthealth.com,https://mycure-myaccount.preprod.localfirsthealth.com,https://mycure-deploydash.preprod.localfirsthealth.com,https://dentalemon.preprod.localfirsthealth.com,https://dentalemon-myaccount.preprod.localfirsthealth.com,https://dentalemon-website.preprod.localfirsthealth.com,https://mycure-pr--*.web.app"
     CORS_STRICT: "true"
     CORS_ALLOW_LOCAL_NETWORK: "false"
     CORS_ALLOW_MOBILE_APPS: "true"
@@ -228,14 +228,6 @@ hapihub:
         remoteKey: mycure-production-auth-secret
       - secretKey: BETTER_AUTH_SECRET
         remoteKey: mycure-production-better-auth-secret
-
-  mongodb:
-    external: false # Use in-cluster MongoDB
-    enabled: true
-    serviceName: mongodb
-    database: hapihub
-    username: root
-    replicaSet: rs0
 
   postgresql:
     enabled: true
@@ -393,37 +385,6 @@ mycure-deploydash:
   podDisruptionBudget:
     enabled: false
 
-# ===== HEALTHCARE: Frontend Application (v8 Legacy) =====
-mycurev8:
-  enabled: true
-
-  image:
-    repository: ghcr.io/mycurelabs/mycureapp
-    tag: "8.24.9"
-    pullPolicy: IfNotPresent
-
-  replicaCount: 1
-
-  resources:
-    requests:
-      cpu: 50m
-      memory: 64Mi
-    limits:
-      cpu: 200m
-      memory: 128Mi
-
-  gateway:
-    hostname: ""
-    sectionName: https-preprod-lfh
-
-  config:
-    API_URL: "https://hapihub.preprod.localfirsthealth.com"
-    HAPIHUB_URL: "https://hapihub.preprod.localfirsthealth.com"
-    MYCURE_X_URL: "https://mycure.preprod.localfirsthealth.com"
-
-  podDisruptionBudget:
-    enabled: false
-
 # ===== HEALTHCARE: HapiHub API Documentation =====
 hapihub-docs:
   enabled: false
@@ -558,8 +519,6 @@ syncd:
     secretStoreKind: ClusterSecretStore
     refreshInterval: 1h
     secrets:
-      - secretKey: MONGO_URI
-        remoteKey: mycure-production-mongo-uri
       - secretKey: ENC_BILLING_INVOICES
         remoteKey: mycure-production-enc-billing-invoices
       - secretKey: ENC_BILLING_ITEMS
@@ -570,14 +529,6 @@ syncd:
         remoteKey: mycure-production-enc-medical-records
       - secretKey: ENC_PERSONAL_DETAILS
         remoteKey: mycure-production-enc-personal-details
-
-  mongodb:
-    external: false # Use in-cluster MongoDB
-    enabled: true
-    serviceName: mongodb
-    database: hapihub
-    username: root
-    replicaSet: rs0
 
 # ===== DATABASE: PostgreSQL =====
 # Standalone (no read replica) in preprod: prod node pool can't fit a
@@ -620,57 +571,6 @@ postgresql:
   podDisruptionBudget:
     enabled: false
 
-# ===== DATABASE: MongoDB =====
-# Disabled in preprod: hapihub 11.x runs on Postgres-only, and the prod
-# node pool can't fit a third stateful workload alongside the HA Postgres
-# pair. Re-enable only if a rehearsal specifically needs Mongo.
-mongodb:
-  enabled: false
-
-  fullnameOverride: "mongodb"
-
-  architecture: replicaset
-  replicaCount: 1
-
-  image:
-    repository: bitnamilegacy/mongodb
-    tag: 7.0.15-debian-12-r0
-
-  auth:
-    rootUser: root
-    existingSecret: mongodb
-
-  arbiter:
-    enabled: false
-
-  livenessProbe:
-    enabled: true
-    timeoutSeconds: 30
-    periodSeconds: 30
-    failureThreshold: 10
-
-  readinessProbe:
-    enabled: true
-    timeoutSeconds: 20
-    periodSeconds: 20
-    failureThreshold: 10
-
-  persistence:
-    enabled: true
-    storageClass: ""
-    size: 100Gi
-
-  resources:
-    requests:
-      cpu: 1000m
-      memory: 4Gi
-    limits:
-      cpu: 3000m
-      memory: 6Gi
-
-  podDisruptionBudget:
-    enabled: false
-
 # ===== CACHE: Valkey (Redis) =====
 valkey:
   enabled: true  # re-enabled 2026-04-29 alongside cadence (root cause fixed in 0.5.x)
@@ -703,7 +603,7 @@ valkey:
 
 # ===== STORAGE: MinIO Object Storage =====
 minio:
-  enabled: false
+  enabled: true
 
   fullnameOverride: "minio"
 
@@ -760,6 +660,7 @@ minio:
   gateway:
     enabled: true
     hostname: ""
+    sectionName: https-preprod-lfh
     rateLimit:
       enabled: false
 
@@ -823,67 +724,6 @@ cadence:
 
   config:
     RUST_LOG: "info"
-
-# ===== MIGRATION: HapiHub Migrator =====
-# Disabled in preprod by default. The migrator is a prod-only long-lived
-# process driving the MongoDB → PostgreSQL cutover; running it in an
-# ephemeral env against cloned data would race with prod's own reverse-cdc
-# capture state. Flip enabled: true only if a specific rehearsal requires it.
-hapihubMigrator:
-  enabled: false
-
-  image:
-    repository: ghcr.io/mycurelabs/hapihub-migrator
-    tag: "3.7.4"
-    pullPolicy: IfNotPresent
-
-  mode: reverse-cdc
-
-  resources:
-    requests:
-      cpu: 500m
-      memory: 1Gi
-    limits:
-      cpu: "2"
-      memory: 4Gi
-
-  postgresql:
-    enabled: true
-    serviceName: postgresql
-    port: 5432
-    auth:
-      database: hapihub
-      username: postgres
-      existingSecret: postgresql
-      passwordKey: postgres-password
-
-  mongodb:
-    enabled: true
-    serviceName: mongodb-headless
-    port: 27017
-    database: hapihub
-    username: root
-    replicaSet: rs0
-    authSource: admin
-    existingSecret: mongodb
-    passwordKey: mongodb-root-password
-
-  externalSecrets:
-    enabled: true
-    secretStore: gcp-secretstore
-    secretStoreKind: ClusterSecretStore
-    refreshInterval: 1h
-    secrets:
-      - secretKey: ENC_BILLING_INVOICES
-        remoteKey: mycure-production-enc-billing-invoices
-      - secretKey: ENC_BILLING_ITEMS
-        remoteKey: mycure-production-enc-billing-items
-      - secretKey: ENC_BILLING_PAYMENTS
-        remoteKey: mycure-production-enc-billing-payments
-      - secretKey: ENC_MEDICAL_RECORDS
-        remoteKey: mycure-production-enc-medical-records
-      - secretKey: ENC_PERSONAL_DETAILS
-        remoteKey: mycure-production-enc-personal-details
 
 # ===== BACKUP =====
 backup:

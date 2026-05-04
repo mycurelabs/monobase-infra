@@ -66,26 +66,6 @@ nginxGatewayResources:
     namespace: nginx-gateway-system
     gatewayClassName: nginx
     listeners:
-      # Staging
-      - name: https-stg-lfh
-        port: 443
-        protocol: HTTPS
-        hostname: "*.stg.localfirsthealth.com"
-        tlsSecretName: nginx-gateway-tls
-      - name: http-stg-lfh
-        port: 80
-        protocol: HTTP
-        hostname: "*.stg.localfirsthealth.com"
-      # Staging mycure.md
-      - name: https-stg-mycure
-        port: 443
-        protocol: HTTPS
-        hostname: "*.stg.mycure.md"
-        tlsSecretName: nginx-gateway-tls-stg-mycure
-      - name: http-stg-mycure
-        port: 80
-        protocol: HTTP
-        hostname: "*.stg.mycure.md"
       # Preprod localfirsthealth.com (ephemeral prod-mirror env)
       - name: https-preprod-lfh
         port: 443
@@ -119,14 +99,6 @@ nginxGatewayResources:
 
   tls:
     certificates:
-      - secretName: nginx-gateway-tls
-        clusterIssuer: letsencrypt-mycure-cloudflare-prod  # DNS-01
-        dnsNames:
-          - "*.stg.localfirsthealth.com"
-      - secretName: nginx-gateway-tls-stg-mycure
-        clusterIssuer: letsencrypt-nginx-http01  # HTTP-01 via NGINX Gateway
-        dnsNames:
-          - dentalemon.stg.mycure.md
       - secretName: nginx-gateway-tls-preprod
         clusterIssuer: letsencrypt-mycure-cloudflare-prod  # DNS-01, wildcard
         dnsNames:
@@ -224,15 +196,6 @@ gateway:
         port: 80
         protocol: HTTP
         hostname: "*.localfirsthealth.com"
-      # Staging localfirsthealth.com
-      - name: https-lfh-stg
-        port: 443
-        protocol: HTTPS
-        hostname: "*.stg.localfirsthealth.com"
-      - name: http-lfh-stg
-        port: 80
-        protocol: HTTP
-        hostname: "*.stg.localfirsthealth.com"
       # Removed: *.mycure.md and *.stg.mycure.md envoy listeners.
       # These were unused — every mycure.md HTTPRoute attaches to
       # nginx-shared-gateway (different gateway, different cert), and
@@ -262,16 +225,6 @@ gateway:
         - hapihub
         - mycure
         - mycurev8
-        # Staging subdomains (mycureapp.com)
-        - dentalemon.stg
-        - hapihub.stg
-        - mycure.stg
-        - mycurev8.stg
-        - api.stg
-        - mail.stg
-        - storage.stg
-        - web.stg
-        - sync.stg
       # Additional domains for localfirsthealth.com
       additionalDomains:
         # Production localfirsthealth.com
@@ -285,26 +238,11 @@ gateway:
         - mycurelocal.localfirsthealth.com
         - mycurev8.localfirsthealth.com
         - sync.localfirsthealth.com
-        # Staging localfirsthealth.com
-        - dentalemon-myaccount.stg.localfirsthealth.com
-        - dentalemon-website.stg.localfirsthealth.com
-        - dentalemon.stg.localfirsthealth.com
-        - hapihub.stg.localfirsthealth.com
-        - mycure-deploydash.stg.localfirsthealth.com
-        - mycure-myaccount.stg.localfirsthealth.com
-        - mycure.stg.localfirsthealth.com
-        - mycurelocal.stg.localfirsthealth.com
-        - mycurev8.stg.localfirsthealth.com
-        - mail.stg.localfirsthealth.com
-        - storage.stg.localfirsthealth.com
-        - sync.stg.localfirsthealth.com
-        # *.mycure.md / *.stg.mycure.md removed: the envoy shared-gateway
-        # no longer has mycure.md listeners (see additionalListeners above),
-        # and the cert-manager Cloudflare DNS-01 issuer cannot resolve the
-        # mycure.md zone in this account, so these challenges hang forever
-        # ("Found no Zones for domain _acme-challenge.api.mycure.md").
-        # The real *.mycure.md routes terminate TLS on nginx-shared-gateway
-        # using separate nginx-gateway-tls-prod-mycure / -stg-mycure certs.
+        # *.mycure.md removed: the envoy shared-gateway no longer has
+        # mycure.md listeners (see additionalListeners above), and the
+        # cert-manager Cloudflare DNS-01 issuer cannot resolve the mycure.md
+        # zone in this account. The real *.mycure.md routes terminate TLS on
+        # nginx-shared-gateway using a separate nginx-gateway-tls-prod-mycure cert.
 
   # HTTP to HTTPS redirect
   httpRedirect:
@@ -319,7 +257,6 @@ gateway:
     listeners:
       - https
       - https-lfh
-      - https-lfh-stg
       - https-mycure
 
 # External Secrets - Secret management
