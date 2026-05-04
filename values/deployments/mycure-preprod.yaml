@@ -530,6 +530,14 @@ syncd:
       - secretKey: ENC_PERSONAL_DETAILS
         remoteKey: mycure-production-enc-personal-details
 
+# ===== LEGACY: MyCure v8 (disabled, stub required by chart template) =====
+mycurev8:
+  enabled: false
+
+# ===== DATABASE: MongoDB (disabled, stub required by chart template) =====
+mongodb:
+  enabled: false
+
 # ===== DATABASE: PostgreSQL =====
 # Standalone (no read replica) in preprod: prod node pool can't fit a
 # second 4Gi PG pod alongside HA Postgres + existing prod workloads.
