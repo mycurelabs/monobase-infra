@@ -60,6 +60,16 @@ ${chalk.yellow("Options:")}
               Default: 25 patients on the parent.
               Pass --patients 0 to skip patient seeding entirely.
 
+  --patient-accounts
+              Seed Better-Auth user accounts for the first N random
+              patients + the fixed demo patient. Each account is tagged
+              ['pxp', 'seed', 'patient'] (the 'pxp' tag is hapihub's
+              convention for self-claiming patient accounts) and the
+              corresponding medical-patient row is PATCHed with
+              account=<uid>. Passwords are the same Mycure123! used for
+              staff. Default: 5 (= 6 total accounts including the fixed).
+              Pass --patient-accounts 0 to skip.
+
   Services    Always seeded — a fixed catalog (~30 entries) covering all
               7 service types (fee, clinical-consultation, clinical-procedure,
               diagnostic, pe, dental, package) is created in BOTH facilities.
@@ -118,6 +128,14 @@ ${chalk.yellow("Options:")}
       - Dental Statuses: 19 curated dental-fixture entries (caries,
         missing, RCT, crown, implant, etc.) using the SDK's
         DENTAL_STATUS_TYPES enum.
+    Demo charts:
+      - 1 fixed demo patient (Pedro Demo Lopez, externalId
+        SEED-PATIENT-FIXED-001) with 2 encounters and 9 medical records:
+        vitals, chief complaint, HPI, 3 ICD-10 assessments (T2DM E11.9,
+        HTN I10, follow-up impression), 2 medication orders (Metformin +
+        Losartan starter regimen, then continued at follow-up).
+        Always-on. Idempotent on externalId.
+
     PME:
       - Report Templates: 5 starter presets imported from the sibling
         mycure repo at ../mycure/apps/mycure/src/pages/pme/. If the
@@ -128,6 +146,12 @@ ${chalk.yellow("Options:")}
       - Tests: 18 common Filipino-clinic lab tests (CBC, Urinalysis,
         FBS, HbA1c, Lipid Profile, Creatinine, BUN, SGPT, SGOT, etc.)
         with HL7 LOINC codes. Each linked to its section.
+      - Measures: ~70 result-form measures across the lab tests
+        (CBC has 13 — Hgb/Hct/RBC/MCV/MCH/MCHC/WBC/5-part diff/
+        Platelets; UA has 14; Lipid Profile has 6 with TC/HDL/LDL/TG/
+        VLDL/ratio; etc.) with PH-clinic reference ranges, units, and
+        sex/age scoping per the OpenAPI DiagnosticMeasureReferenceRange
+        spec. Result entry forms in /lab/orders pre-fill these fields.
       - Packages: 4 common groupings (Basic Health Screen, Diabetes
         Workup, Kidney+Liver, STD/Hep)
       - Analyzers: 6 stock entries (Sysmex, Beckman, Roche Cobas, etc.)
@@ -162,6 +186,9 @@ const { values: args } = parseArgs({
     // No default here — DEFAULT_PATIENT_COUNT is applied below if the flag
     // wasn't passed at all (vs. explicitly `--patients 0` to skip).
     patients: { type: "string" },
+    // Same convention as --patients — DEFAULT_PATIENT_ACCOUNT_COUNT is
+    // the source of truth, parsed below.
+    "patient-accounts": { type: "string" },
     help: { type: "boolean", default: false },
   },
   strict: true,
@@ -176,6 +203,20 @@ const PATIENT_COUNT = (() => {
   if (raw == null) return DEFAULT_PATIENT_COUNT;
   const n = parseInt(raw, 10);
   if (Number.isNaN(n) || n < 0) return DEFAULT_PATIENT_COUNT;
+  return n;
+})();
+
+// Patient-account count — see DEFAULT_PATIENT_ACCOUNT_COUNT (set when
+// seedPatientAccounts is declared). Same parsing semantics as --patients.
+const PATIENT_ACCOUNT_COUNT = (() => {
+  const raw = args["patient-accounts"];
+  // Default applied here is hardcoded to match DEFAULT_PATIENT_ACCOUNT_COUNT
+  // declared further down — the const is referenced here before its
+  // declaration in source order, but Bun hoists the binding.
+  const FALLBACK = 5;
+  if (raw == null) return FALLBACK;
+  const n = parseInt(raw, 10);
+  if (Number.isNaN(n) || n < 0) return FALLBACK;
   return n;
 })();
 
@@ -1159,6 +1200,632 @@ async function seedPatients(
 }
 
 // ---------------------------------------------------------------------------
+// Fixed demo patient — deterministic name + externalId, populated with two
+// encounters and a representative set of medical records (vitals, chief
+// complaint, assessment with ICD-10 codes, medication orders). Lets demo
+// users always have a known patient with a real chart to click through.
+// ---------------------------------------------------------------------------
+//
+// Storyline: 42yo male with newly-diagnosed Type 2 diabetes + hypertension.
+// Visit 1 (~30 days ago): initial diagnosis. Visit 2 (~7 days ago):
+// follow-up showing improvement on Metformin + Losartan.
+//
+// All records use Dr. Juan Cruz (doctor@mycure.test) as the provider.
+// Idempotent on externalId: if the patient already exists, the entire
+// encounter+record chain is skipped (no partial runs).
+
+const FIXED_PATIENT_EXTERNAL_ID = "SEED-PATIENT-FIXED-001";
+const FIXED_PATIENT_DOCTOR_EMAIL = "doctor@mycure.test";
+
+interface CreatedPatientResponse {
+  id?: string;
+  $populated?: { personalDetails?: { id?: string } };
+}
+interface CreatedRecordResponse { id?: string }
+
+async function seedFixedPatient(
+  facilities: Array<{ id: string; label: string; profile: OrgProfile }>,
+  userIds: Record<string, string>,
+): Promise<void> {
+  const parentFacility = facilities.find((f) => !f.profile.parentName);
+  if (!parentFacility) {
+    console.warn(chalk.yellow("⚠  Fixed patient skipped — no parent facility."));
+    return;
+  }
+  const facilityId = parentFacility.id;
+  const doctorUid = userIds[FIXED_PATIENT_DOCTOR_EMAIL];
+  if (!doctorUid) {
+    console.warn(
+      chalk.yellow(`⚠  Fixed patient skipped — no uid for ${FIXED_PATIENT_DOCTOR_EMAIL}.`),
+    );
+    return;
+  }
+
+  const spinner = ora(`Seeding fixed demo patient (Pedro Demo Lopez)...`).start();
+
+  // Idempotency: if the patient with this externalId already exists, the
+  // whole chart was seeded on a previous run — skip everything.
+  if (await patientExists(facilityId, FIXED_PATIENT_EXTERNAL_ID)) {
+    spinner.succeed(
+      `Fixed patient already exists (externalId=${FIXED_PATIENT_EXTERNAL_ID}) — skipped`,
+    );
+    return;
+  }
+
+  // ── 1. Create the patient ───────────────────────────────────────
+  spinner.text = "creating patient row...";
+  let patientId: string;
+  try {
+    const created = (await api("POST", "/medical-patients", {
+      facility: facilityId,
+      externalId: FIXED_PATIENT_EXTERNAL_ID,
+      creatingDevice: "web",
+      tags: ["seed", "demo", "fixed", "adult"],
+      personalDetails: {
+        type: "medical-patients",
+        name: {
+          firstName: "Pedro",
+          middleName: "Reyes",
+          lastName: "Demo Lopez",
+          suffix: "Jr.",
+        },
+        sex: "male",
+        dateOfBirth: new Date("1983-05-15T00:00:00.000Z").toISOString(),
+        age: 42,
+        mobileNo: "+639171234100",
+        email: "pedro.demo.lopez@mycure.test",
+        bloodType: "O+",
+        maritalStatus: "married",
+        nationality: "Filipino",
+        religion: "Roman Catholic",
+        height: 172,
+        weight: 88,
+        address: {
+          street1: "1 Demo Street, Bel-Air Village",
+          city: "Makati",
+          province: "Metro Manila",
+          region: "NCR",
+          country: "PHL",
+          zipCode: "1209",
+        },
+        emergencyContactName: "Maria Demo Lopez",
+        emergencyContactRelationship: "spouse",
+        emergencyContactMobileNo: "+639171234101",
+        insuranceCards: [
+          {
+            provider: "PhilHealth",
+            kind: "government",
+            cardNumber: "12-345678901-0",
+            memberType: "Employed (Direct Contributor)",
+            validUntil: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
+          },
+          {
+            provider: "Maxicare Healthcare Corporation",
+            kind: "hmo",
+            cardNumber: "HMO-100200300",
+            planName: "Premier",
+            validUntil: new Date(Date.now() + 180 * 24 * 60 * 60 * 1000).toISOString(),
+          },
+        ],
+        companies: [
+          {
+            name: "Ayala Corporation",
+            position: "Senior Project Manager",
+            since: new Date("2015-01-15T00:00:00.000Z").toISOString(),
+          },
+        ],
+        tags: ["seed", "demo", "fixed"],
+      },
+    })) as CreatedPatientResponse;
+    patientId = created.id ?? "";
+    if (!patientId) throw new Error("patient create returned no id");
+  } catch (err: unknown) {
+    spinner.fail(`Failed to create fixed patient: ${(err as Error).message.slice(0, 200)}`);
+    process.exit(1);
+  }
+
+  // ── 2. Two encounters: initial-diagnosis (30 days ago) +
+  //       follow-up (7 days ago) ────────────────────────────────────
+  const now = Date.now();
+  const t1 = new Date(now - 30 * 24 * 60 * 60 * 1000); // initial visit
+  const t2 = new Date(now - 7 * 24 * 60 * 60 * 1000);  // follow-up
+
+  spinner.text = "creating initial-visit encounter...";
+  let encounter1Id: string;
+  try {
+    const enc = (await api("POST", "/medical-encounters", {
+      type: "outpatient",
+      facility: facilityId,
+      patient: patientId,
+      encounterType: "new",
+      doctors: [doctorUid],
+      providers: [doctorUid],
+      tags: ["seed", "fixed", "initial-diagnosis"],
+      finishedAt: t1.toISOString(),
+      finishedBy: doctorUid,
+    })) as CreatedRecordResponse;
+    encounter1Id = enc.id ?? "";
+    if (!encounter1Id) throw new Error("encounter 1 returned no id");
+  } catch (err: unknown) {
+    spinner.fail(`Failed to create initial encounter: ${(err as Error).message.slice(0, 200)}`);
+    process.exit(1);
+  }
+
+  spinner.text = "creating follow-up encounter...";
+  let encounter2Id: string;
+  try {
+    const enc = (await api("POST", "/medical-encounters", {
+      type: "outpatient",
+      facility: facilityId,
+      patient: patientId,
+      encounterType: "follow-up",
+      preceding: encounter1Id,
+      doctors: [doctorUid],
+      providers: [doctorUid],
+      tags: ["seed", "fixed", "follow-up"],
+      finishedAt: t2.toISOString(),
+      finishedBy: doctorUid,
+    })) as CreatedRecordResponse;
+    encounter2Id = enc.id ?? "";
+    if (!encounter2Id) throw new Error("encounter 2 returned no id");
+  } catch (err: unknown) {
+    spinner.fail(`Failed to create follow-up encounter: ${(err as Error).message.slice(0, 200)}`);
+    process.exit(1);
+  }
+
+  // ── 3. Records for each encounter ───────────────────────────────
+  // Helper that POSTs a /medical-records body with the common fields
+  // already wired up. Each record links back to the encounter, patient,
+  // facility, and provider.
+  //
+  // PER-RECORD TOLERANT: medication-order records can fail on hapihub
+  // builds where the `emr_status` column was added to the schema but the
+  // SQLite migration was deferred (the refactor/emr-layout branch ships
+  // PG-only migrations for it). One bad record shouldn't kill the rest
+  // of the chart, so we log a warning and continue.
+  let recordsCreated = 0;
+  let recordsFailed = 0;
+  const postRecord = async (encounterId: string, finalizedAt: Date, body: Record<string, unknown>) => {
+    try {
+      await api("POST", "/medical-records", {
+        facility: facilityId,
+        patient: patientId,
+        encounter: encounterId,
+        provider: doctorUid,
+        providerType: "doctor",
+        finalizedAt: finalizedAt.toISOString(),
+        finalizedBy: doctorUid,
+        tags: ["seed", "fixed"],
+        ...body,
+      });
+      recordsCreated++;
+    } catch (err: unknown) {
+      const msg = (err as Error).message;
+      const trimmed = msg.length > 160 ? `${msg.slice(0, 160)}…` : msg;
+      console.warn(
+        chalk.yellow(
+          `  ⚠  record skipped (type=${body.type}${body.subtype ? "/" + body.subtype : ""}): ${trimmed}`,
+        ),
+      );
+      recordsFailed++;
+    }
+  };
+
+  // Encounter 1 — initial diagnosis
+  spinner.text = "writing records for initial encounter...";
+  {
+    // Vitals — elevated BP, mildly overweight
+    await postRecord(encounter1Id, t1, {
+      type: "vitals",
+      takenAt: t1.toISOString(),
+      height: 172,
+      heightUnitDisplayed: "cm",
+      weight: 88,
+      weightUnitDisplayed: "kg",
+      pulse: 84,
+      respiration: 16,
+      temperature: 36.7,
+      bpSystolic: 152,
+      bpDiastolic: 96,
+      o2sats: 98,
+    });
+
+    // Chief complaint
+    await postRecord(encounter1Id, t1, {
+      type: "chief-complaint",
+      text:
+        "Increased thirst and frequent urination for the past 2 weeks. Patient also " +
+        "reports fatigue and 3kg unintentional weight loss over the same period. " +
+        "Family history positive for type 2 diabetes (father, paternal uncle).",
+      doctor: doctorUid,
+      signsAndSymptoms: [
+        { code: "polydipsia", text: "Polydipsia (increased thirst)", duration: "2 weeks", severity: 6 },
+        { code: "polyuria",   text: "Polyuria (frequent urination)",  duration: "2 weeks", severity: 6 },
+        { code: "fatigue",    text: "Fatigue",                         duration: "2 weeks", severity: 5 },
+        { code: "weight-loss", text: "Unintentional weight loss",      duration: "2 weeks", severity: 5 },
+      ],
+    });
+
+    // Assessment — primary diagnosis (T2DM) + secondary (HTN)
+    await postRecord(encounter1Id, t1, {
+      type: "assessment",
+      subtype: "diagnosis",
+      diagnosis: "Type 2 diabetes mellitus, newly diagnosed",
+      diagnosisCode: "E11.9",
+      diagnosisText: "Type 2 diabetes mellitus without complications",
+      icd10: "E11.9",
+      text: "FBS 248 mg/dL, HbA1c 9.2%. Started on metformin and lifestyle modifications.",
+    });
+    await postRecord(encounter1Id, t1, {
+      type: "assessment",
+      subtype: "diagnosis",
+      diagnosis: "Essential hypertension, stage 1",
+      diagnosisCode: "I10",
+      diagnosisText: "Essential (primary) hypertension",
+      icd10: "I10",
+      text: "Average BP 152/96 over 3 readings. Initiating ARB.",
+    });
+
+    // Medication order — Metformin + Losartan starter regimen
+    await postRecord(encounter1Id, t1, {
+      type: "medication-order",
+      note: "Starter regimen for newly-diagnosed T2DM + HTN. Reassess at 4-week follow-up.",
+      validUntil: new Date(t1.getTime() + 60 * 24 * 60 * 60 * 1000).toISOString(),
+      startedAt: t1.toISOString(),
+      items: [
+        {
+          genericName: "Metformin",
+          brandName: "Glucophage",
+          formulation: "500mg tablet",
+          dispense: "60 tablets",
+          dosageSig: "1 tablet",
+          frequency: "twice daily with meals",
+          duration: 30,
+          durationUnit: "day",
+          afterFood: "Take with or right after meals to reduce GI upset.",
+          reasonForPrescription: "T2DM glycemic control",
+          startedAt: t1.toISOString(),
+        },
+        {
+          genericName: "Losartan",
+          brandName: "Cozaar",
+          formulation: "50mg tablet",
+          dispense: "30 tablets",
+          dosageSig: "1 tablet",
+          frequency: "once daily in the morning",
+          duration: 30,
+          durationUnit: "day",
+          reasonForPrescription: "Stage 1 hypertension",
+          startedAt: t1.toISOString(),
+        },
+      ],
+    });
+  }
+
+  // Encounter 2 — follow-up
+  spinner.text = "writing records for follow-up encounter...";
+  {
+    // Vitals — improved BP, slight weight loss
+    await postRecord(encounter2Id, t2, {
+      type: "vitals",
+      takenAt: t2.toISOString(),
+      height: 172,
+      heightUnitDisplayed: "cm",
+      weight: 86,
+      weightUnitDisplayed: "kg",
+      pulse: 78,
+      respiration: 16,
+      temperature: 36.6,
+      bpSystolic: 138,
+      bpDiastolic: 88,
+      o2sats: 99,
+    });
+
+    // HPI / progress note
+    await postRecord(encounter2Id, t2, {
+      type: "hpi",
+      text:
+        "Patient reports good adherence to metformin and losartan. Polydipsia and " +
+        "polyuria have largely resolved. Energy levels improving. No GI side effects " +
+        "from metformin. Lost 2kg since last visit. Home BP readings averaging 135/85.",
+      doctor: doctorUid,
+    });
+
+    // Assessment — improving
+    await postRecord(encounter2Id, t2, {
+      type: "assessment",
+      subtype: "impression",
+      diagnosis: "Type 2 diabetes — improving on Metformin",
+      diagnosisCode: "E11.9",
+      diagnosisText: "Type 2 diabetes mellitus without complications",
+      icd10: "E11.9",
+      text: "Continue current regimen. Schedule HbA1c repeat in 3 months. Reinforce diet/exercise.",
+    });
+
+    // Medication order — continue same regimen
+    await postRecord(encounter2Id, t2, {
+      type: "medication-order",
+      note: "Continue starter regimen. Reassess at 3-month HbA1c.",
+      validUntil: new Date(t2.getTime() + 90 * 24 * 60 * 60 * 1000).toISOString(),
+      startedAt: t2.toISOString(),
+      items: [
+        {
+          genericName: "Metformin",
+          brandName: "Glucophage",
+          formulation: "500mg tablet",
+          dispense: "180 tablets",
+          dosageSig: "1 tablet",
+          frequency: "twice daily with meals",
+          duration: 90,
+          durationUnit: "day",
+          reasonForPrescription: "T2DM (continuing)",
+          startedAt: t2.toISOString(),
+        },
+        {
+          genericName: "Losartan",
+          brandName: "Cozaar",
+          formulation: "50mg tablet",
+          dispense: "90 tablets",
+          dosageSig: "1 tablet",
+          frequency: "once daily in the morning",
+          duration: 90,
+          durationUnit: "day",
+          reasonForPrescription: "Hypertension (continuing)",
+          startedAt: t2.toISOString(),
+        },
+      ],
+    });
+  }
+
+  if (recordsFailed > 0) {
+    spinner.warn(
+      `Fixed patient: Pedro Demo Lopez (${FIXED_PATIENT_EXTERNAL_ID}) — 2 encounters, ${recordsCreated}/${recordsCreated + recordsFailed} medical records (${recordsFailed} skipped — see warnings above)`,
+    );
+  } else {
+    spinner.succeed(
+      `Fixed patient: Pedro Demo Lopez (${FIXED_PATIENT_EXTERNAL_ID}) — 2 encounters, ${recordsCreated} medical records (vitals, chief-complaint, hpi, assessments, medication orders)`,
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Patient accounts — sign up Better-Auth accounts for the fixed patient
+// + the first N random patients, tag the accounts as `pxp` (the
+// PXP-mobile-app self-claim convention from
+// services/hapihub/src/services/account/accounts.schema.ts:39), and link
+// each medical-patient row to its account via the `account` field.
+//
+// Why only N and not all? In a real clinic most walk-in patients never
+// register a self-service account; mirroring that for demo realism. Pass
+// --patient-accounts <N> to override the default of 5.
+// ---------------------------------------------------------------------------
+
+const DEFAULT_PATIENT_ACCOUNT_COUNT = 5;
+
+interface SeededPatientAccount {
+  externalId: string;
+  email: string;
+  isFixed: boolean;
+  /** "new" | "existing" | "skipped" */
+  status: "new" | "existing" | "skipped";
+}
+
+async function seedPatientAccounts(
+  facilities: Array<{ id: string; label: string; profile: OrgProfile }>,
+  randomCount: number,
+): Promise<SeededPatientAccount[]> {
+  const parentFacility = facilities.find((f) => !f.profile.parentName);
+  if (!parentFacility) return [];
+  const facilityId = parentFacility.id;
+
+  // Build the list of (patientId, externalId, isFixed) targets.
+  const targets: Array<{ patientId: string; externalId: string; isFixed: boolean }> = [];
+
+  // Fixed patient first (if it was seeded).
+  try {
+    const res = (await api(
+      "GET",
+      `/medical-patients?facility=${encodeURIComponent(facilityId)}&externalId=${encodeURIComponent(FIXED_PATIENT_EXTERNAL_ID)}&%24limit=1`,
+    )) as { data?: Array<{ id: string }> } | Array<{ id: string }>;
+    const list = Array.isArray(res) ? res : res.data ?? [];
+    if (list[0]?.id) {
+      targets.push({ patientId: list[0].id, externalId: FIXED_PATIENT_EXTERNAL_ID, isFixed: true });
+    }
+  } catch {
+    // ignore — fixed patient may not exist on this run
+  }
+
+  // Then the first N random patients (SEED-PATIENT-1-001 onwards). They
+  // must already exist (seedPatients runs earlier in main()).
+  for (let i = 1; i <= randomCount; i++) {
+    const externalId = `SEED-PATIENT-1-${String(i).padStart(3, "0")}`;
+    try {
+      const res = (await api(
+        "GET",
+        `/medical-patients?facility=${encodeURIComponent(facilityId)}&externalId=${encodeURIComponent(externalId)}&%24limit=1`,
+      )) as { data?: Array<{ id: string }> } | Array<{ id: string }>;
+      const list = Array.isArray(res) ? res : res.data ?? [];
+      if (list[0]?.id) {
+        targets.push({ patientId: list[0].id, externalId, isFixed: false });
+      }
+    } catch {
+      // ignore — patient may not have been seeded
+    }
+  }
+
+  if (targets.length === 0) return [];
+
+  const spinner = ora(`Seeding ${targets.length} patient accounts (1 fixed + ${targets.length - 1} random)...`).start();
+
+  // Capture the superadmin session — sign-up + sign-in mutate sessionCookie,
+  // and we need superadmin auth for the PATCH calls afterwards.
+  const superadminCookie = sessionCookie;
+
+  let accountsCreated = 0;
+  let accountsExisting = 0;
+  let patientsLinked = 0;
+  let skipped = 0;
+  let progress = 0;
+  // Per-target results so main() can render a final-breakdown row for
+  // each patient account (email + status).
+  const results: SeededPatientAccount[] = [];
+
+  for (const target of targets) {
+    progress++;
+    spinner.text = `[${target.externalId}] (${progress}/${targets.length})`;
+
+    // 1. Pull the patient's email + name from personal_details. Recall:
+    //    medical-patient.id == personal_details.id (same convention as
+    //    account.uid). The Better-Auth signup email is what the patient
+    //    will use to log in.
+    let email: string | undefined;
+    let displayName: string | undefined;
+    try {
+      const pd = (await api("GET", `/personal-details/${target.patientId}`)) as {
+        email?: string;
+        name?: { firstName?: string; lastName?: string };
+      };
+      email = pd?.email;
+      displayName = [pd?.name?.firstName, pd?.name?.lastName].filter(Boolean).join(" ").trim();
+    } catch {
+      skipped++;
+      results.push({ externalId: target.externalId, email: "", isFixed: target.isFixed, status: "skipped" });
+      continue;
+    }
+    if (!email) {
+      skipped++;
+      results.push({ externalId: target.externalId, email: "", isFixed: target.isFixed, status: "skipped" });
+      continue;
+    }
+    const name = displayName || "Patient";
+
+    // 2. Sign up. If the account already exists (rerun), sign in instead.
+    sessionCookie = "";
+    let uid: string | undefined;
+    let outcome: "new" | "existing" | "skipped" = "skipped";
+    try {
+      const result = await signUp(email, PASSWORD, name);
+      uid = result.user?.id;
+      if (uid) {
+        accountsCreated++;
+        outcome = "new";
+      }
+    } catch (err: unknown) {
+      const msg = (err as Error).message;
+      if (
+        msg.includes("already exists") ||
+        msg.includes("UNIQUE") ||
+        msg.includes("duplicate") ||
+        msg.includes("already")
+      ) {
+        sessionCookie = "";
+        try {
+          const result = await signIn(email, PASSWORD);
+          uid = result.user?.id;
+          if (uid) {
+            accountsExisting++;
+            outcome = "existing";
+          }
+        } catch (err2: unknown) {
+          const msg2 = (err2 as Error).message;
+          console.warn(
+            chalk.yellow(`  ⚠  ${target.externalId}: signin fallback failed — ${msg2.slice(0, 120)}`),
+          );
+          skipped++;
+          results.push({ externalId: target.externalId, email, isFixed: target.isFixed, status: "skipped" });
+          continue;
+        }
+      } else if (msg.includes("429")) {
+        // Rate limit on Better-Auth signup — wait and retry once.
+        await new Promise((r) => setTimeout(r, 10_000));
+        try {
+          sessionCookie = "";
+          const result = await signUp(email, PASSWORD, name);
+          uid = result.user?.id;
+          if (uid) {
+            accountsCreated++;
+            outcome = "new";
+          }
+        } catch (err2: unknown) {
+          console.warn(
+            chalk.yellow(`  ⚠  ${target.externalId}: signup rate-limit retry failed`),
+          );
+          skipped++;
+          results.push({ externalId: target.externalId, email, isFixed: target.isFixed, status: "skipped" });
+          continue;
+        }
+      } else {
+        console.warn(
+          chalk.yellow(`  ⚠  ${target.externalId}: signup failed — ${msg.slice(0, 120)}`),
+        );
+        skipped++;
+        results.push({ externalId: target.externalId, email, isFixed: target.isFixed, status: "skipped" });
+        continue;
+      }
+    }
+    if (!uid) {
+      skipped++;
+      results.push({ externalId: target.externalId, email, isFixed: target.isFixed, status: "skipped" });
+      continue;
+    }
+    // Account secured (new or existing) — record a successful row even
+    // before tagging/linking lands so the breakdown shows the working
+    // login credential.
+    results.push({ externalId: target.externalId, email, isFixed: target.isFixed, status: outcome });
+
+    // 3. Restore superadmin session for the PATCH calls (signing in as
+    //    the patient gave us a patient session, which can't PATCH random
+    //    accounts/patients).
+    sessionCookie = superadminCookie;
+
+    // 4. Tag the account: ['pxp', 'seed', 'patient']. The 'pxp' tag is
+    //    hapihub's existing convention for accounts that claim a medical
+    //    patient (per accounts.schema.ts comment about PXP mobile signup);
+    //    we set it eagerly here so feature flags / queries that filter on
+    //    that tag work end-to-end in the demo.
+    try {
+      await api("PATCH", `/accounts/${uid}`, {
+        tags: ["pxp", "seed", "patient"],
+      });
+    } catch (err: unknown) {
+      const msg = (err as Error).message;
+      console.warn(
+        chalk.yellow(`  ⚠  ${target.externalId}: failed to tag account — ${msg.slice(0, 120)}`),
+      );
+      // tags are non-critical, continue with the link
+    }
+
+    // 5. Link the medical-patient row to the account.
+    try {
+      await api("PATCH", `/medical-patients/${target.patientId}`, {
+        account: uid,
+      });
+      patientsLinked++;
+    } catch (err: unknown) {
+      const msg = (err as Error).message;
+      console.warn(
+        chalk.yellow(`  ⚠  ${target.externalId}: failed to link account to patient — ${msg.slice(0, 120)}`),
+      );
+    }
+  }
+
+  // Restore superadmin so subsequent steps proceed cleanly.
+  sessionCookie = superadminCookie;
+
+  const accountSummary = `${accountsCreated} new + ${accountsExisting} existing`;
+  if (skipped > 0) {
+    spinner.warn(
+      `Patient accounts: ${accountSummary} (skipped ${skipped}); ${patientsLinked}/${targets.length} medical-patients linked`,
+    );
+  } else {
+    spinner.succeed(
+      `Patient accounts: ${accountSummary}, ${patientsLinked}/${targets.length} medical-patients linked (account uids tagged ['pxp','seed','patient'])`,
+    );
+  }
+  return results;
+}
+
+// ---------------------------------------------------------------------------
 // Service catalog (multiple entries per service type, PHP-pricing realism)
 // ---------------------------------------------------------------------------
 // Service types per CreateServiceServiceRequest enum
@@ -1276,7 +1943,8 @@ const SERVICE_TEMPLATES: ServiceTemplate[] = [
   // ─── diagnostic / lab (subtype=lab) ────────────────────────────
   // SDK uses `diagnostic/lab` as the type-pair; we POST `type=diagnostic`
   // + `subtype=lab` so the UI's filter shows them under Laboratory.
-  { type: "diagnostic", name: "CBC (Complete Blood Count)",         description: "Hematology panel — RBC, WBC, platelets, hgb",      subtype: "lab", category: "hematology",          price: 350,  normalTime: 30, tags: ["lab", "hematology"] },
+  // Name aligned to SEED_LIS_TESTS so service.ref lookup matches the test row.
+  { type: "diagnostic", name: "Complete Blood Count (CBC)",          description: "Hematology panel — RBC, WBC, platelets, hgb",      subtype: "lab", category: "hematology",          price: 350,  normalTime: 30, tags: ["lab", "hematology"] },
   { type: "diagnostic", name: "Hemoglobin",                          description: "Hgb level — anemia screen",                         subtype: "lab", category: "hematology",          price: 180,  normalTime: 20, tags: ["lab", "hematology"] },
   { type: "diagnostic", name: "Platelet Count",                       description: "Platelet count for clotting/bleeding assessment",   subtype: "lab", category: "hematology",          price: 200,  normalTime: 20, tags: ["lab", "hematology"] },
   { type: "diagnostic", name: "Blood Typing (ABO/Rh)",                description: "ABO + Rh blood typing",                             subtype: "lab", category: "hematology",          price: 250,  normalTime: 30, tags: ["lab", "hematology"] },
@@ -1383,6 +2051,14 @@ interface ServiceRefs {
   labPackageByName: Map<string, string>;
   /** radiology package id by name. */
   imagingPackageByName: Map<string, string>;
+  /**
+   * diagnostic-test id by (kind, name). Used to populate `service.ref` on
+   * lab/imaging billing services so hapihub can auto-link the two — see
+   * services/hapihub/src/services/service/services.ts:313 (when ref is
+   * set, testSection + testSectionCode get populated from the test row).
+   */
+  labTestByName: Map<string, string>;
+  imagingTestByName: Map<string, string>;
 }
 
 async function buildServiceRefsForFacility(facilityId: string): Promise<ServiceRefs> {
@@ -1431,7 +2107,31 @@ async function buildServiceRefsForFacility(facilityId: string): Promise<ServiceR
     }
   } catch { /* leave empty */ }
 
-  return { consentFormByName, queueByName, queueByType, labPackageByName, imagingPackageByName };
+  // diagnostic-tests: split client-side by `type` (laboratory|radiology).
+  const labTestByName = new Map<string, string>();
+  const imagingTestByName = new Map<string, string>();
+  try {
+    const res = (await api(
+      "GET",
+      `/diagnostic-tests?facility=${encodeURIComponent(facilityId)}&%24limit=500`,
+    )) as { data?: Array<{ id: string; name?: string; type?: string }> } | Array<{ id: string; name?: string; type?: string }>;
+    const list = Array.isArray(res) ? res : res.data ?? [];
+    for (const t of list) {
+      if (!t.name || !t.id) continue;
+      if (t.type === "laboratory") labTestByName.set(t.name, t.id);
+      else if (t.type === "radiology") imagingTestByName.set(t.name, t.id);
+    }
+  } catch { /* leave empty — diagnostic services lose ref linkage */ }
+
+  return {
+    consentFormByName,
+    queueByName,
+    queueByType,
+    labPackageByName,
+    imagingPackageByName,
+    labTestByName,
+    imagingTestByName,
+  };
 }
 
 function buildServiceBody(
@@ -1490,6 +2190,21 @@ function buildServiceBody(
     }
   }
 
+  // Diagnostic services link to their matching diagnostic-test row via
+  // `ref`. Hapihub auto-populates testSection + testSectionCode from the
+  // referenced test (services.ts:313). Lookup is by name within the
+  // matching kind (lab → labTestByName, imaging → imagingTestByName).
+  let ref: string | undefined;
+  if (template.type === "diagnostic") {
+    const lookup =
+      template.subtype === "lab"
+        ? refs.labTestByName
+        : template.subtype === "imaging"
+          ? refs.imagingTestByName
+          : undefined;
+    ref = lookup?.get(template.name);
+  }
+
   return {
     facility,
     type: template.type,
@@ -1498,6 +2213,7 @@ function buildServiceBody(
     externalId: `SEED-SVC-${slug}`,
     ...(template.subtype ? { subtype: template.subtype } : {}),
     ...(template.category ? { category: template.category } : {}),
+    ...(ref ? { ref } : {}),
     price: template.price,
     priceCurrency: "PHP",
     ...(template.performNTimes ? { performNTimes: template.performNTimes } : {}),
@@ -1540,6 +2256,8 @@ async function seedServices(facilities: { id: string; label: string }[]): Promis
   let queueingApplied = 0;
   let unresolvedConsent = 0;
   let unresolvedQueueing = 0;
+  let testRefsApplied = 0;
+  let unresolvedTestRef = 0;
 
   for (const facility of facilities) {
     spinner.text = `[${facility.label}] resolving service references (consent forms, queues, packages)...`;
@@ -1578,6 +2296,13 @@ async function seedServices(facilities: { id: string; label: string }[]): Promis
           1; // doctor queue is always added when a doctor queue exists
         if (actualQueues < expected) unresolvedQueueing += expected - actualQueues;
       }
+      if (
+        template.type === "diagnostic" &&
+        (template.subtype === "lab" || template.subtype === "imaging")
+      ) {
+        if (body.ref) testRefsApplied++;
+        else unresolvedTestRef++;
+      }
 
       try {
         await api("POST", "/services", body);
@@ -1599,11 +2324,16 @@ async function seedServices(facilities: { id: string; label: string }[]): Promis
     .map(([t, n]) => `${t}=${n}`)
     .join(", ");
 
+  const diagLabImagingCount =
+    SERVICE_TEMPLATES.filter(
+      (t) => t.type === "diagnostic" && (t.subtype === "lab" || t.subtype === "imaging"),
+    ).length * facilities.length;
   const refSummary =
     `consent on ${consentRefsApplied}/${total}` +
     `, queueing on ${queueingApplied}/${SERVICE_TEMPLATES.filter((t) => t.type === "pe").length * facilities.length}` +
-    (unresolvedConsent || unresolvedQueueing
-      ? ` (${unresolvedConsent} consent + ${unresolvedQueueing} queueing refs unresolved)`
+    `, dx-test ref on ${testRefsApplied}/${diagLabImagingCount}` +
+    (unresolvedConsent || unresolvedQueueing || unresolvedTestRef
+      ? ` (${unresolvedConsent} consent + ${unresolvedQueueing} queueing + ${unresolvedTestRef} dx-test refs unresolved)`
       : "");
 
   spinner.succeed(
@@ -3875,6 +4605,7 @@ const SEED_RIS_SECTIONS: DiagnosticSectionTemplate[] = [
   { name: "CT Scan",        code: "CT" },
   { name: "MRI",            code: "MRI" },
   { name: "Mammography",    code: "MAMMO" },
+  { name: "Cardiology",     code: "CARDIO" },
 ];
 
 interface DiagnosticTestTemplate {
@@ -3907,6 +4638,224 @@ const SEED_LIS_TESTS: DiagnosticTestTemplate[] = [
   { name: "Sputum Culture",              section: "Microbiology",         hl7Code: "624-7",   hl7System: "LOINC" },
 ];
 
+// ─── Diagnostic measures (LIS only) ─────────────────────────────────
+// Measures are the structured sub-fields of a diagnostic-test result
+// (per the OpenAPI spec at apis/hapihub/src/diagnostic/components/
+// schemas/CreateDiagnosticMeasureRequest.yaml). For lab tests, this is
+// what the UI renders as numeric fields, dropdowns, etc. on the result
+// form. Imaging tests use form-template HTML reports instead, so we
+// only seed measures for the LIS catalogue.
+//
+// Connection to billing services: unchanged. service.ref → test.id.
+// test.id ← measure.test (separate join). The two are independent — we
+// just enrich the test side with measures so result entry forms have
+// real fields to fill in.
+
+interface MeasureRange {
+  min?: number;
+  max?: number;
+  sex?: "all" | "male" | "female";
+  ageMin?: number;
+  ageMax?: number;
+}
+interface MeasureTemplate {
+  name: string;
+  type: "numeric" | "posneg" | "text" | "html" | "multiplechoice" | "checklist" | "numeric-breakdown";
+  /** Group within the test (e.g., "Hematology"). Optional. */
+  set?: string;
+  unit?: string;
+  siunit?: string;
+  unitToSIUnitConversionFactor?: number;
+  description?: string;
+  choices?: string[];
+  referenceRanges?: MeasureRange[];
+}
+interface TestMeasuresTemplate {
+  /** Must match a SEED_LIS_TESTS entry by name. */
+  testName: string;
+  measures: MeasureTemplate[];
+}
+
+const SEED_LIS_MEASURES: TestMeasuresTemplate[] = [
+  // Complete Blood Count — RBC indices + 5-part diff
+  {
+    testName: "Complete Blood Count (CBC)",
+    measures: [
+      { name: "Hemoglobin",     type: "numeric", set: "RBC indices", unit: "g/dL",        referenceRanges: [{ min: 13.5, max: 17.5, sex: "male" }, { min: 12.0, max: 16.0, sex: "female" }] },
+      { name: "Hematocrit",     type: "numeric", set: "RBC indices", unit: "%",            referenceRanges: [{ min: 41.0, max: 53.0, sex: "male" }, { min: 36.0, max: 46.0, sex: "female" }] },
+      { name: "RBC Count",       type: "numeric", set: "RBC indices", unit: "x10⁶/µL",      referenceRanges: [{ min: 4.5, max: 5.9, sex: "male" }, { min: 4.0, max: 5.2, sex: "female" }] },
+      { name: "MCV",             type: "numeric", set: "RBC indices", unit: "fL",           referenceRanges: [{ min: 80, max: 100, sex: "all" }] },
+      { name: "MCH",             type: "numeric", set: "RBC indices", unit: "pg",           referenceRanges: [{ min: 27, max: 33, sex: "all" }] },
+      { name: "MCHC",            type: "numeric", set: "RBC indices", unit: "g/dL",         referenceRanges: [{ min: 32, max: 36, sex: "all" }] },
+      { name: "WBC Count",       type: "numeric", set: "WBC",        unit: "x10³/µL",      referenceRanges: [{ min: 4.5, max: 11.0, sex: "all" }] },
+      { name: "Neutrophils",    type: "numeric", set: "Differential count", unit: "%",     referenceRanges: [{ min: 40, max: 75, sex: "all" }] },
+      { name: "Lymphocytes",    type: "numeric", set: "Differential count", unit: "%",     referenceRanges: [{ min: 20, max: 45, sex: "all" }] },
+      { name: "Monocytes",      type: "numeric", set: "Differential count", unit: "%",     referenceRanges: [{ min: 2, max: 10, sex: "all" }] },
+      { name: "Eosinophils",    type: "numeric", set: "Differential count", unit: "%",     referenceRanges: [{ min: 1, max: 6, sex: "all" }] },
+      { name: "Basophils",      type: "numeric", set: "Differential count", unit: "%",     referenceRanges: [{ min: 0, max: 2, sex: "all" }] },
+      { name: "Platelet Count", type: "numeric", set: "Platelets",   unit: "x10³/µL",      referenceRanges: [{ min: 150, max: 450, sex: "all" }] },
+    ],
+  },
+  // Standalone single-measure tests
+  {
+    testName: "Hemoglobin",
+    measures: [
+      { name: "Hemoglobin", type: "numeric", unit: "g/dL", referenceRanges: [{ min: 13.5, max: 17.5, sex: "male" }, { min: 12.0, max: 16.0, sex: "female" }] },
+    ],
+  },
+  {
+    testName: "Platelet Count",
+    measures: [
+      { name: "Platelet Count", type: "numeric", unit: "x10³/µL", referenceRanges: [{ min: 150, max: 450, sex: "all" }] },
+    ],
+  },
+  // Blood Typing — multiplechoice
+  {
+    testName: "Blood Typing (ABO/Rh)",
+    measures: [
+      { name: "ABO Group", type: "multiplechoice", choices: ["A", "B", "AB", "O"] },
+      { name: "Rh Type",   type: "multiplechoice", choices: ["Positive", "Negative"] },
+    ],
+  },
+  // Urinalysis — mix of text, posneg, and numeric
+  {
+    testName: "Urinalysis",
+    measures: [
+      { name: "Color",            type: "multiplechoice", set: "Macroscopic",  choices: ["Yellow", "Straw", "Amber", "Dark Yellow", "Red", "Brown"] },
+      { name: "Clarity",          type: "multiplechoice", set: "Macroscopic",  choices: ["Clear", "Slightly Hazy", "Hazy", "Cloudy", "Turbid"] },
+      { name: "pH",               type: "numeric",         set: "Chemical",     referenceRanges: [{ min: 4.5, max: 8.0, sex: "all" }] },
+      { name: "Specific Gravity", type: "numeric",         set: "Chemical",     referenceRanges: [{ min: 1.005, max: 1.030, sex: "all" }] },
+      { name: "Protein",          type: "posneg",          set: "Chemical" },
+      { name: "Glucose",          type: "posneg",          set: "Chemical" },
+      { name: "Ketones",          type: "posneg",          set: "Chemical" },
+      { name: "Blood",            type: "posneg",          set: "Chemical" },
+      { name: "Leukocyte Esterase", type: "posneg",        set: "Chemical" },
+      { name: "Nitrite",          type: "posneg",          set: "Chemical" },
+      { name: "WBC (per HPF)",    type: "text",            set: "Microscopic", description: "White blood cells per high-power field, e.g. '0-2/HPF'" },
+      { name: "RBC (per HPF)",    type: "text",            set: "Microscopic", description: "Red blood cells per high-power field" },
+      { name: "Bacteria",         type: "multiplechoice",  set: "Microscopic", choices: ["None", "Few", "Moderate", "Many"] },
+      { name: "Epithelial Cells", type: "multiplechoice",  set: "Microscopic", choices: ["None", "Few", "Moderate", "Many"] },
+    ],
+  },
+  // Fecalysis
+  {
+    testName: "Fecalysis",
+    measures: [
+      { name: "Color",       type: "multiplechoice", set: "Macroscopic", choices: ["Brown", "Yellow", "Green", "Black", "Red"] },
+      { name: "Consistency", type: "multiplechoice", set: "Macroscopic", choices: ["Formed", "Soft", "Loose", "Watery", "Hard"] },
+      { name: "Mucus",       type: "posneg",          set: "Macroscopic" },
+      { name: "Blood",       type: "posneg",          set: "Macroscopic" },
+      { name: "Pus Cells",   type: "text",            set: "Microscopic" },
+      { name: "Ova / Cyst",  type: "text",            set: "Parasitology", description: "Specify organism if seen, e.g. 'Ascaris lumbricoides'" },
+      { name: "Trophozoite", type: "text",            set: "Parasitology" },
+    ],
+  },
+  // Chemistry singles
+  {
+    testName: "Fasting Blood Sugar (FBS)",
+    measures: [
+      { name: "Glucose (fasting)", type: "numeric", unit: "mg/dL", siunit: "mmol/L", unitToSIUnitConversionFactor: 0.0555, referenceRanges: [{ min: 70, max: 99, sex: "all" }] },
+    ],
+  },
+  {
+    testName: "HbA1c",
+    measures: [
+      { name: "HbA1c", type: "numeric", unit: "%",
+        description: "Reference: <5.7 normal, 5.7-6.4 prediabetes, ≥6.5 diabetes (ADA)",
+        referenceRanges: [{ min: 4.0, max: 5.6, sex: "all" }] },
+      { name: "Estimated Average Glucose", type: "numeric", unit: "mg/dL",
+        description: "Computed: eAG = 28.7 × HbA1c − 46.7" },
+    ],
+  },
+  {
+    testName: "Lipid Profile",
+    measures: [
+      { name: "Total Cholesterol", type: "numeric", unit: "mg/dL", siunit: "mmol/L", unitToSIUnitConversionFactor: 0.02586,
+        description: "Desirable <200, borderline 200-239, high ≥240",
+        referenceRanges: [{ max: 200, sex: "all" }] },
+      { name: "HDL Cholesterol",   type: "numeric", unit: "mg/dL", siunit: "mmol/L", unitToSIUnitConversionFactor: 0.02586,
+        description: "Higher is protective. Low <40 male, <50 female.",
+        referenceRanges: [{ min: 40, sex: "male" }, { min: 50, sex: "female" }] },
+      { name: "LDL Cholesterol",   type: "numeric", unit: "mg/dL", siunit: "mmol/L", unitToSIUnitConversionFactor: 0.02586,
+        description: "Optimal <100, near-optimal 100-129, borderline 130-159, high 160-189, very high ≥190",
+        referenceRanges: [{ max: 130, sex: "all" }] },
+      { name: "Triglycerides",     type: "numeric", unit: "mg/dL", siunit: "mmol/L", unitToSIUnitConversionFactor: 0.01129,
+        description: "Normal <150, borderline 150-199, high 200-499, very high ≥500",
+        referenceRanges: [{ max: 150, sex: "all" }] },
+      { name: "VLDL",              type: "numeric", unit: "mg/dL",
+        description: "Computed: VLDL = Triglycerides / 5",
+        referenceRanges: [{ min: 5, max: 40, sex: "all" }] },
+      { name: "TC/HDL Ratio",      type: "numeric", description: "Cardiac risk indicator",
+        referenceRanges: [{ max: 5.0, sex: "all" }] },
+    ],
+  },
+  {
+    testName: "Creatinine",
+    measures: [
+      { name: "Creatinine", type: "numeric", unit: "mg/dL", siunit: "µmol/L", unitToSIUnitConversionFactor: 88.4,
+        referenceRanges: [{ min: 0.6, max: 1.2, sex: "male" }, { min: 0.5, max: 1.0, sex: "female" }] },
+    ],
+  },
+  {
+    testName: "BUN (Blood Urea Nitrogen)",
+    measures: [
+      { name: "BUN", type: "numeric", unit: "mg/dL", siunit: "mmol/L", unitToSIUnitConversionFactor: 0.357,
+        referenceRanges: [{ min: 7, max: 20, sex: "all" }] },
+    ],
+  },
+  {
+    testName: "SGPT/ALT",
+    measures: [
+      { name: "SGPT/ALT", type: "numeric", unit: "U/L",
+        referenceRanges: [{ min: 7, max: 56, sex: "male" }, { min: 7, max: 35, sex: "female" }] },
+    ],
+  },
+  {
+    testName: "SGOT/AST",
+    measures: [
+      { name: "SGOT/AST", type: "numeric", unit: "U/L",
+        referenceRanges: [{ min: 10, max: 40, sex: "male" }, { min: 9, max: 32, sex: "female" }] },
+    ],
+  },
+  // Serology — single posneg
+  {
+    testName: "HBsAg (Hep B Surface Ag)",
+    measures: [
+      { name: "HBsAg", type: "posneg", description: "Reactive (positive) suggests Hep B infection." },
+    ],
+  },
+  {
+    testName: "HIV Screening",
+    measures: [
+      { name: "Anti-HIV 1/2", type: "posneg", description: "Reactive screens require confirmatory testing." },
+    ],
+  },
+  {
+    testName: "Pregnancy Test (β-hCG)",
+    measures: [
+      { name: "β-hCG", type: "posneg", description: "Qualitative urine pregnancy test." },
+    ],
+  },
+  // Microbiology — text-heavy
+  {
+    testName: "Urine Culture & Sensitivity",
+    measures: [
+      { name: "Organism Isolated", type: "text", description: "Genus + species if identified, e.g. 'Escherichia coli'." },
+      { name: "Colony Count",       type: "text", unit: "CFU/mL", description: "≥10⁵ CFU/mL is significant." },
+      { name: "Sensitivities",      type: "html", description: "Antibiotic sensitivity panel — paste the analyzer's table." },
+    ],
+  },
+  {
+    testName: "Sputum Culture",
+    measures: [
+      { name: "Gram Stain",       type: "text" },
+      { name: "Organism Isolated", type: "text" },
+      { name: "Colony Count",      type: "text" },
+      { name: "Sensitivities",     type: "html" },
+    ],
+  },
+];
+
 const SEED_RIS_TESTS: DiagnosticTestTemplate[] = [
   { name: "Chest X-ray (PA view)",       section: "X-ray",       hl7Code: "36572-2", hl7System: "LOINC" },
   { name: "Chest X-ray (PA + Lateral)",  section: "X-ray",       hl7Code: "24648-8", hl7System: "LOINC" },
@@ -3920,6 +4869,9 @@ const SEED_RIS_TESTS: DiagnosticTestTemplate[] = [
   { name: "MRI — Brain (Plain + Contrast)", section: "MRI",      hl7Code: "30661-9", hl7System: "LOINC" },
   { name: "MRI — Lumbar Spine",          section: "MRI",         hl7Code: "30667-6", hl7System: "LOINC" },
   { name: "Mammography (Bilateral)",     section: "Mammography", hl7Code: "26346-7", hl7System: "LOINC" },
+  // ECG is billed as imaging in SEED_SERVICES (cardiology); the matching
+  // test row lets services.ref link the two so testSection auto-populates.
+  { name: "12-lead ECG",                 section: "Cardiology",  hl7Code: "11524-6", hl7System: "LOINC" },
 ];
 
 interface DiagnosticPackageTemplate {
@@ -4153,6 +5105,96 @@ async function seedDiagnosticTests(
     `${kind} tests: ${created} new, ${skipped} skipped, ${missingSection} unmatched section — ${total} target`,
   );
   return testIds;
+}
+
+// ---- Measures (diagnostic-measures) — LIS only ----------------------------
+//
+// /diagnostic-measures `includeQueryFields = ['facility','test','name','type','isPublic','hl7IdentifierCod','hl7IdentifierSys']`
+// (services/hapihub/src/services/diagnostic/measures.ts:120). `test` and
+// `name` are both whitelisted, so we can use them for natural-key dedup.
+// We pre-fetch the full set per test to avoid N round-trips when a test
+// has many measures (CBC has 13).
+//
+// Connection to billing services is unaffected — service.ref points at
+// the diagnostic-test row, and measure.test points at the same test row.
+// They form a chain (service → test → measures), independent links.
+
+async function listExistingMeasureNames(facility: string, testId: string): Promise<Set<string>> {
+  try {
+    const res = (await api(
+      "GET",
+      `/diagnostic-measures?facility=${encodeURIComponent(facility)}&test=${encodeURIComponent(testId)}&%24limit=200`,
+    )) as { data?: Array<{ name?: string }> } | Array<{ name?: string }>;
+    const list = Array.isArray(res) ? res : res.data ?? [];
+    return new Set(list.map((m) => m.name).filter(Boolean) as string[]);
+  } catch {
+    return new Set();
+  }
+}
+
+async function seedDiagnosticMeasures(
+  facilities: { id: string; label: string }[],
+  testIdsByFacility: Record<string, Record<string, string>>,
+  templates: TestMeasuresTemplate[],
+): Promise<void> {
+  const measuresPerFacility = templates.reduce((sum, t) => sum + t.measures.length, 0);
+  const total = measuresPerFacility * facilities.length;
+  const spinner = ora(
+    `Seeding ${total} diagnostic measures (${measuresPerFacility} per facility, across ${templates.length} tests)...`,
+  ).start();
+  let created = 0;
+  let skipped = 0;
+  let missingTest = 0;
+  let progress = 0;
+
+  for (const facility of facilities) {
+    const facilityTests = testIdsByFacility[facility.id] ?? {};
+    for (const tpl of templates) {
+      const testId = facilityTests[tpl.testName];
+      if (!testId) {
+        missingTest += tpl.measures.length;
+        progress += tpl.measures.length;
+        continue;
+      }
+      const existing = await listExistingMeasureNames(facility.id, testId);
+      for (const m of tpl.measures) {
+        progress++;
+        spinner.text = `[${facility.label}] ${tpl.testName} → ${m.name} (${progress}/${total})`;
+        if (existing.has(m.name)) {
+          skipped++;
+          continue;
+        }
+        try {
+          await api("POST", "/diagnostic-measures", {
+            facility: facility.id,
+            test: testId,
+            name: m.name,
+            type: m.type,
+            ...(m.set ? { set: m.set } : {}),
+            ...(m.unit ? { unit: m.unit } : {}),
+            ...(m.siunit ? { siunit: m.siunit } : {}),
+            ...(m.unitToSIUnitConversionFactor != null
+              ? { unitToSIUnitConversionFactor: m.unitToSIUnitConversionFactor }
+              : {}),
+            ...(m.description ? { description: m.description } : {}),
+            ...(m.choices ? { choices: m.choices } : {}),
+            ...(m.referenceRanges ? { referenceRanges: m.referenceRanges } : {}),
+          });
+          created++;
+        } catch (err: unknown) {
+          const msg = (err as Error).message;
+          spinner.fail(
+            `Failed to create measure '${tpl.testName}/${m.name}': ${msg.slice(0, 200)}`,
+          );
+          process.exit(1);
+        }
+      }
+    }
+  }
+
+  spinner.succeed(
+    `Diagnostic measures: ${created} new, ${skipped} skipped, ${missingTest} test refs unresolved — ${total} target`,
+  );
 }
 
 // ---- Packages (diagnostic-packages) ---------------------------------------
@@ -4964,24 +6006,48 @@ async function resetSeedData() {
     }
   }
 
-  // Step 3a: Delete seed patients (any medical_patient with externalId
-  // starting with "SEED-PATIENT-"). Done before org delete so we don't
-  // leave dangling patients on a deleted facility.
+  // Step 3a: Delete seed patients + their encounters/records.
+  // Find seed patients first (regex match on externalId), then for each
+  // we sweep their encounters and medical-records before deleting the
+  // patient row — hapihub doesn't cascade the medical_* tables on
+  // patient delete and we'd otherwise orphan the fixed patient's chart.
+  let seedPatientIds: string[] = [];
   try {
     const res = (await api(
       "GET",
       `/medical-patients?externalId%5B%24regex%5D=%5ESEED-PATIENT-&%24limit=500`,
     )) as { data?: Array<{ id: string }> } | Array<{ id: string }>;
     const list = Array.isArray(res) ? res : res.data ?? [];
-    for (const p of list) {
-      try {
-        await api("DELETE", `/medical-patients/${p.id}`);
-      } catch {
-        // ignore — best effort
-      }
-    }
+    seedPatientIds = list.map((p) => p.id).filter(Boolean);
   } catch {
-    // ignore — endpoint or query syntax might not support $regex in all envs
+    // ignore
+  }
+
+  for (const pid of seedPatientIds) {
+    // medical-records (vitals, assessment, medication-order, etc.)
+    try {
+      const res = (await api(
+        "GET",
+        `/medical-records?patient=${encodeURIComponent(pid)}&%24limit=500`,
+      )) as { data?: Array<{ id: string }> } | Array<{ id: string }>;
+      const list = Array.isArray(res) ? res : res.data ?? [];
+      for (const r of list) {
+        try { await api("DELETE", `/medical-records/${r.id}`); } catch { /* ignore */ }
+      }
+    } catch { /* ignore */ }
+    // medical-encounters
+    try {
+      const res = (await api(
+        "GET",
+        `/medical-encounters?patient=${encodeURIComponent(pid)}&%24limit=500`,
+      )) as { data?: Array<{ id: string }> } | Array<{ id: string }>;
+      const list = Array.isArray(res) ? res : res.data ?? [];
+      for (const e of list) {
+        try { await api("DELETE", `/medical-encounters/${e.id}`); } catch { /* ignore */ }
+      }
+    } catch { /* ignore */ }
+    // patient row itself
+    try { await api("DELETE", `/medical-patients/${pid}`); } catch { /* ignore */ }
   }
 
   // Step 3a-svc: Delete seed services (externalId starts with "SEED-SVC-").
@@ -5183,6 +6249,25 @@ async function resetSeedData() {
       for (const p of list) {
         try {
           await api("DELETE", `/diagnostic-packages/${p.id}`);
+        } catch {
+          // ignore
+        }
+      }
+    } catch {
+      // ignore
+    }
+    // 3a-extras-10b: diagnostic-measures — must run BEFORE diagnostic-tests
+    // since measures reference tests via measure.test. Sweep all by
+    // facility (LIS-only seeded but cleanup is broader for safety).
+    try {
+      const res = (await api(
+        "GET",
+        `/diagnostic-measures?facility=${encodeURIComponent(orgId)}&%24limit=500`,
+      )) as { data?: Array<{ id: string }> } | Array<{ id: string }>;
+      const list = Array.isArray(res) ? res : res.data ?? [];
+      for (const m of list) {
+        try {
+          await api("DELETE", `/diagnostic-measures/${m.id}`);
         } catch {
           // ignore
         }
@@ -5540,6 +6625,10 @@ async function main() {
   // pick a lab package by name in their queueing[] config.
   await seedDiagnosticSections(orgsToSeed, "laboratory", SEED_LIS_SECTIONS);
   const lisTestIds = await seedDiagnosticTests(orgsToSeed, "laboratory", SEED_LIS_TESTS);
+  // Measures depend on test ids (measure.test = test.id). Run after
+  // tests, before packages — measures don't affect packages, but the
+  // ordering keeps the test+its-measures conceptually grouped.
+  await seedDiagnosticMeasures(orgsToSeed, lisTestIds, SEED_LIS_MEASURES);
   await seedDiagnosticPackages(orgsToSeed, "laboratory", SEED_LIS_PACKAGES, lisTestIds);
   await seedAnalyzers(orgsToSeed, SEED_LIS_ANALYZERS);
   await seedDiagnosticFormTemplates(orgsToSeed, "laboratory");
@@ -5591,6 +6680,16 @@ async function main() {
   // Step 20 (optional): Seed random patients for each facility.
   await seedPatients(orgsToSeed, PATIENT_COUNT);
 
+  // Step 21: Fixed demo patient (Pedro Demo Lopez) with 2 encounters and
+  // 9 medical records. Always-on; gives demo users a known, click-throughable
+  // chart to inspect. Idempotent on externalId.
+  await seedFixedPatient(orgsToSeed, userIds);
+
+  // Step 22: Patient accounts — Better-Auth accounts for the fixed
+  // patient + the first N random patients, linked back via
+  // medical-patients.account. Default N=5; --patient-accounts 0 to skip.
+  const patientAccounts = await seedPatientAccounts(orgsToSeed, PATIENT_ACCOUNT_COUNT);
+
   // Per-type service breakdown for the summary
   const svcByType = SERVICE_TEMPLATES.reduce<Record<string, number>>((acc, t) => {
     acc[t.type] = (acc[t.type] ?? 0) + 1;
@@ -5640,7 +6739,7 @@ async function main() {
     `${chalk.gray("EMR:")}         ${SEED_MEDICINES.length} medicines, ${favCount} favorite Rx, ${SEED_DENTAL_STATUSES.length} dental statuses per facility`,
   );
   console.log(
-    `${chalk.gray("LIS:")}         ${SEED_LIS_SECTIONS.length} sections, ${SEED_LIS_TESTS.length} tests, ${SEED_LIS_PACKAGES.length} packages, ${SEED_LIS_ANALYZERS.length} analyzers per facility`,
+    `${chalk.gray("LIS:")}         ${SEED_LIS_SECTIONS.length} sections, ${SEED_LIS_TESTS.length} tests, ${SEED_LIS_MEASURES.reduce((s, t) => s + t.measures.length, 0)} measures, ${SEED_LIS_PACKAGES.length} packages, ${SEED_LIS_ANALYZERS.length} analyzers per facility`,
   );
   console.log(
     `${chalk.gray("RIS:")}         ${SEED_RIS_SECTIONS.length} sections, ${SEED_RIS_TESTS.length} tests, ${SEED_RIS_PACKAGES.length} packages per facility`,
@@ -5650,6 +6749,9 @@ async function main() {
       `${chalk.gray("Patients:")}    ${PATIENT_COUNT} on parent facility, shared with branches via hierarchy — verbose PH demographics, vitals, PhilHealth/HMO insurance cards (externalId SEED-PATIENT-1-NNN)`,
     );
   }
+  console.log(
+    `${chalk.gray("Demo chart:")}  Pedro Demo Lopez (${FIXED_PATIENT_EXTERNAL_ID}) — 2 encounters, 9 medical records (T2DM + HTN storyline)`,
+  );
   console.log(`\n${chalk.gray("Accounts")} (password: ${chalk.yellow(PASSWORD)}):`);
   console.log("-".repeat(64));
   console.log(
@@ -5676,6 +6778,32 @@ async function main() {
     );
   }
   console.log("-".repeat(64));
+
+  // Patient accounts breakdown — separate table since they're a distinct
+  // identity tier (PXP self-service tag, not staff).
+  if (patientAccounts.length > 0) {
+    console.log(`\n${chalk.gray("Patient Accounts")} (password: ${chalk.yellow(PASSWORD)}, tags: pxp/seed/patient):`);
+    console.log("-".repeat(72));
+    console.log(
+      `${"Email".padEnd(48)} ${"Patient externalId".padEnd(22)} ${"Status"}`,
+    );
+    console.log("-".repeat(72));
+    for (const acct of patientAccounts) {
+      const tag = acct.isFixed ? chalk.cyan(acct.externalId) : acct.externalId;
+      const statusLabel =
+        acct.status === "new"
+          ? chalk.green("new")
+          : acct.status === "existing"
+            ? chalk.gray("existing")
+            : chalk.red("skipped");
+      const emailDisplay = acct.email || chalk.gray("(no email)");
+      console.log(
+        `${emailDisplay.padEnd(48)} ${tag.padEnd(22)} ${statusLabel}`,
+      );
+    }
+    console.log("-".repeat(72));
+  }
+
   console.log(`\n${chalk.gray("Login at:")} ${CMS_URL}`);
 }
 
