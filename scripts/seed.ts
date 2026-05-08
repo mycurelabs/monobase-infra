@@ -6500,43 +6500,63 @@ async function main() {
   authSpinner.succeed("Authenticated as superadmin");
 
   // Post-flight: verify each service account got auto-elevated by hapihub's
-  // databaseHooks.user.create.after. If the row is missing or
-  // isServiceAccount=false, the env var wasn't set when signup ran (or the
-  // pod wasn't restarted to pick up a values change). Abort with a clear
-  // remediation message — admin-plugin endpoints will not work until fixed.
+  // databaseHooks.user.create.after. We sign in AS the service account
+  // itself rather than querying /accounts as superadmin — hapihub's
+  // /accounts list is scoped to the caller's own row for non-service
+  // accounts (services/account/accounts.ts:30-37), so a superadmin query
+  // for a service-account email returns empty even when the row exists.
+  // Signing in as the service account lets us read its better-auth session
+  // (where role='admin' is the elevation marker) and its own /accounts row
+  // via the self-scope filter.
   if (SERVICE_ACCOUNT_EMAILS.size > 0) {
     const svcSpinner = ora("Verifying service-account elevation...").start();
     for (const email of SERVICE_ACCOUNT_EMAILS) {
+      sessionCookie = "";
+      try {
+        await signIn(email, PASSWORD);
+      } catch (err: unknown) {
+        svcSpinner.fail(
+          `Cannot sign in as ${email}: ${(err as Error).message}\n` +
+            `   The signup loop reported success but the better-auth user\n` +
+            `   either doesn't exist or has a different password. Check the\n` +
+            `   signup logs above and hapihub stdout for errors.`,
+        );
+        process.exit(1);
+      }
+      const session = (await api("GET", "/auth/get-session")) as
+        | { user?: { role?: string; email?: string } }
+        | null;
+      const role = session?.user?.role;
+      if (role !== "admin") {
+        svcSpinner.fail(
+          `${email} signed in but better-auth user.role='${role}' (expected 'admin').\n` +
+            `   Auto-elevation did not fire. Likely causes (most-common first):\n` +
+            `     1. ACCOUNTS_SERVICE_ACCOUNT_EMAILS is not set on the running\n` +
+            `        hapihub (env var or values misconfig). On local dev: add\n` +
+            `        ACCOUNTS_SERVICE_ACCOUNT_EMAILS=${email} to hapihub's\n` +
+            `        .env, restart it, re-run with --reset.\n` +
+            `     2. ACCOUNTS_SERVICE_ACCOUNT_EMAILS is set but doesn't match\n` +
+            `        '${email}' (typo, missing comma in CSV, or escaped quotes).\n` +
+            `     3. The user already existed before --reset wiped legacy data,\n` +
+            `        so signup hit "already exists" and the after-hook never\n` +
+            `        re-ran. Wipe both better-auth user + legacy accounts rows\n` +
+            `        for this email in the DB, then re-run.`,
+        );
+        process.exit(1);
+      }
+      // Cross-check the legacy /accounts row's flag. Self-scoped query —
+      // returns the caller's own row only.
       const accs = (await api(
         "GET",
         `/accounts?email=${encodeURIComponent(email)}`,
       )) as { data?: Array<{ isServiceAccount?: boolean }> } | Array<{ isServiceAccount?: boolean }>;
       const list = Array.isArray(accs) ? accs : accs.data ?? [];
-      const acc = list[0];
-      if (!acc) {
+      if (!list[0]?.isServiceAccount) {
         svcSpinner.fail(
-          `Service account ${email} was not created.\n` +
-            `   The signup loop reported success but no /accounts row exists.\n` +
-            `   Likely causes (most-common first):\n` +
-            `     1. ACCOUNTS_SERVICE_ACCOUNT_EMAILS is not set on the running\n` +
-            `        hapihub (env var or values misconfig). On local dev: add\n` +
-            `        ACCOUNTS_SERVICE_ACCOUNT_EMAILS=${email} to hapihub's\n` +
-            `        .env, restart it, re-run the seed.\n` +
-            `     2. ACCOUNTS_SERVICE_ACCOUNT_EMAILS is set but doesn't match\n` +
-            `        '${email}' (typo, missing comma in CSV, or escaped quotes).\n` +
-            `     3. hapihub's create-after hook errored silently while creating\n` +
-            `        the legacy account row — check hapihub logs around the\n` +
-            `        service-account signup time.`,
-        );
-        process.exit(1);
-      }
-      if (!acc.isServiceAccount) {
-        svcSpinner.fail(
-          `${email} exists but isServiceAccount=false — auto-elevation did not fire.\n` +
-            `   Fix: ensure ACCOUNTS_SERVICE_ACCOUNT_EMAILS on the hapihub pod env\n` +
-            `   contains "${email}", restart the deployment, then either:\n` +
-            `     (a) re-run with --reset to recreate the account, OR\n` +
-            `     (b) sign in once as ${email} to trigger lazy migration.`,
+          `${email}: better-auth role='admin' but legacy accounts.isServiceAccount=false.\n` +
+            `   Hook ran partially — set role='admin' but didn't stamp\n` +
+            `   isServiceAccount on the legacy row. Likely a hapihub bug;\n` +
+            `   check services/hapihub/src/auth/auth.ts databaseHooks.user.create.after.`,
         );
         process.exit(1);
       }
@@ -6544,6 +6564,11 @@ async function main() {
     svcSpinner.succeed(
       `Service-account elevation confirmed for: ${[...SERVICE_ACCOUNT_EMAILS].join(", ")}`,
     );
+
+    // Restore the superadmin session for the rest of main() — subsequent
+    // org/member/etc. operations expect to run as superadmin.
+    sessionCookie = "";
+    await signIn("superadmin@mycure.test", PASSWORD);
   }
 
   // Step 3: Find-or-create the parent organization, then the child branch.
