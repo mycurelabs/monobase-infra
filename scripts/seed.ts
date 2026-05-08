@@ -5913,6 +5913,24 @@ async function listAccountIdByEmail(email: string): Promise<string | undefined> 
   }
 }
 
+/**
+ * Like listAccountIdByEmail but returns ALL matching ids — useful in --reset
+ * where polluted state may have multiple legacy /accounts rows for the same
+ * email (orphans from previous broken-state runs).
+ */
+async function listAllAccountIdsByEmail(email: string): Promise<string[]> {
+  try {
+    const res = (await api(
+      "GET",
+      `/accounts?email=${encodeURIComponent(email)}&%24limit=100`,
+    )) as { data?: Array<{ id: string }> } | Array<{ id: string }>;
+    const list = Array.isArray(res) ? res : res.data ?? [];
+    return list.map((a) => a.id).filter(Boolean);
+  } catch {
+    return [];
+  }
+}
+
 async function listOrgIdsByName(name: string): Promise<string[]> {
   try {
     const res = (await api("GET", `/organizations?name=${encodeURIComponent(name)}`)) as
@@ -5938,87 +5956,97 @@ async function listMembershipIdsForUser(uid: string): Promise<string[]> {
 async function resetSeedData() {
   const spinner = ora("Resetting existing seed data...").start();
 
-  // Step 0: Prefer signing in as a seeded service account if one exists —
-  // legacy /accounts DELETE requires isServiceAccount=true on the caller
-  // (services/account/accounts.ts:673). On the very first reset (before
-  // any service account exists), this fails silently and we fall back to
-  // superadmin auth; subsequent resets pick up the prior run's service
-  // account and clean orphaned legacy rows properly.
-  let authedAsServiceAccount = false;
-  for (const email of SERVICE_ACCOUNT_EMAILS) {
+  // Bootstrap a service-account session for the entire reset.
+  //
+  // We need full admin scope across both the legacy /accounts service
+  // (gated on isServiceAccount=true at services/account/accounts.ts:673)
+  // and better-auth (admin/remove-user requires user.role='admin'). Service
+  // accounts get both flags via the auto-elevation hook.
+  //
+  // Strategy:
+  //   1. Try signIn(service@) — works on every reset after the first.
+  //   2. If the user doesn't exist yet, signUp(service@) — the
+  //      user.create.after hook fires and stamps role='admin' +
+  //      isServiceAccount=true, giving us the scope we need before any
+  //      delete runs.
+  //   3. If neither works, the env var almost certainly isn't set on
+  //      hapihub. Abort with a clear remediation message.
+  //
+  // The service account itself is preserved across resets — the forward
+  // path of main() will hit "already exists" → signIn fallback for it,
+  // which is fine.
+  const serviceEmail = [...SERVICE_ACCOUNT_EMAILS][0];
+  if (!serviceEmail) {
+    spinner.fail("--reset requires at least one entry in SERVICE_ACCOUNT_EMAILS.");
+    process.exit(1);
+  }
+  let bootstrapped = false;
+  sessionCookie = "";
+  try {
+    await signIn(serviceEmail, PASSWORD);
+    bootstrapped = true;
+  } catch {
+    // Existing user with wrong password OR user doesn't exist. Try signup.
     try {
       sessionCookie = "";
-      await signIn(email, PASSWORD);
-      authedAsServiceAccount = true;
-      spinner.text = `Authenticated as service account ${email}`;
-      break;
-    } catch {
-      // try next service-account email, or fall through to superadmin
-    }
-  }
-
-  // Step 1: If we don't have a service-account session, fall back to
-  // superadmin. Legacy /accounts DELETE will silently 403 on rows the
-  // superadmin doesn't own, but everything else (memberships, orgs,
-  // patients) still cleans up correctly. The next reset will be fully
-  // clean once a service account exists.
-  if (!authedAsServiceAccount) {
-    sessionCookie = "";
-    try {
-      await signIn("superadmin@mycure.test", PASSWORD);
+      await signUp(serviceEmail, PASSWORD, "Platform Service Account");
     } catch (err: unknown) {
-    const msg = (err as Error).message;
-    // Treat "user not found" / 404-ish as "nothing to reset"
-    if (
-      msg.includes("USER_NOT_FOUND") ||
-      msg.includes("not found") ||
-      msg.includes("404") ||
-      msg.includes("INVALID_EMAIL_OR_PASSWORD") ||
-      msg.includes("Invalid email") ||
-      msg.includes("Invalid credentials")
-    ) {
-      // Could be either "no superadmin yet" (clean DB) or "superadmin
-      // exists but password doesn't match". We can't distinguish these
-      // from a single 4xx without inspecting the response shape, so try
-      // a probe: if the email exists, exit with a clear error; else move on.
-      const probe = await listAccountIdByEmail("superadmin@mycure.test");
-      if (probe) {
+      const msg = (err as Error).message;
+      if (msg.includes("already exists") || msg.includes("USER_ALREADY_EXISTS")) {
         spinner.fail(
           chalk.red(
-            "Cannot sign in as superadmin@mycure.test for --reset.\n" +
-            "The account exists but the password doesn't match.\n" +
-            "Either rotate the password manually, or wipe the seed users from the DB:\n" +
-            "  DELETE FROM organization_members\n" +
-            "    WHERE uid IN (SELECT id FROM accounts WHERE email LIKE '%@mycure.test');\n" +
-            "  DELETE FROM accounts WHERE email LIKE '%@mycure.test';\n" +
-            "  DELETE FROM organizations WHERE name IN (\n" +
-            "    " + SEED_ORG_NAMES.map((n) => `'${n}'`).join(", ") + ");\n" +
-            "Then rerun without --reset.",
+            `Cannot sign in or sign up as ${serviceEmail} for --reset.\n` +
+              `The user exists but the password doesn't match BRANDING.password.\n` +
+              `Wipe the better-auth user row for this email and re-run, or rotate\n` +
+              `its password to match.`,
           ),
         );
         process.exit(1);
       }
-      spinner.succeed("No existing seed data found — skipping reset");
-      return;
-    }
-      spinner.fail(`Unexpected error during reset auth: ${msg}`);
+      spinner.fail(`Unexpected error signing up service account: ${msg}`);
       process.exit(1);
     }
+    bootstrapped = true;
   }
+  if (!bootstrapped) {
+    spinner.fail("Could not establish service-account session for --reset.");
+    process.exit(1);
+  }
+  // Verify the auto-elevation actually fired — otherwise our deletes will
+  // silently 403 and we'll leave half-cleaned state. Better to abort early.
+  const session = (await api("GET", "/auth/get-session")) as
+    | { user?: { role?: string } }
+    | null;
+  if (session?.user?.role !== "admin") {
+    spinner.fail(
+      chalk.red(
+        `${serviceEmail} signed in but better-auth user.role='${session?.user?.role}' (expected 'admin').\n` +
+          `Auto-elevation did not fire. Make sure ACCOUNTS_SERVICE_ACCOUNT_EMAILS\n` +
+          `on the running hapihub pod includes "${serviceEmail}", restart hapihub,\n` +
+          `then re-run.`,
+      ),
+    );
+    process.exit(1);
+  }
+  spinner.text = `Authenticated as service account ${serviceEmail}`;
 
-  // Step 2: For each seed user, find their account id then delete their
-  // org memberships. Stash the uid for the final account delete pass.
-  const userIds: Record<string, string> = {};
+  // Step 2: For each seed user, find ALL their legacy /account rows
+  // (polluted state may have multiple rows for one email) then delete
+  // their org memberships. Stash all uids for the final account delete
+  // pass.
+  const userIdsByEmail: Record<string, string[]> = {};
   for (const user of USERS) {
-    const uid = await listAccountIdByEmail(user.email);
-    if (!uid) continue;
-    userIds[user.email] = uid;
-    const memberIds = await listMembershipIdsForUser(uid);
-    for (const mid of memberIds) {
-      try {
-        await api("DELETE", `/organization-members/${mid}`);
-      } catch {
-        // ignore — best effort
+    const uids = await listAllAccountIdsByEmail(user.email);
+    if (uids.length === 0) continue;
+    userIdsByEmail[user.email] = uids;
+    for (const uid of uids) {
+      const memberIds = await listMembershipIdsForUser(uid);
+      for (const mid of memberIds) {
+        try {
+          await api("DELETE", `/organization-members/${mid}`);
+        } catch {
+          // ignore — best effort
+        }
       }
     }
   }
@@ -6403,18 +6431,44 @@ async function resetSeedData() {
     }
   }
 
-  // Step 4: Delete user accounts. Superadmin LAST so the session stays valid.
-  const orderedUsers = [
-    ...USERS.filter((u) => !u.superadmin),
-    ...USERS.filter((u) => u.superadmin),
-  ];
-  for (const user of orderedUsers) {
-    const uid = userIds[user.email];
-    if (!uid) continue;
+  // Step 4: Delete user accounts (legacy + better-auth). Skip the service
+  // account we're authed as — that stays for the next reset; deleting it
+  // mid-reset would invalidate our session. The forward path of main()
+  // will hit "already exists" on it and signIn fallback, which is fine.
+  //
+  // For each non-service-account user, delete every legacy /accounts row
+  // (handles polluted state with duplicate rows) then delete the
+  // better-auth user via admin/remove-user (works because we're role=admin).
+  const targetEmails = USERS.map((u) => u.email).filter((e) => e !== serviceEmail);
+  for (const email of targetEmails) {
+    const uids = userIdsByEmail[email] ?? [];
+    for (const uid of uids) {
+      try {
+        await api("DELETE", `/accounts/${uid}`);
+      } catch {
+        // ignore — best effort
+      }
+      try {
+        await api("POST", "/auth/admin/remove-user", { userId: uid });
+      } catch {
+        // ignore — better-auth user may not match the legacy id (orphan)
+      }
+    }
+    // Cleanup pass: any better-auth user with this email but no legacy
+    // counterpart we already deleted. List via admin/list-users.
     try {
-      await api("DELETE", `/accounts/${uid}`);
+      const lu = (await api(
+        "POST",
+        "/auth/admin/list-users",
+        { searchValue: email, searchField: "email", searchOperator: "contains" },
+      )) as { users?: Array<{ id: string; email: string }> };
+      const remaining = (lu.users ?? []).filter((u) => u.email === email);
+      for (const u of remaining) {
+        try { await api("POST", "/auth/admin/remove-user", { userId: u.id }); }
+        catch { /* ignore */ }
+      }
     } catch {
-      // ignore — user might already be gone
+      // admin/list-users may not accept GET-style query — ignore
     }
   }
 
@@ -6452,23 +6506,19 @@ async function resetSeedData() {
     }
   }
 
-  // Step 5: Self-delete each seed user from better-auth.
-  //
-  // The legacy /accounts DELETE above only cleans the legacy table.
-  // Better-auth's "user" table has its own row per email and survives the
-  // legacy delete. Re-running --seed without this step makes every signup
-  // hit "already exists" → fall back to signIn → the user.create.after hook
-  // never re-runs → no fresh elevation → service-account bootstrap silently
-  // fails. Self-delete (POST /auth/delete-user) bypasses the admin scope
-  // requirement since each user is deleting themselves.
-  spinner.text = "Deleting better-auth users...";
-  for (const user of USERS) {
-    try {
-      sessionCookie = "";
-      await signIn(user.email, PASSWORD);
-      await api("POST", "/auth/delete-user", { password: PASSWORD });
-    } catch {
-      // ignore — user may not exist (clean DB) or password rotated
+  // Step 6: Clean orphaned service-account legacy rows. We kept service@'s
+  // OWN row (the one tied to our session) but earlier resets may have left
+  // duplicate /accounts rows for the same email whose ids don't match any
+  // better-auth user. Find them and delete (we have service-account auth).
+  for (const email of SERVICE_ACCOUNT_EMAILS) {
+    const sess = (await api("GET", "/auth/get-session")) as
+      | { user?: { id?: string } }
+      | null;
+    const liveUid = sess?.user?.id;
+    const allUids = await listAllAccountIdsByEmail(email);
+    for (const uid of allUids) {
+      if (uid === liveUid) continue; // keep the one we're signed in as
+      try { await api("DELETE", `/accounts/${uid}`); } catch { /* ignore */ }
     }
   }
 
