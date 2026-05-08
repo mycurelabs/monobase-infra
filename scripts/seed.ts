@@ -5931,6 +5931,35 @@ async function listAllAccountIdsByEmail(email: string): Promise<string[]> {
   }
 }
 
+/**
+ * Delete an org as the current service-account session by first granting
+ * ourselves a superadmin membership on it. DELETE /organizations/:id
+ * requires the caller to have at least one membership on the org with
+ * superadmin:true (organizations.ts:835); service accounts aren't members
+ * by default. Once the org is gone, its cleanup() cascade removes the
+ * membership we just added (organizations.ts:504), so nothing leaks.
+ *
+ * Best-effort — silently ignores both the membership POST (may already
+ * exist from a prior reset attempt) and the DELETE (404 / parent-children
+ * edge cases).
+ */
+async function deleteOrgAsServiceAccount(orgId: string, svcUid: string): Promise<void> {
+  try {
+    await api("POST", "/organization-members", {
+      organization: orgId,
+      uid: svcUid,
+      superadmin: true,
+    });
+  } catch {
+    // membership may already exist — that's fine
+  }
+  try {
+    await api("DELETE", `/organizations/${orgId}`);
+  } catch {
+    // best-effort — ignore
+  }
+}
+
 async function listOrgIdsByName(name: string): Promise<string[]> {
   try {
     const res = (await api("GET", `/organizations?name=${encodeURIComponent(name)}`)) as
@@ -6030,25 +6059,27 @@ async function resetSeedData() {
   }
   spinner.text = `Authenticated as service account ${serviceEmail}`;
 
-  // Step 2: For each seed user, find ALL their legacy /account rows
-  // (polluted state may have multiple rows for one email) then delete
-  // their org memberships. Stash all uids for the final account delete
-  // pass.
+  // Cache the service-account uid for org-delete bootstrapping below.
+  const sess = (await api("GET", "/auth/get-session")) as
+    | { user?: { id?: string } }
+    | null;
+  const svcUid = sess?.user?.id;
+  if (!svcUid) {
+    spinner.fail("Lost service-account session immediately after sign-in. Aborting.");
+    process.exit(1);
+  }
+
+  // Step 2: Pre-fetch the legacy uids per user (needed for the legacy
+  // /accounts DELETE in Step 4). Memberships are NOT deleted here — Step 3b
+  // deletes the orgs themselves under superadmin auth, and the org service's
+  // cleanup() cascades memberships automatically (services/hapihub/src/
+  // services/organization/organizations.ts:504). Deleting memberships first
+  // would strip superadmin's superadmin:true rows, breaking the org-delete
+  // permission check (organizations.ts:835).
   const userIdsByEmail: Record<string, string[]> = {};
   for (const user of USERS) {
     const uids = await listAllAccountIdsByEmail(user.email);
-    if (uids.length === 0) continue;
-    userIdsByEmail[user.email] = uids;
-    for (const uid of uids) {
-      const memberIds = await listMembershipIdsForUser(uid);
-      for (const mid of memberIds) {
-        try {
-          await api("DELETE", `/organization-members/${mid}`);
-        } catch {
-          // ignore — best effort
-        }
-      }
-    }
+    if (uids.length > 0) userIdsByEmail[user.email] = uids;
   }
 
   // Step 3a: Delete seed patients + their encounters/records.
@@ -6195,25 +6226,9 @@ async function resetSeedData() {
     } catch {
       // ignore
     }
-    // 3a-extras-5: diagnostic-center orgs (type=diagnostic-center,
-    // overlords contains seed orgId). These are full org rows, deleted
-    // before the parent org so we don't orphan the overlords pointer.
-    try {
-      const res = (await api(
-        "GET",
-        `/organizations?type=diagnostic-center&overlords=${encodeURIComponent(orgId)}&%24limit=500`,
-      )) as { data?: Array<{ id: string }> } | Array<{ id: string }>;
-      const list = Array.isArray(res) ? res : res.data ?? [];
-      for (const dx of list) {
-        try {
-          await api("DELETE", `/organizations/${dx.id}`);
-        } catch {
-          // ignore
-        }
-      }
-    } catch {
-      // ignore
-    }
+    // 3a-extras-5: handled in a single global pass below (see step 3a-extras-5b),
+    // since dx-centers may reference deleted orgs and won't surface in this
+    // per-live-org overlords query.
     // 3a-extras-6: queues (organization=orgId)
     try {
       const res = (await api(
@@ -6418,17 +6433,64 @@ async function resetSeedData() {
     // (org.tags, org.mf_kioskMessages) so they die with the org delete.
   }
 
-  // Step 3b: Delete seed orgs (child first to avoid orphan _ch refs on the parent).
+  // Step 3a-extras-5b: Global dx-center cleanup. Find all
+  // type=diagnostic-center orgs whose name matches a SEED_DX_CENTERS
+  // entry — covers orphans whose `overlords` points at a now-deleted
+  // seed org. Done before the seed-org delete so deletion order matches
+  // the original code intent.
+  for (const tpl of SEED_DX_CENTERS) {
+    const res = (await api(
+      "GET",
+      `/organizations?type=diagnostic-center&name=${encodeURIComponent(tpl.name)}&%24limit=500`,
+    )) as { data?: Array<{ id: string }> } | Array<{ id: string }>;
+    const list = Array.isArray(res) ? res : res.data ?? [];
+    for (const dx of list) {
+      await deleteOrgAsServiceAccount(dx.id, svcUid);
+    }
+  }
+
+  // Step 3b: Delete seed orgs (any duplicates from previous broken-state
+  // runs are caught by listing all by name with $limit=100).
   for (const name of SEED_ORG_NAMES) {
-    const ids = await listOrgIdsByName(name);
-    for (const id of ids) {
+    const ids = (await api(
+      "GET",
+      `/organizations?name=${encodeURIComponent(name)}&%24limit=100`,
+    )) as { data?: Array<{ id: string }> } | Array<{ id: string }>;
+    const list = Array.isArray(ids) ? ids : ids.data ?? [];
+    for (const o of list) {
+      await deleteOrgAsServiceAccount(o.id, svcUid);
+    }
+  }
+
+  // Step 3c: Sweep orphan memberships — rows whose org no longer exists.
+  // These linger when previous resets deleted orgs without cascading,
+  // or when memberships were created against orgs that have since been
+  // wiped. Service-account auth covers the DELETE.
+  try {
+    const res = (await api(
+      "GET",
+      `/organization-members?%24limit=500`,
+    )) as { data?: Array<{ id: string; organization?: string }> } | Array<{ id: string; organization?: string }>;
+    const all = Array.isArray(res) ? res : res.data ?? [];
+    // Verify which orgs still exist; everything else is orphan-by-org
+    const orgIds = new Set<string>();
+    for (const m of all) if (m.organization) orgIds.add(m.organization);
+    const liveOrgIds = new Set<string>();
+    for (const oid of orgIds) {
       try {
-        await api("DELETE", `/organizations/${id}`);
+        await api("GET", `/organizations/${oid}`);
+        liveOrgIds.add(oid);
       } catch {
-        // ignore — best effort (e.g., if hapihub blocks delete on a parent
-        // that still has children it didn't return in our list).
+        // 404 — orphan
       }
     }
+    for (const m of all) {
+      if (!m.organization) continue;
+      if (liveOrgIds.has(m.organization)) continue;
+      try { await api("DELETE", `/organization-members/${m.id}`); } catch { /* ignore */ }
+    }
+  } catch {
+    // ignore — best effort
   }
 
   // Step 4: Delete user accounts (legacy + better-auth). Skip the service
