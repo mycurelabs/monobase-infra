@@ -341,7 +341,22 @@ interface SeedUser {
   superadmin: boolean;
 }
 
+// Emails that hapihub auto-elevates to service accounts via
+// databaseHooks.user.create.after. Each address here MUST also appear in
+// ACCOUNTS_SERVICE_ACCOUNT_EMAILS on the running hapihub pod (configured
+// per env in values/deployments/mycure-{preprod,production}.yaml) BEFORE
+// this script signs them up — otherwise the auto-elevation hook never
+// fires and the account stays as a regular user. The post-flight check
+// in main() asserts isServiceAccount=true and aborts if it isn't.
+const SERVICE_ACCOUNT_EMAILS = new Set<string>(["service@mycure.md"]);
+const isServiceAccount = (u: SeedUser) => SERVICE_ACCOUNT_EMAILS.has(u.email);
+
 const USERS: SeedUser[] = [
+  // Platform-admin service account. Has no org scope — service accounts
+  // operate above the org level via better-auth user.role='admin'. The
+  // signup is enough; org-scoped loops below skip this user via
+  // isServiceAccount().
+  { email: "service@mycure.md",      name: "Platform Service Account", roleIds: [],                                                  superadmin: false },
   // Each user gets a primary role + extra roles to unlock more demo
   // features. Picked from the SDK's role registry — clinic_manager,
   // doctor_pme (PE module access), nurse_head (nurse leadership UI),
@@ -6448,6 +6463,16 @@ async function main() {
   console.log(`\n${chalk.bold("MyCure Seed Script")}`);
   console.log(`${chalk.gray("API:")} ${API_URL}\n`);
 
+  if (SERVICE_ACCOUNT_EMAILS.size > 0) {
+    console.log(
+      chalk.gray(
+        `Note: service-account elevation requires ACCOUNTS_SERVICE_ACCOUNT_EMAILS\n` +
+        `      on the running hapihub pod to include: ${[...SERVICE_ACCOUNT_EMAILS].join(", ")}\n` +
+        `      Verify with: kubectl exec deploy/hapihub -- printenv ACCOUNTS_SERVICE_ACCOUNT_EMAILS\n`,
+      ),
+    );
+  }
+
   // Optional pre-step: --reset wipes existing seed data so we re-create
   // everything fresh. Useful when role privileges or other body fields
   // changed and you want existing memberships to pick up the new shape.
@@ -6485,6 +6510,40 @@ async function main() {
     }
   }
   spinner.succeed(`Created ${Object.keys(userIds).length} user accounts`);
+
+  // Post-flight: verify each service account got auto-elevated by hapihub's
+  // databaseHooks.user.create.after. If isServiceAccount=false, the env var
+  // wasn't set when signup ran (or the pod wasn't restarted to pick up a
+  // values change). Abort with a clear remediation message — admin-plugin
+  // endpoints will not work until this is fixed.
+  if (SERVICE_ACCOUNT_EMAILS.size > 0) {
+    const svcSpinner = ora("Verifying service-account elevation...").start();
+    for (const email of SERVICE_ACCOUNT_EMAILS) {
+      const accs = (await api(
+        "GET",
+        `/accounts?email=${encodeURIComponent(email)}`,
+      )) as { data?: Array<{ isServiceAccount?: boolean }> } | Array<{ isServiceAccount?: boolean }>;
+      const list = Array.isArray(accs) ? accs : accs.data ?? [];
+      const acc = list[0];
+      if (!acc) {
+        svcSpinner.fail(`Service account ${email} was not created — check signup errors above.`);
+        process.exit(1);
+      }
+      if (!acc.isServiceAccount) {
+        svcSpinner.fail(
+          `${email} exists but isServiceAccount=false — auto-elevation did not fire.\n` +
+            `   Fix: ensure ACCOUNTS_SERVICE_ACCOUNT_EMAILS on the hapihub pod env\n` +
+            `   contains "${email}", restart the deployment, then either:\n` +
+            `     (a) re-run with --reset to recreate the account, OR\n` +
+            `     (b) sign in once as ${email} to trigger lazy migration.`,
+        );
+        process.exit(1);
+      }
+    }
+    svcSpinner.succeed(
+      `Service-account elevation confirmed for: ${[...SERVICE_ACCOUNT_EMAILS].join(", ")}`,
+    );
+  }
 
   // Step 2: Sign in as superadmin
   const authSpinner = ora("Signing in as superadmin...").start();
@@ -6558,6 +6617,9 @@ async function main() {
   // (uid, organization) pair — enforces no duplicates on rerun).
   const memberSpinner = ora(`Creating organization members in ${orgsToSeed.length} orgs...`).start();
   for (const user of USERS) {
+    // Service accounts operate above the org scope (better-auth user.role='admin')
+    // and don't get organization-members rows.
+    if (isServiceAccount(user)) continue;
     const uid = userIds[user.email];
     if (!uid) {
       memberSpinner.warn(`${user.email}: no user ID, skipping`);
