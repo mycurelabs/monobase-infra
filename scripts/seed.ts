@@ -6428,6 +6428,26 @@ async function resetSeedData() {
     }
   }
 
+  // Step 5: Self-delete each seed user from better-auth.
+  //
+  // The legacy /accounts DELETE above only cleans the legacy table.
+  // Better-auth's "user" table has its own row per email and survives the
+  // legacy delete. Re-running --seed without this step makes every signup
+  // hit "already exists" → fall back to signIn → the user.create.after hook
+  // never re-runs → no fresh elevation → service-account bootstrap silently
+  // fails. Self-delete (POST /auth/delete-user) bypasses the admin scope
+  // requirement since each user is deleting themselves.
+  spinner.text = "Deleting better-auth users...";
+  for (const user of USERS) {
+    try {
+      sessionCookie = "";
+      await signIn(user.email, PASSWORD);
+      await api("POST", "/auth/delete-user", { password: PASSWORD });
+    } catch {
+      // ignore — user may not exist (clean DB) or password rotated
+    }
+  }
+
   // Clear session — main flow will re-auth fresh.
   sessionCookie = "";
   spinner.succeed("Reset complete — proceeding with fresh seed");
