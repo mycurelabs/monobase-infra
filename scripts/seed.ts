@@ -5938,12 +5938,35 @@ async function listMembershipIdsForUser(uid: string): Promise<string[]> {
 async function resetSeedData() {
   const spinner = ora("Resetting existing seed data...").start();
 
-  // Step 1: Auth as superadmin. If the user doesn't exist, that's fine —
-  // assume nothing to reset and move on.
-  sessionCookie = "";
-  try {
-    await signIn("superadmin@mycure.test", PASSWORD);
-  } catch (err: unknown) {
+  // Step 0: Prefer signing in as a seeded service account if one exists —
+  // legacy /accounts DELETE requires isServiceAccount=true on the caller
+  // (services/account/accounts.ts:673). On the very first reset (before
+  // any service account exists), this fails silently and we fall back to
+  // superadmin auth; subsequent resets pick up the prior run's service
+  // account and clean orphaned legacy rows properly.
+  let authedAsServiceAccount = false;
+  for (const email of SERVICE_ACCOUNT_EMAILS) {
+    try {
+      sessionCookie = "";
+      await signIn(email, PASSWORD);
+      authedAsServiceAccount = true;
+      spinner.text = `Authenticated as service account ${email}`;
+      break;
+    } catch {
+      // try next service-account email, or fall through to superadmin
+    }
+  }
+
+  // Step 1: If we don't have a service-account session, fall back to
+  // superadmin. Legacy /accounts DELETE will silently 403 on rows the
+  // superadmin doesn't own, but everything else (memberships, orgs,
+  // patients) still cleans up correctly. The next reset will be fully
+  // clean once a service account exists.
+  if (!authedAsServiceAccount) {
+    sessionCookie = "";
+    try {
+      await signIn("superadmin@mycure.test", PASSWORD);
+    } catch (err: unknown) {
     const msg = (err as Error).message;
     // Treat "user not found" / 404-ish as "nothing to reset"
     if (
@@ -5978,8 +6001,9 @@ async function resetSeedData() {
       spinner.succeed("No existing seed data found — skipping reset");
       return;
     }
-    spinner.fail(`Unexpected error during reset auth: ${msg}`);
-    process.exit(1);
+      spinner.fail(`Unexpected error during reset auth: ${msg}`);
+      process.exit(1);
+    }
   }
 
   // Step 2: For each seed user, find their account id then delete their
