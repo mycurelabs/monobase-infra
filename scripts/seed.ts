@@ -6516,14 +6516,17 @@ async function main() {
       if (!acc) {
         svcSpinner.fail(
           `Service account ${email} was not created.\n` +
-            `   The signup loop reported success but no /accounts row exists\n` +
-            `   for this email (queried as superadmin, so it's not a permission\n` +
-            `   filter). Likely causes:\n` +
-            `     - hapihub's create-after hook errored silently while creating\n` +
-            `       the legacy account row — check hapihub logs around the\n` +
-            `       service-account signup time.\n` +
-            `     - better-auth user row exists but no legacy account — try\n` +
-            `       --reset and re-run, or delete the better-auth user manually.`,
+            `   The signup loop reported success but no /accounts row exists.\n` +
+            `   Likely causes (most-common first):\n` +
+            `     1. ACCOUNTS_SERVICE_ACCOUNT_EMAILS is not set on the running\n` +
+            `        hapihub (env var or values misconfig). On local dev: add\n` +
+            `        ACCOUNTS_SERVICE_ACCOUNT_EMAILS=${email} to hapihub's\n` +
+            `        .env, restart it, re-run the seed.\n` +
+            `     2. ACCOUNTS_SERVICE_ACCOUNT_EMAILS is set but doesn't match\n` +
+            `        '${email}' (typo, missing comma in CSV, or escaped quotes).\n` +
+            `     3. hapihub's create-after hook errored silently while creating\n` +
+            `        the legacy account row — check hapihub logs around the\n` +
+            `        service-account signup time.`,
         );
         process.exit(1);
       }
