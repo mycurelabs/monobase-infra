@@ -6489,11 +6489,21 @@ async function main() {
   }
   spinner.succeed(`Created ${Object.keys(userIds).length} user accounts`);
 
+  // Step 2: Sign in as superadmin (must come BEFORE the service-account
+  // post-flight, since hapihub filters service-account rows out of the
+  // default /accounts listing for non-admin sessions — querying as the
+  // last-signed-up regular user returns an empty list even when the
+  // service account exists and is properly elevated).
+  const authSpinner = ora("Signing in as superadmin...").start();
+  sessionCookie = "";
+  await signIn("superadmin@mycure.test", PASSWORD);
+  authSpinner.succeed("Authenticated as superadmin");
+
   // Post-flight: verify each service account got auto-elevated by hapihub's
-  // databaseHooks.user.create.after. If isServiceAccount=false, the env var
-  // wasn't set when signup ran (or the pod wasn't restarted to pick up a
-  // values change). Abort with a clear remediation message — admin-plugin
-  // endpoints will not work until this is fixed.
+  // databaseHooks.user.create.after. If the row is missing or
+  // isServiceAccount=false, the env var wasn't set when signup ran (or the
+  // pod wasn't restarted to pick up a values change). Abort with a clear
+  // remediation message — admin-plugin endpoints will not work until fixed.
   if (SERVICE_ACCOUNT_EMAILS.size > 0) {
     const svcSpinner = ora("Verifying service-account elevation...").start();
     for (const email of SERVICE_ACCOUNT_EMAILS) {
@@ -6504,7 +6514,17 @@ async function main() {
       const list = Array.isArray(accs) ? accs : accs.data ?? [];
       const acc = list[0];
       if (!acc) {
-        svcSpinner.fail(`Service account ${email} was not created — check signup errors above.`);
+        svcSpinner.fail(
+          `Service account ${email} was not created.\n` +
+            `   The signup loop reported success but no /accounts row exists\n` +
+            `   for this email (queried as superadmin, so it's not a permission\n` +
+            `   filter). Likely causes:\n` +
+            `     - hapihub's create-after hook errored silently while creating\n` +
+            `       the legacy account row — check hapihub logs around the\n` +
+            `       service-account signup time.\n` +
+            `     - better-auth user row exists but no legacy account — try\n` +
+            `       --reset and re-run, or delete the better-auth user manually.`,
+        );
         process.exit(1);
       }
       if (!acc.isServiceAccount) {
@@ -6522,12 +6542,6 @@ async function main() {
       `Service-account elevation confirmed for: ${[...SERVICE_ACCOUNT_EMAILS].join(", ")}`,
     );
   }
-
-  // Step 2: Sign in as superadmin
-  const authSpinner = ora("Signing in as superadmin...").start();
-  sessionCookie = "";
-  await signIn("superadmin@mycure.test", PASSWORD);
-  authSpinner.succeed("Authenticated as superadmin");
 
   // Step 3: Find-or-create the parent organization, then the child branch.
   // Hapihub constraint (organizations.ts:262): "Can only make child branches
