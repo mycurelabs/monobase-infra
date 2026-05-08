@@ -115,11 +115,10 @@ ${chalk.yellow("Options:")}
       - Patient Tags (VIP, Senior Citizen, PWD, etc. — 10)
       - Privacy Notices (English + Tagalog kiosk consents)
     EMR:
-      - Form Templates: ~30 starter presets imported from the sibling
-        mycure repo at ../mycure/apps/mycure/src/pages/emr/. Covers
-        med-cert, fit-cert, consent, waiver, questionnaire, general,
-        claims. Skipped with a warning if mycure repo isn't checked
-        out alongside mycure-infra.
+      - Form Templates: ~30 starter presets vendored from the mycure
+        frontend at scripts/seed-data/templates/emr/. Covers med-cert,
+        fit-cert, consent, waiver, questionnaire, general, claims.
+        Re-vendor steps in scripts/seed-data/templates/README.md.
       - Medicines: ~40 PH formulary staples (Paracetamol, Amoxicillin,
         Salbutamol, Metformin, Losartan, Atorvastatin, etc.) per facility
       - Favorite Medicines: prescription combinations (formulation +
@@ -137,10 +136,9 @@ ${chalk.yellow("Options:")}
         Always-on. Idempotent on externalId.
 
     PME:
-      - Report Templates: 5 starter presets imported from the sibling
-        mycure repo at ../mycure/apps/mycure/src/pages/pme/. If the
-        repo is not checked out alongside mycure-infra, this step is
-        skipped with a warning (everything else still runs).
+      - Report Templates: 5 starter presets vendored from the mycure
+        frontend at scripts/seed-data/templates/pme/. Re-vendor steps
+        in scripts/seed-data/templates/README.md.
     Laboratory (LIS):
       - Sections: Hematology, Chemistry, Microscopy, Immunology, Microbiology
       - Tests: 18 common Filipino-clinic lab tests (CBC, Urinalysis,
@@ -155,16 +153,16 @@ ${chalk.yellow("Options:")}
       - Packages: 4 common groupings (Basic Health Screen, Diabetes
         Workup, Kidney+Liver, STD/Hep)
       - Analyzers: 6 stock entries (Sysmex, Beckman, Roche Cobas, etc.)
-      - Report Templates: 8 starter presets imported from
-        ../mycure/apps/mycure/src/pages/lis/.
+      - Report Templates: 8 starter presets vendored at
+        scripts/seed-data/templates/lis/.
     Imaging (RIS):
       - Sections: X-ray, Ultrasound, CT Scan, MRI, Mammography
       - Tests: 12 imaging studies (Chest X-ray, Abdominal UTZ, CT,
         MRI, Mammography) with HL7 LOINC codes.
       - Packages: 3 common groupings (Pre-Employment Imaging,
         Abdominal Workup, Prenatal Imaging)
-      - Report Templates: 11 starter presets imported from
-        ../mycure/apps/mycure/src/pages/ris/.
+      - Report Templates: 11 starter presets vendored at
+        scripts/seed-data/templates/ris/.
   --help      Show this help message
 
 ${chalk.yellow("Examples:")}
@@ -2903,24 +2901,14 @@ interface PmeReportPreset {
 }
 
 async function loadPmeReportPresets(): Promise<PmeReportPreset[] | null> {
-  // Try to find the sibling mycure repo. Default layout:
-  //   <ws>/mycure-infra/scripts/seed.ts        ← __dirname
-  //   <ws>/mycure/apps/mycure/src/pages/pme/reportTemplatePresets.ts
-  const candidates = [
-    `${import.meta.dir}/../../mycure/apps/mycure/src/pages/pme/reportTemplatePresets.ts`,
-    `${import.meta.dir}/../../../mycure/apps/mycure/src/pages/pme/reportTemplatePresets.ts`,
-  ];
-  for (const path of candidates) {
-    try {
-      const file = Bun.file(path);
-      if (!(await file.exists())) continue;
-      const mod = await import(path);
-      if (Array.isArray(mod.PME_REPORT_PRESETS)) {
-        return mod.PME_REPORT_PRESETS as PmeReportPreset[];
-      }
-    } catch {
-      // try next candidate
+  // Vendored from the mycure frontend; see scripts/seed-data/templates/README.md.
+  try {
+    const mod = await import("./seed-data/templates/pme/reportTemplatePresets.ts");
+    if (Array.isArray(mod.PME_REPORT_PRESETS)) {
+      return mod.PME_REPORT_PRESETS as PmeReportPreset[];
     }
+  } catch {
+    // fall through to null
   }
   return null;
 }
@@ -2948,9 +2936,9 @@ async function seedPmeFormTemplates(facilities: { id: string; label: string }[])
     console.log(
       chalk.yellow(
         "⚠  PME Form Templates skipped — could not load PME_REPORT_PRESETS\n" +
-        "   from sibling mycure repo. Expected at:\n" +
-        "     ../mycure/apps/mycure/src/pages/pme/reportTemplatePresets.ts\n" +
-        "   Clone the mycure repo next to mycure-infra to enable this step.",
+        "   from scripts/seed-data/templates/pme/reportTemplatePresets.ts.\n" +
+        "   The vendored file may be missing or its export was renamed —\n" +
+        "   see scripts/seed-data/templates/README.md for the re-vendor steps.",
       ),
     );
     return;
@@ -3664,21 +3652,14 @@ interface EmrFormTemplatePreset {
 }
 
 async function loadEmrFormPresets(): Promise<EmrFormTemplatePreset[] | null> {
-  const candidates = [
-    `${import.meta.dir}/../../mycure/apps/mycure/src/pages/emr/formTemplatePresets.ts`,
-    `${import.meta.dir}/../../../mycure/apps/mycure/src/pages/emr/formTemplatePresets.ts`,
-  ];
-  for (const path of candidates) {
-    try {
-      const file = Bun.file(path);
-      if (!(await file.exists())) continue;
-      const mod = await import(path);
-      if (Array.isArray(mod.FORM_TEMPLATE_PRESETS)) {
-        return mod.FORM_TEMPLATE_PRESETS as EmrFormTemplatePreset[];
-      }
-    } catch {
-      // try next candidate
+  // Vendored from the mycure frontend; see scripts/seed-data/templates/README.md.
+  try {
+    const mod = await import("./seed-data/templates/emr/formTemplatePresets.ts");
+    if (Array.isArray(mod.FORM_TEMPLATE_PRESETS)) {
+      return mod.FORM_TEMPLATE_PRESETS as EmrFormTemplatePreset[];
     }
+  } catch {
+    // fall through to null
   }
   return null;
 }
@@ -3689,8 +3670,9 @@ async function seedEmrFormTemplates(facilities: { id: string; label: string }[])
     console.log(
       chalk.yellow(
         "⚠  EMR Form Templates skipped — could not load FORM_TEMPLATE_PRESETS\n" +
-        "   from sibling mycure repo. Expected at:\n" +
-        "     ../mycure/apps/mycure/src/pages/emr/formTemplatePresets.ts",
+        "   from scripts/seed-data/templates/emr/formTemplatePresets.ts.\n" +
+        "   The vendored file may be missing or its export was renamed —\n" +
+        "   see scripts/seed-data/templates/README.md for the re-vendor steps.",
       ),
     );
     return;
@@ -5362,26 +5344,20 @@ interface DiagnosticReportPreset {
 async function loadDiagnosticReportPresets(
   kind: DiagnosticKind,
 ): Promise<{ presets: DiagnosticReportPreset[] | null; templateType: string }> {
-  const subdir = kind === "laboratory" ? "lis" : "ris";
+  // Vendored from the mycure frontend; see scripts/seed-data/templates/README.md.
   const exportName = kind === "laboratory" ? "LIS_FORM_TEMPLATE_PRESETS" : "RIS_REPORT_PRESETS";
-  const candidates = [
-    `${import.meta.dir}/../../mycure/apps/mycure/src/pages/${subdir}/formTemplatePresets.ts`,
-    `${import.meta.dir}/../../../mycure/apps/mycure/src/pages/${subdir}/formTemplatePresets.ts`,
-  ];
-  for (const path of candidates) {
-    try {
-      const file = Bun.file(path);
-      if (!(await file.exists())) continue;
-      const mod = await import(path);
-      if (Array.isArray(mod[exportName])) {
-        return {
-          presets: mod[exportName] as DiagnosticReportPreset[],
-          templateType: FORM_TEMPLATE_TYPE_FOR[kind],
-        };
-      }
-    } catch {
-      // try next candidate
+  try {
+    const mod = kind === "laboratory"
+      ? await import("./seed-data/templates/lis/formTemplatePresets.ts")
+      : await import("./seed-data/templates/ris/formTemplatePresets.ts");
+    if (Array.isArray((mod as Record<string, unknown>)[exportName])) {
+      return {
+        presets: (mod as Record<string, unknown>)[exportName] as DiagnosticReportPreset[],
+        templateType: FORM_TEMPLATE_TYPE_FOR[kind],
+      };
     }
+  } catch {
+    // fall through
   }
   return { presets: null, templateType: FORM_TEMPLATE_TYPE_FOR[kind] };
 }
@@ -5396,7 +5372,9 @@ async function seedDiagnosticFormTemplates(
     console.log(
       chalk.yellow(
         `⚠  ${kind} Form Templates skipped — could not load presets from\n` +
-        `   ../mycure/apps/mycure/src/pages/${subdir}/formTemplatePresets.ts`,
+        `   scripts/seed-data/templates/${subdir}/formTemplatePresets.ts.\n` +
+        `   The vendored file may be missing or its export was renamed —\n` +
+        `   see scripts/seed-data/templates/README.md for the re-vendor steps.`,
       ),
     );
     return;
