@@ -3001,6 +3001,223 @@ async function seedPmeFormTemplates(facilities: { id: string; label: string }[])
 }
 
 // ---------------------------------------------------------------------------
+// Subscriptions — give every seed org an unlimited demo plan.
+//
+// Hapihub gates feature visibility (LIS, RIS, PME, dental, pharmacy, etc.)
+// on per-org subscription rows. Without a subscription, the corresponding
+// `<feature>` boolean stays false and the UI hides those modules. We POST a
+// dedicated 'seed-unlimited' subscription package with every feature
+// `base: true` and `billingConfig.amount: 0` — the zero amount is what
+// keeps the auto-billing path in subscriptions.ts:108-111 from resetting
+// the feature flags to false until an invoice is paid.
+//
+// Subscription id defaults to organization.id (subscriptions.ts:311), so
+// idempotency is a single GET /subscriptions/:orgId probe per facility.
+// On --reset, the org-delete cascade (organizations.ts:504+) removes
+// subscription rows automatically — no extra cleanup needed. The package
+// definition itself is global and persists across resets.
+// ---------------------------------------------------------------------------
+
+const SEED_SUBSCRIPTION_PACKAGE_ID = "seed-unlimited";
+
+const SEED_SUBSCRIPTION_PACKAGE = {
+  id: SEED_SUBSCRIPTION_PACKAGE_ID,
+  name: "Seed Unlimited (demo)",
+  description:
+    "All features enabled, no billing — used by seeded demo orgs only. Not for production tenants.",
+  tags: ["seed", "demo", "unlimited"],
+  planInterval: "month",
+  // amount: 0 — critical. With any non-zero amount, processBillableItems
+  // (subscriptions.ts:108-111) flips every feature flag to false until the
+  // generated invoice is marked paid. Zero amount → no invoice → flags
+  // stick to their `base` value.
+  billingConfig: { amount: 0, currency: "php" },
+  organizationTypes: ["clinic", "hospital", "laboratory", "facility"],
+  products: {
+    // Consumables — generous demo limits.
+    memberSeatsMax:        { key: "memberSeatsMax",        keyConsumed: "memberSeatsOccupied",        type: "consumable", base: 1000,        max: 10000,        multiplier: 1 },
+    storageMax:            { key: "storageMax",            keyConsumed: "storageUsedTotal",           type: "consumable", base: 1_000_000,   max: 10_000_000,   multiplier: 1 },
+    teleconsultsMax:       { key: "teleconsultsMax",       keyConsumed: "teleconsultsConsumed",       type: "consumable", base: 100_000,     max: 1_000_000,    multiplier: 1 },
+    emailCreditsMax:       { key: "emailCreditsMax",       keyConsumed: "emailCreditsConsumed",       type: "consumable", base: 1_000_000,   max: 10_000_000,   multiplier: 1 },
+    smsCreditsMax:         { key: "smsCreditsMax",         keyConsumed: "smsCreditsConsumed",         type: "consumable", base: 1_000_000,   max: 10_000_000,   multiplier: 1 },
+    inventoryVariantsMax:  { key: "inventoryVariantsMax",  keyConsumed: "inventoryVariantsConsumed",  type: "consumable", base: 100_000,     max: 1_000_000,    multiplier: 1 },
+    // Feature flags — every gateable module on. Names mirror the booleans
+    // listed in services/hapihub/src/services/subscriptions/subscriptions.schema.ts.
+    clinicWebsite:           { key: "clinicWebsite",           type: "feature", base: true },
+    onlineBooking:           { key: "onlineBooking",           type: "feature", base: true },
+    booking:                 { key: "booking",                 type: "feature", base: true },
+    onlinePayments:          { key: "onlinePayments",          type: "feature", base: true },
+    payLaterOptions:         { key: "payLaterOptions",         type: "feature", base: true },
+    dailyCensus:             { key: "dailyCensus",             type: "feature", base: true },
+    salesReports:            { key: "salesReports",            type: "feature", base: true },
+    chatSupport:             { key: "chatSupport",             type: "feature", base: true },
+    lis:                     { key: "lis",                     type: "feature", base: true },
+    ris:                     { key: "ris",                     type: "feature", base: true },
+    pme:                     { key: "pme",                     type: "feature", base: true },
+    prm:                     { key: "prm",                     type: "feature", base: true },
+    hris:                    { key: "hris",                    type: "feature", base: true },
+    dental:                  { key: "dental",                  type: "feature", base: true },
+    pharmacy:                { key: "pharmacy",                type: "feature", base: true },
+    inventory:               { key: "inventory",               type: "feature", base: true },
+    inventoryImportAI:       { key: "inventoryImportAI",       type: "feature", base: true },
+    philhealthEclaims:       { key: "philhealthEclaims",       type: "feature", base: true },
+    philhealthKonsulta:      { key: "philhealthKonsulta",      type: "feature", base: true },
+    billingTaxCompliancePH:  { key: "billingTaxCompliancePH",  type: "feature", base: true },
+    billingPOS:              { key: "billingPOS",              type: "feature", base: true },
+  },
+};
+
+async function ensureSeedSubscriptionPackage(): Promise<void> {
+  // The packages service has no PATCH endpoint — only Create / Get /
+  // Delete (services/subscriptions/packages.ts). To guarantee the package
+  // matches the current SEED_SUBSCRIPTION_PACKAGE definition (including
+  // any features added in later seed revisions), delete-and-recreate on
+  // every run. Existing subscriptions snapshot the package as JSON
+  // (subscriptions.schema.ts), so deleting the package definition itself
+  // doesn't break them; the seedSubscriptions PATCH path re-fetches the
+  // fresh package by id when assigning it.
+  //
+  // DELETE /subscription/packages/:id requires service-account auth
+  // (apis/hapihub/src/subscription/paths/subscription_packages_{id}.yaml
+  // — `security: - access_token: - serviceAccount`). Hapihub silently
+  // returns 204 to non-service-account callers WITHOUT actually deleting
+  // the row, so we MUST switch to the service-account session for this
+  // step or the recreate will hit a unique-constraint conflict and 500.
+  const serviceEmail = [...SERVICE_ACCOUNT_EMAILS][0];
+  const savedSession = sessionCookie;
+  if (serviceEmail) {
+    try {
+      sessionCookie = "";
+      await signIn(serviceEmail, PASSWORD);
+    } catch {
+      // Service account not yet provisioned — fall back to superadmin
+      // session. The DELETE will silently no-op but a subsequent POST may
+      // succeed if the row doesn't already exist.
+      sessionCookie = savedSession;
+    }
+  }
+  try {
+    await api("DELETE", `/subscription/packages/${SEED_SUBSCRIPTION_PACKAGE_ID}`);
+  } catch {
+    // 404 / not-found — fine, nothing to delete
+  }
+  try {
+    await api("POST", "/subscription/packages", SEED_SUBSCRIPTION_PACKAGE);
+  } catch (err: unknown) {
+    const msg = (err as Error).message;
+    // Race against another seed runner — fine if a duplicate slipped in.
+    if (
+      !msg.includes("duplicate") &&
+      !msg.includes("UNIQUE") &&
+      !msg.includes("already exists") &&
+      !msg.includes("E11000")
+    ) {
+      // Restore session before throwing so the caller's catch sees a
+      // consistent state.
+      sessionCookie = savedSession;
+      throw err;
+    }
+  }
+  // Restore the caller's session (typically superadmin) for subsequent
+  // PATCH /subscriptions/:id calls — those don't need service-account
+  // scope and we want to keep the rest of main() running as superadmin.
+  sessionCookie = savedSession;
+}
+
+async function seedSubscriptions(
+  facilities: Array<{ id: string; label: string; profile: OrgProfile }>,
+): Promise<void> {
+  await ensureSeedSubscriptionPackage();
+
+  const total = facilities.length;
+  const spinner = ora(
+    `Seeding subscriptions on ${total} facilities (all features enabled)...`,
+  ).start();
+  let created = 0;
+  let patched = 0;
+
+  for (const facility of facilities) {
+    // Try POST first — succeeds when no row exists. If a subscription
+    // already exists (id == organization.id, so any prior call left one
+    // behind), POST conflicts — fall through to PATCH which swaps the
+    // package and re-applies feature flags from the latest definition.
+    let didCreate = false;
+    try {
+      spinner.text = `[${facility.label}] creating subscription...`;
+      await api("POST", "/subscriptions", {
+        organization: facility.id,
+        package: SEED_SUBSCRIPTION_PACKAGE_ID,
+      });
+      didCreate = true;
+    } catch (err: unknown) {
+      const msg = (err as Error).message;
+      if (
+        !msg.includes("duplicate") &&
+        !msg.includes("UNIQUE") &&
+        !msg.includes("already exists") &&
+        !msg.includes("E11000") &&
+        !msg.includes("409")
+      ) {
+        spinner.fail(
+          `Failed to create subscription for ${facility.label}: ${msg.slice(0, 200)}`,
+        );
+        process.exit(1);
+      }
+    }
+
+    // Always PATCH `{package}` to (re)apply the latest package definition.
+    // Critical for re-runs: an existing seed-unlimited subscription holds
+    // a JSON snapshot of the OLD package, so newly-added features won't
+    // appear on the row until we PATCH it through the package-change path
+    // (subscriptions.ts:423-441), which iterates the fresh package.products
+    // and writes each feature.base onto the subscription row.
+    spinner.text = `[${facility.label}] applying ${SEED_SUBSCRIPTION_PACKAGE_ID} package...`;
+    try {
+      await api("PATCH", `/subscriptions/${facility.id}`, {
+        package: SEED_SUBSCRIPTION_PACKAGE_ID,
+      });
+    } catch (err: unknown) {
+      const msg = (err as Error).message;
+      spinner.fail(
+        `Failed to apply package to ${facility.label}: ${msg.slice(0, 200)}`,
+      );
+      process.exit(1);
+    }
+
+    // PATCH-package leaves status='pending' (subscriptions.ts:430). With
+    // billingConfig.amount=0 there's no invoice to wait on, so flip status
+    // back to 'active' explicitly — keeps the UI from showing a pending-
+    // payment banner.
+    try {
+      await api("PATCH", `/subscriptions/${facility.id}`, { status: "active" });
+    } catch {
+      // ignore — best effort
+    }
+
+    if (didCreate) created++;
+    else patched++;
+
+    // Verify the subscription got the expected feature flags.
+    const after = (await api("GET", `/subscriptions/${facility.id}`)) as
+      | { package?: { id?: string }; lis?: boolean; ris?: boolean; pme?: boolean; dental?: boolean; pharmacy?: boolean; inventory?: boolean; status?: string }
+      | null;
+    const requiredFeatures = { lis: !!after?.lis, ris: !!after?.ris, pme: !!after?.pme, dental: !!after?.dental, pharmacy: !!after?.pharmacy, inventory: !!after?.inventory };
+    const missing = Object.entries(requiredFeatures).filter(([, v]) => !v).map(([k]) => k);
+    if (after?.package?.id !== SEED_SUBSCRIPTION_PACKAGE_ID || missing.length > 0) {
+      spinner.fail(
+        `Subscription verification failed for ${facility.label}: ` +
+          `package=${after?.package?.id}, missing features=[${missing.join(", ")}]`,
+      );
+      process.exit(1);
+    }
+  }
+
+  spinner.succeed(
+    `Subscriptions: ${created} new, ${patched} patched — all ${total} facilities active on '${SEED_SUBSCRIPTION_PACKAGE_ID}' (LIS, RIS, PME, dental, pharmacy, inventory verified)`,
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Verbose clinic profiles — layer the contact details / address / socials
 // onto each org via PATCH /organizations/:id. Idempotent: same fields just
 // get overwritten with the same values on rerun.
@@ -6786,6 +7003,12 @@ async function main() {
 
   // Patch each org with its verbose profile (email/phone/website/address/etc.)
   await seedClinicProfiles(orgsToSeed);
+
+  // Give every seed facility a subscription with all features enabled
+  // (the seed-unlimited package). Without this, modules like LIS/RIS/PME
+  // are hidden in the UI. Done after profiles so the spinner ordering
+  // mirrors the user-facing setup flow.
+  await seedSubscriptions(orgsToSeed);
 
   // Step 4: Create organization members for ALL orgs.
   // Each user gets the same role/privileges in every org, satisfying the
