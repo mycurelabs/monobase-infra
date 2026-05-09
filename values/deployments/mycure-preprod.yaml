@@ -108,6 +108,34 @@ account:
   podDisruptionBudget:
     enabled: false
 
+# ===== HEALTHCARE: MyCure Dashboard (operator/admin web UI) =====
+mycure-dashboard:
+  enabled: true
+
+  image:
+    repository: ghcr.io/mycurelabs/dashboard
+    tag: "0.2.0"
+    pullPolicy: IfNotPresent
+
+  replicaCount: 1
+
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 128Mi
+
+  gateway:
+    hostname: ""  # defaults to mycure-dashboard.preprod.localfirsthealth.com
+
+  config:
+    API_URL: "https://hapihub.preprod.localfirsthealth.com"
+
+  podDisruptionBudget:
+    enabled: false
+
 # ===== HEALTHCARE: HapiHub API =====
 hapihub:
   enabled: true

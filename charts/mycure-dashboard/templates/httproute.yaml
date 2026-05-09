@@ -1,0 +1,31 @@
+{{- if and .Values.enabled .Values.gateway.enabled }}
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: {{ include "mycure-dashboard.fullname" . }}
+  namespace: {{ include "mycure-dashboard.namespace" . }}
+  labels:
+    {{- include "mycure-dashboard.labels" . | nindent 4 }}
+spec:
+  parentRefs:
+    - name: {{ include "mycure-dashboard.gateway.name" . }}
+      namespace: {{ include "mycure-dashboard.gateway.namespace" . }}
+      sectionName: https  # Only attach to HTTPS listener
+  hostnames:
+    {{- if .Values.gateway.hostnames }}
+    {{- range .Values.gateway.hostnames }}
+    - {{ . }}
+    {{- end }}
+    {{- else }}
+    - {{ include "mycure-dashboard.gateway.hostname" . }}
+    {{- end }}
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      backendRefs:
+        - name: {{ include "mycure-dashboard.fullname" . }}
+          port: {{ .Values.service.port }}
+          weight: 1
+{{- end }}

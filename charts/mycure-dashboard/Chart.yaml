@@ -1,0 +1,17 @@
+apiVersion: v2
+name: mycure-dashboard
+description: MyCure Dashboard App (mycure satellite) - operator/admin web UI
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+keywords:
+  - frontend
+  - react
+  - vite
+  - dashboard
+home: https://github.com/monobaselabs/monobase-infra
+sources:
+  - https://github.com/monobaselabs/monobase
+maintainers:
+  - name: Your Organization
+    email: devops@example.com
