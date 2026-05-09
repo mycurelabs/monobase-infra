@@ -114,7 +114,7 @@ mycure-dashboard:
 
   image:
     repository: ghcr.io/mycurelabs/dashboard
-    tag: "0.2.0"
+    tag: "0.3.0"
     pullPolicy: IfNotPresent
 
   replicaCount: 1
@@ -143,7 +143,7 @@ hapihub:
 
   image:
     repository: ghcr.io/mycurelabs/hapihub
-    tag: "11.4.0"
+    tag: "11.4.1"
     pullPolicy: IfNotPresent
 
   replicaCount: 1
@@ -273,7 +273,7 @@ mycure:
 
   image:
     repository: ghcr.io/mycurelabs/mycureapp
-    tag: "10.8.0"
+    tag: "10.8.1"
     pullPolicy: IfNotPresent
 
   replicaCount: 1
