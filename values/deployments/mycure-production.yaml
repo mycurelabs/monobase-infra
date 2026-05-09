@@ -115,6 +115,7 @@ mycure-dashboard:
 
   gateway:
     hostname: ""  # defaults to mycure-dashboard.localfirsthealth.com
+    sectionName: https-lfh
 
   config:
     API_URL: "https://hapihub.localfirsthealth.com"

@@ -10,7 +10,11 @@ spec:
   parentRefs:
     - name: {{ include "mycure-dashboard.gateway.name" . }}
       namespace: {{ include "mycure-dashboard.gateway.namespace" . }}
-      sectionName: https  # Only attach to HTTPS listener
+      {{- if .Values.gateway.sectionName }}
+      sectionName: {{ .Values.gateway.sectionName }}
+      {{- else }}
+      sectionName: https  # Default: attach to HTTPS listener
+      {{- end }}
   hostnames:
     {{- if .Values.gateway.hostnames }}
     {{- range .Values.gateway.hostnames }}

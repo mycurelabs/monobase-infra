@@ -129,6 +129,7 @@ mycure-dashboard:
 
   gateway:
     hostname: ""  # defaults to mycure-dashboard.preprod.localfirsthealth.com
+    sectionName: https-preprod-lfh
 
   config:
     API_URL: "https://hapihub.preprod.localfirsthealth.com"
