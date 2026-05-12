@@ -179,5 +179,6 @@ If a quarterly drill fails, treat it as a P1 incident — the secondary backup i
 ## Related
 
 - [BACKUP_DR.md](BACKUP_DR.md) — overall backup strategy
+- [ONPREM_BACKUP_SETUP.md](ONPREM_BACKUP_SETUP.md) — how to add a new mirror host
 - [infrastructure/velero/](../../infrastructure/velero/) — Velero schedules and BackupStorageLocation config
 - [infrastructure/external-secrets/velero-repo-credentials-externalsecret.yaml](../../infrastructure/external-secrets/velero-repo-credentials-externalsecret.yaml) — Kopia password source
