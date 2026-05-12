@@ -17,7 +17,7 @@ spec:
   source:
     chart: velero
     repoURL: https://vmware-tanzu.github.io/helm-charts
-    targetRevision: {{ .Values.velero.version | default "7.1.4" }}
+    targetRevision: {{ .Values.velero.version | default "12.0.1" }}
     helm:
       releaseName: velero
       values: |
@@ -46,7 +46,12 @@ spec:
         deployNodeAgent: true
         nodeAgent:
           podVolumePath: /var/lib/kubelet/pods
-          privileged: true
+          # Chart 12 renamed `privileged` -> `containerSecurityContext.privileged`.
+          # Required for FSB (file-system backup) to bind-mount pod volumes
+          # from /var/lib/kubelet/pods. Without it FSB fails on Bottlerocket,
+          # COS, and most hardened distros.
+          containerSecurityContext:
+            privileged: true
           # Tolerate every taint so node-agent runs on production/staging
           # pools too. Without this, FSB-style backups silently fail for any
           # pod scheduled on a tainted node (production stateful workloads
@@ -58,7 +63,8 @@ spec:
         initContainers:
 {{- if or (eq .Values.velero.provider "aws") (eq .Values.velero.provider "digitalocean") (eq .Values.velero.provider "minio") }}
           - name: velero-plugin-for-aws
-            image: velero/velero-plugin-for-aws:v1.10.0
+            # Velero 1.18 pairs with velero-plugin-for-aws v1.14.x.
+            image: velero/velero-plugin-for-aws:v1.14.0
             volumeMounts:
               - mountPath: /target
                 name: plugins
