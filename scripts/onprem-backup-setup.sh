@@ -32,12 +32,15 @@ YES_WIPE_DEVICE=0
 KOPIA_VERSION=0.21.1
 RCLONE_TRANSFERS=2
 RCLONE_CHECKERS=4
+NOTIFY_ON=both                                  # both | failure-only | success-only | off
 
 CONFIG_DIR=/etc/mycure-backup
 RCLONE_CONFIG=/etc/rclone/rclone.conf
 LOG_FILE=/var/log/mycure-backup-mirror.log
 SERVICE_NAME=mycure-backup-mirror
 SYSTEMD_DIR=/etc/systemd/system
+NOTIFY_BIN=/usr/local/sbin/mycure-backup-notify
+WEBHOOK_FILE=$CONFIG_DIR/discord-webhook.url
 
 # ---------- helpers ----------
 log()    { printf '\033[1;34m[setup]\033[0m %s\n' "$*"; }
@@ -62,13 +65,22 @@ Flags:
   --timer-on-calendar=S   systemd OnCalendar=                  (default: "$TIMER_ON_CALENDAR")
   --yes-wipe-device       required confirm for luks-partition mode
   --kopia-version=VER     kopia release tag to install         (default: $KOPIA_VERSION)
+  --notify-on=MODE        both | failure-only | success-only | off  (default: $NOTIFY_ON)
   -h, --help              this help
 
-Environment (all required):
+Environment (required):
   SPACES_ACCESS_KEY       DO Spaces access key, read-only recommended
   SPACES_SECRET_KEY       DO Spaces secret key
   KOPIA_PASSWORD          Kopia repo password (gcloud secrets versions access
                           latest --secret=monobase-velero-repo-password)
+
+Environment (optional):
+  DISCORD_WEBHOOK_URL     Discord webhook for backup notifications. If set, the
+                          script installs a notifier and writes the URL to
+                          /etc/mycure-backup/discord-webhook.url so the timer
+                          can use it. If unset, no notifier is configured and
+                          any previously stored URL is left intact (pass an
+                          empty string to clear it).
 EOF
 }
 
@@ -86,11 +98,18 @@ while [[ $# -gt 0 ]]; do
     --service-user=*)       SERVICE_USER="${1#*=}";        shift;;
     --timer-on-calendar=*)  TIMER_ON_CALENDAR="${1#*=}";   shift;;
     --kopia-version=*)      KOPIA_VERSION="${1#*=}";       shift;;
+    --notify-on=*)          NOTIFY_ON="${1#*=}";           shift;;
+    --discord-webhook-url=*) DISCORD_WEBHOOK_URL="${1#*=}";shift;;
     --yes-wipe-device)      YES_WIPE_DEVICE=1;             shift;;
     -h|--help)              usage; exit 0;;
     *) err "unknown flag: $1 (see --help)";;
   esac
 done
+
+case "$NOTIFY_ON" in
+  both|failure-only|success-only|off) ;;
+  *) err "--notify-on must be one of: both | failure-only | success-only | off";;
+esac
 
 # ---------- preflight ----------
 need_root
@@ -253,14 +272,113 @@ touch "$LOG_FILE"
 chown "$SERVICE_USER:$SERVICE_USER" "$LOG_FILE"
 chmod 0640 "$LOG_FILE"
 
+# ---------- discord webhook (optional) ----------
+# If DISCORD_WEBHOOK_URL is set in env, write it to disk so the timer can
+# read it. Empty string explicitly clears any previously stored URL.
+# Unset env var means "leave existing config alone" (idempotent rerun).
+if [[ -v DISCORD_WEBHOOK_URL ]]; then
+  if [[ -z "$DISCORD_WEBHOOK_URL" ]]; then
+    rm -f "$WEBHOOK_FILE"
+    log "DISCORD_WEBHOOK_URL was empty — cleared $WEBHOOK_FILE"
+  else
+    umask 077
+    printf '%s' "$DISCORD_WEBHOOK_URL" > "$WEBHOOK_FILE"
+    umask 022
+    chgrp "$SERVICE_USER" "$WEBHOOK_FILE"
+    chmod 0640 "$WEBHOOK_FILE"
+    log "Discord webhook stored at $WEBHOOK_FILE"
+  fi
+  unset DISCORD_WEBHOOK_URL
+fi
+
+# ---------- notify helper script ----------
+# Reads the webhook URL at runtime; silently no-ops if absent or empty.
+# Idempotent: overwriting the script is harmless.
+log "installing notifier at $NOTIFY_BIN"
+install -m 0755 /dev/stdin "$NOTIFY_BIN" <<'NOTIFY'
+#!/usr/bin/env bash
+# Send a Discord webhook notification about the on-prem backup mirror.
+# Usage: mycure-backup-notify success|failure|test [extra_message]
+# Silent no-op if /etc/mycure-backup/discord-webhook.url is missing/empty.
+set -euo pipefail
+
+WEBHOOK_FILE=/etc/mycure-backup/discord-webhook.url
+LOG_FILE=/var/log/mycure-backup-mirror.log
+SERVICE_NAME=mycure-backup-mirror
+
+[[ -r "$WEBHOOK_FILE" ]] || exit 0
+url=$(<"$WEBHOOK_FILE")
+[[ -n "$url" ]] || exit 0
+
+case "${1:-}" in
+  success) title=":white_check_mark: On-prem backup mirror succeeded"; color=3066993 ;;
+  failure) title=":x: On-prem backup mirror FAILED"; color=15158332 ;;
+  test)    title=":bell: On-prem backup mirror — test notification"; color=10181046 ;;
+  *)       title="On-prem backup mirror: ${1:-unknown}"; color=8421504 ;;
+esac
+
+extra="${2:-}"
+hostname=$(hostname -f 2>/dev/null || hostname)
+timestamp=$(date -u -Iseconds 2>/dev/null || date -u +%FT%TZ)
+
+# Try to pull a few useful stats from the most recent journal entry for the
+# service so the message is informative.
+elapsed="unknown"
+mirrored="see log"
+if command -v systemctl >/dev/null; then
+  # ActiveEnterTimestamp - InactiveEnterTimestamp gives the run duration.
+  start_ts=$(systemctl show "$SERVICE_NAME.service" -p ActiveEnterTimestampMonotonic --value 2>/dev/null || echo 0)
+  end_ts=$(systemctl show "$SERVICE_NAME.service" -p InactiveEnterTimestampMonotonic --value 2>/dev/null || echo 0)
+  if [[ "$end_ts" -gt "$start_ts" ]] && [[ "$start_ts" -gt 0 ]]; then
+    delta_us=$((end_ts - start_ts))
+    elapsed=$(awk -v u="$delta_us" 'BEGIN{s=u/1000000; printf (s>=3600)?"%dh%dm":(s>=60)?"%dm%ds":"%ds", (s>=3600)?int(s/3600):(s>=60)?int(s/60):int(s), (s>=3600)?int((s%3600)/60):(s>=60)?int(s%60):0}')
+  fi
+fi
+if [[ -r /var/backups/mycure/spaces ]]; then
+  mirrored=$(du -sh /var/backups/mycure/spaces 2>/dev/null | awk '{print $1}')
+  [[ -n "$mirrored" ]] || mirrored="see log"
+fi
+
+# Build the JSON payload with jq if available (handles escaping properly);
+# fall back to a simple printf for hosts without jq.
+if command -v jq >/dev/null; then
+  payload=$(jq -nc \
+    --arg title "$title" --argjson color "$color" \
+    --arg host "$hostname" --arg ts "$timestamp" \
+    --arg elapsed "$elapsed" --arg mirrored "$mirrored" \
+    --arg extra "$extra" \
+    '{username:"mycure-backup",embeds:[{title:$title,color:$color,timestamp:$ts,fields:[
+       {name:"Host",value:$host,inline:true},
+       {name:"Duration",value:$elapsed,inline:true},
+       {name:"Mirrored",value:$mirrored,inline:true}
+     ] + (if $extra == "" then [] else [{name:"Note",value:$extra,inline:false}] end)}]}')
+else
+  esc() { printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g'; }
+  payload=$(printf '{"username":"mycure-backup","embeds":[{"title":"%s","color":%d,"timestamp":"%s","fields":[{"name":"Host","value":"%s","inline":true},{"name":"Duration","value":"%s","inline":true},{"name":"Mirrored","value":"%s","inline":true}]}]}' \
+    "$(esc "$title")" "$color" "$timestamp" "$(esc "$hostname")" "$(esc "$elapsed")" "$(esc "$mirrored")")
+fi
+
+curl -sS -m 15 -X POST -H 'Content-Type: application/json' -d "$payload" "$url" >/dev/null || true
+NOTIFY
+
 # ---------- systemd service + timer ----------
 log "writing systemd unit $SERVICE_NAME.service"
+# ExecStartPost only fires on ExecStart success → success notification.
+# OnFailure= triggers a sibling unit → failure notification.
+case "$NOTIFY_ON" in
+  both)          notify_success="ExecStartPost=$NOTIFY_BIN success"; failure_onfailure="OnFailure=${SERVICE_NAME}-failure.service" ;;
+  success-only)  notify_success="ExecStartPost=$NOTIFY_BIN success"; failure_onfailure="" ;;
+  failure-only)  notify_success="";                                  failure_onfailure="OnFailure=${SERVICE_NAME}-failure.service" ;;
+  off)           notify_success="";                                  failure_onfailure="" ;;
+esac
+
 cat > "$SYSTEMD_DIR/$SERVICE_NAME.service" <<UNIT
 [Unit]
 Description=Mirror Velero backups from DO Spaces (Mycure on-prem tier-4)
 After=network-online.target
 Wants=network-online.target
 $( [[ "$ENCRYPTION" != "none" ]] && printf 'Requires=mycure-backup-volume.service\nAfter=mycure-backup-volume.service\n' )
+$failure_onfailure
 
 [Service]
 Type=oneshot
@@ -275,6 +393,7 @@ ExecStart=/usr/bin/rclone sync spaces:$BUCKET/ $BACKUP_DIR/spaces/ \\
   --log-level INFO \\
   --stats 5m \\
   --stats-one-line
+$notify_success
 
 # Hard cap so a runaway sync doesn't burn an entire day.
 TimeoutStartSec=8h
@@ -284,6 +403,18 @@ IOSchedulingPriority=7
 
 [Install]
 WantedBy=multi-user.target
+UNIT
+
+# Sibling unit fired via OnFailure= when the mirror service fails.
+# Runs the notifier as root so it can read $WEBHOOK_FILE regardless of
+# the failure mode (e.g. service user permission drift).
+cat > "$SYSTEMD_DIR/${SERVICE_NAME}-failure.service" <<UNIT
+[Unit]
+Description=Notify on failure of $SERVICE_NAME.service
+
+[Service]
+Type=oneshot
+ExecStart=$NOTIFY_BIN failure
 UNIT
 
 log "writing systemd timer $SERVICE_NAME.timer"
@@ -325,10 +456,23 @@ echo "  bucket        : spaces:$BUCKET ($REGION)"
 echo "  service user  : $SERVICE_USER"
 echo "  retention ref : ${RETENTION_DAYS}d (rclone --max-age=$MAX_AGE)"
 echo "  timer         : $TIMER_ON_CALENDAR"
-echo "  next run      : $(systemctl show "$SERVICE_NAME.timer" -p NextElapseUSecRealtime --value | xargs -I{} date -u -d "@$(({}/1000000))" 2>/dev/null || echo 'see: systemctl list-timers')"
+next_run=$(systemctl list-timers --no-legend --no-pager "$SERVICE_NAME.timer" 2>/dev/null | awk '{print $1, $2, $3}' | head -1)
+echo "  next run      : ${next_run:-see: systemctl list-timers}"
+if [[ -f "$WEBHOOK_FILE" ]]; then
+  echo "  notifications : Discord webhook configured (mode: $NOTIFY_ON)"
+else
+  echo "  notifications : disabled (set DISCORD_WEBHOOK_URL to enable)"
+fi
 echo
 echo "Verify:"
 echo "  systemctl status $SERVICE_NAME.timer"
 echo "  sudo -u $SERVICE_USER rclone --config $RCLONE_CONFIG size spaces:$BUCKET"
 echo "  sudo systemctl start $SERVICE_NAME.service   # trigger now"
 echo "  journalctl -u $SERVICE_NAME.service -f"
+
+# Fire a one-shot test notification on first-time-with-webhook installs so the
+# operator can confirm the channel is wired up before the first scheduled run.
+if [[ -f "$WEBHOOK_FILE" ]] && [[ "$NOTIFY_ON" != "off" ]]; then
+  log "sending test notification to Discord…"
+  "$NOTIFY_BIN" test "setup script completed on $(hostname -f 2>/dev/null || hostname)" || warn "test notification failed (non-fatal)"
+fi

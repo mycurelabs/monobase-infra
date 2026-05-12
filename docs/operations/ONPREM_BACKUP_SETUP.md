@@ -108,8 +108,28 @@ sudo SPACES_ACCESS_KEY=… SPACES_SECRET_KEY=… KOPIA_PASSWORD=… \
 | `--service-user=USER` | `mycure-backup` | System user that runs the mirror. |
 | `--timer-on-calendar=S` | `*-*-* 02:30:00 UTC` | systemd OnCalendar. |
 | `--kopia-version=VER` | pinned in script | Kopia static binary release. |
+| `--notify-on=MODE` | `both` | `both` / `failure-only` / `success-only` / `off`. Controls Discord notifications. |
+| `--discord-webhook-url=URL` | (env var) | Same as `DISCORD_WEBHOOK_URL`. Stored at `/etc/mycure-backup/discord-webhook.url`. |
 
 ---
+
+### Optional: Discord notifications
+
+If `DISCORD_WEBHOOK_URL` is set in env (or passed via `--discord-webhook-url`), the script installs a notifier at `/usr/local/sbin/mycure-backup-notify` and wires it into the systemd unit:
+
+- **Success** (`--notify-on=both` or `success-only`): fires after `ExecStart` succeeds via `ExecStartPost=`.
+- **Failure** (`--notify-on=both` or `failure-only`): fires via a sibling `mycure-backup-mirror-failure.service` triggered by `OnFailure=`.
+- **Setup test** (always, when a webhook is configured): one-shot `test` notification sent at the end of the setup script so operators can confirm the channel is wired up before the first scheduled run.
+
+The webhook URL is stored at `/etc/mycure-backup/discord-webhook.url` (mode 0640, readable by the service user). Rotate by re-running the script with the new URL, or clear by passing an empty `DISCORD_WEBHOOK_URL=""`.
+
+Each notification includes host FQDN, run duration, and the size of `/var/backups/mycure/spaces/`. If `jq` is installed on the host, payloads use proper JSON escaping; otherwise a portable `sed`-based fallback is used.
+
+To disable entirely without removing the URL, pass `--notify-on=off`. To send a manual notification:
+
+```sh
+sudo /usr/local/sbin/mycure-backup-notify test "running adhoc check"
+```
 
 ## 3. Verify
 
@@ -153,7 +173,10 @@ Both commands should succeed.
 | `/etc/rclone/rclone.conf` | 0640 | root:mycure-backup | S3 endpoint + read-only key. |
 | `/etc/mycure-backup/kopia.password` | 0400 | root | Kopia repo password. |
 | `/etc/mycure-backup/luks.key` | 0400 | root | LUKS keyfile (only LUKS modes). |
+| `/etc/mycure-backup/discord-webhook.url` | 0640 | root:mycure-backup | Discord webhook URL (only when `DISCORD_WEBHOOK_URL` is set). |
+| `/usr/local/sbin/mycure-backup-notify` | 0755 | root | Notifier helper (always installed). |
 | `/etc/systemd/system/mycure-backup-mirror.{service,timer}` | 0644 | root | Systemd units. |
+| `/etc/systemd/system/mycure-backup-mirror-failure.service` | 0644 | root | OnFailure handler that calls the notifier (only when `--notify-on` covers failure). |
 | `/etc/systemd/system/mycure-backup-volume.service` | 0644 | root | LUKS open+mount at boot (only LUKS modes). |
 | `/var/backups/mycure/` | 0750 | mycure-backup | Mirror target (mountpoint in LUKS modes). |
 | `/var/log/mycure-backup-mirror.log` | 0640 | mycure-backup | rclone log. |
@@ -192,7 +215,8 @@ sudo cryptsetup close mycure-backup 2>/dev/null || true
 sudo rm -rf /etc/mycure-backup /etc/rclone/rclone.conf \
             /etc/systemd/system/mycure-backup-mirror.* \
             /etc/systemd/system/mycure-backup-volume.service \
-            /var/log/mycure-backup-mirror.log
+            /var/log/mycure-backup-mirror.log \
+            /usr/local/sbin/mycure-backup-notify
 sudo userdel mycure-backup 2>/dev/null || true
 # /var/backups/mycure/ contents (or the LUKS image/partition) are left alone —
 # decide separately whether to wipe.
