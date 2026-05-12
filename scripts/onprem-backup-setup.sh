@@ -347,11 +347,14 @@ if command -v jq >/dev/null; then
     --arg host "$hostname" --arg ts "$timestamp" \
     --arg elapsed "$elapsed" --arg mirrored "$mirrored" \
     --arg extra "$extra" \
-    '{username:"mycure-backup",embeds:[{title:$title,color:$color,timestamp:$ts,fields:[
-       {name:"Host",value:$host,inline:true},
-       {name:"Duration",value:$elapsed,inline:true},
-       {name:"Mirrored",value:$mirrored,inline:true}
-     ] + (if $extra == "" then [] else [{name:"Note",value:$extra,inline:false}] end)}]}')
+    '{username:"mycure-backup",embeds:[{title:$title,color:$color,timestamp:$ts,fields:(
+       [
+         {name:"Host",value:$host,inline:true},
+         {name:"Duration",value:$elapsed,inline:true},
+         {name:"Mirrored",value:$mirrored,inline:true}
+       ]
+       + (if $extra == "" then [] else [{name:"Note",value:$extra,inline:false}] end)
+     )}]}')
 else
   esc() { printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g'; }
   payload=$(printf '{"username":"mycure-backup","embeds":[{"title":"%s","color":%d,"timestamp":"%s","fields":[{"name":"Host","value":"%s","inline":true},{"name":"Duration","value":"%s","inline":true},{"name":"Mirrored","value":"%s","inline":true}]}]}' \
