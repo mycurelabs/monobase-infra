@@ -38,7 +38,7 @@ spec:
     storageLocation: default
     ttl: {{ .Values.velero.schedules.infrastructure.daily.retention | default "720h" }}
     snapshotVolumes: true
-    defaultVolumesToFsBackup: true
+    defaultVolumesToFsBackup: false
     snapshotMoveData: true
 
 ---
@@ -98,7 +98,7 @@ spec:
     storageLocation: default
     ttl: {{ .Values.velero.schedules.production.daily.retention | default "720h" }}
     snapshotVolumes: true
-    defaultVolumesToFsBackup: true
+    defaultVolumesToFsBackup: false
     snapshotMoveData: true
 {{- end }}
 
@@ -128,6 +128,6 @@ spec:
     storageLocation: default
     ttl: {{ .Values.velero.schedules.infrastructure.hourly.retention | default "72h" }}
     snapshotVolumes: true
-    defaultVolumesToFsBackup: true
+    defaultVolumesToFsBackup: false
 {{- end }}
 {{- end }}

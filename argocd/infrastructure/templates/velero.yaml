@@ -24,7 +24,11 @@ spec:
         upgradeCRDs: false
         configuration:
           defaultBackupTTL: 720h
-          defaultVolumesToFsBackup: true
+          # CSI snapshots are now the primary path (see schedules + the
+          # do-block-storage-velero VolumeSnapshotClass). FSB stays available
+          # per-backup via `defaultVolumesToFsBackup: true` on the spec, but
+          # is no longer the cluster-wide default.
+          defaultVolumesToFsBackup: false
         credentials:
           useSecret: true
           existingSecret: velero-credentials
@@ -32,6 +36,14 @@ spec:
         nodeAgent:
           podVolumePath: /var/lib/kubelet/pods
           privileged: true
+          # Tolerate every taint so node-agent runs on production/staging
+          # pools too. Without this, FSB-style backups silently fail for any
+          # pod scheduled on a tainted node (production stateful workloads
+          # were affected — see incident 2026-05-12). node-agent is also the
+          # data-mover for CSI snapshot uploads to Spaces, so it must reach
+          # every node that holds a backed-up volume.
+          tolerations:
+            - operator: Exists
         initContainers:
 {{- if or (eq .Values.velero.provider "aws") (eq .Values.velero.provider "digitalocean") (eq .Values.velero.provider "minio") }}
           - name: velero-plugin-for-aws
