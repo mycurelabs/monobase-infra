@@ -36,11 +36,15 @@ NOTIFY_ON=both                                  # both | failure-only | success-
 
 CONFIG_DIR=/etc/mycure-backup
 RCLONE_CONFIG=/etc/rclone/rclone.conf
-LOG_FILE=/var/log/mycure-backup-mirror.log
 SERVICE_NAME=mycure-backup-mirror
 SYSTEMD_DIR=/etc/systemd/system
 NOTIFY_BIN=/usr/local/sbin/mycure-backup-notify
 WEBHOOK_FILE=$CONFIG_DIR/discord-webhook.url
+LOG_NAMESPACE=mycure-backup
+JOURNALD_NAMESPACE_CONFIG=/etc/systemd/journald@${LOG_NAMESPACE}.conf
+JOURNAL_MAX_USE=500M
+JOURNAL_KEEP_FREE=2G
+JOURNAL_MAX_RETENTION=4week
 
 # ---------- helpers ----------
 log()    { printf '\033[1;34m[setup]\033[0m %s\n' "$*"; }
@@ -270,10 +274,33 @@ chmod 0400 "$CONFIG_DIR/kopia.password"
 # Scrub the env so accidental subshells don't see secrets.
 unset SPACES_ACCESS_KEY SPACES_SECRET_KEY KOPIA_PASSWORD
 
-# ---------- log file ----------
-touch "$LOG_FILE"
-chown "$SERVICE_USER:$SERVICE_USER" "$LOG_FILE"
-chmod 0640 "$LOG_FILE"
+# ---------- journald namespace (bounded log volume) ----------
+# rclone writes to stdout, systemd captures it into a per-namespace journal
+# with explicit size caps so logs can't grow unbounded. View with:
+#   journalctl --namespace=$LOG_NAMESPACE -u $SERVICE_NAME.service [-f]
+log "configuring bounded journal namespace $LOG_NAMESPACE (≤ $JOURNAL_MAX_USE)"
+cat > "$JOURNALD_NAMESPACE_CONFIG" <<JOURNAL
+# Bounded journal for the mycure-backup namespace. systemd spawns
+# systemd-journald@${LOG_NAMESPACE}.service on first unit start.
+[Journal]
+Storage=persistent
+SystemMaxUse=$JOURNAL_MAX_USE
+SystemKeepFree=$JOURNAL_KEEP_FREE
+SystemMaxFileSize=100M
+MaxRetentionSec=$JOURNAL_MAX_RETENTION
+ForwardToSyslog=no
+ForwardToKMsg=no
+ForwardToWall=no
+JOURNAL
+chmod 0644 "$JOURNALD_NAMESPACE_CONFIG"
+
+# Reload the namespaced journald if it's already running, so caps apply on
+# the next ExecStart. Initial start happens automatically when the service runs.
+systemctl reload "systemd-journald@$LOG_NAMESPACE.service" 2>/dev/null || true
+
+# Sweep the old plain log file from earlier versions of this script; logs
+# now live in the namespaced journal, not /var/log/mycure-backup-mirror.log.
+rm -f /var/log/mycure-backup-mirror.log
 
 # ---------- discord webhook (optional) ----------
 # If DISCORD_WEBHOOK_URL is set in env, write it to disk so the timer can
@@ -403,12 +430,13 @@ Type=oneshot
 User=$SERVICE_USER
 Group=$SERVICE_USER
 Environment=RCLONE_CONFIG=$RCLONE_CONFIG
+LogNamespace=$LOG_NAMESPACE
+SyslogIdentifier=$SERVICE_NAME
 $notify_start
 ExecStart=/usr/bin/rclone sync spaces:$BUCKET/ $BACKUP_DIR/spaces/ \\
   --max-age $MAX_AGE \\
   --transfers $RCLONE_TRANSFERS \\
   --checkers $RCLONE_CHECKERS \\
-  --log-file=$LOG_FILE \\
   --log-level INFO \\
   --stats 5m \\
   --stats-one-line
@@ -426,13 +454,16 @@ UNIT
 
 # Sibling unit fired via OnFailure= when the mirror service fails.
 # Runs the notifier as root so it can read $WEBHOOK_FILE regardless of
-# the failure mode (e.g. service user permission drift).
+# the failure mode (e.g. service user permission drift). Shares the
+# same log namespace so all related events show up in one query.
 cat > "$SYSTEMD_DIR/${SERVICE_NAME}-failure.service" <<UNIT
 [Unit]
 Description=Notify on failure of $SERVICE_NAME.service
 
 [Service]
 Type=oneshot
+LogNamespace=$LOG_NAMESPACE
+SyslogIdentifier=${SERVICE_NAME}-failure
 ExecStart=$NOTIFY_BIN failure
 UNIT
 
@@ -487,7 +518,7 @@ echo "Verify:"
 echo "  systemctl status $SERVICE_NAME.timer"
 echo "  sudo -u $SERVICE_USER rclone --config $RCLONE_CONFIG size spaces:$BUCKET"
 echo "  sudo systemctl start $SERVICE_NAME.service   # trigger now"
-echo "  journalctl -u $SERVICE_NAME.service -f"
+echo "  sudo journalctl --namespace=$LOG_NAMESPACE -u $SERVICE_NAME.service -f"
 
 # Fire a one-shot test notification on first-time-with-webhook installs so the
 # operator can confirm the channel is wired up before the first scheduled run.

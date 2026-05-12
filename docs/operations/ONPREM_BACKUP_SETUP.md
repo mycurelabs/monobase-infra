@@ -146,11 +146,15 @@ sudo -u mycure-backup rclone --config /etc/rclone/rclone.conf size \
 
 # Trigger the first run now instead of waiting for 02:30 UTC:
 sudo systemctl start mycure-backup-mirror.service
-journalctl -u mycure-backup-mirror.service -f
+
+# Tail the run live (rclone --stats 5m output, one line per 5 min):
+sudo journalctl --namespace=mycure-backup -u mycure-backup-mirror.service -f
 
 # After the first run, local size should approximate the remote size:
 sudo du -sh /var/backups/mycure/spaces/
 ```
+
+The unit's logs go to a dedicated `mycure-backup` journal namespace with explicit size caps (default `500M`, `4 week` retention) so they can't bloat the global journal. Per-unit caps are owned by `/etc/systemd/journald@mycure-backup.conf` — tune `SystemMaxUse=` there if you want a different ceiling. Logs from the OnFailure helper share the same namespace, so one `journalctl --namespace=mycure-backup` query covers the full lifecycle of a run.
 
 Once at least one Velero backup has been mirrored, validate that the Kopia repo can be opened from on-prem with the password the script stored:
 
@@ -179,8 +183,8 @@ Both commands should succeed.
 | `/etc/systemd/system/mycure-backup-mirror.{service,timer}` | 0644 | root | Systemd units. |
 | `/etc/systemd/system/mycure-backup-mirror-failure.service` | 0644 | root | OnFailure handler that calls the notifier (only when `--notify-on` covers failure). |
 | `/etc/systemd/system/mycure-backup-volume.service` | 0644 | root | LUKS open+mount at boot (only LUKS modes). |
+| `/etc/systemd/journald@mycure-backup.conf` | 0644 | root | Per-unit journal namespace config (size-capped). |
 | `/var/backups/mycure/` | 0750 | mycure-backup | Mirror target (mountpoint in LUKS modes). |
-| `/var/log/mycure-backup-mirror.log` | 0640 | mycure-backup | rclone log. |
 
 ---
 
@@ -216,8 +220,10 @@ sudo cryptsetup close mycure-backup 2>/dev/null || true
 sudo rm -rf /etc/mycure-backup /etc/rclone/rclone.conf \
             /etc/systemd/system/mycure-backup-mirror.* \
             /etc/systemd/system/mycure-backup-volume.service \
-            /var/log/mycure-backup-mirror.log \
+            /etc/systemd/journald@mycure-backup.conf \
             /usr/local/sbin/mycure-backup-notify
+sudo systemctl reset-failed "systemd-journald@mycure-backup.service" 2>/dev/null || true
+sudo rm -rf /var/log/journal/*/system@mycure-backup-* 2>/dev/null || true
 sudo userdel mycure-backup 2>/dev/null || true
 # /var/backups/mycure/ contents (or the LUKS image/partition) are left alone —
 # decide separately whether to wipe.
