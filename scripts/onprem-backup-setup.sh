@@ -159,7 +159,10 @@ if ! id -u "$SERVICE_USER" >/dev/null 2>&1; then
 fi
 
 # ---------- backup directory + optional encryption ----------
+# Config dir must be traversable by the service user so it can read the
+# webhook URL at runtime. Group-owned by the service user, mode 0750.
 mkdir -p "$CONFIG_DIR"
+chgrp "$SERVICE_USER" "$CONFIG_DIR"
 chmod 0750 "$CONFIG_DIR"
 
 case "$ENCRYPTION" in
