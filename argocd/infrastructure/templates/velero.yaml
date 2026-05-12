@@ -29,6 +29,11 @@ spec:
           # per-backup via `defaultVolumesToFsBackup: true` on the spec, but
           # is no longer the cluster-wide default.
           defaultVolumesToFsBackup: false
+          # EnableCSI is required even in Velero v1.14+ where the CSI plugin
+          # is integrated into core. Without it, the csi-pvc-backupper action
+          # is registered but skipped at runtime, so no VolumeSnapshots get
+          # created and backups silently complete with only manifests.
+          features: EnableCSI
         credentials:
           useSecret: true
           existingSecret: velero-credentials
