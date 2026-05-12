@@ -11,13 +11,16 @@ Complete backup procedures, restore operations, and disaster recovery plans.
 
 ---
 
-## 3-Tier Backup Strategy
+## 4-Tier Backup Strategy
 
 | Tier | Frequency | Retention | Storage | RTO | RPO | Use Case |
 |------|-----------|-----------|---------|-----|-----|----------|
 | **1** | Hourly | 72h | Longhorn (local) | 5 min | 1h | Quick rollback |
-| **2** | Daily | 30d | S3 (off-cluster) | 1h | 24h | Recent recovery |
+| **2** | Daily | 30d | S3 / DO Spaces (off-cluster) | 1h | 24h | Recent recovery |
 | **3** | Weekly | 90d | S3 Glacier (archive) | 4h | 1w | Compliance, DR |
+| **4** | Daily | 30d | On-prem mirror (off-cloud) | hours | 24h | DO region outage / primary backup corruption |
+
+Tier 4 is a pull-only `rclone` mirror of the Velero bucket onto on-prem hosts. Defense-in-depth for "DO sgp1 is unreachable" or "primary backup repo compromised" scenarios. Restore is slower (requires a recovery cluster or `kopia` extraction). See [RESTORE_FROM_ONPREM.md](RESTORE_FROM_ONPREM.md).
 
 ---
 
