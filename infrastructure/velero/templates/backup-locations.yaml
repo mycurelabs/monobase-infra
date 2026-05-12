@@ -145,20 +145,16 @@ spec:
     key: cloud
   default: true
 
----
-# DigitalOcean Volume Snapshot Location
-apiVersion: velero.io/v1
-kind: VolumeSnapshotLocation
-metadata:
-  name: default
-  namespace: velero
-  labels:
-    app.kubernetes.io/name: velero
-    app.kubernetes.io/component: volume-snapshots
-spec:
-  provider: digitalocean.com/velero
-  config:
-    region: {{ .Values.velero.digitalocean.region | default "nyc3" }}
+# No VolumeSnapshotLocation for digitalocean.com/velero.
+#
+# Volume snapshots flow through the CSI driver (dobs.csi.digitalocean.com)
+# via the do-block-storage-velero VolumeSnapshotClass instead. The CSI path
+# requires no VSL — it uses the in-cluster CSI driver directly.
+#
+# Registering a VSL with provider: digitalocean.com/velero would activate
+# the legacy velero-plugin-for-digitalocean and Velero would prefer it over
+# CSI, defeating the whole point of the switch (and currently failing with
+# 401s because the plugin's DO API token credentials are stale).
 {{- end }}
 
 {{- if eq .Values.velero.provider "minio" }}
