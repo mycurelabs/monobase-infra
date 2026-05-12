@@ -117,6 +117,7 @@ sudo SPACES_ACCESS_KEY=… SPACES_SECRET_KEY=… KOPIA_PASSWORD=… \
 
 If `DISCORD_WEBHOOK_URL` is set in env (or passed via `--discord-webhook-url`), the script installs a notifier at `/usr/local/sbin/mycure-backup-notify` and wires it into the systemd unit:
 
+- **Start** (any `--notify-on` mode except `off`): fires before `ExecStart` via `ExecStartPre=`. Reassures operators that a long-running mirror is in progress, not hung. Failure of the start notifier is ignored (`-` prefix) so a webhook outage never blocks the actual backup.
 - **Success** (`--notify-on=both` or `success-only`): fires after `ExecStart` succeeds via `ExecStartPost=`.
 - **Failure** (`--notify-on=both` or `failure-only`): fires via a sibling `mycure-backup-mirror-failure.service` triggered by `OnFailure=`.
 - **Setup test** (always, when a webhook is configured): one-shot `test` notification sent at the end of the setup script so operators can confirm the channel is wired up before the first scheduled run.

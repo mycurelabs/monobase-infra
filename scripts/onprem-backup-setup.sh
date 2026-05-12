@@ -298,7 +298,7 @@ log "installing notifier at $NOTIFY_BIN"
 install -m 0755 /dev/stdin "$NOTIFY_BIN" <<'NOTIFY'
 #!/usr/bin/env bash
 # Send a Discord webhook notification about the on-prem backup mirror.
-# Usage: mycure-backup-notify success|failure|test [extra_message]
+# Usage: mycure-backup-notify start|success|failure|test [extra_message]
 # Silent no-op if /etc/mycure-backup/discord-webhook.url is missing/empty.
 set -euo pipefail
 
@@ -310,23 +310,28 @@ SERVICE_NAME=mycure-backup-mirror
 url=$(<"$WEBHOOK_FILE")
 [[ -n "$url" ]] || exit 0
 
-case "${1:-}" in
-  success) title=":white_check_mark: On-prem backup mirror succeeded"; color=3066993 ;;
-  failure) title=":x: On-prem backup mirror FAILED"; color=15158332 ;;
-  test)    title=":bell: On-prem backup mirror — test notification"; color=10181046 ;;
-  *)       title="On-prem backup mirror: ${1:-unknown}"; color=8421504 ;;
+# kind -> (title, color, want_duration, want_mirrored)
+# "want_*" toggles whether to include those fields (e.g. start has no
+# duration yet; test is purely informational).
+kind="${1:-}"
+case "$kind" in
+  start)   title=":hourglass_flowing_sand: On-prem backup mirror started"; color=3447003;  want_duration=0; want_mirrored=0 ;;
+  success) title=":white_check_mark: On-prem backup mirror succeeded";     color=3066993;  want_duration=1; want_mirrored=1 ;;
+  failure) title=":x: On-prem backup mirror FAILED";                       color=15158332; want_duration=1; want_mirrored=1 ;;
+  test)    title=":bell: On-prem backup mirror — test notification";       color=10181046; want_duration=0; want_mirrored=0 ;;
+  *)       title="On-prem backup mirror: ${kind:-unknown}";                color=8421504;  want_duration=1; want_mirrored=1 ;;
 esac
 
 extra="${2:-}"
 hostname=$(hostname -f 2>/dev/null || hostname)
 timestamp=$(date -u -Iseconds 2>/dev/null || date -u +%FT%TZ)
 
-# Try to pull a few useful stats from the most recent journal entry for the
-# service so the message is informative.
+# Pull stats from systemd for success/failure messages so the embed is
+# self-contained. ExecMainStartTimestampMonotonic is when ExecStart began
+# (for start notifications, that's now; we don't compute elapsed in that case).
 elapsed="unknown"
 mirrored="see log"
-if command -v systemctl >/dev/null; then
-  # ActiveEnterTimestamp - InactiveEnterTimestamp gives the run duration.
+if [[ "$want_duration" == "1" ]] && command -v systemctl >/dev/null; then
   start_ts=$(systemctl show "$SERVICE_NAME.service" -p ActiveEnterTimestampMonotonic --value 2>/dev/null || echo 0)
   end_ts=$(systemctl show "$SERVICE_NAME.service" -p InactiveEnterTimestampMonotonic --value 2>/dev/null || echo 0)
   if [[ "$end_ts" -gt "$start_ts" ]] && [[ "$start_ts" -gt 0 ]]; then
@@ -334,7 +339,7 @@ if command -v systemctl >/dev/null; then
     elapsed=$(awk -v u="$delta_us" 'BEGIN{s=u/1000000; printf (s>=3600)?"%dh%dm":(s>=60)?"%dm%ds":"%ds", (s>=3600)?int(s/3600):(s>=60)?int(s/60):int(s), (s>=3600)?int((s%3600)/60):(s>=60)?int(s%60):0}')
   fi
 fi
-if [[ -r /var/backups/mycure/spaces ]]; then
+if [[ "$want_mirrored" == "1" ]] && [[ -r /var/backups/mycure/spaces ]]; then
   mirrored=$(du -sh /var/backups/mycure/spaces 2>/dev/null | awk '{print $1}')
   [[ -n "$mirrored" ]] || mirrored="see log"
 fi
@@ -347,18 +352,21 @@ if command -v jq >/dev/null; then
     --arg host "$hostname" --arg ts "$timestamp" \
     --arg elapsed "$elapsed" --arg mirrored "$mirrored" \
     --arg extra "$extra" \
+    --argjson want_duration "$want_duration" \
+    --argjson want_mirrored "$want_mirrored" \
     '{username:"mycure-backup",embeds:[{title:$title,color:$color,timestamp:$ts,fields:(
-       [
-         {name:"Host",value:$host,inline:true},
-         {name:"Duration",value:$elapsed,inline:true},
-         {name:"Mirrored",value:$mirrored,inline:true}
-       ]
-       + (if $extra == "" then [] else [{name:"Note",value:$extra,inline:false}] end)
+       [{name:"Host",value:$host,inline:true}]
+       + (if $want_duration == 1 then [{name:"Duration",value:$elapsed,inline:true}] else [] end)
+       + (if $want_mirrored == 1 then [{name:"Mirrored",value:$mirrored,inline:true}] else [] end)
+       + (if $extra == ""        then [] else [{name:"Note",value:$extra,inline:false}] end)
      )}]}')
 else
   esc() { printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g'; }
-  payload=$(printf '{"username":"mycure-backup","embeds":[{"title":"%s","color":%d,"timestamp":"%s","fields":[{"name":"Host","value":"%s","inline":true},{"name":"Duration","value":"%s","inline":true},{"name":"Mirrored","value":"%s","inline":true}]}]}' \
-    "$(esc "$title")" "$color" "$timestamp" "$(esc "$hostname")" "$(esc "$elapsed")" "$(esc "$mirrored")")
+  fields="{\"name\":\"Host\",\"value\":\"$(esc "$hostname")\",\"inline\":true}"
+  [[ "$want_duration" == "1" ]] && fields+=",{\"name\":\"Duration\",\"value\":\"$(esc "$elapsed")\",\"inline\":true}"
+  [[ "$want_mirrored" == "1" ]] && fields+=",{\"name\":\"Mirrored\",\"value\":\"$(esc "$mirrored")\",\"inline\":true}"
+  [[ -n "$extra"             ]] && fields+=",{\"name\":\"Note\",\"value\":\"$(esc "$extra")\",\"inline\":false}"
+  payload="{\"username\":\"mycure-backup\",\"embeds\":[{\"title\":\"$(esc "$title")\",\"color\":$color,\"timestamp\":\"$timestamp\",\"fields\":[$fields]}]}"
 fi
 
 curl -sS -m 15 -X POST -H 'Content-Type: application/json' -d "$payload" "$url" >/dev/null || true
@@ -366,13 +374,17 @@ NOTIFY
 
 # ---------- systemd service + timer ----------
 log "writing systemd unit $SERVICE_NAME.service"
-# ExecStartPost only fires on ExecStart success → success notification.
-# OnFailure= triggers a sibling unit → failure notification.
+# ExecStartPre  fires before ExecStart → start notification (always on when
+#   notifications are enabled, so a long-running mirror doesn't look hung).
+#   The `-` prefix tells systemd to ignore a non-zero exit so a webhook
+#   outage can never block the actual backup.
+# ExecStartPost fires only on ExecStart success → success notification.
+# OnFailure=    triggers a sibling unit → failure notification.
 case "$NOTIFY_ON" in
-  both)          notify_success="ExecStartPost=$NOTIFY_BIN success"; failure_onfailure="OnFailure=${SERVICE_NAME}-failure.service" ;;
-  success-only)  notify_success="ExecStartPost=$NOTIFY_BIN success"; failure_onfailure="" ;;
-  failure-only)  notify_success="";                                  failure_onfailure="OnFailure=${SERVICE_NAME}-failure.service" ;;
-  off)           notify_success="";                                  failure_onfailure="" ;;
+  both)          notify_start="ExecStartPre=-$NOTIFY_BIN start";  notify_success="ExecStartPost=$NOTIFY_BIN success"; failure_onfailure="OnFailure=${SERVICE_NAME}-failure.service" ;;
+  success-only)  notify_start="ExecStartPre=-$NOTIFY_BIN start";  notify_success="ExecStartPost=$NOTIFY_BIN success"; failure_onfailure="" ;;
+  failure-only)  notify_start="ExecStartPre=-$NOTIFY_BIN start";  notify_success="";                                  failure_onfailure="OnFailure=${SERVICE_NAME}-failure.service" ;;
+  off)           notify_start="";                                 notify_success="";                                  failure_onfailure="" ;;
 esac
 
 cat > "$SYSTEMD_DIR/$SERVICE_NAME.service" <<UNIT
@@ -388,6 +400,7 @@ Type=oneshot
 User=$SERVICE_USER
 Group=$SERVICE_USER
 Environment=RCLONE_CONFIG=$RCLONE_CONFIG
+$notify_start
 ExecStart=/usr/bin/rclone sync spaces:$BUCKET/ $BACKUP_DIR/spaces/ \\
   --max-age $MAX_AGE \\
   --transfers $RCLONE_TRANSFERS \\
