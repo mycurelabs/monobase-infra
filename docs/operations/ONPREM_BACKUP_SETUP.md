@@ -158,13 +158,23 @@ The unit's logs go to a dedicated `mycure-backup` journal namespace with explici
 
 ### Weekly integrity verification
 
-The setup also installs `mycure-backup-verify.service` and `.timer`. The timer fires by default at **Sunday 03:00 UTC**, runs `/usr/local/sbin/mycure-backup-verify`, which:
+The setup also installs `mycure-backup-verify.service` and `.timer`. The timer fires by default at **Sunday 03:00 UTC**, runs `/usr/local/sbin/mycure-backup-verify`, which executes `rclone check` against the upstream DO Spaces bucket:
 
-1. Connects to the local Kopia repo at `<backup-dir>/spaces/kopia` (idempotent).
-2. Runs `kopia content verify --verify-files-percent=5` — random-samples 5% of blobs and revalidates checksums.
-3. Exits non-zero on any failure → triggers `OnFailure=mycure-backup-verify-failure.service` → Discord red embed.
+```
+rclone check spaces:mycure-doks-velero-backups /mnt/storage/mycure-backup/spaces/ --one-way ...
+```
 
-This is Layer 1 of the verification strategy in [BACKUP_DR.md](BACKUP_DR.md). It catches bit-rot, corrupted blobs, and password drift, but **does not validate that Postgres/Mongo data inside the snapshots is logically restorable** — that's still the quarterly drill in [RESTORE_FROM_ONPREM.md](RESTORE_FROM_ONPREM.md).
+This compares hashes between every remote object and its local mirror copy. It catches:
+
+- silent bit-rot on the local disk
+- mirror desync (interrupted `rclone sync` runs, partial transfers)
+- accidental local modifications
+
+Failure path: non-zero exit → `OnFailure=mycure-backup-verify-failure.service` → Discord red embed.
+
+**What it does NOT catch**: Kopia repo *internal* corruption (broken chains of references, encrypted blob inconsistencies from Kopia's POV). The Kopia layout used by Velero's data-mover (S3-backend, flat blob namespace) is not directly readable via `kopia connect filesystem` (see [kopia/kopia#2065](https://github.com/kopia/kopia/issues/2065)), and the rclone-serve-s3 shim that *would* expose it to Kopia stalls on large repos with HDD-backed mirrors. Deeper structural validation lives in the quarterly drill in [RESTORE_FROM_ONPREM.md](RESTORE_FROM_ONPREM.md), where the operator round-trips a real restore.
+
+If DO Spaces is unreachable during a verify run, the rclone check fails fast and the OnFailure handler fires a red Discord embed — exactly the alert behaviour you want, since the cloud being unreachable is one of the scenarios this mirror exists for.
 
 Trigger manually:
 

@@ -499,96 +499,42 @@ UNIT
 log "installing verify helper at $VERIFY_BIN"
 install -m 0755 /dev/stdin "$VERIFY_BIN" <<VERIFY
 #!/usr/bin/env bash
-# Verify every Kopia repository under the on-prem mirror.
+# Layer 1 integrity check: verify the on-prem mirror is byte-faithful to
+# the upstream DO Spaces bucket. Catches:
+#   - silent bit-rot on local disk
+#   - mirror desync (e.g. interrupted rclone runs)
+#   - accidental local modifications
 #
-# Why this is more involved than \`kopia repository connect filesystem\`:
-# Velero's data-mover writes its Kopia repos via the S3 backend (DO Spaces).
-# That backend stores blobs in a flat layout that \`kopia connect filesystem\`
-# refuses to open ("repository not initialized in the provided storage";
-# see kopia/kopia#2065). The blobs are byte-correct in the mirror — we just
-# need to feed them back to Kopia through the S3 backend it was written by.
+# It does NOT validate Kopia repo internal consistency (chain of references,
+# encrypted blob integrity from Kopia's POV, etc.) — Velero's Kopia repos
+# are written via the S3 backend in a flat layout that \`kopia connect
+# filesystem\` rejects (kopia/kopia#2065), and the rclone-serve-s3 +
+# kopia-connect-s3 workaround listings stall on large repos / HDD mirrors.
 #
-# Workaround: stand up an ephemeral S3 server with \`rclone serve s3\`
-# pointed at the mirror, then \`kopia repository connect s3\` to localhost.
-# The server lives only for the duration of this run and binds 127.0.0.1.
+# Deeper structural validation is part of the quarterly restore drill in
+# docs/operations/RESTORE_FROM_ONPREM.md.
 #
-# Repositories are discovered by their kopia.repository marker file; one
-# Velero repo per K8s namespace (e.g. infrastructure/kopia/mycure-production).
-# Exits non-zero if ANY repo fails to open or verify.
+# rclone check compares hashes (or size+modtime) for every object; for our
+# ~170 GB / 8.7k object mirror this completes in 1–3 min over a working
+# link to DO Spaces.
 set -euo pipefail
 
 MIRROR_ROOT=$BACKUP_DIR/spaces
-PASSWORD_FILE=$CONFIG_DIR/kopia.password
-VERIFY_PERCENT=\${VERIFY_PERCENT:-$VERIFY_FILES_PERCENT}
+BUCKET=$BUCKET
+RCLONE_CONFIG=$RCLONE_CONFIG
+RCLONE_BIN=$RCLONE_BIN
 
-[[ -r "\$PASSWORD_FILE" ]] || { echo "missing \$PASSWORD_FILE" >&2; exit 1; }
 [[ -d "\$MIRROR_ROOT" ]] || { echo "missing \$MIRROR_ROOT (no successful mirror run yet?)" >&2; exit 1; }
+[[ -r "\$RCLONE_CONFIG" ]] || { echo "missing \$RCLONE_CONFIG" >&2; exit 1; }
 
-password=\$(<"\$PASSWORD_FILE")
-
-mapfile -t repos < <(find "\$MIRROR_ROOT" -mindepth 1 -maxdepth 6 -type f -name kopia.repository -printf '%h\n' | sort -u)
-[[ \${#repos[@]} -gt 0 ]] || { echo "no Kopia repos (kopia.repository markers) found under \$MIRROR_ROOT" >&2; exit 1; }
-
-# Spin up an ephemeral S3 server with a random port + random credentials.
-# Pick a free high port to avoid colliding with anything else on the host.
-PORT=\$(python3 -c 'import socket; s=socket.socket(); s.bind(("127.0.0.1",0)); print(s.getsockname()[1]); s.close()' 2>/dev/null || echo \$((20000 + RANDOM % 30000)))
-ACCESS_KEY=\$(openssl rand -hex 8)
-SECRET_KEY=\$(openssl rand -hex 16)
-
-echo "starting ephemeral rclone S3 server on 127.0.0.1:\$PORT (root: \$MIRROR_ROOT)"
-$RCLONE_BIN serve s3 "\$MIRROR_ROOT" \\
-  --addr "127.0.0.1:\$PORT" \\
-  --auth-key "\$ACCESS_KEY,\$SECRET_KEY" \\
-  --vfs-cache-mode off \\
-  --no-checksum \\
-  >/tmp/rclone-verify.log 2>&1 &
-RCLONE_PID=\$!
-
-cleanup() {
-  local rc=\$?
-  kopia repository disconnect >/dev/null 2>&1 || true
-  kill "\$RCLONE_PID" 2>/dev/null || true
-  wait "\$RCLONE_PID" 2>/dev/null || true
-  exit \$rc
-}
-trap cleanup EXIT INT TERM
-
-# Wait for the S3 server to actually bind.
-for _ in {1..30}; do
-  if curl -s --max-time 1 "http://127.0.0.1:\$PORT/" >/dev/null 2>&1; then break; fi
-  sleep 0.2
-done
-
-echo "discovered \${#repos[@]} Kopia repo(s); verifying \${VERIFY_PERCENT}% of blobs per repo"
-fail=0
-for repo in "\${repos[@]}"; do
-  # Strip the mirror root to recover the bucket/prefix the S3 server exposes.
-  rel="\${repo#\$MIRROR_ROOT/}"          # e.g. infrastructure/kopia/mycure-production
-  bucket="\${rel%%/*}"                   # infrastructure
-  prefix="\${rel#\$bucket/}/"            # kopia/mycure-production/
-
-  echo ""
-  echo "==> s3://\$bucket/\$prefix"
-  kopia repository disconnect >/dev/null 2>&1 || true
-  if ! kopia repository connect s3 \\
-        --endpoint="127.0.0.1:\$PORT" \\
-        --disable-tls \\
-        --bucket="\$bucket" \\
-        --prefix="\$prefix" \\
-        --access-key="\$ACCESS_KEY" \\
-        --secret-access-key="\$SECRET_KEY" \\
-        --password="\$password" >/dev/null; then
-    echo "FAILED to connect: s3://\$bucket/\$prefix" >&2
-    fail=1
-    continue
-  fi
-  if ! kopia content verify --download-percent="\$VERIFY_PERCENT" --parallel=4; then
-    echo "FAILED verification: s3://\$bucket/\$prefix" >&2
-    fail=1
-  fi
-done
-
-exit "\$fail"
+echo "rclone check spaces:\$BUCKET vs \$MIRROR_ROOT"
+exec "\$RCLONE_BIN" check "spaces:\$BUCKET" "\$MIRROR_ROOT" \\
+  --config "\$RCLONE_CONFIG" \\
+  --one-way \\
+  --transfers 4 \\
+  --checkers 8 \\
+  --stats 30s \\
+  --stats-one-line
 VERIFY
 
 log "writing systemd unit $VERIFY_SERVICE_NAME.service"
@@ -610,18 +556,11 @@ $v_onfailure
 Type=oneshot
 LogNamespace=$LOG_NAMESPACE
 SyslogIdentifier=$VERIFY_SERVICE_NAME
-# Kopia needs HOME for its connection state + cache. systemd's default
-# environment is minimal, so set both explicitly.
-Environment=HOME=/var/lib/mycure-backup
-Environment=XDG_CACHE_HOME=/var/lib/mycure-backup/cache
-Environment=XDG_CONFIG_HOME=/var/lib/mycure-backup/config
-Environment=KOPIA_CHECK_FOR_UPDATES=false
 $v_start
-ExecStartPre=/usr/bin/install -d -m 0700 /var/lib/mycure-backup /var/lib/mycure-backup/cache /var/lib/mycure-backup/config
 ExecStart=$VERIFY_BIN
 $v_success
 
-TimeoutStartSec=2h
+TimeoutStartSec=1h
 Nice=15
 IOSchedulingClass=best-effort
 IOSchedulingPriority=7
