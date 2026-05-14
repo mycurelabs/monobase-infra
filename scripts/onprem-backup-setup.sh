@@ -610,7 +610,13 @@ $v_onfailure
 Type=oneshot
 LogNamespace=$LOG_NAMESPACE
 SyslogIdentifier=$VERIFY_SERVICE_NAME
+# Kopia needs HOME for its connection state + cache. systemd's default
+# environment is minimal, so set both explicitly.
+Environment=HOME=/var/lib/mycure-backup
+Environment=XDG_CACHE_HOME=/var/lib/mycure-backup/cache
+Environment=XDG_CONFIG_HOME=/var/lib/mycure-backup/config
 $v_start
+ExecStartPre=/usr/bin/install -d -m 0700 /var/lib/mycure-backup /var/lib/mycure-backup/cache /var/lib/mycure-backup/config
 ExecStart=$VERIFY_BIN
 $v_success
 
