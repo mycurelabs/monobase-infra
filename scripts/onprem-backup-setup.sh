@@ -582,7 +582,7 @@ for repo in "\${repos[@]}"; do
     fail=1
     continue
   fi
-  if ! kopia content verify --verify-files-percent="\$VERIFY_PERCENT" --parallel=4; then
+  if ! kopia content verify --download-percent="\$VERIFY_PERCENT" --parallel=4; then
     echo "FAILED verification: s3://\$bucket/\$prefix" >&2
     fail=1
   fi
@@ -615,6 +615,7 @@ SyslogIdentifier=$VERIFY_SERVICE_NAME
 Environment=HOME=/var/lib/mycure-backup
 Environment=XDG_CACHE_HOME=/var/lib/mycure-backup/cache
 Environment=XDG_CONFIG_HOME=/var/lib/mycure-backup/config
+Environment=KOPIA_CHECK_FOR_UPDATES=false
 $v_start
 ExecStartPre=/usr/bin/install -d -m 0700 /var/lib/mycure-backup /var/lib/mycure-backup/cache /var/lib/mycure-backup/config
 ExecStart=$VERIFY_BIN
