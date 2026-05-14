@@ -105,60 +105,132 @@ mise run provision local-k3d -- -destroy
 
 ## Path B — `kopia` bare-metal extract
 
-Use this only when Path A is not possible (no hardware for a recovery cluster, or the recovery cluster cannot be provisioned in time). Extracting raw PVC bytes and splicing them into a fresh Postgres is brittle but works.
+Use this only when Path A is not possible (no hardware for a recovery cluster, or the recovery cluster cannot be provisioned in time). Extracting raw PVC bytes and splicing them into a fresh Postgres is brittle but works — drill-tested 2026-05-14 (3.5M `medical_records` rows recovered, total ~8 min from snapshot ID to verified query).
 
-### 1. Connect to the on-prem Kopia repo
+Notable gotchas not obvious from the upstream docs:
+- **`kopia connect filesystem` does NOT work** on Velero's mirrored repos — they're written via the S3 backend (flat blob layout) which kopia's filesystem backend refuses to open ([kopia/kopia#2065](https://github.com/kopia/kopia/issues/2065)). Workaround: serve the local mirror via `rclone serve s3` and connect kopia to localhost via its S3 backend.
+- **The data PVC contains only `PG_VERSION` and `pg_ident.conf`**, not the `postgresql.conf` / `pg_hba.conf` that stock Postgres expects in `PGDATA`. Bitnami keeps these in `/opt/bitnami/postgresql/conf/` on the running cluster. We have to write minimal versions before booting Postgres.
+- **Use stock `postgres:16` image, not `bitnamilegacy/postgresql`**. Bitnami's entrypoint tries to chown `/opt/bitnami/postgresql/conf` which fails when the container is run with `--user 1001` against a pre-existing data dir.
+
+### 1. Find the snapshot
 
 ```sh
-sudo kopia repository connect filesystem \
-  --path=/var/backups/mycure/spaces/kopia \
-  --password="$(sudo cat /etc/mycure-backup/kopia.password)"
+ssh hel.niflheim
+
+# Start an ephemeral S3 server pointing at the mirror, with random creds.
+export PORT=$(python3 -c "import socket; s=socket.socket(); s.bind(('127.0.0.1',0)); print(s.getsockname()[1]); s.close()")
+export ACCESS_KEY=$(openssl rand -hex 8)
+export SECRET_KEY=$(openssl rand -hex 16)
+sudo /usr/local/bin/rclone serve s3 /mnt/storage/mycure-backup/spaces \
+  --addr 127.0.0.1:$PORT \
+  --auth-key "$ACCESS_KEY,$SECRET_KEY" \
+  --vfs-cache-mode off --no-checksum \
+  > /tmp/rclone-restore.log 2>&1 &
+
+# Wait for it to bind, then connect kopia.
+sleep 2
+export HOME=/root KOPIA_CHECK_FOR_UPDATES=false
+PASSWORD=$(sudo cat /etc/mycure-backup/kopia.password)
+sudo HOME=/root kopia repository disconnect 2>/dev/null || true
+sudo HOME=/root kopia repository connect s3 \
+  --endpoint="127.0.0.1:$PORT" --disable-tls \
+  --bucket=infrastructure --prefix=kopia/mycure-production/ \
+  --access-key="$ACCESS_KEY" --secret-access-key="$SECRET_KEY" \
+  --password="$PASSWORD"
+
+# Snapshots are owned by velero's synthetic user; --all to see them.
+sudo HOME=/root kopia snapshot list --all --max-results=20
 ```
 
-The exact path under `/var/backups/mycure/spaces/` depends on the Velero data-mover prefix — inspect with `find /var/backups/mycure/spaces -type d -name 'kopia' -maxdepth 4` if uncertain.
+Find the most-recent line under `default@default:snapshot-data-upload-download/kopia/mycure-production/data-postgresql-primary-0` — its first field is the snapshot ID (e.g. `k2bdf22833ec4fafad2f76faabe47f78b`).
 
-### 2. List snapshots
+### 2. Restore the PVC contents
 
 ```sh
-sudo kopia snapshot list
+SNAPSHOT=k2bdf22833ec4fafad2f76faabe47f78b   # use the ID from step 1
+sudo HOME=/root kopia snapshot restore "$SNAPSHOT" /tmp/pg-restore
 ```
 
-Each Velero data-mover upload appears as a Kopia snapshot. Note the snapshot ID for the PVC you want (typically `data-postgresql-primary-0`).
+Expect ~8 min for a 20 GB PVC on HDD-backed mirror (~40 MB/s). The result lives at `/tmp/pg-restore/data/` (the kopia snapshot captures the parent PVC mount, so the Postgres data is one level down).
 
-### 3. Restore raw files
+### 3. Drop in minimal Postgres config
+
+The restored data dir is missing `postgresql.conf` and `pg_hba.conf` — Bitnami stores those outside the PVC. Add minimal versions so stock `postgres:16` can boot.
 
 ```sh
-sudo kopia restore <snapshot-id> /tmp/pvc-extract/
+DATA=/tmp/pg-restore/data
+sudo tee "$DATA/postgresql.conf" > /dev/null <<'EOF'
+listen_addresses = '*'
+port = 5432
+max_connections = 100
+shared_buffers = 256MB
+dynamic_shared_memory_type = posix
+max_wal_size = 1GB
+log_timezone = 'UTC'
+datestyle = 'iso, mdy'
+timezone = 'UTC'
+lc_messages = 'en_US.utf8'
+lc_monetary = 'en_US.utf8'
+lc_numeric = 'en_US.utf8'
+lc_time = 'en_US.utf8'
+default_text_search_config = 'pg_catalog.english'
+EOF
+sudo tee "$DATA/pg_hba.conf" > /dev/null <<'EOF'
+# Throwaway restore drill — trust local only.
+local all all                trust
+host  all all 127.0.0.1/32   trust
+host  all all ::1/128        trust
+host  all all 0.0.0.0/0      trust
+EOF
+
+# Stock postgres:16 runs as uid 999. Match ownership; drop any stale PID.
+sudo chown -R 999:999 "$DATA"
+sudo rm -f "$DATA/postmaster.pid"
 ```
 
-The contents of `/tmp/pvc-extract/` are the raw Postgres data directory as it was on the source PVC at backup time.
-
-### 4. Bring up a Postgres around it
+### 4. Boot Postgres + run sanity queries
 
 ```sh
-# Match the production Postgres major version (currently 16)
-docker run -d --name pg-restore \
-  -v /tmp/pvc-extract:/var/lib/postgresql/data:Z \
-  -e POSTGRES_PASSWORD=temporary \
+sudo docker rm -f pg-restore 2>/dev/null || true
+sudo docker run -d --name pg-restore \
+  -v "$DATA":/var/lib/postgresql/data \
+  -e POSTGRES_PASSWORD=dummyforinitdb \
   postgres:16
 
-docker exec -it pg-restore psql -U postgres -d hapihub -c '\dt'
+# WAL replay takes a few seconds; wait for ready.
+until sudo docker exec pg-restore pg_isready -U postgres 2>/dev/null; do sleep 3; done
+
+# Sanity: database list + a few real row counts.
+sudo docker exec pg-restore psql -U postgres -c "
+  SELECT datname, pg_size_pretty(pg_database_size(datname)) AS size
+  FROM pg_database WHERE datistemplate = false
+  ORDER BY pg_database_size(datname) DESC;
+"
+sudo docker exec pg-restore psql -U postgres -d hapihub -c "
+  SELECT 'medical_records' AS t, count(*) FROM medical_records UNION ALL
+  SELECT 'services',                count(*) FROM services       UNION ALL
+  SELECT 'session',                 count(*) FROM session;
+"
 ```
 
-Postgres replays WAL on startup (it's a crash-consistent snapshot). Once up, dump out logically and re-ingest into the eventual target:
+You'll see a `WARNING: database "hapihub" has a collation version mismatch` — that's benign for a drill (cluster libc was 2.36, the postgres:16 image is 2.41). For a real restore-to-production target it'd warrant a `REINDEX` or matching libc.
+
+Logical export for later re-ingest (optional, if you actually need the data elsewhere):
 
 ```sh
-docker exec pg-restore pg_dump -U postgres -Fc -d hapihub > hapihub-recovered.pgc
-# Then on the real target Postgres:
-pg_restore -d hapihub --no-owner --no-privileges --jobs=4 hapihub-recovered.pgc
+sudo docker exec pg-restore pg_dump -U postgres -Fc -d hapihub > /tmp/hapihub-recovered.pgc
+# On the real target:
+pg_restore -d hapihub --no-owner --no-privileges --jobs=4 /tmp/hapihub-recovered.pgc
 ```
 
 ### 5. Cleanup
 
 ```sh
-docker rm -f pg-restore
-sudo rm -rf /tmp/pvc-extract
-sudo kopia repository disconnect
+sudo docker rm -f pg-restore
+sudo rm -rf /tmp/pg-restore /tmp/hapihub-recovered.pgc
+sudo HOME=/root kopia repository disconnect
+# Kill the transient rclone S3 server we started in step 1:
+sudo pkill -f "rclone serve s3" || true
 ```
 
 ---
