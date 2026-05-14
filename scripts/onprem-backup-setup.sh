@@ -499,24 +499,22 @@ UNIT
 log "installing verify helper at $VERIFY_BIN"
 install -m 0755 /dev/stdin "$VERIFY_BIN" <<VERIFY
 #!/usr/bin/env bash
-# Layer 1 integrity check: verify the on-prem mirror is byte-faithful to
-# the upstream DO Spaces bucket. Catches:
-#   - silent bit-rot on local disk
-#   - mirror desync (e.g. interrupted rclone runs)
+# Layer 1 integrity check: verify that every locally-mirrored file
+# matches the upstream DO Spaces version. Catches:
+#   - bit-rot on the local disk
 #   - accidental local modifications
+#   - mirror desync that produced corrupted (not just missing) files
 #
-# It does NOT validate Kopia repo internal consistency (chain of references,
-# encrypted blob integrity from Kopia's POV, etc.) — Velero's Kopia repos
-# are written via the S3 backend in a flat layout that \`kopia connect
-# filesystem\` rejects (kopia/kopia#2065), and the rclone-serve-s3 +
-# kopia-connect-s3 workaround listings stall on large repos / HDD mirrors.
+# Tolerates "mirror lag" — i.e. files in the upstream bucket that haven't
+# been mirrored locally yet. Velero writes new backups continuously and
+# our nightly rclone sync runs once a day, so a few new objects on the
+# upstream side at verify time is expected, not a failure.
 #
-# Deeper structural validation is part of the quarterly restore drill in
-# docs/operations/RESTORE_FROM_ONPREM.md.
-#
-# rclone check compares hashes (or size+modtime) for every object; for our
-# ~170 GB / 8.7k object mirror this completes in 1–3 min over a working
-# link to DO Spaces.
+# Does NOT validate Kopia repo internal consistency. Velero writes its
+# Kopia repos via S3 in a flat layout that \`kopia connect filesystem\`
+# rejects (kopia/kopia#2065), and the rclone-serve-s3 + kopia-connect-s3
+# workaround stalls on large repos with HDD-backed mirrors. Structural
+# validation is the quarterly restore drill in RESTORE_FROM_ONPREM.md.
 set -euo pipefail
 
 MIRROR_ROOT=$BACKUP_DIR/spaces
@@ -527,14 +525,56 @@ RCLONE_BIN=$RCLONE_BIN
 [[ -d "\$MIRROR_ROOT" ]] || { echo "missing \$MIRROR_ROOT (no successful mirror run yet?)" >&2; exit 1; }
 [[ -r "\$RCLONE_CONFIG" ]] || { echo "missing \$RCLONE_CONFIG" >&2; exit 1; }
 
-echo "rclone check spaces:\$BUCKET vs \$MIRROR_ROOT"
-exec "\$RCLONE_BIN" check "spaces:\$BUCKET" "\$MIRROR_ROOT" \\
+# rclone check --combined emits one line per object with a leading marker:
+#   = identical (same hash)
+#   - present in source only (= remote-only, mirror lag — TOLERATED)
+#   + present in destination only (= local-only, unexpected but not corruption)
+#   * present in both but differ (= corruption — FAIL)
+#   ! read error                  (= I/O fault — FAIL)
+report=\$(mktemp)
+trap 'rm -f "\$report"' EXIT
+
+echo "rclone check (one-way, hashes) spaces:\$BUCKET -> \$MIRROR_ROOT"
+"\$RCLONE_BIN" check "spaces:\$BUCKET" "\$MIRROR_ROOT" \\
   --config "\$RCLONE_CONFIG" \\
   --one-way \\
+  --checksum \\
+  --combined "\$report" \\
   --transfers 4 \\
   --checkers 8 \\
-  --stats 30s \\
-  --stats-one-line
+  --stats 1m \\
+  --stats-one-line || true   # exit code reflects ANY diff; we reinterpret below
+
+identical=\$(grep -c '^= ' "\$report" || true)
+remote_only=\$(grep -c '^- ' "\$report" || true)   # mirror lag
+local_only=\$(grep -c '^+ ' "\$report" || true)    # unexpected
+differ=\$(grep -c '^\* ' "\$report" || true)       # corruption
+errored=\$(grep -c '^! ' "\$report" || true)       # I/O fault
+
+echo ""
+echo "==> summary"
+printf "  identical   : %s\n" "\$identical"
+printf "  remote-only : %s   (mirror lag, tolerated)\n" "\$remote_only"
+printf "  local-only  : %s\n" "\$local_only"
+printf "  differ      : %s   (CORRUPTION)\n" "\$differ"
+printf "  errored     : %s   (I/O FAULT)\n" "\$errored"
+
+if [[ "\$differ" -gt 0 ]]; then
+  echo ""
+  echo "first 20 differ entries:" >&2
+  grep '^\* ' "\$report" | head -20 >&2
+fi
+if [[ "\$errored" -gt 0 ]]; then
+  echo ""
+  echo "first 20 error entries:" >&2
+  grep '^! ' "\$report" | head -20 >&2
+fi
+
+# Pass iff no corrupted-byte files and no read errors.
+if [[ "\$differ" -gt 0 ]] || [[ "\$errored" -gt 0 ]]; then
+  exit 1
+fi
+exit 0
 VERIFY
 
 log "writing systemd unit $VERIFY_SERVICE_NAME.service"
