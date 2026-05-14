@@ -484,27 +484,43 @@ UNIT
 log "installing verify helper at $VERIFY_BIN"
 install -m 0755 /dev/stdin "$VERIFY_BIN" <<VERIFY
 #!/usr/bin/env bash
-# Verify the on-prem Kopia repository integrity. Exits non-zero if the
-# repo can't be opened or the sampled blobs don't checksum.
+# Verify every Kopia repository under the on-prem mirror. The Velero
+# data-mover writes one repo per namespace it backs up, so the mirror
+# contains N repos (e.g. .../infrastructure/kopia/<namespace>/). We
+# discover them by their kopia.repository marker file and verify each
+# in turn. Exits non-zero if ANY repo fails.
 set -euo pipefail
 
-REPO_PATH=$BACKUP_DIR/spaces/kopia
+MIRROR_DIR=$BACKUP_DIR/spaces
 PASSWORD_FILE=$CONFIG_DIR/kopia.password
 VERIFY_PERCENT=\${VERIFY_PERCENT:-$VERIFY_FILES_PERCENT}
 
 [[ -r "\$PASSWORD_FILE" ]] || { echo "missing \$PASSWORD_FILE" >&2; exit 1; }
-[[ -d "\$REPO_PATH" ]] || { echo "missing \$REPO_PATH (no successful mirror run yet?)" >&2; exit 1; }
+[[ -d "\$MIRROR_DIR" ]] || { echo "missing \$MIRROR_DIR (no successful mirror run yet?)" >&2; exit 1; }
 
 password=\$(<"\$PASSWORD_FILE")
 
-# Reconnect every run — idempotent and survives lost ~/.config/kopia state.
-kopia repository connect filesystem \\
-  --path="\$REPO_PATH" \\
-  --password="\$password" >/dev/null 2>&1 || \\
-  kopia repository disconnect >/dev/null 2>&1 && \\
-  kopia repository connect filesystem --path="\$REPO_PATH" --password="\$password" >/dev/null
+mapfile -t repos < <(find "\$MIRROR_DIR" -mindepth 1 -maxdepth 6 -type f -name kopia.repository -printf '%h\n' | sort -u)
+[[ \${#repos[@]} -gt 0 ]] || { echo "no Kopia repos (kopia.repository markers) found under \$MIRROR_DIR" >&2; exit 1; }
 
-kopia content verify --verify-files-percent="\$VERIFY_PERCENT" --parallel=4
+echo "discovered \${#repos[@]} Kopia repo(s); verifying \${VERIFY_PERCENT}% of blobs per repo"
+fail=0
+for repo in "\${repos[@]}"; do
+  echo ""
+  echo "==> \$repo"
+  kopia repository disconnect >/dev/null 2>&1 || true
+  if ! kopia repository connect filesystem --path="\$repo" --password="\$password" >/dev/null; then
+    echo "FAILED to connect: \$repo" >&2
+    fail=1
+    continue
+  fi
+  if ! kopia content verify --verify-files-percent="\$VERIFY_PERCENT" --parallel=4; then
+    echo "FAILED verification: \$repo" >&2
+    fail=1
+  fi
+done
+kopia repository disconnect >/dev/null 2>&1 || true
+exit "\$fail"
 VERIFY
 
 log "writing systemd unit $VERIFY_SERVICE_NAME.service"
