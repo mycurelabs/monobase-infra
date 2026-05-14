@@ -30,6 +30,8 @@ SERVICE_USER=mycure-backup
 TIMER_ON_CALENDAR="*-*-* 02:30:00 UTC"
 YES_WIPE_DEVICE=0
 KOPIA_VERSION=0.21.1
+RCLONE_VERSION=1.69.1
+RCLONE_BIN=/usr/local/bin/rclone
 RCLONE_TRANSFERS=2
 RCLONE_CHECKERS=4
 NOTIFY_ON=both                                  # both | failure-only | success-only | off
@@ -141,20 +143,33 @@ if [[ "$ENCRYPTION" == "luks-partition" ]]; then
 fi
 
 # ---------- install dependencies ----------
-log "ensuring dependencies (rclone, kopia)…"
+log "ensuring dependencies (rclone, kopia, curl, cryptsetup, unzip, jq)…"
 apt-get update -qq
-apt-get install -y -qq rclone curl ca-certificates cryptsetup-bin >/dev/null
+apt-get install -y -qq curl ca-certificates cryptsetup-bin unzip jq python3 openssl >/dev/null
 
+arch=$(uname -m)
+case "$arch" in
+  x86_64)  kopia_arch=x64; rclone_arch=amd64 ;;
+  aarch64) kopia_arch=arm64; rclone_arch=arm64 ;;
+  *) err "unsupported architecture: $arch";;
+esac
+
+tmp=$(mktemp -d)
+trap 'rm -rf "$tmp"' EXIT
+
+# rclone — pinned static binary (>= 1.65 needed for \`rclone serve s3\` which
+# the verify helper uses). Ubuntu 24.04's apt ships v1.60, which lacks it.
+# We install to /usr/local/bin so it shadows apt's /usr/bin/rclone in PATH.
+if ! command -v "$RCLONE_BIN" >/dev/null || ! "$RCLONE_BIN" version 2>/dev/null | grep -q "rclone v$RCLONE_VERSION"; then
+  log "installing rclone v$RCLONE_VERSION to $RCLONE_BIN…"
+  curl -fsSL "https://downloads.rclone.org/v${RCLONE_VERSION}/rclone-v${RCLONE_VERSION}-linux-${rclone_arch}.zip" -o "$tmp/rclone.zip"
+  unzip -q "$tmp/rclone.zip" -d "$tmp"
+  install -m 0755 "$tmp"/rclone-v*-linux-*/rclone "$RCLONE_BIN"
+fi
+
+# kopia — pinned static binary.
 if ! command -v kopia >/dev/null || ! kopia --version 2>/dev/null | grep -q "$KOPIA_VERSION"; then
   log "installing kopia v$KOPIA_VERSION…"
-  arch=$(uname -m)
-  case "$arch" in
-    x86_64)  kopia_arch=x64;;
-    aarch64) kopia_arch=arm64;;
-    *) err "unsupported architecture for kopia: $arch";;
-  esac
-  tmp=$(mktemp -d)
-  trap 'rm -rf "$tmp"' EXIT
   curl -fsSL "https://github.com/kopia/kopia/releases/download/v${KOPIA_VERSION}/kopia-${KOPIA_VERSION}-linux-${kopia_arch}.tar.gz" -o "$tmp/kopia.tgz"
   tar -xzf "$tmp/kopia.tgz" -C "$tmp"
   install -m 0755 "$tmp"/kopia-*-linux-*/kopia /usr/local/bin/kopia
@@ -441,7 +456,7 @@ Environment=RCLONE_CONFIG=$RCLONE_CONFIG
 LogNamespace=$LOG_NAMESPACE
 SyslogIdentifier=$SERVICE_NAME
 $notify_start
-ExecStart=/usr/bin/rclone sync spaces:$BUCKET/ $BACKUP_DIR/spaces/ \\
+ExecStart=$RCLONE_BIN sync spaces:$BUCKET/ $BACKUP_DIR/spaces/ \\
   --max-age $MAX_AGE \\
   --transfers $RCLONE_TRANSFERS \\
   --checkers $RCLONE_CHECKERS \\
@@ -521,13 +536,12 @@ ACCESS_KEY=\$(openssl rand -hex 8)
 SECRET_KEY=\$(openssl rand -hex 16)
 
 echo "starting ephemeral rclone S3 server on 127.0.0.1:\$PORT (root: \$MIRROR_ROOT)"
-rclone serve s3 "\$MIRROR_ROOT" \\
+$RCLONE_BIN serve s3 "\$MIRROR_ROOT" \\
   --addr "127.0.0.1:\$PORT" \\
   --auth-key "\$ACCESS_KEY,\$SECRET_KEY" \\
   --vfs-cache-mode off \\
   --no-checksum \\
-  --quit-after 4h \\
-  >/dev/null 2>&1 &
+  >/tmp/rclone-verify.log 2>&1 &
 RCLONE_PID=\$!
 
 cleanup() {
