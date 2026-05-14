@@ -106,7 +106,7 @@ sudo SPACES_ACCESS_KEY=… SPACES_SECRET_KEY=… KOPIA_PASSWORD=… \
 | `--region=REGION` | `sgp1` | DO Spaces region. |
 | `--max-age=DURATION` | `30d` | rclone `--max-age`; older objects skipped/deleted locally. |
 | `--service-user=USER` | `mycure-backup` | System user that runs the mirror. |
-| `--timer-on-calendar=S` | `*-*-* 02:30:00 UTC` | systemd OnCalendar. |
+| `--timer-on-calendar=S` | `*-*-* 02:30:00 UTC` | systemd OnCalendar for the mirror. |
 | `--kopia-version=VER` | pinned in script | Kopia static binary release. |
 | `--notify-on=MODE` | `both` | `both` / `failure-only` / `success-only` / `off`. Controls Discord notifications. |
 | `--discord-webhook-url=URL` | (env var) | Same as `DISCORD_WEBHOOK_URL`. Stored at `/etc/mycure-backup/discord-webhook.url`. |
@@ -156,6 +156,29 @@ sudo du -sh /var/backups/mycure/spaces/
 
 The unit's logs go to a dedicated `mycure-backup` journal namespace with explicit size caps (default `500M`, `4 week` retention) so they can't bloat the global journal. Per-unit caps are owned by `/etc/systemd/journald@mycure-backup.conf` — tune `SystemMaxUse=` there if you want a different ceiling. Logs from the OnFailure helper share the same namespace, so one `journalctl --namespace=mycure-backup` query covers the full lifecycle of a run.
 
+### Weekly integrity verification
+
+The setup also installs `mycure-backup-verify.service` and `.timer`. The timer fires by default at **Sunday 03:00 UTC**, runs `/usr/local/sbin/mycure-backup-verify`, which:
+
+1. Connects to the local Kopia repo at `<backup-dir>/spaces/kopia` (idempotent).
+2. Runs `kopia content verify --verify-files-percent=5` — random-samples 5% of blobs and revalidates checksums.
+3. Exits non-zero on any failure → triggers `OnFailure=mycure-backup-verify-failure.service` → Discord red embed.
+
+This is Layer 1 of the verification strategy in [BACKUP_DR.md](BACKUP_DR.md). It catches bit-rot, corrupted blobs, and password drift, but **does not validate that Postgres/Mongo data inside the snapshots is logically restorable** — that's still the quarterly drill in [RESTORE_FROM_ONPREM.md](RESTORE_FROM_ONPREM.md).
+
+Trigger manually:
+
+```sh
+sudo systemctl start mycure-backup-verify.service
+sudo journalctl --namespace=mycure-backup -u mycure-backup-verify.service -f
+```
+
+Disable the weekly run without uninstalling:
+
+```sh
+sudo systemctl disable --now mycure-backup-verify.timer
+```
+
 Once at least one Velero backup has been mirrored, validate that the Kopia repo can be opened from on-prem with the password the script stored:
 
 ```sh
@@ -180,8 +203,11 @@ Both commands should succeed.
 | `/etc/mycure-backup/luks.key` | 0400 | root | LUKS keyfile (only LUKS modes). |
 | `/etc/mycure-backup/discord-webhook.url` | 0640 | root:mycure-backup | Discord webhook URL (only when `DISCORD_WEBHOOK_URL` is set). |
 | `/usr/local/sbin/mycure-backup-notify` | 0755 | root | Notifier helper (always installed). |
-| `/etc/systemd/system/mycure-backup-mirror.{service,timer}` | 0644 | root | Systemd units. |
+| `/etc/systemd/system/mycure-backup-mirror.{service,timer}` | 0644 | root | Mirror units. |
 | `/etc/systemd/system/mycure-backup-mirror-failure.service` | 0644 | root | OnFailure handler that calls the notifier (only when `--notify-on` covers failure). |
+| `/etc/systemd/system/mycure-backup-verify.{service,timer}` | 0644 | root | Weekly Kopia integrity check. |
+| `/etc/systemd/system/mycure-backup-verify-failure.service` | 0644 | root | OnFailure handler for the verify run. |
+| `/usr/local/sbin/mycure-backup-verify` | 0755 | root | Helper: connect to local Kopia repo + run content verify. |
 | `/etc/systemd/system/mycure-backup-volume.service` | 0644 | root | LUKS open+mount at boot (only LUKS modes). |
 | `/etc/systemd/journald@mycure-backup.conf` | 0644 | root | Per-unit journal namespace config (size-capped). |
 | `/var/backups/mycure/` | 0750 | mycure-backup | Mirror target (mountpoint in LUKS modes). |
@@ -213,15 +239,19 @@ The Kopia password is owned by the cluster, not this host. Rotate via the cluste
 ### Teardown
 
 ```sh
-sudo systemctl disable --now mycure-backup-mirror.timer mycure-backup-mirror.service
+sudo systemctl disable --now mycure-backup-mirror.timer mycure-backup-mirror.service \
+                              mycure-backup-verify.timer mycure-backup-verify.service
 sudo systemctl disable --now mycure-backup-volume.service 2>/dev/null || true
 sudo umount /var/backups/mycure 2>/dev/null || true
 sudo cryptsetup close mycure-backup 2>/dev/null || true
+sudo kopia repository disconnect 2>/dev/null || true
 sudo rm -rf /etc/mycure-backup /etc/rclone/rclone.conf \
             /etc/systemd/system/mycure-backup-mirror.* \
+            /etc/systemd/system/mycure-backup-verify.* \
             /etc/systemd/system/mycure-backup-volume.service \
             /etc/systemd/journald@mycure-backup.conf \
-            /usr/local/sbin/mycure-backup-notify
+            /usr/local/sbin/mycure-backup-notify \
+            /usr/local/sbin/mycure-backup-verify
 sudo systemctl reset-failed "systemd-journald@mycure-backup.service" 2>/dev/null || true
 sudo rm -rf /var/log/journal/*/system@mycure-backup-* 2>/dev/null || true
 sudo userdel mycure-backup 2>/dev/null || true

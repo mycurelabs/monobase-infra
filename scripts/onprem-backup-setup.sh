@@ -37,6 +37,10 @@ NOTIFY_ON=both                                  # both | failure-only | success-
 CONFIG_DIR=/etc/mycure-backup
 RCLONE_CONFIG=/etc/rclone/rclone.conf
 SERVICE_NAME=mycure-backup-mirror
+VERIFY_SERVICE_NAME=mycure-backup-verify
+VERIFY_TIMER_ON_CALENDAR="Sun *-*-* 03:00:00 UTC"
+VERIFY_FILES_PERCENT=5
+VERIFY_BIN=/usr/local/sbin/mycure-backup-verify
 SYSTEMD_DIR=/etc/systemd/system
 NOTIFY_BIN=/usr/local/sbin/mycure-backup-notify
 WEBHOOK_FILE=$CONFIG_DIR/discord-webhook.url
@@ -327,29 +331,33 @@ fi
 log "installing notifier at $NOTIFY_BIN"
 install -m 0755 /dev/stdin "$NOTIFY_BIN" <<'NOTIFY'
 #!/usr/bin/env bash
-# Send a Discord webhook notification about the on-prem backup mirror.
-# Usage: mycure-backup-notify start|success|failure|test [extra_message]
+# Send a Discord webhook notification about the on-prem backup mirror or
+# the weekly Kopia repo integrity verification.
+# Usage: mycure-backup-notify KIND [extra_message]
+#   KIND ∈ start|success|failure|verify-start|verify-success|verify-failure|test
 # Silent no-op if /etc/mycure-backup/discord-webhook.url is missing/empty.
 set -euo pipefail
 
 WEBHOOK_FILE=/etc/mycure-backup/discord-webhook.url
-LOG_FILE=/var/log/mycure-backup-mirror.log
-SERVICE_NAME=mycure-backup-mirror
 
 [[ -r "$WEBHOOK_FILE" ]] || exit 0
 url=$(<"$WEBHOOK_FILE")
 [[ -n "$url" ]] || exit 0
 
-# kind -> (title, color, want_duration, want_mirrored)
-# "want_*" toggles whether to include those fields (e.g. start has no
-# duration yet; test is purely informational).
+# kind -> (title, color, want_duration, want_mirrored, service_name)
+# "want_*" toggles whether the embed includes those fields. service_name
+# is the systemd unit we pull ActiveEnterTimestamp/Inactive from for the
+# Duration field (mirror lifecycle vs. verify lifecycle).
 kind="${1:-}"
 case "$kind" in
-  start)   title=":hourglass_flowing_sand: On-prem backup mirror started"; color=3447003;  want_duration=0; want_mirrored=0 ;;
-  success) title=":white_check_mark: On-prem backup mirror succeeded";     color=3066993;  want_duration=1; want_mirrored=1 ;;
-  failure) title=":x: On-prem backup mirror FAILED";                       color=15158332; want_duration=1; want_mirrored=1 ;;
-  test)    title=":bell: On-prem backup mirror — test notification";       color=10181046; want_duration=0; want_mirrored=0 ;;
-  *)       title="On-prem backup mirror: ${kind:-unknown}";                color=8421504;  want_duration=1; want_mirrored=1 ;;
+  start)          title=":hourglass_flowing_sand: On-prem backup mirror started"; color=3447003;  want_duration=0; want_mirrored=0; SERVICE_NAME=mycure-backup-mirror ;;
+  success)        title=":white_check_mark: On-prem backup mirror succeeded";     color=3066993;  want_duration=1; want_mirrored=1; SERVICE_NAME=mycure-backup-mirror ;;
+  failure)        title=":x: On-prem backup mirror FAILED";                       color=15158332; want_duration=1; want_mirrored=1; SERVICE_NAME=mycure-backup-mirror ;;
+  verify-start)   title=":mag: On-prem backup verification started";              color=3447003;  want_duration=0; want_mirrored=0; SERVICE_NAME=mycure-backup-verify ;;
+  verify-success) title=":white_check_mark: On-prem backup verification passed";  color=3066993;  want_duration=1; want_mirrored=0; SERVICE_NAME=mycure-backup-verify ;;
+  verify-failure) title=":rotating_light: On-prem backup verification FAILED";    color=15158332; want_duration=1; want_mirrored=0; SERVICE_NAME=mycure-backup-verify ;;
+  test)           title=":bell: On-prem backup mirror — test notification";       color=10181046; want_duration=0; want_mirrored=0; SERVICE_NAME=mycure-backup-mirror ;;
+  *)              title="On-prem backup: ${kind:-unknown}";                       color=8421504;  want_duration=1; want_mirrored=1; SERVICE_NAME=mycure-backup-mirror ;;
 esac
 
 extra="${2:-}"
@@ -467,6 +475,93 @@ SyslogIdentifier=${SERVICE_NAME}-failure
 ExecStart=$NOTIFY_BIN failure
 UNIT
 
+# ---------- verify helper + service + timer ----------
+# Weekly Kopia repository integrity check. Connects to the mirrored repo
+# (idempotent — connect is a no-op if already connected) and runs
+# `kopia content verify --verify-files-percent=N`, which fetches a
+# random sample of blobs and revalidates their checksums. Catches
+# bit-rot, missing blobs, and password drift on cheap commodity.
+log "installing verify helper at $VERIFY_BIN"
+install -m 0755 /dev/stdin "$VERIFY_BIN" <<VERIFY
+#!/usr/bin/env bash
+# Verify the on-prem Kopia repository integrity. Exits non-zero if the
+# repo can't be opened or the sampled blobs don't checksum.
+set -euo pipefail
+
+REPO_PATH=$BACKUP_DIR/spaces/kopia
+PASSWORD_FILE=$CONFIG_DIR/kopia.password
+VERIFY_PERCENT=\${VERIFY_PERCENT:-$VERIFY_FILES_PERCENT}
+
+[[ -r "\$PASSWORD_FILE" ]] || { echo "missing \$PASSWORD_FILE" >&2; exit 1; }
+[[ -d "\$REPO_PATH" ]] || { echo "missing \$REPO_PATH (no successful mirror run yet?)" >&2; exit 1; }
+
+password=\$(<"\$PASSWORD_FILE")
+
+# Reconnect every run — idempotent and survives lost ~/.config/kopia state.
+kopia repository connect filesystem \\
+  --path="\$REPO_PATH" \\
+  --password="\$password" >/dev/null 2>&1 || \\
+  kopia repository disconnect >/dev/null 2>&1 && \\
+  kopia repository connect filesystem --path="\$REPO_PATH" --password="\$password" >/dev/null
+
+kopia content verify --verify-files-percent="\$VERIFY_PERCENT" --parallel=4
+VERIFY
+
+log "writing systemd unit $VERIFY_SERVICE_NAME.service"
+case "$NOTIFY_ON" in
+  both)          v_start="ExecStartPre=-$NOTIFY_BIN verify-start"; v_success="ExecStartPost=$NOTIFY_BIN verify-success"; v_onfailure="OnFailure=${VERIFY_SERVICE_NAME}-failure.service" ;;
+  success-only)  v_start="ExecStartPre=-$NOTIFY_BIN verify-start"; v_success="ExecStartPost=$NOTIFY_BIN verify-success"; v_onfailure="" ;;
+  failure-only)  v_start="ExecStartPre=-$NOTIFY_BIN verify-start"; v_success="";                                          v_onfailure="OnFailure=${VERIFY_SERVICE_NAME}-failure.service" ;;
+  off)           v_start="";                                       v_success="";                                          v_onfailure="" ;;
+esac
+
+cat > "$SYSTEMD_DIR/$VERIFY_SERVICE_NAME.service" <<UNIT
+[Unit]
+Description=Verify integrity of the on-prem Kopia backup repository
+After=network-online.target
+Wants=network-online.target
+$v_onfailure
+
+[Service]
+Type=oneshot
+LogNamespace=$LOG_NAMESPACE
+SyslogIdentifier=$VERIFY_SERVICE_NAME
+$v_start
+ExecStart=$VERIFY_BIN
+$v_success
+
+TimeoutStartSec=2h
+Nice=15
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7
+UNIT
+
+cat > "$SYSTEMD_DIR/${VERIFY_SERVICE_NAME}-failure.service" <<UNIT
+[Unit]
+Description=Notify on failure of $VERIFY_SERVICE_NAME.service
+
+[Service]
+Type=oneshot
+LogNamespace=$LOG_NAMESPACE
+SyslogIdentifier=${VERIFY_SERVICE_NAME}-failure
+ExecStart=$NOTIFY_BIN verify-failure
+UNIT
+
+log "writing systemd timer $VERIFY_SERVICE_NAME.timer"
+cat > "$SYSTEMD_DIR/$VERIFY_SERVICE_NAME.timer" <<UNIT
+[Unit]
+Description=Weekly timer for Mycure on-prem backup verification
+
+[Timer]
+OnCalendar=$VERIFY_TIMER_ON_CALENDAR
+Persistent=true
+RandomizedDelaySec=30m
+Unit=$VERIFY_SERVICE_NAME.service
+
+[Install]
+WantedBy=timers.target
+UNIT
+
 log "writing systemd timer $SERVICE_NAME.timer"
 cat > "$SYSTEMD_DIR/$SERVICE_NAME.timer" <<UNIT
 [Unit]
@@ -494,6 +589,8 @@ log "credentials OK"
 systemctl daemon-reload
 systemctl enable --now "$SERVICE_NAME.timer" >/dev/null
 log "$SERVICE_NAME.timer enabled"
+systemctl enable --now "$VERIFY_SERVICE_NAME.timer" >/dev/null
+log "$VERIFY_SERVICE_NAME.timer enabled"
 
 # ---------- summary ----------
 echo
@@ -505,9 +602,12 @@ echo "  backup dir    : $BACKUP_DIR"
 echo "  bucket        : spaces:$BUCKET ($REGION)"
 echo "  service user  : $SERVICE_USER"
 echo "  retention ref : ${RETENTION_DAYS}d (rclone --max-age=$MAX_AGE)"
-echo "  timer         : $TIMER_ON_CALENDAR"
-next_run=$(systemctl list-timers --no-legend --no-pager "$SERVICE_NAME.timer" 2>/dev/null | awk '{print $1, $2, $3}' | head -1)
-echo "  next run      : ${next_run:-see: systemctl list-timers}"
+echo "  mirror timer  : $TIMER_ON_CALENDAR"
+mirror_next=$(systemctl list-timers --no-legend --no-pager "$SERVICE_NAME.timer" 2>/dev/null | awk '{print $1, $2, $3}' | head -1)
+echo "  next mirror   : ${mirror_next:-see: systemctl list-timers}"
+echo "  verify timer  : $VERIFY_TIMER_ON_CALENDAR  (verifies ${VERIFY_FILES_PERCENT}% of blobs)"
+verify_next=$(systemctl list-timers --no-legend --no-pager "$VERIFY_SERVICE_NAME.timer" 2>/dev/null | awk '{print $1, $2, $3}' | head -1)
+echo "  next verify   : ${verify_next:-see: systemctl list-timers}"
 if [[ -f "$WEBHOOK_FILE" ]]; then
   echo "  notifications : Discord webhook configured (mode: $NOTIFY_ON)"
 else
@@ -515,10 +615,12 @@ else
 fi
 echo
 echo "Verify:"
-echo "  systemctl status $SERVICE_NAME.timer"
+echo "  systemctl status $SERVICE_NAME.timer $VERIFY_SERVICE_NAME.timer"
 echo "  sudo -u $SERVICE_USER rclone --config $RCLONE_CONFIG size spaces:$BUCKET"
-echo "  sudo systemctl start $SERVICE_NAME.service   # trigger now"
+echo "  sudo systemctl start $SERVICE_NAME.service   # trigger mirror now"
+echo "  sudo systemctl start $VERIFY_SERVICE_NAME.service   # trigger verify now (needs ≥1 successful mirror)"
 echo "  sudo journalctl --namespace=$LOG_NAMESPACE -u $SERVICE_NAME.service -f"
+echo "  sudo journalctl --namespace=$LOG_NAMESPACE -u $VERIFY_SERVICE_NAME.service -f"
 
 # Fire a one-shot test notification on first-time-with-webhook installs so the
 # operator can confirm the channel is wired up before the first scheduled run.
