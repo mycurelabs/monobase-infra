@@ -558,21 +558,30 @@ trap 'rm -f "\$report"' EXIT
 identical=\$(grep -c '^= ' "\$report" || true)
 remote_only=\$(grep -c '^- ' "\$report" || true)
 local_only=\$(grep -c '^+ ' "\$report" || true)
-differ=\$(grep -c '^\* ' "\$report" || true)
+differ_total=\$(grep -c '^\* ' "\$report" || true)
 errored=\$(grep -c '^! ' "\$report" || true)
+
+# kopia.maintenance is the only file in a Velero-Kopia repo that legitimately
+# changes between sync and check — Kopia rewrites it on every backup, and the
+# cluster's Velero schedules can fire any minute. Everything else under a Kopia
+# repo is content-addressable (named by its own hash) and therefore immutable.
+# Discount these expected churn entries from the fail condition.
+benign_pattern='/kopia\.maintenance\$'
+differ=\$(grep '^\* ' "\$report" | grep -cvE "\$benign_pattern" || true)
+benign_differ=\$((differ_total - differ))
 
 echo ""
 echo "==> summary"
-printf "  identical   : %s\n" "\$identical"
-printf "  remote-only : %s   (post-sync race, should be 0; small numbers OK)\n" "\$remote_only"
-printf "  local-only  : %s\n" "\$local_only"
-printf "  differ      : %s   (CORRUPTION)\n" "\$differ"
-printf "  errored     : %s   (I/O FAULT)\n" "\$errored"
+printf "  identical    : %s\n" "\$identical"
+printf "  remote-only  : %s   (post-sync race, expected small)\n" "\$remote_only"
+printf "  local-only   : %s   (older files no longer on remote, tolerated)\n" "\$local_only"
+printf "  differ       : %s   (CORRUPTION) — was %s total, %s expected (kopia.maintenance churn)\n" "\$differ" "\$differ_total" "\$benign_differ"
+printf "  errored      : %s   (I/O FAULT)\n" "\$errored"
 
 if [[ "\$differ" -gt 0 ]]; then
   echo ""
-  echo "first 20 differ entries:" >&2
-  grep '^\* ' "\$report" | head -20 >&2
+  echo "first 20 unexpected differ entries:" >&2
+  grep '^\* ' "\$report" | grep -vE "\$benign_pattern" | head -20 >&2
 fi
 if [[ "\$errored" -gt 0 ]]; then
   echo ""
