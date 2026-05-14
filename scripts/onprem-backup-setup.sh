@@ -484,42 +484,96 @@ UNIT
 log "installing verify helper at $VERIFY_BIN"
 install -m 0755 /dev/stdin "$VERIFY_BIN" <<VERIFY
 #!/usr/bin/env bash
-# Verify every Kopia repository under the on-prem mirror. The Velero
-# data-mover writes one repo per namespace it backs up, so the mirror
-# contains N repos (e.g. .../infrastructure/kopia/<namespace>/). We
-# discover them by their kopia.repository marker file and verify each
-# in turn. Exits non-zero if ANY repo fails.
+# Verify every Kopia repository under the on-prem mirror.
+#
+# Why this is more involved than \`kopia repository connect filesystem\`:
+# Velero's data-mover writes its Kopia repos via the S3 backend (DO Spaces).
+# That backend stores blobs in a flat layout that \`kopia connect filesystem\`
+# refuses to open ("repository not initialized in the provided storage";
+# see kopia/kopia#2065). The blobs are byte-correct in the mirror — we just
+# need to feed them back to Kopia through the S3 backend it was written by.
+#
+# Workaround: stand up an ephemeral S3 server with \`rclone serve s3\`
+# pointed at the mirror, then \`kopia repository connect s3\` to localhost.
+# The server lives only for the duration of this run and binds 127.0.0.1.
+#
+# Repositories are discovered by their kopia.repository marker file; one
+# Velero repo per K8s namespace (e.g. infrastructure/kopia/mycure-production).
+# Exits non-zero if ANY repo fails to open or verify.
 set -euo pipefail
 
-MIRROR_DIR=$BACKUP_DIR/spaces
+MIRROR_ROOT=$BACKUP_DIR/spaces
 PASSWORD_FILE=$CONFIG_DIR/kopia.password
 VERIFY_PERCENT=\${VERIFY_PERCENT:-$VERIFY_FILES_PERCENT}
 
 [[ -r "\$PASSWORD_FILE" ]] || { echo "missing \$PASSWORD_FILE" >&2; exit 1; }
-[[ -d "\$MIRROR_DIR" ]] || { echo "missing \$MIRROR_DIR (no successful mirror run yet?)" >&2; exit 1; }
+[[ -d "\$MIRROR_ROOT" ]] || { echo "missing \$MIRROR_ROOT (no successful mirror run yet?)" >&2; exit 1; }
 
 password=\$(<"\$PASSWORD_FILE")
 
-mapfile -t repos < <(find "\$MIRROR_DIR" -mindepth 1 -maxdepth 6 -type f -name kopia.repository -printf '%h\n' | sort -u)
-[[ \${#repos[@]} -gt 0 ]] || { echo "no Kopia repos (kopia.repository markers) found under \$MIRROR_DIR" >&2; exit 1; }
+mapfile -t repos < <(find "\$MIRROR_ROOT" -mindepth 1 -maxdepth 6 -type f -name kopia.repository -printf '%h\n' | sort -u)
+[[ \${#repos[@]} -gt 0 ]] || { echo "no Kopia repos (kopia.repository markers) found under \$MIRROR_ROOT" >&2; exit 1; }
+
+# Spin up an ephemeral S3 server with a random port + random credentials.
+# Pick a free high port to avoid colliding with anything else on the host.
+PORT=\$(python3 -c 'import socket; s=socket.socket(); s.bind(("127.0.0.1",0)); print(s.getsockname()[1]); s.close()' 2>/dev/null || echo \$((20000 + RANDOM % 30000)))
+ACCESS_KEY=\$(openssl rand -hex 8)
+SECRET_KEY=\$(openssl rand -hex 16)
+
+echo "starting ephemeral rclone S3 server on 127.0.0.1:\$PORT (root: \$MIRROR_ROOT)"
+rclone serve s3 "\$MIRROR_ROOT" \\
+  --addr "127.0.0.1:\$PORT" \\
+  --auth-key "\$ACCESS_KEY,\$SECRET_KEY" \\
+  --vfs-cache-mode off \\
+  --no-checksum \\
+  --quit-after 4h \\
+  >/dev/null 2>&1 &
+RCLONE_PID=\$!
+
+cleanup() {
+  local rc=\$?
+  kopia repository disconnect >/dev/null 2>&1 || true
+  kill "\$RCLONE_PID" 2>/dev/null || true
+  wait "\$RCLONE_PID" 2>/dev/null || true
+  exit \$rc
+}
+trap cleanup EXIT INT TERM
+
+# Wait for the S3 server to actually bind.
+for _ in {1..30}; do
+  if curl -s --max-time 1 "http://127.0.0.1:\$PORT/" >/dev/null 2>&1; then break; fi
+  sleep 0.2
+done
 
 echo "discovered \${#repos[@]} Kopia repo(s); verifying \${VERIFY_PERCENT}% of blobs per repo"
 fail=0
 for repo in "\${repos[@]}"; do
+  # Strip the mirror root to recover the bucket/prefix the S3 server exposes.
+  rel="\${repo#\$MIRROR_ROOT/}"          # e.g. infrastructure/kopia/mycure-production
+  bucket="\${rel%%/*}"                   # infrastructure
+  prefix="\${rel#\$bucket/}/"            # kopia/mycure-production/
+
   echo ""
-  echo "==> \$repo"
+  echo "==> s3://\$bucket/\$prefix"
   kopia repository disconnect >/dev/null 2>&1 || true
-  if ! kopia repository connect filesystem --path="\$repo" --password="\$password" >/dev/null; then
-    echo "FAILED to connect: \$repo" >&2
+  if ! kopia repository connect s3 \\
+        --endpoint="127.0.0.1:\$PORT" \\
+        --disable-tls \\
+        --bucket="\$bucket" \\
+        --prefix="\$prefix" \\
+        --access-key="\$ACCESS_KEY" \\
+        --secret-access-key="\$SECRET_KEY" \\
+        --password="\$password" >/dev/null; then
+    echo "FAILED to connect: s3://\$bucket/\$prefix" >&2
     fail=1
     continue
   fi
   if ! kopia content verify --verify-files-percent="\$VERIFY_PERCENT" --parallel=4; then
-    echo "FAILED verification: \$repo" >&2
+    echo "FAILED verification: s3://\$bucket/\$prefix" >&2
     fail=1
   fi
 done
-kopia repository disconnect >/dev/null 2>&1 || true
+
 exit "\$fail"
 VERIFY
 
