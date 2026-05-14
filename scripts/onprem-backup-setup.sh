@@ -499,16 +499,17 @@ UNIT
 log "installing verify helper at $VERIFY_BIN"
 install -m 0755 /dev/stdin "$VERIFY_BIN" <<VERIFY
 #!/usr/bin/env bash
-# Layer 1 integrity check: verify that every locally-mirrored file
-# matches the upstream DO Spaces version. Catches:
+# Layer 1 integrity check: bring the on-prem mirror fully up to date
+# from upstream, then verify every local file's bytes against the
+# upstream copy. The sync-then-check pair eliminates "mirror lag" false
+# positives — after a fresh sync, any remaining differences are real
+# corruption, not just files that were updated upstream since the last
+# nightly sync.
+#
+# Catches:
 #   - bit-rot on the local disk
 #   - accidental local modifications
 #   - mirror desync that produced corrupted (not just missing) files
-#
-# Tolerates "mirror lag" — i.e. files in the upstream bucket that haven't
-# been mirrored locally yet. Velero writes new backups continuously and
-# our nightly rclone sync runs once a day, so a few new objects on the
-# upstream side at verify time is expected, not a failure.
 #
 # Does NOT validate Kopia repo internal consistency. Velero writes its
 # Kopia repos via S3 in a flat layout that \`kopia connect filesystem\`
@@ -525,36 +526,45 @@ RCLONE_BIN=$RCLONE_BIN
 [[ -d "\$MIRROR_ROOT" ]] || { echo "missing \$MIRROR_ROOT (no successful mirror run yet?)" >&2; exit 1; }
 [[ -r "\$RCLONE_CONFIG" ]] || { echo "missing \$RCLONE_CONFIG" >&2; exit 1; }
 
-# rclone check --combined emits one line per object with a leading marker:
-#   = identical (same hash)
-#   - present in source only (= remote-only, mirror lag — TOLERATED)
-#   + present in destination only (= local-only, unexpected but not corruption)
-#   * present in both but differ (= corruption — FAIL)
-#   ! read error                  (= I/O fault — FAIL)
+# Step 1 — sync first so any pending upstream changes land locally.
+# This closes the "lag" gap that would otherwise show up as false
+# differences in the check below.
+echo "==> pre-verify sync"
+"\$RCLONE_BIN" sync "spaces:\$BUCKET" "\$MIRROR_ROOT" \\
+  --config "\$RCLONE_CONFIG" \\
+  --transfers 4 \\
+  --checkers 8 \\
+  --stats 1m --stats-one-line
+
+# Step 2 — hash check. rclone check --combined emits one line per object:
+#   = identical
+#   - in src (remote) only — should be ~0 right after a sync
+#   + in dst (local) only — unexpected (mirror retains extras)
+#   * present in both but differ — CORRUPTION
+#   ! read error — I/O FAULT
+echo ""
+echo "==> integrity check"
 report=\$(mktemp)
 trap 'rm -f "\$report"' EXIT
 
-echo "rclone check (one-way, hashes) spaces:\$BUCKET -> \$MIRROR_ROOT"
 "\$RCLONE_BIN" check "spaces:\$BUCKET" "\$MIRROR_ROOT" \\
   --config "\$RCLONE_CONFIG" \\
-  --one-way \\
   --checksum \\
   --combined "\$report" \\
   --transfers 4 \\
   --checkers 8 \\
-  --stats 1m \\
-  --stats-one-line || true   # exit code reflects ANY diff; we reinterpret below
+  --stats 1m --stats-one-line || true   # exit code reflects ANY diff; we reinterpret
 
 identical=\$(grep -c '^= ' "\$report" || true)
-remote_only=\$(grep -c '^- ' "\$report" || true)   # mirror lag
-local_only=\$(grep -c '^+ ' "\$report" || true)    # unexpected
-differ=\$(grep -c '^\* ' "\$report" || true)       # corruption
-errored=\$(grep -c '^! ' "\$report" || true)       # I/O fault
+remote_only=\$(grep -c '^- ' "\$report" || true)
+local_only=\$(grep -c '^+ ' "\$report" || true)
+differ=\$(grep -c '^\* ' "\$report" || true)
+errored=\$(grep -c '^! ' "\$report" || true)
 
 echo ""
 echo "==> summary"
 printf "  identical   : %s\n" "\$identical"
-printf "  remote-only : %s   (mirror lag, tolerated)\n" "\$remote_only"
+printf "  remote-only : %s   (post-sync race, should be 0; small numbers OK)\n" "\$remote_only"
 printf "  local-only  : %s\n" "\$local_only"
 printf "  differ      : %s   (CORRUPTION)\n" "\$differ"
 printf "  errored     : %s   (I/O FAULT)\n" "\$errored"
@@ -570,7 +580,6 @@ if [[ "\$errored" -gt 0 ]]; then
   grep '^! ' "\$report" | head -20 >&2
 fi
 
-# Pass iff no corrupted-byte files and no read errors.
 if [[ "\$differ" -gt 0 ]] || [[ "\$errored" -gt 0 ]]; then
   exit 1
 fi
