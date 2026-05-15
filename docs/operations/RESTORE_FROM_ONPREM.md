@@ -105,7 +105,36 @@ mise run provision local-k3d -- -destroy
 
 ## Path B — `kopia` bare-metal extract
 
-Use this only when Path A is not possible (no hardware for a recovery cluster, or the recovery cluster cannot be provisioned in time). Extracting raw PVC bytes and splicing them into a fresh Postgres is brittle but works — drill-tested 2026-05-14 (3.5M `medical_records` rows recovered, total ~8 min from snapshot ID to verified query).
+Use this only when Path A is not possible (no hardware for a recovery cluster, or the recovery cluster cannot be provisioned in time). Extracting raw PVC bytes and splicing them into a fresh Postgres is brittle but works — drill-tested 2026-05-14 (3.5M `medical_records` rows recovered, total ~8 min from snapshot ID to verified query; 127/140 user tables exactly matched production at the snapshot moment).
+
+The fast path is `scripts/onprem-backup-restore.sh`. It wraps the entire flow (rclone S3 shim, kopia connect, snapshot lookup, restore, container boot) into four subcommands. The long-form manual procedure below documents what the script does in case you ever need to deviate or debug.
+
+### 1. Fast path — using the script
+
+On the host that holds the mirror (e.g. `hel.niflheim`):
+
+```sh
+# What snapshots are available?
+sudo scripts/onprem-backup-restore.sh list
+
+# Restore the latest postgres-primary snapshot:
+sudo scripts/onprem-backup-restore.sh extract \
+  --pvc=data-postgresql-primary-0 \
+  --target=/tmp/pg-restore
+
+# Boot postgres:16 against it (writes minimal pg config; chowns to uid 999):
+sudo scripts/onprem-backup-restore.sh boot-postgres
+
+# psql in:
+sudo docker exec -it pg-restore psql -U postgres -d hapihub
+
+# Tear everything down:
+sudo scripts/onprem-backup-restore.sh cleanup
+```
+
+Other PVCs follow the same pattern — e.g. `--pvc=datadir-mongodb-0` extracts the mongo PVC, after which you'd boot a `mongo:7` container manually rather than `boot-postgres`.
+
+### 2. Long-form (what the script does)
 
 Notable gotchas not obvious from the upstream docs:
 - **`kopia connect filesystem` does NOT work** on Velero's mirrored repos — they're written via the S3 backend (flat blob layout) which kopia's filesystem backend refuses to open ([kopia/kopia#2065](https://github.com/kopia/kopia/issues/2065)). Workaround: serve the local mirror via `rclone serve s3` and connect kopia to localhost via its S3 backend.
@@ -252,5 +281,7 @@ If a quarterly drill fails, treat it as a P1 incident — the secondary backup i
 
 - [BACKUP_DR.md](BACKUP_DR.md) — overall backup strategy
 - [ONPREM_BACKUP_SETUP.md](ONPREM_BACKUP_SETUP.md) — how to add a new mirror host
+- [`scripts/onprem-backup-restore.sh`](../../scripts/onprem-backup-restore.sh) — Path B restore + drill helper
+- [`scripts/onprem-backup-setup.sh`](../../scripts/onprem-backup-setup.sh) — host-side mirror installer
 - [infrastructure/velero/](../../infrastructure/velero/) — Velero schedules and BackupStorageLocation config
 - [infrastructure/external-secrets/velero-repo-credentials-externalsecret.yaml](../../infrastructure/external-secrets/velero-repo-credentials-externalsecret.yaml) — Kopia password source
