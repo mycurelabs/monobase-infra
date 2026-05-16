@@ -100,7 +100,7 @@ mycure-dashboard:
 
   image:
     repository: ghcr.io/mycurelabs/dashboard
-    tag: "0.2.0"
+    tag: "0.5.0"
     pullPolicy: IfNotPresent
 
   replicaCount: 1
