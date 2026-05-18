@@ -17,5 +17,5 @@ maintainers:
     email: devops@example.com
 
 # Dependencies managed via separate ArgoCD Applications
-# See: argocd/applications/ for PostgreSQL, Valkey, MinIO, Mailpit
+# See: charts/argocd-applications/templates/ for PostgreSQL, Valkey, MinIO, Mailpit
 # This is a pure application chart with no sub-charts

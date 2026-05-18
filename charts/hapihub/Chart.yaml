@@ -17,5 +17,5 @@ maintainers:
     email: devops@example.com
 
 # Dependencies managed via separate ArgoCD Applications
-# See: argocd/applications/ for MongoDB
+# See: charts/argocd-applications/templates/ for MongoDB
 # This is a pure application chart with no sub-charts

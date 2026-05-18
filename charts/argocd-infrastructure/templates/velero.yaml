@@ -35,7 +35,7 @@ spec:
           # created and backups silently complete with only manifests.
           features: EnableCSI
           # BSL/VSL are managed by the velero-resources app (see
-          # infrastructure/velero/templates/backup-locations.yaml), not by
+          # charts/velero-resources/templates/backup-locations.yaml), not by
           # the chart. Empty arrays prevent the chart from rendering its
           # own placeholder BSL/VSL with null fields (which fails admission).
           backupStorageLocation: []

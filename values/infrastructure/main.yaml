@@ -139,7 +139,7 @@ nginxGatewayResources:
     # image does not bundle `headers-more`. Use the bundled njs module
     # (ngx_http_js_module) to delete the header in the response-header phase.
     # Script: charts/nginx-gateway/files/security-headers.js
-    # Mount:  argocd/infrastructure/templates/nginx-gateway.yaml
+    # Mount:  charts/argocd-infrastructure/templates/nginx-gateway.yaml
     - name: nginx-strip-server-header
       snippets:
         - context: http
