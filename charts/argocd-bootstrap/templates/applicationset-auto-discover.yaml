@@ -34,15 +34,17 @@ spec:
 
   generators:
     # Git Files Generator: Scans values/deployments/*.yaml files
+    #
+    # Note on excludes: ArgoCD's Git Files Generator `exclude: true` field is
+    # silently ignored on some CRD versions (kubectl warns "unknown field
+    # spec.generators[0].git.files[N].exclude") — verified on argocd-helm 7.7.12.
+    # Mitigation: keep reference/example deployment yaml outside this path
+    # (see docs/examples/example-deployment.yaml).
     - git:
         repoURL: {{ .Values.argocd.repoURL | required "argocd.repoURL is required" }}
         revision: {{ .Values.argocd.targetRevision | default "HEAD" }}
         files:
-          # Include: scan all YAML files in values/deployments/
           - path: "values/deployments/*.yaml"
-          # Exclude: reference examples
-          - path: "values/deployments/example-*.yaml"
-            exclude: true
 
   # Template for creating root Applications
   template:
