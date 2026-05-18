@@ -82,13 +82,27 @@ markdownlint-cli2 --fix '**/*.md' --ignore node_modules --ignore .git 2>&1 || tr
 """
 
 [tasks.lint-helm]
-description = "Lint all Helm charts under charts/"
+description = "Lint all Helm charts under charts/ with appropriate values"
 run = """
 echo "Linting Helm charts..."
+INFRA_VALUES="values/infrastructure/main.yaml"
+DEPLOY_VALUES="values/deployments/mycure-production.yaml"
 for chart in charts/*/; do
-    if [ -f "$chart/Chart.yaml" ]; then
-        helm lint "$chart" || echo "  ✗ helm lint failed: $chart"
-    fi
+    if [ ! -f "$chart/Chart.yaml" ]; then continue; fi
+    name=$(basename "$chart")
+    case "$name" in
+        # external-dns + cert-manager-issuers are rendered via ApplicationSet
+        # with valuesObject extracted from main.yaml's subkey; standalone with -f
+        # doesn't reproduce the right composition. Skip them from the bulk sweep.
+        external-dns|cert-manager-issuers)
+            continue ;;
+        argocd-bootstrap|argocd-infrastructure|*-resources|*-stores|*-httproute)
+            VFILE="$INFRA_VALUES" ;;
+        *)
+            VFILE="$DEPLOY_VALUES" ;;
+    esac
+    helm lint "$chart" --set argocd.repoURL=https://example/repo.git -f "$VFILE" \\
+        || echo "  ✗ helm lint failed: $chart"
 done
 """
 
@@ -113,13 +127,29 @@ echo "Validating Terraform modules..."
 """
 
 [tasks.validate-helm]
-description = "Validate Helm charts (helm template across all charts/*)"
+description = "Validate Helm charts (helm template across all charts/*); uses appropriate values per chart"
 run = """
 echo "Validating Helm charts..."
+INFRA_VALUES="values/infrastructure/main.yaml"
+DEPLOY_VALUES="values/deployments/mycure-production.yaml"
 for chart in charts/*/; do
-    if [ -f "$chart/Chart.yaml" ]; then
-        helm template test "$chart" --dry-run > /dev/null || echo "  ✗ helm template failed: $chart"
-    fi
+    if [ ! -f "$chart/Chart.yaml" ]; then continue; fi
+    name=$(basename "$chart")
+    # argocd-*, *-resources, *-stores, *-httproute, cert-manager-*, external-dns
+    # consume infrastructure values; everything else consumes deployment values.
+    case "$name" in
+        # external-dns + cert-manager-issuers are rendered via ApplicationSet
+        # with valuesObject extracted from main.yaml's subkey; standalone with -f
+        # doesn't reproduce the right composition. Skip them from the bulk sweep.
+        external-dns|cert-manager-issuers)
+            continue ;;
+        argocd-bootstrap|argocd-infrastructure|*-resources|*-stores|*-httproute)
+            VFILE="$INFRA_VALUES" ;;
+        *)
+            VFILE="$DEPLOY_VALUES" ;;
+    esac
+    helm template test "$chart" --dry-run --set argocd.repoURL=https://example/repo.git -f "$VFILE" > /dev/null \\
+        || echo "  ✗ helm template failed: $chart"
 done
 """
 
