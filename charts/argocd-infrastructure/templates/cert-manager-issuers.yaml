@@ -23,6 +23,8 @@ spec:
       values: |
         issuers:
           {{- toYaml .Values.certManagerIssuers.issuers | nindent 10 }}
+        cloudflareExternalSecret:
+          {{- toYaml (.Values.certManagerIssuers.cloudflareExternalSecret | default dict) | nindent 10 }}
   
   destination:
     server: https://kubernetes.default.svc

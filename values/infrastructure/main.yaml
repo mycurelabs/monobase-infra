@@ -10,6 +10,16 @@ certManager:
 # Cert Manager Resources - ClusterIssuers and certificate configuration
 certManagerIssuers:
   enabled: true
+
+  # ExternalSecret syncing the Cloudflare API token used by DNS-01 ClusterIssuers
+  cloudflareExternalSecret:
+    enabled: true
+    secretStore: gcp-secretstore
+    namespace: cert-manager
+    targetName: mycure-cloudflare-api-token
+    refreshInterval: "1h"
+    remoteKey: "infrastructure-cloudflare-api-token"
+
   issuers:
     # HTTP-01 challenge type (no DNS provider needed)
     - name: letsencrypt-prod
@@ -304,6 +314,72 @@ externalSecrets:
 externalDNS:
   enabled: true  # Automatic DNS via Cloudflare
 
+  # External DNS image configuration
+  image:
+    registry: registry.k8s.io
+    repository: external-dns/external-dns
+    tag: "v0.19.0"
+    pullPolicy: IfNotPresent
+
+  # ExternalSecret syncing Cloudflare API token from GCP Secret Manager
+  externalSecrets:
+    enabled: true
+    secretStore: gcp-secretstore
+    refreshInterval: "1h"
+    remoteKey: "infrastructure-cloudflare-api-token"
+
+  # Multiple External DNS instances — each instance can manage a different
+  # DNS provider and domains.
+  instances:
+    # Primary instance: Cloudflare for mycureapp.com and localfirsthealth.com
+    - name: primary
+      enabled: true
+      provider: cloudflare
+
+      # Manage DNS subdomains across all namespaces
+      domainFilters:
+        - mycureapp.com
+        - localfirsthealth.com
+
+      # Cloudflare-specific configuration
+      cloudflare:
+        proxied: false  # DNS only, no Cloudflare proxy
+        apiTokenSecretRef:
+          name: cloudflare-api-token
+          key: api-token
+
+      # Resource limits
+      resources:
+        requests:
+          cpu: 10m
+          memory: 32Mi
+        limits:
+          cpu: 50m
+          memory: 64Mi
+
+  # Global configuration applied to all instances
+  global:
+    sources:
+      - gateway-httproute
+      - gateway-tcproute
+      - gateway-tlsroute
+      - service
+    policy: sync
+    registry: txt
+    txtPrefix: "external-dns-"
+    logLevel: info
+    logFormat: text
+    interval: 1m
+    triggerLoopOnEvent: true
+
+  # Pod-level security context (PodSecurity restricted compliant)
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 65534
+    fsGroup: 65534
+    seccompProfile:
+      type: RuntimeDefault
+
 # Longhorn - Distributed block storage
 longhorn:
   enabled: false  # Usually use cloud provider storage
@@ -484,3 +560,164 @@ monitoring:
       smarthost: ""  # SMTP server (e.g., smtp.gmail.com:587)
       from: ""  # From email address
       to: ""  # To email address
+
+# =============================================================================
+# ArgoCD Installation Values
+# =============================================================================
+# Consumed by:
+#   - Direct `helm install argocd argo/argo-cd -f values/infrastructure/main.yaml`
+#     during cluster bootstrap (ArgoCD bootstraps itself first, then the rest).
+#   - charts/argocd-bootstrap/ chart for repoURL/targetRevision plumbing into the
+#     ApplicationSet and infrastructure-root Applications.
+
+argocd:
+  # Git repository for GitOps (also used by the bootstrap chart)
+  repoURL: https://github.com/mycurelabs/monobase-infra.git
+  targetRevision: HEAD
+
+  # Global settings
+  global:
+    domain: argocd.localfirsthealth.com
+
+  # Simplified configuration (non-HA)
+  redis-ha:
+    enabled: false
+
+  # Controller (reconciliation engine)
+  controller:
+    replicas: 1
+    metrics:
+      enabled: true
+      serviceMonitor:
+        enabled: false
+    resources:
+      requests:
+        cpu: 250m
+        memory: 768Mi
+      limits:
+        cpu: 1
+        memory: 896Mi
+
+  # Server (API and UI)
+  server:
+    replicas: 1
+    metrics:
+      enabled: true
+      serviceMonitor:
+        enabled: false
+    resources:
+      requests:
+        cpu: 100m
+        memory: 192Mi
+      limits:
+        cpu: 500m
+        memory: 384Mi
+    ingress:
+      enabled: false
+    config:
+      url: https://argocd.localfirsthealth.com
+      repositories: |
+        - type: git
+          url: https://github.com/mycurelabs/monobase-infra.git
+      resource.customizations: |
+        argoproj.io/Application:
+          health.lua: |
+            hs = {}
+            hs.status = "Progressing"
+            hs.message = ""
+            if obj.status ~= nil then
+              if obj.status.health ~= nil then
+                hs.status = obj.status.health.status
+                if obj.status.health.message ~= nil then
+                  hs.message = obj.status.health.message
+                end
+              end
+            end
+            return hs
+    rbacConfig:
+      policy.default: role:readonly
+      policy.csv: |
+        p, role:readonly, applications, get, */*, allow
+        p, role:readonly, projects, get, *, allow
+        g, admin, role:admin
+    extraArgs:
+      - --insecure  # TLS termination at Gateway
+
+  # Repo Server (Git repository interaction)
+  repoServer:
+    replicas: 1
+    metrics:
+      enabled: true
+      serviceMonitor:
+        enabled: false
+    resources:
+      requests:
+        cpu: 100m
+        memory: 1Gi
+      limits:
+        cpu: 1
+        memory: 1536Mi
+
+  # ApplicationSet Controller (App-of-Apps)
+  applicationSet:
+    enabled: true
+    replicas: 1
+    metrics:
+      enabled: true
+      serviceMonitor:
+        enabled: false
+    resources:
+      requests:
+        cpu: 50m
+        memory: 128Mi
+      limits:
+        cpu: 250m
+        memory: 256Mi
+
+  # Notifications Controller
+  notifications:
+    enabled: true
+    argocdUrl: https://argocd.localfirsthealth.com
+    notifiers:
+      service.slack: |
+        token: $slack-token
+      service.email: |
+        host: smtp.gmail.com
+        port: 587
+        from: argocd@localfirsthealth.com
+    templates:
+      template.app-deployed: |
+        message: |
+          Application {{.app.metadata.name}} deployed to {{.app.spec.destination.namespace}}
+      template.app-sync-failed: |
+        message: |
+          Application {{.app.metadata.name}} sync failed
+    triggers:
+      trigger.on-deployed: |
+        - when: app.status.sync.status == 'Synced'
+          send: [app-deployed]
+      trigger.on-sync-failed: |
+        - when: app.status.sync.status == 'Failed'
+          send: [app-sync-failed]
+
+  # Dex (SSO/OAuth) — disabled
+  dex:
+    enabled: false
+
+  configs:
+    secret:
+      createSecret: true
+    ssh:
+      knownHosts: |
+        github.com ssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAQEAq2A7hRGmdnm9tUDbO9IDSwBK6TbQa+PXYPCPy6rbTrTtw7PHkccKrpp0yVhp5HdEIcKr6pLlVDBfOLX9QUsyCOV0wzfjIJNlGEYsdlLJizHhbn2mUjvSAHQqZETYP81eFzLQNnPHt4EVVUh7VfDESU84KezmD5QlWpXLmvU31/yMf+Se8xhHTvKSCZIFImWwoG6mbUoWf9nzpIoaSjB+weqqUUmpaaasXVal72J+UX2B+2RPW3RcT0eOzQgqlJL3RKrTJvdsjE3JEAvGq3lGHSZXy28G3skua2SmVi/w4yCE6gbODqnTWlg7+wC604ydGXA8VJiS5ap43JXiUFFAaQ==
+
+  # Redis (cache) — standard single instance
+  redis:
+    enabled: true
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+      limits:
+        cpu: 250m
+        memory: 128Mi

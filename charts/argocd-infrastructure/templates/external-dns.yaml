@@ -20,8 +20,8 @@ spec:
     path: charts/external-dns
     helm:
       releaseName: external-dns
-      valueFiles:
-        - ../../values/infrastructure/external-dns.yaml
+      valuesObject:
+        {{- toYaml .Values.externalDNS | nindent 8 }}
   
   destination:
     server: https://kubernetes.default.svc
