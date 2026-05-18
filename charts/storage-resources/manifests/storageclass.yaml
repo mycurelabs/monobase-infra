@@ -1,0 +1,85 @@
+# Longhorn StorageClass
+# Deployed automatically by ArgoCD when longhorn.enabled=true
+#
+# This creates the default StorageClass for the cluster using Longhorn distributed storage.
+# Applications use this via global.storage.className="" (empty = cluster default)
+
+---
+# Longhorn Encrypted StorageClass with 3-Replica Policy
+# This is the primary StorageClass for all StatefulSets
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: longhorn
+  annotations:
+    storageclass.kubernetes.io/is-default-class: "true"  # Make this the default
+  labels:
+    app.kubernetes.io/name: longhorn-storageclass
+    app.kubernetes.io/component: storage
+    app.kubernetes.io/managed-by: argocd
+provisioner: driver.longhorn.io
+allowVolumeExpansion: true  # Allow online volume expansion
+reclaimPolicy: Retain  # Don't delete volumes when PVC is deleted (safety)
+volumeBindingMode: Immediate
+parameters:
+  # Replication
+  numberOfReplicas: "3"  # High availability - tolerate 2 node failures
+  staleReplicaTimeout: "30"  # Minutes before removing stale replicas
+  
+  # Performance
+  dataLocality: "best-effort"  # Try to schedule pod on node with data
+  diskSelector: ""  # Use all available disks
+  nodeSelector: ""  # Use all nodes
+  
+  # Encryption
+  encrypted: "true"  # Encrypt volumes at rest
+  
+  # Snapshots
+  recurringJobSelector: '[{"name":"snap-daily", "isGroup":true}]'
+  
+  # Filesystem
+  fsType: "ext4"  # Default filesystem
+
+---
+# Longhorn Fast StorageClass (2 replicas, for non-critical data)
+# Optional: Use for cache, temporary data, development environments
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: longhorn-fast
+  labels:
+    app.kubernetes.io/name: longhorn-fast-storageclass
+    app.kubernetes.io/component: storage
+    app.kubernetes.io/managed-by: argocd
+provisioner: driver.longhorn.io
+allowVolumeExpansion: true
+reclaimPolicy: Delete  # Auto-delete volumes (non-critical data)
+volumeBindingMode: Immediate
+parameters:
+  numberOfReplicas: "2"  # Lower redundancy for speed
+  staleReplicaTimeout: "30"
+  dataLocality: "strict"  # Force pod on data node (better performance)
+  encrypted: "false"  # No encryption for speed
+  fsType: "ext4"
+
+---
+# Longhorn Archive StorageClass (1 replica, for backups/archives)
+# Optional: Use for one-time backup storage, log archives
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: longhorn-archive
+  labels:
+    app.kubernetes.io/name: longhorn-archive-storageclass
+    app.kubernetes.io/component: storage
+    app.kubernetes.io/managed-by: argocd
+provisioner: driver.longhorn.io
+allowVolumeExpansion: true
+reclaimPolicy: Retain
+volumeBindingMode: Immediate
+parameters:
+  numberOfReplicas: "1"  # Minimal redundancy (cost-effective)
+  staleReplicaTimeout: "30"
+  dataLocality: "disabled"  # Don't care about locality
+  encrypted: "true"  # Still encrypt archives
+  fsType: "ext4"

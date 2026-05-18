@@ -1,0 +1,22 @@
+{{- if and .Values.velero.enabled (eq .Values.velero.provider "digitalocean") }}
+---
+# Velero-owned VolumeSnapshotClass for CSI-based volume backups.
+#
+# A duplicate of the DOKS-managed `do-block-storage` class (same driver),
+# created so we can attach `velero.io/csi-volumesnapshot-class: "true"`
+# without fighting DOKS reconciliation on the managed class.
+#
+# deletionPolicy: Retain — Velero-owned snapshots survive PVC deletion,
+# which is what we want for backups (otherwise removing a workload would
+# wipe its history).
+apiVersion: snapshot.storage.k8s.io/v1
+kind: VolumeSnapshotClass
+metadata:
+  name: do-block-storage-velero
+  labels:
+    app.kubernetes.io/name: velero
+    app.kubernetes.io/component: volume-snapshots
+    velero.io/csi-volumesnapshot-class: "true"
+driver: dobs.csi.digitalocean.com
+deletionPolicy: Retain
+{{- end }}

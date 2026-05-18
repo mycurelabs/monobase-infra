@@ -1,0 +1,169 @@
+# Kyverno Policy: Pod Security Standards (Restricted Profile)
+# Enforces Kubernetes Pod Security Standards at the highest security level
+
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: pod-security
+  annotations:
+    policies.kyverno.io/title: Pod Security Standards (Restricted)
+    policies.kyverno.io/category: Pod Security Standards
+    policies.kyverno.io/severity: high
+    policies.kyverno.io/subject: Pod
+    policies.kyverno.io/description: >-
+      Enforces the restricted Pod Security Standards profile.
+      All pods must run as non-root, drop all capabilities, use seccomp,
+      and prevent privilege escalation.
+spec:
+  validationFailureAction: enforce  # Change to "audit" for testing
+  background: true  # Also check existing resources
+
+  rules:
+  # Rule 1: Require runAsNonRoot
+  - name: require-run-as-non-root
+    match:
+      any:
+      - resources:
+          kinds:
+          - Pod
+    validate:
+      message: >-
+        Pod must set securityContext.runAsNonRoot=true.
+        Running containers as root is a security risk.
+      pattern:
+        spec:
+          securityContext:
+            runAsNonRoot: true
+          containers:
+          - securityContext:
+              runAsNonRoot: true
+
+  # Rule 2: Disallow privilege escalation
+  - name: disallow-privilege-escalation
+    match:
+      any:
+      - resources:
+          kinds:
+          - Pod
+    validate:
+      message: >-
+        Privilege escalation must be disabled.
+        Containers must set securityContext.allowPrivilegeEscalation=false.
+      pattern:
+        spec:
+          containers:
+          - securityContext:
+              allowPrivilegeEscalation: false
+
+  # Rule 3: Require capabilities to be dropped
+  - name: require-drop-all-capabilities
+    match:
+      any:
+      - resources:
+          kinds:
+          - Pod
+    validate:
+      message: >-
+        All capabilities must be dropped.
+        Containers must set securityContext.capabilities.drop=[ALL].
+      pattern:
+        spec:
+          containers:
+          - securityContext:
+              capabilities:
+                drop:
+                - ALL
+
+  # Rule 4: Require seccomp profile
+  - name: require-seccomp-profile
+    match:
+      any:
+      - resources:
+          kinds:
+          - Pod
+    validate:
+      message: >-
+        Seccomp profile must be set.
+        Pod must set securityContext.seccompProfile.type=RuntimeDefault.
+      anyPattern:
+      - spec:
+          securityContext:
+            seccompProfile:
+              type: RuntimeDefault
+      - spec:
+          securityContext:
+            seccompProfile:
+              type: Localhost
+
+  # Rule 5: Disallow host namespaces
+  - name: disallow-host-namespaces
+    match:
+      any:
+      - resources:
+          kinds:
+          - Pod
+    validate:
+      message: >-
+        Host namespaces (hostNetwork, hostPID, hostIPC) are not allowed.
+      pattern:
+        spec:
+          =(hostNetwork): false
+          =(hostPID): false
+          =(hostIPC): false
+
+  # Rule 6: Disallow host path volumes
+  - name: disallow-host-path-volumes
+    match:
+      any:
+      - resources:
+          kinds:
+          - Pod
+    validate:
+      message: >-
+        HostPath volumes are not allowed.
+      pattern:
+        spec:
+          =(volumes):
+          - =(hostPath):
+              X(path): "*"
+
+  # Rule 7: Disallow privileged containers
+  - name: disallow-privileged-containers
+    match:
+      any:
+      - resources:
+          kinds:
+          - Pod
+    validate:
+      message: >-
+        Privileged containers are not allowed.
+        Containers must not set securityContext.privileged=true.
+      pattern:
+        spec:
+          containers:
+          - =(securityContext):
+              =(privileged): false
+
+  # Rule 8: Restrict volume types
+  - name: restrict-volume-types
+    match:
+      any:
+      - resources:
+          kinds:
+          - Pod
+    validate:
+      message: >-
+        Only allowed volume types: configMap, downwardAPI, emptyDir,
+        persistentVolumeClaim, projected, secret.
+      deny:
+        conditions:
+          any:
+          - key: "{{ request.object.spec.volumes[].hostPath || `[]` | length(@) }}"
+            operator: GreaterThan
+            value: 0
+          - key: "{{ request.object.spec.volumes[].gcePersistentDisk || `[]` | length(@) }}"
+            operator: GreaterThan
+            value: 0
+          - key: "{{ request.object.spec.volumes[].awsElasticBlockStore || `[]` | length(@) }}"
+            operator: GreaterThan
+            value: 0

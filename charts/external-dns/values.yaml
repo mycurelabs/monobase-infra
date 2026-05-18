@@ -4,6 +4,15 @@
 # Global enable/disable toggle
 enabled: true
 
+# ExternalSecret: DNS-provider API token (Cloudflare) synced from a ClusterSecretStore
+externalSecrets:
+  enabled: false
+  secretStore: gcp-secretstore
+  refreshInterval: "1h"
+  # remoteKey must be set when enabled — the secret-manager key whose payload
+  # holds the Cloudflare API token used by external-dns.
+  remoteKey: ""
+
 # External DNS image configuration
 image:
   registry: registry.k8s.io

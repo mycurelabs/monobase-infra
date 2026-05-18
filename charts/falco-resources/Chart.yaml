@@ -1,0 +1,11 @@
+apiVersion: v2
+name: falco-resources
+description: Falco runtime-security rules (api + database custom rule sets)
+type: application
+version: 1.0.0
+appVersion: "1.0"
+keywords:
+  - falco
+  - security
+maintainers:
+  - name: MyCure Labs

@@ -264,19 +264,35 @@ externalSecrets:
   enabled: true
   version: 0.9.11
   provider: gcp
-  
+
+  # ClusterSecretStores rendered by charts/external-secrets-stores chart
+  stores:
+    - name: gcp-secretstore
+      provider: gcp
+      gcp:
+        projectId: "mc-v4-prod"
+        auth:
+          workloadIdentity:
+            enabled: false
+          serviceAccountKey:
+            enabled: true
+            secretRef:
+              name: gcpsm-secret
+              key: secret-access-credentials
+              namespace: external-secrets-system
+
   # AWS Secrets Manager configuration
   aws:
     region: us-east-1
     roleArn: ""
     serviceAccountName: external-secrets-sa
-  
+
   # Azure Key Vault configuration
   azure:
     vaultUrl: ""
     identityId: ""
     tenantId: ""
-  
+
   # GCP Secret Manager configuration
   gcp:
     projectId: ""
@@ -311,6 +327,13 @@ velero:
   # and forward; we jump to 1.18.x for ~14 months of additional fixes.
   version: 12.0.1
   provider: digitalocean
+
+  # ExternalSecrets rendered by charts/velero-resources templates
+  externalSecrets:
+    enabled: true
+    secretStore: gcp-secretstore
+    credentialsKey: monobase-digitalocean-spaces
+    repoCredentialsKey: monobase-velero-repo-password
   
   # AWS S3 configuration
   aws:

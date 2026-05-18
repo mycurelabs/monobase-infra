@@ -1,0 +1,2 @@
+# Default values for falco-resources chart.
+namespace: falco

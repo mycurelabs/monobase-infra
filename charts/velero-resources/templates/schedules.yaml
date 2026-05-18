@@ -1,0 +1,133 @@
+{{- if .Values.velero.enabled }}
+---
+# Daily Infrastructure Backup Schedule
+# Backs up all infrastructure namespaces daily at 3 AM
+
+apiVersion: velero.io/v1
+kind: Schedule
+metadata:
+  name: infrastructure-daily
+  namespace: velero
+  labels:
+    app.kubernetes.io/name: velero
+    app.kubernetes.io/component: backup-schedule
+    backup-tier: infrastructure-daily
+spec:
+  schedule: {{ .Values.velero.schedules.infrastructure.daily.schedule | default "0 3 * * *" | quote }}
+  template:
+    includedNamespaces:
+      - cert-manager
+      - envoy-gateway-system
+      - external-secrets-system
+      - longhorn-system
+      - velero
+      - monitoring
+      - kube-system
+      - argocd
+      {{- if .Values.kyverno.enabled }}
+      - kyverno
+      {{- end }}
+      {{- if .Values.falco.enabled }}
+      - falco
+      {{- end }}
+    excludedNamespaces:
+      - default
+      - kube-node-lease
+      - kube-public
+    includeClusterResources: false
+    storageLocation: default
+    ttl: {{ .Values.velero.schedules.infrastructure.daily.retention | default "720h" }}
+    snapshotVolumes: true
+    defaultVolumesToFsBackup: false
+    snapshotMoveData: true
+
+---
+# Weekly Cluster Resources Backup Schedule
+
+apiVersion: velero.io/v1
+kind: Schedule
+metadata:
+  name: cluster-resources-weekly
+  namespace: velero
+  labels:
+    app.kubernetes.io/name: velero
+    app.kubernetes.io/component: backup-schedule
+    backup-tier: cluster-weekly
+spec:
+  schedule: {{ .Values.velero.schedules.cluster.weekly.schedule | default "0 4 * * 0" | quote }}
+  template:
+    includeClusterResources: true
+    includedResources:
+      - customresourcedefinitions
+      - clusterroles
+      - clusterrolebindings
+      - storageclasses
+      - volumesnapshotclasses
+      - ingressclasses
+      - priorityclasses
+      - runtimeclasses
+      - validatingwebhookconfigurations
+      - mutatingwebhookconfigurations
+    excludedNamespaces:
+      - "*"
+    storageLocation: default
+    ttl: {{ .Values.velero.schedules.cluster.weekly.retention | default "2160h" }}
+    snapshotVolumes: false
+
+{{- if .Values.velero.schedules.production.daily.enabled }}
+---
+# Daily Production Workloads Backup Schedule
+
+apiVersion: velero.io/v1
+kind: Schedule
+metadata:
+  name: production-daily
+  namespace: velero
+  labels:
+    app.kubernetes.io/name: velero
+    app.kubernetes.io/component: backup-schedule
+    backup-tier: production-daily
+spec:
+  schedule: {{ .Values.velero.schedules.production.daily.schedule | default "0 2 * * *" | quote }}
+  template:
+    includedNamespaces:
+      {{- range .Values.velero.schedules.production.daily.namespaces }}
+      - {{ . }}
+      {{- end }}
+    includeClusterResources: false
+    storageLocation: default
+    ttl: {{ .Values.velero.schedules.production.daily.retention | default "720h" }}
+    snapshotVolumes: true
+    defaultVolumesToFsBackup: false
+    snapshotMoveData: true
+{{- end }}
+
+{{- if .Values.velero.schedules.infrastructure.hourly.enabled }}
+---
+# Hourly Infrastructure Backup Schedule (Optional)
+
+apiVersion: velero.io/v1
+kind: Schedule
+metadata:
+  name: infrastructure-hourly
+  namespace: velero
+  labels:
+    app.kubernetes.io/name: velero
+    app.kubernetes.io/component: backup-schedule
+    backup-tier: infrastructure-hourly
+spec:
+  schedule: {{ .Values.velero.schedules.infrastructure.hourly.schedule | default "0 * * * *" | quote }}
+  template:
+    includedNamespaces:
+      - cert-manager
+      - envoy-gateway-system
+      - external-secrets-system
+      - monitoring
+      - argocd
+    includeClusterResources: false
+    storageLocation: default
+    ttl: {{ .Values.velero.schedules.infrastructure.hourly.retention | default "72h" }}
+    snapshotVolumes: true
+    defaultVolumesToFsBackup: false
+{{- end }}
+{{- end }}

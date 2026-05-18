@@ -18,11 +18,17 @@ spec:
   source:
     repoURL: {{ .Values.argocd.repoURL }}
     targetRevision: {{ .Values.argocd.targetRevision }}
-    path: infrastructure/velero
+    path: charts/velero-resources
     helm:
       releaseName: velero-resources
       valueFiles:
         - ../../values/infrastructure/main.yaml
+      valuesObject:
+        externalSecrets:
+          enabled: {{ .Values.velero.externalSecrets.enabled | default false }}
+          secretStore: {{ .Values.velero.externalSecrets.secretStore | default "gcp-secretstore" }}
+          credentialsKey: {{ .Values.velero.externalSecrets.credentialsKey | default "monobase-digitalocean-spaces" }}
+          repoCredentialsKey: {{ .Values.velero.externalSecrets.repoCredentialsKey | default "monobase-velero-repo-password" }}
 
   destination:
     server: https://kubernetes.default.svc

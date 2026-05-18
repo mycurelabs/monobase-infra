@@ -21,7 +21,7 @@ spec:
   source:
     repoURL: {{ .Values.argocd.repoURL }}
     targetRevision: {{ .Values.argocd.targetRevision }}
-    path: infrastructure/storage
+    path: charts/storage-resources/manifests
   
   destination:
     server: https://kubernetes.default.svc

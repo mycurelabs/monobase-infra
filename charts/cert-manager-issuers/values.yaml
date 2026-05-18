@@ -2,6 +2,17 @@
 # This is a YAML-formatted file.
 # Declare variables to be passed into your templates.
 
+# ExternalSecret syncing a Cloudflare API token into the cert-manager namespace.
+# Required when issuers use a DNS-01 challenge with apiTokenSecretRef pointing
+# at a secret name that doesn't exist as a static manifest.
+cloudflareExternalSecret:
+  enabled: false
+  secretStore: gcp-secretstore
+  namespace: cert-manager
+  targetName: mycure-cloudflare-api-token
+  refreshInterval: "1h"
+  remoteKey: "infrastructure-cloudflare-api-token"
+
 # ClusterIssuer configurations
 # Each issuer in this array will create a ClusterIssuer resource
 issuers: []

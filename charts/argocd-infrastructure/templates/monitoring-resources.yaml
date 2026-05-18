@@ -21,9 +21,7 @@ spec:
   source:
     repoURL: {{ .Values.argocd.repoURL }}
     targetRevision: {{ .Values.argocd.targetRevision }}
-    path: infrastructure/monitoring
-    
-    # Exclude helm-values.yaml (used by main monitoring app)
+    path: charts/monitoring-resources/manifests
     directory:
       exclude: 'helm-values.yaml'
   

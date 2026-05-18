@@ -1,0 +1,12 @@
+apiVersion: v2
+name: velero-resources
+description: Velero backup configuration — backup locations, schedules, snapshot classes, ExternalSecrets
+type: application
+version: 1.0.0
+appVersion: "1.0"
+keywords:
+  - velero
+  - backup
+  - disaster-recovery
+maintainers:
+  - name: MyCure Labs

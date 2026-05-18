@@ -1,0 +1,68 @@
+# ServiceMonitors for Metrics Collection
+# Deployed automatically by ArgoCD when monitoring.enabled=true
+#
+# These ServiceMonitors tell Prometheus which services to scrape for metrics
+
+---
+# Monobase API ServiceMonitor
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: monobase-api
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: monobase-api-monitor
+    app.kubernetes.io/component: monitoring
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: api
+  namespaceSelector:
+    any: true  # Monitor API in all namespaces
+  endpoints:
+    - port: metrics
+      interval: 30s
+      path: /metrics
+      scheme: http
+
+---
+# PostgreSQL ServiceMonitor
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: postgresql
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: postgresql-monitor
+    app.kubernetes.io/component: monitoring
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: postgresql
+  namespaceSelector:
+    any: true
+  endpoints:
+    - port: metrics
+      interval: 30s
+      path: /metrics
+
+---
+# Valkey (Redis) ServiceMonitor
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: valkey
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: valkey-monitor
+    app.kubernetes.io/component: monitoring
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: valkey
+  namespaceSelector:
+    any: true
+  endpoints:
+    - port: metrics
+      interval: 30s
+      path: /metrics

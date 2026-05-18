@@ -1,0 +1,17 @@
+apiVersion: v2
+name: external-secrets-stores
+description: Multi-provider ClusterSecretStore management for External Secrets Operator
+type: application
+version: 1.0.0
+appVersion: "1.0"
+
+keywords:
+  - external-secrets
+  - secrets
+  - gcp
+  - aws
+  - azure
+
+maintainers:
+  - name: Monobase
+    email: hello@monobase.com

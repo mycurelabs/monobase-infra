@@ -167,12 +167,18 @@ async function render(mode: "before" | "after"): Promise<void> {
 
   // 3. Per-chart × per-deployment renders (catches any chart-level changes
   //    independent of ApplicationSet structure).
+  const infraOnlyCharts = new Set([
+    "external-secrets-stores", "cert-manager-issuers", "external-dns",
+    "monitoring-resources", "falco-resources", "kyverno-resources",
+    "velero-resources", "storage-resources", "minio-httproute",
+  ]);
   for (const env of deployments) {
     const envOut = join(outRoot, env);
     mkdirSync(envOut, { recursive: true });
     const envValues = join(REPO_ROOT, "values", "deployments", `${env}.yaml`);
     for (const chart of charts) {
-      if (chart.startsWith("argocd-")) continue; // covered by _apps/_infra above
+      if (chart.startsWith("argocd-")) continue;     // covered by _apps/_infra above
+      if (infraOnlyCharts.has(chart)) continue;       // belongs with infra values, not deployment values
       const out = join(envOut, `${chart}.yaml`);
       const r = await helmTemplate(
         chart,

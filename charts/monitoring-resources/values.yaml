@@ -1,0 +1,4 @@
+# Default values for monitoring-resources chart.
+# Manifests are templated against {{ .Values.namespace }} where applicable.
+
+namespace: monitoring

@@ -1,0 +1,205 @@
+# Falco Custom Rules: Monobase API
+# Detection rules specific to the Monobase API application
+
+# ========== Lists ==========
+
+- list: database_credential_files
+  items: [.env, database.yml, credentials.json, config/database.json, .env.production, .env.local]
+
+- list: api_config_files
+  items: [config.json, app.config, settings.json, application.yml]
+
+- list: sensitive_api_dirs
+  items: [/app/secrets, /run/secrets, /app/.secrets, /var/secrets]
+
+- list: known_api_processes
+  items: [node, bun, deno, tsx, ts-node]
+
+- list: api_package_managers
+  items: [npm, yarn, pnpm, bun]
+
+# ========== Macros ==========
+
+- macro: api_container
+  condition: >
+    container and
+    (container.image.repository contains "monobase-api" or
+     container.name contains "api")
+
+- macro: api_namespace
+  condition: k8s.ns.name glob "*-prod" or k8s.ns.name glob "*-staging"
+
+- macro: production_namespace
+  condition: k8s.ns.name glob "*-prod"
+
+- macro: known_safe_api_tools
+  condition: proc.name in (healthcheck, metrics, readiness-probe, liveness-probe)
+
+# ========== Rules ==========
+
+# Rule 1: Database Credentials Access
+- rule: Database Credentials File Access in API
+  desc: Detect when database credential files are accessed in API container
+  condition: >
+    open_read and
+    api_container and
+    fd.name pmatch (database_credential_files) and
+    not known_safe_api_tools
+  output: >
+    Database credentials accessed in API container
+    (user=%user.name
+     container=%container.name
+     namespace=%k8s.ns.name
+     file=%fd.name
+     command=%proc.cmdline
+     parent=%proc.pname
+     pid=%proc.pid)
+  priority: WARNING
+  tags: [api, credentials, database]
+
+# Rule 2: API Config Modification
+- rule: API Configuration File Modified
+  desc: Detect modifications to API configuration files
+  condition: >
+    open_write and
+    api_container and
+    fd.name pmatch (api_config_files) and
+    not proc.name in (api_package_managers)
+  output: >
+    API configuration file modified
+    (user=%user.name
+     container=%container.name
+     file=%fd.name
+     command=%proc.cmdline
+     pid=%proc.pid)
+  priority: ERROR
+  tags: [api, config, modification]
+
+# Rule 3: Unexpected Process in API Container
+- rule: Unexpected Process Spawned in API
+  desc: Detect processes that should not run in API container
+  condition: >
+    spawned_process and
+    api_container and
+    not proc.name in (known_api_processes) and
+    not known_safe_api_tools and
+    not proc.name in (sh, bash, zsh)  # Shells caught by default rules
+  output: >
+    Unexpected process spawned in API container
+    (user=%user.name
+     container=%container.name
+     process=%proc.name
+     command=%proc.cmdline
+     parent=%proc.pname
+     pid=%proc.pid)
+  priority: WARNING
+  tags: [api, process]
+
+# Rule 4: Sensitive Directory Access
+- rule: Access to Sensitive API Directory
+  desc: Detect access to directories containing sensitive data
+  condition: >
+    open_read and
+    api_container and
+    fd.directory pmatch (sensitive_api_dirs)
+  output: >
+    Sensitive directory accessed in API container
+    (user=%user.name
+     container=%container.name
+     directory=%fd.directory
+     file=%fd.name
+     command=%proc.cmdline
+     pid=%proc.pid)
+  priority: WARNING
+  tags: [api, sensitive, directory]
+
+# Rule 5: Package Manager in Production API
+- rule: Package Manager Execution in Production API
+  desc: Detect package manager execution in production (should be immutable)
+  condition: >
+    spawned_process and
+    production_namespace and
+    api_container and
+    proc.name in (api_package_managers)
+  output: >
+    Package manager executed in production API container
+    (user=%user.name
+     container=%container.name
+     namespace=%k8s.ns.name
+     package_manager=%proc.name
+     command=%proc.cmdline
+     pid=%proc.pid)
+  priority: ERROR
+  tags: [api, package-manager, production]
+
+# Rule 6: API Binary Modification
+- rule: API Binary or Library Modified
+  desc: Detect modification to API binaries or libraries (potential backdoor)
+  condition: >
+    open_write and
+    api_container and
+    (fd.directory=/app/node_modules or
+     fd.directory=/usr/local/lib or
+     fd.name glob "*.so")
+  output: >
+    API binary or library modified
+    (user=%user.name
+     container=%container.name
+     file=%fd.name
+     directory=%fd.directory
+     command=%proc.cmdline
+     pid=%proc.pid)
+  priority: CRITICAL
+  tags: [api, binary, modification, backdoor]
+
+# Rule 7: Outbound Connection from API to Unexpected Host
+- rule: Unexpected Outbound Connection from API
+  desc: Detect API connecting to hosts outside allowed list
+  condition: >
+    outbound and
+    api_container and
+    not fd.sip.name in (db, postgresql, redis, valkey, minio, s3.amazonaws.com) and
+    not fd.sport in (443, 80, 5432, 6379, 9000)  # HTTPS, HTTP, Postgres, Redis, MinIO
+  output: >
+    Unexpected outbound connection from API
+    (user=%user.name
+     container=%container.name
+     connection=%fd.name
+     destination=%fd.sip.name:%fd.sport
+     process=%proc.name
+     command=%proc.cmdline
+     pid=%proc.pid)
+  priority: WARNING
+  tags: [api, network, outbound]
+
+# Rule 8: High Volume of Failed Authentication in API Logs
+# Note: This is a conceptual rule - actual implementation depends on log parsing
+- rule: Suspicious API Authentication Pattern
+  desc: Detect suspicious authentication patterns (potential brute force)
+  condition: >
+    evt.type=write and
+    api_container and
+    fd.name=/dev/stdout and
+    evt.buffer contains "authentication failed" and
+    evt.count > 10
+  output: >
+    High volume of authentication failures in API
+    (container=%container.name
+     namespace=%k8s.ns.name
+     failures=%evt.count)
+  priority: WARNING
+  tags: [api, authentication, brute-force]
+
+# Usage Examples:
+#
+# Test Rule 1 (Database Credentials):
+# kubectl exec -it api-pod -- cat /app/.env
+#
+# Test Rule 2 (Config Modification):
+# kubectl exec -it api-pod -- echo "malicious=true" >> /app/config.json
+#
+# Test Rule 5 (Package Manager):
+# kubectl exec -it api-pod -- npm install malicious-package
+#
+# Test Rule 6 (Binary Modification):
+# kubectl exec -it api-pod -- echo "backdoor" >> /app/node_modules/express/index.js

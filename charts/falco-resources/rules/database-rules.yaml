@@ -1,0 +1,251 @@
+# Falco Custom Rules: PostgreSQL Database
+# Detection rules specific to PostgreSQL database containers
+
+# ========== Lists ==========
+
+- list: postgres_data_dirs
+  items: [/var/lib/postgresql/data, /bitnami/postgresql/data, /pgdata]
+
+- list: postgres_config_files
+  items: [postgresql.conf, pg_hba.conf, pg_ident.conf, recovery.conf]
+
+- list: postgres_backup_dirs
+  items: [/backups, /var/backups, /pgbackup]
+
+- list: known_postgres_processes
+  items: [postgres, postmaster, pg_dump, pg_restore, psql, pg_basebackup]
+
+- list: postgres_system_users
+  items: [postgres, postgresql]
+
+# ========== Macros ==========
+
+- macro: postgres_container
+  condition: >
+    container and
+    (container.image.repository contains "postgresql" or
+     container.image.repository contains "postgres" or
+     container.name contains "postgresql" or
+     container.name contains "postgres")
+
+- macro: production_namespace
+  condition: k8s.ns.name glob "*-prod"
+
+- macro: known_postgres_tools
+  condition: >
+    proc.name in (known_postgres_processes) or
+    proc.pname in (known_postgres_processes)
+
+# ========== Rules ==========
+
+# Rule 1: Direct Database File Access
+- rule: Direct PostgreSQL Data File Access
+  desc: Detect direct access to PostgreSQL data files (bypassing postgres process)
+  condition: >
+    open_read and
+    postgres_container and
+    fd.directory pmatch (postgres_data_dirs) and
+    not known_postgres_tools and
+    not proc.name in (tar, gzip, backup-agent)
+  output: >
+    Direct access to PostgreSQL data files (potential data theft)
+    (user=%user.name
+     container=%container.name
+     namespace=%k8s.ns.name
+     file=%fd.name
+     directory=%fd.directory
+     process=%proc.name
+     command=%proc.cmdline
+     pid=%proc.pid)
+  priority: CRITICAL
+  tags: [database, data-theft, postgresql]
+
+# Rule 2: PostgreSQL Config Modification
+- rule: PostgreSQL Configuration File Modified
+  desc: Detect modifications to PostgreSQL configuration files
+  condition: >
+    open_write and
+    postgres_container and
+    fd.name pmatch (postgres_config_files) and
+    not known_postgres_tools
+  output: >
+    PostgreSQL configuration file modified
+    (user=%user.name
+     container=%container.name
+     file=%fd.name
+     process=%proc.name
+     command=%proc.cmdline
+     pid=%proc.pid)
+  priority: ERROR
+  tags: [database, config, modification, postgresql]
+
+# Rule 3: Unauthorized Process in Database Container
+- rule: Unexpected Process in PostgreSQL Container
+  desc: Detect processes that should not run in database container
+  condition: >
+    spawned_process and
+    postgres_container and
+    not proc.name in (known_postgres_processes) and
+    not proc.name in (sh, bash)  # Shells caught by default rules
+  output: >
+    Unexpected process spawned in PostgreSQL container
+    (user=%user.name
+     container=%container.name
+     process=%proc.name
+     command=%proc.cmdline
+     parent=%proc.pname
+     pid=%proc.pid)
+  priority: WARNING
+  tags: [database, process, postgresql]
+
+# Rule 4: PostgreSQL Backup Tampering
+- rule: PostgreSQL Backup File Modification
+  desc: Detect modifications to PostgreSQL backup files
+  condition: >
+    (open_write or rename or unlink) and
+    postgres_container and
+    fd.directory pmatch (postgres_backup_dirs)
+  output: >
+    PostgreSQL backup file modified or deleted
+    (user=%user.name
+     container=%container.name
+     operation=%evt.type
+     file=%fd.name
+     directory=%fd.directory
+     process=%proc.name
+     command=%proc.cmdline
+     pid=%proc.pid)
+  priority: CRITICAL
+  tags: [database, backup, tampering, postgresql]
+
+# Rule 5: Non-Postgres User Running Database Process
+- rule: PostgreSQL Process Run by Non-Postgres User
+  desc: Detect PostgreSQL processes running as non-postgres user
+  condition: >
+    spawned_process and
+    postgres_container and
+    proc.name in (known_postgres_processes) and
+    not user.name in (postgres_system_users)
+  output: >
+    PostgreSQL process run by unauthorized user
+    (user=%user.name
+     expected_user=postgres
+     container=%container.name
+     process=%proc.name
+     command=%proc.cmdline
+     pid=%proc.pid)
+  priority: ERROR
+  tags: [database, privilege, postgresql]
+
+# Rule 6: PostgreSQL Data Directory Creation/Deletion
+- rule: PostgreSQL Data Directory Structure Changed
+  desc: Detect creation or deletion of directories in PostgreSQL data directory
+  condition: >
+    (mkdir or rmdir) and
+    postgres_container and
+    fd.directory pmatch (postgres_data_dirs)
+  output: >
+    PostgreSQL data directory structure changed
+    (user=%user.name
+     container=%container.name
+     operation=%evt.type
+     directory=%fd.name
+     process=%proc.name
+     command=%proc.cmdline
+     pid=%proc.pid)
+  priority: WARNING
+  tags: [database, directory, postgresql]
+
+# Rule 7: PostgreSQL Port Scan Detection
+- rule: Port Scan to PostgreSQL
+  desc: Detect port scanning targeting PostgreSQL
+  condition: >
+    inbound and
+    postgres_container and
+    fd.sport=5432 and
+    evt.count > 10 and
+    evt.delta < 1000  # Multiple connections within 1 second
+  output: >
+    Possible port scan detected on PostgreSQL
+    (source=%fd.cip
+     destination=%fd.sip
+     port=%fd.sport
+     connections=%evt.count
+     container=%container.name)
+  priority: WARNING
+  tags: [database, network, port-scan, postgresql]
+
+# Rule 8: PostgreSQL Superuser Creation
+- rule: PostgreSQL Superuser Account Created
+  desc: Detect creation of new PostgreSQL superuser accounts
+  condition: >
+    spawned_process and
+    postgres_container and
+    proc.name=psql and
+    proc.cmdline contains "CREATE USER" and
+    proc.cmdline contains "SUPERUSER"
+  output: >
+    PostgreSQL superuser account created
+    (user=%user.name
+     container=%container.name
+     command=%proc.cmdline
+     pid=%proc.pid)
+  priority: WARNING
+  tags: [database, privilege-escalation, postgresql]
+
+# Rule 9: PostgreSQL replication.conf Modification
+- rule: PostgreSQL Replication Config Modified
+  desc: Detect modifications to replication configuration
+  condition: >
+    open_write and
+    postgres_container and
+    (fd.name=recovery.conf or
+     fd.name=standby.signal or
+     fd.name=postgresql.auto.conf)
+  output: >
+    PostgreSQL replication configuration modified
+    (user=%user.name
+     container=%container.name
+     file=%fd.name
+     process=%proc.name
+     command=%proc.cmdline
+     pid=%proc.pid)
+  priority: ERROR
+  tags: [database, replication, config, postgresql]
+
+# Rule 10: High Volume of Failed Connections
+- rule: High Volume of Failed PostgreSQL Connections
+  desc: Detect potential brute force attack on PostgreSQL
+  condition: >
+    inbound and
+    postgres_container and
+    fd.sport=5432 and
+    evt.failed=true and
+    evt.count > 20
+  output: >
+    High volume of failed PostgreSQL connections (potential brute force)
+    (source=%fd.cip
+     destination=%fd.sip
+     port=%fd.sport
+     failed_attempts=%evt.count
+     container=%container.name
+     namespace=%k8s.ns.name)
+  priority: WARNING
+  tags: [database, authentication, brute-force, postgresql]
+
+# Usage Examples:
+#
+# Test Rule 1 (Direct Data File Access):
+# kubectl exec -it postgresql-0 -- cat /var/lib/postgresql/data/base/16384/1234
+#
+# Test Rule 2 (Config Modification):
+# kubectl exec -it postgresql-0 -- echo "malicious=true" >> /var/lib/postgresql/data/postgresql.conf
+#
+# Test Rule 3 (Unexpected Process):
+# kubectl exec -it postgresql-0 -- curl http://malicious.com
+#
+# Test Rule 4 (Backup Tampering):
+# kubectl exec -it postgresql-0 -- rm /backups/daily-backup.sql
+#
+# Test Rule 8 (Superuser Creation):
+# kubectl exec -it postgresql-0 -- psql -U postgres -c "CREATE USER hacker SUPERUSER PASSWORD 'backdoor';"
