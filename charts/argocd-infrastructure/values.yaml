@@ -1,0 +1,100 @@
+# Default values for argocd-infrastructure chart.
+#
+# These defaults render an empty infrastructure (all components disabled) when
+# the chart is helm-linted standalone. Deployment-specific values live in
+# values/infrastructure/main.yaml and are layered via the bootstrap chart's
+# infrastructure-root Application.
+
+# Cert Manager - TLS certificate automation (cluster-wide)
+certManager:
+  enabled: false
+  version: v1.16.2
+
+# Cert Manager Issuers - ClusterIssuer + ExternalSecret for DNS-01 provider tokens
+certManagerIssuers:
+  enabled: false
+  issuers: []
+
+# Envoy Gateway - Gateway API implementation
+envoyGateway:
+  enabled: false
+  version: v1.2.0
+
+# Gateway Resources - Shared Gateway + listeners
+gatewayResources: {}
+
+# Envoy Proxy Config - EnvoyProxy CR for cloud-provider Service annotations
+envoyProxyConfig:
+  enabled: false
+
+# NGINX Gateway - alternative Gateway API implementation (used by mycure for *.localfirsthealth.com)
+nginxGateway:
+  enabled: false
+  version: "2.4.1"
+
+nginxGatewayResources:
+  gatewayClass:
+    enabled: false
+  gateway: {}
+  tls:
+    certificates: []
+  snippetsPolicies: []
+
+# Longhorn - distributed block storage (on-prem fallback)
+longhorn:
+  enabled: false
+  version: "1.6.0"
+
+# Storage Resources - cluster StorageClasses, VolumeSnapshotClasses
+storageResources:
+  enabled: false
+
+# External Secrets Operator
+externalSecrets:
+  enabled: false
+  version: 0.9.11
+  stores: []
+
+# External DNS
+externalDNS:
+  enabled: false
+  instances: []
+
+# Monitoring (Bitnami kube-prometheus)
+monitoring:
+  enabled: false
+  version: 11.3.9
+
+monitoringResources:
+  enabled: false
+
+# Grafana (standalone — monitoring stack ships its own)
+grafana:
+  enabled: false
+
+# Loki + Promtail (log aggregation)
+loki:
+  enabled: false
+
+# Falco - runtime security
+falco:
+  enabled: false
+  version: 4.6.1
+  rules:
+    enabled: false
+
+# Kyverno - policy engine
+kyverno:
+  enabled: false
+  version: 3.2.0
+  policies:
+    enabled: false
+
+# Velero - backup/DR
+velero:
+  enabled: false
+  version: 7.1.4
+  provider: digitalocean
+
+# ArgoCD repo/revision injected by bootstrap chart (do not override here)
+argocd: {}

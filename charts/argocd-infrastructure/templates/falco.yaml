@@ -1,0 +1,41 @@
+{{- if .Values.falco.enabled }}
+# ArgoCD Application: Falco
+# Sync Wave 0 - Deploy runtime security monitoring (cluster-wide)
+# Only deployed if falco.enabled=true
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: falco
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+
+  source:
+    chart: falco
+    repoURL: https://falcosecurity.github.io/charts
+    targetRevision: {{ .Values.falco.version | default "4.6.1" }}
+    helm:
+      releaseName: falco
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: falco
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 10s
+        maxDuration: 3m
+{{- end }}

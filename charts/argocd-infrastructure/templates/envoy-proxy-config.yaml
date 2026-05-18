@@ -1,0 +1,46 @@
+{{- if .Values.envoyProxyConfig.enabled }}
+# ArgoCD Application: EnvoyProxy Configuration
+# Configures cloud-specific LoadBalancer settings for Envoy Gateway
+# Sync Wave 0.5 - After Envoy Gateway operator (wave 0), before Gateway resources (wave 1)
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: envoy-proxy-config
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "0.5"
+  labels:
+    app.kubernetes.io/name: envoy-proxy-config
+    app.kubernetes.io/component: infrastructure
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+
+  source:
+    repoURL: {{ .Values.argocd.repoURL }}
+    targetRevision: {{ .Values.argocd.targetRevision }}
+    path: charts/envoy-proxy-config
+    helm:
+      releaseName: envoy-proxy-config
+      valuesObject:
+        {{- toYaml .Values.envoyProxyConfig | nindent 8 }}
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: envoy-gateway-system
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        maxDuration: 3m
+{{- end }}

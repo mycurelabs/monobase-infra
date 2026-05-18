@@ -1,0 +1,122 @@
+{{- if .Values.monitoring.enabled }}
+# ArgoCD Application: Monitoring Stack (Prometheus + Grafana)
+# Sync Wave 0 - Deploy monitoring (cluster-wide, optional)
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: monitoring
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  
+  source:
+    chart: kube-prometheus
+    repoURL: https://charts.bitnami.com/bitnami
+    targetRevision: {{ .Values.monitoring.version | default "11.x.x" }}
+    helm:
+      releaseName: monitoring
+      valuesObject:
+        # Global storage configuration
+        global:
+          defaultStorageClass: ""
+        
+        # Use bitnamilegacy images (Bitnami deprecated non-hardened Debian images)
+        operator:
+          enabled: true
+          image:
+            repository: bitnamilegacy/prometheus-operator
+        
+        # Prometheus configuration
+        prometheus:
+          enabled: true
+          retention: "30d"
+          retentionSize: "45GB"
+          image:
+            repository: bitnamilegacy/prometheus
+          
+          persistence:
+            enabled: true
+            storageClass: ""
+            size: "50Gi"
+          
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "400Mi"  # Increased from 200Mi - prevent OOM (actual usage: 324Mi)
+            limits:
+              cpu: "500m"
+              memory: "768Mi"  # Optimized from 1Gi (actual usage: 533Mi = 69%)
+          
+          # Security context
+          securityContext:
+            enabled: true
+            runAsNonRoot: true
+            runAsUser: 1000
+            fsGroup: 2000
+
+        # Alertmanager configuration (disabled for resource-constrained staging)
+        alertmanager:
+          enabled: false
+        
+        # Blackbox Exporter
+        blackboxExporter:
+          enabled: true
+          image:
+            repository: bitnamilegacy/blackbox-exporter
+        
+        # Node Exporter (subchart - DaemonSet runs on all nodes)
+        node-exporter:
+          image:
+            repository: bitnamilegacy/node-exporter
+          resources:
+            requests:
+              cpu: "10m"       # Optimized from 100m (actual usage: ~2m = 2%)
+              memory: "64Mi"   # Optimized from 128Mi (actual usage: ~16Mi = 12%)
+            limits:
+              cpu: "100m"      # Reduced from 150m
+              memory: "128Mi"  # Reduced from 192Mi
+        
+        # Kube State Metrics (subchart)
+        kube-state-metrics:
+          image:
+            repository: bitnamilegacy/kube-state-metrics
+          resources:
+            requests:
+              cpu: "10m"      # Optimized from 250m (actual usage: 3m = 30%)
+              memory: "64Mi"  # Optimized from 256Mi (actual usage: 32Mi = 50%)
+            limits:
+              cpu: "100m"
+              memory: "128Mi"
+  
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring
+  
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 10s
+        maxDuration: 5m
+  
+  ignoreDifferences:
+    - group: admissionregistration.k8s.io
+      kind: MutatingWebhookConfiguration
+      jsonPointers:
+        - /webhooks/0/clientConfig/caBundle
+    - group: admissionregistration.k8s.io
+      kind: ValidatingWebhookConfiguration
+      jsonPointers:
+        - /webhooks/0/clientConfig/caBundle
+{{- end }}

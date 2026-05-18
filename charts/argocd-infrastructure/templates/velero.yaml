@@ -1,0 +1,132 @@
+{{- if .Values.velero.enabled }}
+# ArgoCD Application: Velero
+# Sync Wave 0 - Deploy backup infrastructure (cluster-wide)
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: velero
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+
+  source:
+    chart: velero
+    repoURL: https://vmware-tanzu.github.io/helm-charts
+    targetRevision: {{ .Values.velero.version | default "12.0.1" }}
+    helm:
+      releaseName: velero
+      values: |
+        upgradeCRDs: false
+        configuration:
+          defaultBackupTTL: 720h
+          # CSI snapshots are now the primary path (see schedules + the
+          # do-block-storage-velero VolumeSnapshotClass). FSB stays available
+          # per-backup via `defaultVolumesToFsBackup: true` on the spec, but
+          # is no longer the cluster-wide default.
+          defaultVolumesToFsBackup: false
+          # EnableCSI is required even in Velero v1.14+ where the CSI plugin
+          # is integrated into core. Without it, the csi-pvc-backupper action
+          # is registered but skipped at runtime, so no VolumeSnapshots get
+          # created and backups silently complete with only manifests.
+          features: EnableCSI
+          # BSL/VSL are managed by the velero-resources app (see
+          # infrastructure/velero/templates/backup-locations.yaml), not by
+          # the chart. Empty arrays prevent the chart from rendering its
+          # own placeholder BSL/VSL with null fields (which fails admission).
+          backupStorageLocation: []
+          volumeSnapshotLocation: []
+        credentials:
+          useSecret: true
+          existingSecret: velero-credentials
+        deployNodeAgent: true
+        nodeAgent:
+          podVolumePath: /var/lib/kubelet/pods
+          # Chart 12 renamed `privileged` -> `containerSecurityContext.privileged`.
+          # Required for FSB (file-system backup) to bind-mount pod volumes
+          # from /var/lib/kubelet/pods. Without it FSB fails on Bottlerocket,
+          # COS, and most hardened distros.
+          containerSecurityContext:
+            privileged: true
+          # Tolerate every taint so node-agent runs on production/staging
+          # pools too. Without this, FSB-style backups silently fail for any
+          # pod scheduled on a tainted node (production stateful workloads
+          # were affected — see incident 2026-05-12). node-agent is also the
+          # data-mover for CSI snapshot uploads to Spaces, so it must reach
+          # every node that holds a backed-up volume.
+          tolerations:
+            - operator: Exists
+        initContainers:
+{{- if or (eq .Values.velero.provider "aws") (eq .Values.velero.provider "digitalocean") (eq .Values.velero.provider "minio") }}
+          - name: velero-plugin-for-aws
+            # Velero 1.18 pairs with velero-plugin-for-aws v1.14.x.
+            image: velero/velero-plugin-for-aws:v1.14.0
+            volumeMounts:
+              - mountPath: /target
+                name: plugins
+{{- end }}
+{{- /*
+  Note: velero-plugin-for-digitalocean is intentionally NOT installed.
+  It registers a BackupItemAction that fires on every PVC and calls the
+  DO REST API with stale credentials, breaking backups before CSI can
+  take over. Volume snapshots flow through CSI
+  (dobs.csi.digitalocean.com) via the do-block-storage-velero
+  VolumeSnapshotClass. The aws plugin above handles the S3-compatible
+  Spaces bucket for backup metadata + data-mover uploads.
+*/ -}}
+{{- if eq .Values.velero.provider "azure" }}
+          - name: velero-plugin-for-microsoft-azure
+            image: velero/velero-plugin-for-microsoft-azure:v1.10.0
+            volumeMounts:
+              - mountPath: /target
+                name: plugins
+{{- end }}
+{{- if eq .Values.velero.provider "gcp" }}
+          - name: velero-plugin-for-gcp
+            image: velero/velero-plugin-for-gcp:v1.10.0
+            volumeMounts:
+              - mountPath: /target
+                name: plugins
+{{- end }}
+        serviceAccount:
+          server:
+            create: true
+            name: velero
+            annotations:
+{{- if eq .Values.velero.provider "aws" }}
+              eks.amazonaws.com/role-arn: {{ .Values.velero.aws.roleArn }}
+{{- end }}
+{{- if eq .Values.velero.provider "azure" }}
+              azure.workload.identity/client-id: {{ .Values.velero.azure.identityClientId }}
+{{- end }}
+{{- if eq .Values.velero.provider "gcp" }}
+              iam.gke.io/gcp-service-account: {{ .Values.velero.gcp.serviceAccount }}
+{{- end }}
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: velero
+
+  syncPolicy:
+    automated:
+      prune: false
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 10s
+        maxDuration: 5m
+
+  ignoreDifferences:
+    - group: apiextensions.k8s.io
+      kind: CustomResourceDefinition
+      jsonPointers:
+        - /status
+{{- end }}
