@@ -1,0 +1,70 @@
+# ArgoCD Application: Infrastructure Root
+# Deploys all cluster-wide infrastructure components via GitOps
+#
+# This Application is deployed ONCE per cluster during bootstrap.
+# It manages cluster-wide infrastructure (cert-manager, gateways, storage, security, backups).
+#
+# Bootstrap workflow:
+# 1. Install ArgoCD (helm install argocd)
+# 2. Deploy this bootstrap chart (helm install argocd-bootstrap)
+# 3. ArgoCD manages everything else via Git!
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: infrastructure
+  namespace: {{ .Values.argocd.namespace | default "argocd" }}
+  labels:
+    app.kubernetes.io/name: infrastructure
+    app.kubernetes.io/component: cluster-infrastructure
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+
+  source:
+    repoURL: {{ .Values.argocd.repoURL | required "argocd.repoURL is required" }}
+    targetRevision: {{ .Values.argocd.targetRevision | default "HEAD" }}
+    path: charts/argocd-infrastructure
+
+    # Use Helm to render infrastructure components
+    helm:
+      releaseName: infrastructure
+      # Infrastructure values are in values/infrastructure/main.yaml
+      valueFiles:
+        - ../../values/infrastructure/main.yaml
+      # Inject repoURL from bootstrap (single source of truth)
+      values: |
+        argocd:
+          repoURL: {{ .Values.argocd.repoURL }}
+          targetRevision: {{ .Values.argocd.targetRevision | default "HEAD" }}
+
+  destination:
+    server: {{ .Values.argocd.clusterServer | default "https://kubernetes.default.svc" }}
+    # Infrastructure components create their own namespaces
+    namespace: {{ .Values.argocd.namespace | default "argocd" }}
+
+  syncPolicy:
+    automated:
+      prune: true       # Remove components disabled in values
+      selfHeal: true    # Auto-correct drift
+      allowEmpty: false
+
+    syncOptions:
+      - CreateNamespace=false  # Components create their own namespaces
+      - PrunePropagationPolicy=foreground
+      - PruneLast=true
+
+    retry:
+      limit: 5
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 5m
+
+  # Ignore expected differences
+  ignoreDifferences:
+    - group: apiextensions.k8s.io
+      kind: CustomResourceDefinition
+      jsonPointers:
+        - /status

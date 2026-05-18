@@ -1,0 +1,18 @@
+# Default values for argocd-bootstrap chart
+# This chart creates the ArgoCD Applications that bootstrap the cluster:
+# 1. Infrastructure root Application (deploys charts/argocd-infrastructure/)
+# 2. ApplicationSet for auto-discovering client deployments (uses charts/argocd-applications/)
+#
+# Values can be overridden in values/infrastructure/main.yaml when deployed:
+#   helm upgrade --install argocd-bootstrap charts/argocd-bootstrap \
+#     --values values/infrastructure/main.yaml
+
+argocd:
+  # Git repository configuration
+  # DEPLOYMENT-SPECIFIC: Override with your forked repository
+  repoURL: https://github.com/mycurelabs/monobase-infra.git
+  targetRevision: HEAD
+
+  # Kubernetes cluster configuration
+  namespace: argocd
+  clusterServer: https://kubernetes.default.svc
