@@ -103,7 +103,7 @@ Examples:
  * Auto-detect GCP project from existing gcp-secretstore.yaml
  */
 function detectProjectFromClusterSecretStore(): string | undefined {
-  const secretStorePath = "infrastructure/external-secrets/gcp-secretstore.yaml";
+  const secretStorePath = "charts/external-secrets-stores/legacy/gcp-secretstore.yaml";
   
   if (!existsSync(secretStorePath)) {
     return undefined;
@@ -275,9 +275,9 @@ function getKubeconfigPath(): string | undefined {
  */
 function detectProviderFromClusterSecretStore(): string | undefined {
   const providers = [
-    { name: "gcp", file: "infrastructure/external-secrets/gcp-secretstore.yaml" },
-    { name: "aws", file: "infrastructure/external-secrets/aws-secretstore.yaml" },
-    { name: "azure", file: "infrastructure/external-secrets/azure-secretstore.yaml" },
+    { name: "gcp", file: "charts/external-secrets-stores/legacy/gcp-secretstore.yaml" },
+    { name: "aws", file: "charts/external-secrets-stores/legacy/aws-secretstore.yaml" },
+    { name: "azure", file: "charts/external-secrets-stores/legacy/azure-secretstore.yaml" },
   ];
   
   for (const provider of providers) {
@@ -411,7 +411,7 @@ async function generateCommand() {
   const parsed = files.map((f) => parseSecretsFile(f));
 
   // Generate ClusterSecretStore
-  const clusterSecretStorePath = "infrastructure/external-secrets/gcp-secretstore.yaml";
+  const clusterSecretStorePath = "charts/external-secrets-stores/legacy/gcp-secretstore.yaml";
 
   if (values["dry-run"]) {
     logInfo(`[DRY RUN] Would generate: ${clusterSecretStorePath}`);
@@ -429,7 +429,7 @@ async function generateCommand() {
   for (const file of parsed) {
     for (const secret of file.config.secrets) {
       const namespace = resolveTargetNamespace(secret, file.defaultNamespace);
-      const outputPath = `infrastructure/external-secrets/${secret.name}-externalsecret.yaml`;
+      const outputPath = `charts/external-secrets-stores/legacy/${secret.name}-externalsecret.yaml`;
 
       externalsecrets.push({ secret, namespace, outputPath });
 

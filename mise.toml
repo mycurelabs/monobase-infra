@@ -82,12 +82,14 @@ markdownlint-cli2 --fix '**/*.md' --ignore node_modules --ignore .git 2>&1 || tr
 """
 
 [tasks.lint-helm]
-description = "Lint Helm charts"
+description = "Lint all Helm charts under charts/"
 run = """
 echo "Linting Helm charts..."
-helm lint charts/api
-helm lint charts/account
-helm lint charts/namespace
+for chart in charts/*/; do
+    if [ -f "$chart/Chart.yaml" ]; then
+        helm lint "$chart" || echo "  ✗ helm lint failed: $chart"
+    fi
+done
 """
 
 [tasks.lint]
@@ -111,12 +113,14 @@ echo "Validating Terraform modules..."
 """
 
 [tasks.validate-helm]
-description = "Validate Helm charts"
+description = "Validate Helm charts (helm template across all charts/*)"
 run = """
 echo "Validating Helm charts..."
-helm template test charts/api --dry-run > /dev/null
-helm template test charts/account --dry-run > /dev/null
-helm template test charts/namespace --dry-run > /dev/null
+for chart in charts/*/; do
+    if [ -f "$chart/Chart.yaml" ]; then
+        helm template test "$chart" --dry-run > /dev/null || echo "  ✗ helm template failed: $chart"
+    fi
+done
 """
 
 [tasks.validate]
@@ -217,6 +221,10 @@ run = 'bun scripts/seed.ts "$@"'
 [tasks.unbootstrap]
 description = "Unbootstrap cluster (destroy ArgoCD/Applications) - REQUIRES CONFIRMATION"
 run = 'bun scripts/bootstrap.ts --destroy "$@"'
+
+[tasks.monitor-migration]
+description = "Monitor hapihub-migrator and post status to Discord (reads DISCORD_WEBHOOK_URL from .env.local)"
+run = 'bun scripts/monitor-migration.ts "$@"'
 
 # Migration parity (migrate/medicard-shape branch only)
 # =============================================================================

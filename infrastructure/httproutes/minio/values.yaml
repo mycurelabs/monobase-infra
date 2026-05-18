@@ -1,5 +1,0 @@
-hostname: storage.example.com
-namespace: default
-gateway:
-  name: shared-gateway
-  namespace: gateway-system
