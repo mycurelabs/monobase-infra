@@ -50,8 +50,12 @@ terraform/**/kubeconfig.yaml
 .terraform/
 .terragrunt-cache/
 
-# Active cluster configuration (copied from terraform/examples/)
-cluster/
+# Active cluster configuration at the repo root (copied from terraform/examples/)
+# Note: values/cluster/ is intentionally tracked — only state and locks are ignored.
+/cluster/
+values/cluster/.terraform/
+values/cluster/.terraform.tfstate.lock.info
+values/cluster/terraform.tfstate*
 
 # IDE and OS files
 .vscode/
