@@ -1,0 +1,222 @@
+---
+# Source: mycurelocal/templates/networkpolicy.yaml
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: mycurelocal
+  namespace: mycure-production
+  labels:
+    helm.sh/chart: mycurelocal-1.0.0
+    app.kubernetes.io/name: mycurelocal
+    app.kubernetes.io/instance: mycurelocal
+    app.kubernetes.io/version: "1.0.0"
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/part-of: mycurelocal
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: mycurelocal
+      app.kubernetes.io/instance: mycurelocal
+  policyTypes:
+    - Ingress
+    - Egress
+---
+# Source: mycurelocal/templates/pdb.yaml
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: mycurelocal
+  namespace: mycure-production
+  labels:
+    helm.sh/chart: mycurelocal-1.0.0
+    app.kubernetes.io/name: mycurelocal
+    app.kubernetes.io/instance: mycurelocal
+    app.kubernetes.io/version: "1.0.0"
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/part-of: mycurelocal
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: mycurelocal
+      app.kubernetes.io/instance: mycurelocal
+---
+# Source: mycurelocal/templates/serviceaccount.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: mycurelocal
+  namespace: mycure-production
+  labels:
+    helm.sh/chart: mycurelocal-1.0.0
+    app.kubernetes.io/name: mycurelocal
+    app.kubernetes.io/instance: mycurelocal
+    app.kubernetes.io/version: "1.0.0"
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/part-of: mycurelocal
+---
+# Source: mycurelocal/templates/configmap.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mycurelocal
+  namespace: mycure-production
+  labels:
+    helm.sh/chart: mycurelocal-1.0.0
+    app.kubernetes.io/name: mycurelocal
+    app.kubernetes.io/instance: mycurelocal
+    app.kubernetes.io/version: "1.0.0"
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/part-of: mycurelocal
+data:
+  API_URL: ""
+  HAPIHUB_URL: ""
+---
+# Source: mycurelocal/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: mycurelocal
+  namespace: mycure-production
+  labels:
+    helm.sh/chart: mycurelocal-1.0.0
+    app.kubernetes.io/name: mycurelocal
+    app.kubernetes.io/instance: mycurelocal
+    app.kubernetes.io/version: "1.0.0"
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/part-of: mycurelocal
+spec:
+  type: ClusterIP
+  ports:
+    - port: 80
+      targetPort: 8080
+      protocol: TCP
+      name: http
+  selector:
+    app.kubernetes.io/name: mycurelocal
+    app.kubernetes.io/instance: mycurelocal
+---
+# Source: mycurelocal/templates/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mycurelocal
+  namespace: mycure-production
+  labels:
+    helm.sh/chart: mycurelocal-1.0.0
+    app.kubernetes.io/name: mycurelocal
+    app.kubernetes.io/instance: mycurelocal
+    app.kubernetes.io/version: "1.0.0"
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/part-of: mycurelocal
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: mycurelocal
+      app.kubernetes.io/instance: mycurelocal
+  template:
+    metadata:
+      annotations:
+        checksum/config: 01185b379bcc2ee05a11f17128b1afd1676d8be6c36a4235e8034168c271068f
+      labels:
+        app.kubernetes.io/name: mycurelocal
+        app.kubernetes.io/instance: mycurelocal
+    spec:
+      serviceAccountName: mycurelocal
+      securityContext:
+        fsGroup: 101
+        runAsNonRoot: true
+        runAsUser: 101
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+      - name: mycurelocal
+        securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
+            readOnlyRootFilesystem: true
+        image: "ghcr.io/mycurelabs/mycurelocal:latest"
+        imagePullPolicy: IfNotPresent
+        ports:
+        - name: http
+          containerPort: 8080
+          protocol: TCP
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        resources:
+            limits:
+              cpu: 1
+              memory: 1Gi
+            requests:
+              cpu: 200m
+              memory: 512Mi
+        env:
+        - name: API_URL
+          value: ""
+        - name: HAPIHUB_URL
+          value: ""
+        # Caddy volumes for tmp, data, and config (read-only root filesystem)
+        volumeMounts:
+        - name: tmp
+          mountPath: /tmp
+        - name: caddy-data
+          mountPath: /data
+        - name: caddy-config
+          mountPath: /config
+      volumes:
+      - name: tmp
+        emptyDir: {}
+      - name: caddy-data
+        emptyDir: {}
+      - name: caddy-config
+        emptyDir: {}
+      nodeSelector:
+        node-pool: production
+      tolerations:
+        - key: "node-pool"
+          operator: "Equal"
+          value: "production"
+          effect: "NoSchedule"
+---
+# Source: mycurelocal/templates/httproute.yaml
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: mycurelocal
+  namespace: mycure-production
+  labels:
+    helm.sh/chart: mycurelocal-1.0.0
+    app.kubernetes.io/name: mycurelocal
+    app.kubernetes.io/instance: mycurelocal
+    app.kubernetes.io/version: "1.0.0"
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/part-of: mycurelocal
+spec:
+  parentRefs:
+    - name: nginx-shared-gateway
+      namespace: nginx-gateway-system
+      sectionName: https  # Default: attach to HTTPS listener
+  hostnames:
+    - mycurelocal.localfirsthealth.com
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      backendRefs:
+        - name: mycurelocal
+          port: 80
+          weight: 1

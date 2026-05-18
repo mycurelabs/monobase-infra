@@ -1,0 +1,180 @@
+---
+# Source: mycure-deploydash/templates/serviceaccount.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: mycure-deploydash
+  namespace: mycure-production
+  labels:
+    helm.sh/chart: mycure-deploydash-1.0.0
+    app.kubernetes.io/name: mycure-deploydash
+    app.kubernetes.io/instance: mycure-deploydash
+    app.kubernetes.io/version: "1.0.0"
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/part-of: mycure-deploydash
+---
+# Source: mycure-deploydash/templates/configmap.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mycure-deploydash
+  namespace: mycure-production
+  labels:
+    helm.sh/chart: mycure-deploydash-1.0.0
+    app.kubernetes.io/name: mycure-deploydash
+    app.kubernetes.io/instance: mycure-deploydash
+    app.kubernetes.io/version: "1.0.0"
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/part-of: mycure-deploydash
+data:
+  API_URL: ""
+  HAPIHUB_URL: ""
+---
+# Source: mycure-deploydash/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: mycure-deploydash
+  namespace: mycure-production
+  labels:
+    helm.sh/chart: mycure-deploydash-1.0.0
+    app.kubernetes.io/name: mycure-deploydash
+    app.kubernetes.io/instance: mycure-deploydash
+    app.kubernetes.io/version: "1.0.0"
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/part-of: mycure-deploydash
+spec:
+  type: ClusterIP
+  ports:
+    - port: 80
+      targetPort: 8080
+      protocol: TCP
+      name: http
+  selector:
+    app.kubernetes.io/name: mycure-deploydash
+    app.kubernetes.io/instance: mycure-deploydash
+---
+# Source: mycure-deploydash/templates/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mycure-deploydash
+  namespace: mycure-production
+  labels:
+    helm.sh/chart: mycure-deploydash-1.0.0
+    app.kubernetes.io/name: mycure-deploydash
+    app.kubernetes.io/instance: mycure-deploydash
+    app.kubernetes.io/version: "1.0.0"
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/part-of: mycure-deploydash
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: mycure-deploydash
+      app.kubernetes.io/instance: mycure-deploydash
+  template:
+    metadata:
+      annotations:
+        checksum/config: 375baeffb32a56e2f43f5fc844a92c56ece1284609e2c3dfb744d057e8f224e3
+      labels:
+        app.kubernetes.io/name: mycure-deploydash
+        app.kubernetes.io/instance: mycure-deploydash
+    spec:
+      serviceAccountName: mycure-deploydash
+      securityContext:
+        fsGroup: 101
+        runAsNonRoot: true
+        runAsUser: 101
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+      - name: mycure-deploydash
+        securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
+            readOnlyRootFilesystem: true
+        image: "ghcr.io/mycurelabs/deploydash:latest"
+        imagePullPolicy: IfNotPresent
+        ports:
+        - name: http
+          containerPort: 8080
+          protocol: TCP
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        resources:
+            limits:
+              cpu: 200m
+              memory: 128Mi
+            requests:
+              cpu: 50m
+              memory: 64Mi
+        env:
+        - name: API_URL
+          value: ""
+        - name: HAPIHUB_URL
+          value: ""
+        # Caddy volumes for tmp, data, and config (read-only root filesystem)
+        volumeMounts:
+        - name: tmp
+          mountPath: /tmp
+        - name: caddy-data
+          mountPath: /data
+        - name: caddy-config
+          mountPath: /config
+      volumes:
+      - name: tmp
+        emptyDir: {}
+      - name: caddy-data
+        emptyDir: {}
+      - name: caddy-config
+        emptyDir: {}
+      nodeSelector:
+        node-pool: production
+      tolerations:
+        - key: "node-pool"
+          operator: "Equal"
+          value: "production"
+          effect: "NoSchedule"
+---
+# Source: mycure-deploydash/templates/httproute.yaml
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: mycure-deploydash
+  namespace: mycure-production
+  labels:
+    helm.sh/chart: mycure-deploydash-1.0.0
+    app.kubernetes.io/name: mycure-deploydash
+    app.kubernetes.io/instance: mycure-deploydash
+    app.kubernetes.io/version: "1.0.0"
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/part-of: mycure-deploydash
+spec:
+  parentRefs:
+    - name: nginx-shared-gateway
+      namespace: nginx-gateway-system
+      sectionName: https  # Default: attach to HTTPS listener
+  hostnames:
+    - mycure-deploydash.localfirsthealth.com
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      backendRefs:
+        - name: mycure-deploydash
+          port: 80
+          weight: 1

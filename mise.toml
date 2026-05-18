@@ -217,3 +217,18 @@ run = 'bun scripts/seed.ts "$@"'
 [tasks.unbootstrap]
 description = "Unbootstrap cluster (destroy ArgoCD/Applications) - REQUIRES CONFIRMATION"
 run = 'bun scripts/bootstrap.ts --destroy "$@"'
+
+# Migration parity (migrate/medicard-shape branch only)
+# =============================================================================
+
+[tasks.render-baseline]
+description = "Render every chart × deployment combo into rendered/before/ (pre-migration snapshot)"
+run = 'bun scripts/render-parity.ts --mode=before'
+
+[tasks.render-after]
+description = "Render every chart × deployment combo into rendered/after/ (post-migration snapshot)"
+run = 'bun scripts/render-parity.ts --mode=after'
+
+[tasks.parity-check]
+description = "Diff rendered/before vs rendered/after; non-zero exit on any change"
+run = 'bun scripts/render-parity.ts --diff'

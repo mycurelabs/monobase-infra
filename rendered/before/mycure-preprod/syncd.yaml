@@ -1,0 +1,253 @@
+---
+# Source: syncd/templates/pdb.yaml
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: syncd
+  namespace: mycure-preprod
+  labels:
+    helm.sh/chart: syncd-1.0.0
+    app.kubernetes.io/name: syncd
+    app.kubernetes.io/instance: syncd
+    app.kubernetes.io/version: "5.130.18"
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/part-of: monobase
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: syncd
+      app.kubernetes.io/instance: syncd
+---
+# Source: syncd/templates/serviceaccount.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: syncd
+  namespace: mycure-preprod
+  labels:
+    helm.sh/chart: syncd-1.0.0
+    app.kubernetes.io/name: syncd
+    app.kubernetes.io/instance: syncd
+    app.kubernetes.io/version: "5.130.18"
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/part-of: monobase
+---
+# Source: syncd/templates/configmap.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: syncd
+  namespace: mycure-preprod
+  labels:
+    helm.sh/chart: syncd-1.0.0
+    app.kubernetes.io/name: syncd
+    app.kubernetes.io/instance: syncd
+    app.kubernetes.io/version: "5.130.18"
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/part-of: monobase
+data:
+  # NOTE: PORT removed - causes known issue in HapiHub app (port: NaN)
+  # App uses default port 7500 automatically
+  SYNCD_PATH: "/ws"
+  SYNCD_PORT: "7800"
+  SYNCD_PULL_LIMIT: "1000"
+  SYNCD_PUSH_BATCH_SIZE: "10"
+  SYNCD_WORKERS: "true"
+---
+# Source: syncd/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: syncd
+  namespace: mycure-preprod
+  labels:
+    helm.sh/chart: syncd-1.0.0
+    app.kubernetes.io/name: syncd
+    app.kubernetes.io/instance: syncd
+    app.kubernetes.io/version: "5.130.18"
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/part-of: monobase
+spec:
+  type: ClusterIP
+  ports:
+    - port: 7800
+      targetPort: 7800
+      protocol: TCP
+      name: http
+  selector:
+    app.kubernetes.io/name: syncd
+    app.kubernetes.io/instance: syncd
+---
+# Source: syncd/templates/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: syncd
+  namespace: mycure-preprod
+  labels:
+    helm.sh/chart: syncd-1.0.0
+    app.kubernetes.io/name: syncd
+    app.kubernetes.io/instance: syncd
+    app.kubernetes.io/version: "5.130.18"
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/part-of: monobase
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: syncd
+      app.kubernetes.io/instance: syncd
+  template:
+    metadata:
+      annotations:
+        checksum/config: 19281bdde532aa7ae9582d2717514402b716f18eef0efa5f1590486d7114e063
+      labels:
+        app.kubernetes.io/name: syncd
+        app.kubernetes.io/instance: syncd
+    spec:
+      serviceAccountName: syncd
+      # Disable service environment variables to avoid port config conflicts
+      enableServiceLinks: false
+      securityContext:
+        fsGroup: 1000
+        runAsNonRoot: true
+        runAsUser: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+      - name: syncd
+        securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
+            readOnlyRootFilesystem: false
+        image: "ghcr.io/mycurelabs/syncd:latest"
+        imagePullPolicy: IfNotPresent
+        ports:
+        - name: http
+          containerPort: 7800
+          protocol: TCP
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 7800
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /healthz
+            port: 7800
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 2
+        resources:
+            limits:
+              cpu: "2"
+              memory: 4Gi
+            requests:
+              cpu: 500m
+              memory: 1Gi
+        env:
+        # Set HOME to /tmp to avoid permission denied errors when running as non-root
+        - name: HOME
+          value: "/tmp"
+        # Load from ConfigMap (conditionally)
+        # Port configuration - must be numeric (unquoted) for proper parsing
+        - name: SYNCD_PORT
+          value: "7800"
+        - name: PORT
+          value: "7800"
+        # MongoDB connection
+        # In-cluster MongoDB - individual components
+        # Note: MongoDB may be deployed separately in GitOps
+        - name: MONGODB_HOST
+          value: "mongodb-headless.mycure-preprod.svc.cluster.local"
+        - name: MONGODB_PORT
+          value: "27017"
+        - name: MONGODB_DATABASE
+          value: "hapihub"
+        - name: MONGODB_USER
+          value: "root"
+        - name: MONGODB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: mongodb
+              key: mongodb-root-password
+        # MONGO_URI constructed from components using K8s variable expansion
+        - name: MONGO_URI
+          value: "mongodb://$(MONGODB_USER):$(MONGODB_PASSWORD)@$(MONGODB_HOST):$(MONGODB_PORT)/$(MONGODB_DATABASE)?replicaSet=rs0&directConnection=true&authSource=admin"
+        # Service URLs from dependencies
+        - name: REDIS_URL
+          value: "redis://syncd-valkey-master.mycure-preprod.svc.cluster.local:6379"
+        - name: SMTP_HOST
+          value: "mailpit.mycure-preprod.svc.cluster.local"
+        - name: SMTP_PORT
+          value: "25"
+        - name: SMTP_SECURE
+          value: "false"
+        # Load secrets from External Secrets Operator (only if defined)
+        # Additional environment variables from config
+        - name: SYNCD_PATH
+          value: "/ws"
+        - name: SYNCD_PORT
+          value: "7800"
+        - name: SYNCD_PULL_LIMIT
+          value: "1000"
+        - name: SYNCD_PUSH_BATCH_SIZE
+          value: "10"
+        - name: SYNCD_WORKERS
+          value: "true"
+      nodeSelector:
+        node-pool: staging
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app.kubernetes.io/name
+                  operator: In
+                  values:
+                  - syncd
+              topologyKey: kubernetes.io/hostname
+            weight: 100
+      tolerations:
+        - key: "node-pool"
+          operator: "Equal"
+          value: "staging"
+          effect: "NoSchedule"
+---
+# Source: syncd/templates/httproute.yaml
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: syncd
+  namespace: mycure-preprod
+  labels:
+    helm.sh/chart: syncd-1.0.0
+    app.kubernetes.io/name: syncd
+    app.kubernetes.io/instance: syncd
+    app.kubernetes.io/version: "5.130.18"
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/part-of: monobase
+spec:
+  parentRefs:
+    - name: nginx-shared-gateway
+      namespace: nginx-gateway-system
+      sectionName: https  # Default: attach to HTTPS listener
+  hostnames:
+    - sync.preprod.localfirsthealth.com
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      backendRefs:
+        - name: syncd
+          port: 7800
+          weight: 1

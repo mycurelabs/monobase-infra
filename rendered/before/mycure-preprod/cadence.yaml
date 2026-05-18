@@ -1,0 +1,292 @@
+---
+# Source: cadence/templates/serviceaccount.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: cadence
+  namespace: mycure-preprod
+  labels:
+    helm.sh/chart: cadence-1.0.0
+    app.kubernetes.io/name: cadence
+    app.kubernetes.io/instance: cadence
+    app.kubernetes.io/version: "0.2.0"
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/part-of: monobase
+---
+# Source: cadence/templates/configmap.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cadence
+  namespace: mycure-preprod
+  labels:
+    helm.sh/chart: cadence-1.0.0
+    app.kubernetes.io/name: cadence
+    app.kubernetes.io/instance: cadence
+    app.kubernetes.io/version: "0.2.0"
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/part-of: monobase
+data:
+  RUST_LOG: "info"
+  cadence.yml: |
+    collections:
+      "*":
+        strategy: lww
+        scope_rules:
+          account: organization
+          created_by: user
+          facility: organization
+          organization: organization
+          warehouse: organization
+      "accounts":
+        strategy: lww
+        scope_columns:
+          user: id
+      "personal_details":
+        strategy: lww
+        scope_columns:
+          organization: facility
+          user: id
+      "personal_details_history":
+        strategy: lww
+        scope_columns:
+          organization: facility
+          user: id
+    collections_blacklist:
+      - "--drizzle-migrations"
+      - "-migration-checkpoints"
+    priorities:
+      "*": 50
+      "account": 200
+      "account-configurations": 190
+      "account_configurations": 190
+      "accounts": 200
+      "activity-logs": 0
+      "activity_logs": 0
+      "billing-customers": 110
+      "billing-invoices": 120
+      "billing-items": 110
+      "billing-payments": 110
+      "billing_customers": 110
+      "billing_invoices": 120
+      "billing_items": 110
+      "billing_payments": 110
+      "bookings": 90
+      "diagnostic-order-tests": 130
+      "diagnostic-orders": 130
+      "diagnostic_order_tests": 130
+      "diagnostic_orders": 130
+      "medical-encounters": 140
+      "medical-patients": 150
+      "medical-records": 140
+      "medical-records-history": 130
+      "medical_encounters": 140
+      "medical_patients": 150
+      "medical_records": 140
+      "medical_records_history": 130
+      "notifications": 30
+      "organization": 180
+      "organization-members": 170
+      "organization_members": 170
+      "organizations": 180
+      "personal-details": 180
+      "personal-details-history": 170
+      "personal_details": 180
+      "personal_details_history": 170
+      "prm-conversations": 30
+      "prm-messages": 30
+      "prm_conversations": 30
+      "prm_messages": 30
+      "queue-items": 90
+      "queue_items": 90
+      "queues": 90
+      "services": 80
+      "services-performeds": 80
+      "services_performeds": 80
+      "session": 200
+      "user": 200
+      "webhook-deliveries": 20
+      "webhook-subscriptions": 20
+      "webhook_deliveries": 20
+      "webhook_subscriptions": 20
+---
+# Source: cadence/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: cadence
+  namespace: mycure-preprod
+  labels:
+    helm.sh/chart: cadence-1.0.0
+    app.kubernetes.io/name: cadence
+    app.kubernetes.io/instance: cadence
+    app.kubernetes.io/version: "0.2.0"
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/part-of: monobase
+spec:
+  type: ClusterIP
+  ports:
+    - port: 7890
+      targetPort: 7890
+      protocol: TCP
+      name: http
+  selector:
+    app.kubernetes.io/name: cadence
+    app.kubernetes.io/instance: cadence
+---
+# Source: cadence/templates/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cadence
+  namespace: mycure-preprod
+  labels:
+    helm.sh/chart: cadence-1.0.0
+    app.kubernetes.io/name: cadence
+    app.kubernetes.io/instance: cadence
+    app.kubernetes.io/version: "0.2.0"
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/part-of: monobase
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: cadence
+      app.kubernetes.io/instance: cadence
+  template:
+    metadata:
+      annotations:
+        checksum/config: f2079da3c54589303feb8e6009fa1b8ae794b16412caf7b8dbb912f69adea711
+      labels:
+        app.kubernetes.io/name: cadence
+        app.kubernetes.io/instance: cadence
+    spec:
+      serviceAccountName: cadence
+      enableServiceLinks: false
+      securityContext:
+        fsGroup: 1000
+        runAsNonRoot: true
+        runAsUser: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+      - name: cadence
+        securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
+            readOnlyRootFilesystem: false
+        image: "ghcr.io/mycurelabs/cadence:latest"
+        imagePullPolicy: IfNotPresent
+        command: ["/bin/sh", "-c"]
+        args:
+          - exec cadence --primary-db "postgres://${POSTGRESQL_USER}:${POSTGRESQL_PASSWORD}@postgresql.mycure-preprod.svc.cluster.local:5432/hapihub"
+        ports:
+        - name: http
+          containerPort: 7890
+          protocol: TCP
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 7890
+          initialDelaySeconds: 15
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 7890
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 5
+          failureThreshold: 3
+        resources:
+            limits:
+              cpu: 500m
+              memory: 256Mi
+            requests:
+              cpu: 100m
+              memory: 128Mi
+        env:
+        # Data directory for metadata storage
+        - name: CADENCE_DATA_DIR
+          value: "/tmp/cadence-data"
+        # PostgreSQL connection
+        - name: POSTGRESQL_USER
+          value: "postgres"
+        - name: POSTGRESQL_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: postgresql
+              key: postgres-password
+        - name: CADENCE_PRIMARY_DB_URL
+          value: "postgres://$(POSTGRESQL_USER):$(POSTGRESQL_PASSWORD)@postgresql.mycure-preprod.svc.cluster.local:5432/hapihub"
+        # JWKS URL for JWT validation (from HapiHub)
+        - name: CADENCE_JWKS_URL
+          value: "http://hapihub.mycure-preprod.svc.cluster.local:7500/.well-known/jwks.json"
+        # Valkey metadata backend
+        - name: CADENCE_METADATA_BACKEND
+          value: "valkey"
+        - name: VALKEY_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: valkey
+              key: valkey-password
+        - name: CADENCE_VALKEY_URL
+          value: "redis://:$(VALKEY_PASSWORD)@valkey-primary.mycure-preprod.svc.cluster.local:6379"
+        # Load secrets from External Secrets Operator
+        # Additional environment variables from config
+        - name: RUST_LOG
+          value: "info"
+        # Custom environment variables
+        volumeMounts:
+        - name: config
+          mountPath: /app/cadence.yml
+          subPath: cadence.yml
+          readOnly: true
+      volumes:
+      - name: config
+        configMap:
+          name: cadence
+          items:
+          - key: cadence.yml
+            path: cadence.yml
+      nodeSelector:
+        node-pool: staging
+      tolerations:
+        - key: "node-pool"
+          operator: "Equal"
+          value: "staging"
+          effect: "NoSchedule"
+---
+# Source: cadence/templates/httproute.yaml
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: cadence
+  namespace: mycure-preprod
+  labels:
+    helm.sh/chart: cadence-1.0.0
+    app.kubernetes.io/name: cadence
+    app.kubernetes.io/instance: cadence
+    app.kubernetes.io/version: "0.2.0"
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/part-of: monobase
+spec:
+  parentRefs:
+    - name: nginx-shared-gateway
+      namespace: nginx-gateway-system
+      sectionName: https
+  hostnames:
+    - cadence.preprod.localfirsthealth.com
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      backendRefs:
+        - name: cadence
+          port: 7890
+          weight: 1
