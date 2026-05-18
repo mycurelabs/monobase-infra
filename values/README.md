@@ -22,7 +22,7 @@ values/
 Infrastructure values are referenced by ArgoCD applications in `argocd/infrastructure/`:
 
 ```yaml
-# argocd/bootstrap/infrastructure-root.yaml
+# charts/argocd-bootstrap/templates/infrastructure-root.yaml
 helm:
   valueFiles:
     - ../../values/infrastructure/main.yaml
@@ -30,7 +30,7 @@ helm:
 
 ### Deployment Configuration
 
-Deployment values are automatically discovered by the ApplicationSet in `argocd/bootstrap/applicationset-auto-discover.yaml`.
+Deployment values are automatically discovered by the ApplicationSet in `charts/argocd-bootstrap/templates/applicationset-auto-discover.yaml`.
 
 The ApplicationSet uses a **Git Files Generator** to scan `values/deployments/*.yaml` files:
 
@@ -65,7 +65,7 @@ git push
 
 ### Naming Convention
 
-- **Infrastructure**: `{component}.yaml` (e.g., `main.yaml`, `argocd.yaml`)
+- **Infrastructure**: single-file `main.yaml` (folds in the previously-separate argocd + external-dns blocks)
 - **Deployments**: `{client}-{environment}.yaml` (e.g., `acme-staging.yaml`)
 
 ### Secrets
@@ -75,7 +75,7 @@ git push
 - AWS Secrets Manager
 - Azure Key Vault
 
-See `infrastructure/external-secrets/` for ExternalSecret definitions.
+See `charts/external-secrets-stores/`, `charts/external-dns/templates/externalsecret-*.yaml`, `charts/cert-manager-issuers/templates/externalsecret-*.yaml`, and `charts/velero-resources/templates/externalsecret-*.yaml` for ExternalSecret definitions.
 
 ### Structure
 
@@ -97,9 +97,11 @@ postgresql:
 
 ## Migration from Old Structure
 
-This directory was created to consolidate configurations previously scattered across:
+Layered consolidation across two migrations:
 - `argocd/infrastructure/values.yaml` → `values/infrastructure/main.yaml`
 - `infrastructure/*/values.yaml` → `values/infrastructure/{component}.yaml`
 - `deployments/{client}-{env}/values.yaml` → `values/deployments/{client}-{env}.yaml`
+- `values/infrastructure/{argocd,external-dns}.yaml` → folded into `values/infrastructure/main.yaml` (medicard-shape migration)
+- New: `values/cluster/` for Terraform module call (DOKS provisioning)
 
-The old `deployments/` marker directories have been removed. ApplicationSet now directly scans YAML files in `values/deployments/` for auto-discovery.
+The old `argocd/` and `infrastructure/` top-level directories have been removed. All ArgoCD/Helm definitions now live under `charts/argocd-*` and `charts/*-resources`. ApplicationSet scans `values/deployments/*.yaml` (excluding `example-*.yaml`) for auto-discovery.

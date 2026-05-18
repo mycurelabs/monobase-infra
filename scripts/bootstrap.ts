@@ -373,7 +373,9 @@ spec:
         key: argocd-github-app-private-key
 `;
 
-    const path = 'infrastructure/external-secrets/argocd-github-app-externalsecret.yaml';
+    // Generated ExternalSecret — applied directly by kubectl, not via a chart.
+    // (External Secrets Operator picks it up from the cluster regardless of source.)
+    const path = '/tmp/argocd-github-app-externalsecret.yaml';
     
     if (this.config.dryRun) {
       console.log(chalk.gray(`\nDry run: Would create ${path}`));
@@ -421,13 +423,17 @@ spec:
 
     spinner.start('Installing ArgoCD...');
     try {
+      // Extract the argocd: subblock from values/infrastructure/main.yaml
+      // so the ArgoCD Helm chart receives values at its expected top level.
+      await $`yq '.argocd' values/infrastructure/main.yaml > /tmp/argocd-values.yaml`.quiet();
+
       await $`helm upgrade --install argocd argo/argo-cd \
         --namespace argocd \
         --version 7.7.12 \
-        --values infrastructure/argocd/helm-values.yaml \
+        --values /tmp/argocd-values.yaml \
         --wait \
         --timeout 10m`.quiet();
-      
+
       spinner.succeed('ArgoCD installed successfully');
     } catch (error) {
       spinner.fail('ArgoCD installation failed');
@@ -450,22 +456,17 @@ spec:
       return;
     }
 
-    const spinner = ora('Deploying Infrastructure Root...').start();
-    
-    try {
-      await $`kubectl apply -f argocd/bootstrap/infrastructure-root.yaml`.quiet();
-      spinner.succeed('Infrastructure Root deployed');
-    } catch (error) {
-      spinner.fail('Infrastructure Root deployment failed');
-      throw error;
-    }
+    const spinner = ora('Deploying argocd-bootstrap chart (infrastructure-root + ApplicationSet)...').start();
 
-    spinner.start('Deploying ApplicationSet...');
     try {
-      await $`kubectl apply -f argocd/bootstrap/applicationset-auto-discover.yaml`.quiet();
-      spinner.succeed('ApplicationSet deployed');
+      // The bootstrap chart renders both the infrastructure-root Application
+      // and the auto-discover ApplicationSet from values/infrastructure/main.yaml.
+      await $`helm upgrade --install argocd-bootstrap charts/argocd-bootstrap \
+        --namespace argocd \
+        --values values/infrastructure/main.yaml`.quiet();
+      spinner.succeed('Bootstrap chart deployed (infrastructure-root + ApplicationSet)');
     } catch (error) {
-      spinner.fail('ApplicationSet deployment failed');
+      spinner.fail('Bootstrap chart deployment failed');
       throw error;
     }
 

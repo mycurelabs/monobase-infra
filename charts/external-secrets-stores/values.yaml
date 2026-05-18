@@ -1,0 +1,52 @@
+# Default values for external-secrets-stores
+# This chart creates ClusterSecretStore resources for External Secrets Operator
+
+# ClusterSecretStore configurations
+# Supports multiple providers: gcp, aws, azure
+stores: []
+  # Example GCP Secret Manager store:
+  # - name: gcp-secretstore
+  #   provider: gcp
+  #   gcp:
+  #     projectId: "my-gcp-project"
+  #     auth:
+  #       # Option 1: Workload Identity (recommended for GKE)
+  #       workloadIdentity:
+  #         enabled: true
+  #         clusterLocation: us-central1
+  #         clusterName: my-cluster
+  #         serviceAccountRef:
+  #           name: external-secrets
+  #           namespace: external-secrets-system
+  #       # Option 2: Service Account Key
+  #       serviceAccountKey:
+  #         enabled: false
+  #         secretRef:
+  #           name: gcpsm-secret
+  #           key: secret-access-credentials
+  #           namespace: external-secrets-system
+
+  # Example AWS Secrets Manager store:
+  # - name: aws-secretstore
+  #   provider: aws
+  #   aws:
+  #     region: us-east-1
+  #     service: SecretsManager
+  #     auth:
+  #       jwt:
+  #         serviceAccountRef:
+  #           name: external-secrets
+  #           namespace: external-secrets-system
+
+  # Example Azure Key Vault store:
+  # - name: azure-secretstore
+  #   provider: azure
+  #   azure:
+  #     vaultUrl: "https://my-vault.vault.azure.net"
+  #     tenantId: "tenant-id"
+  #     auth:
+  #       workloadIdentity:
+  #         enabled: true
+  #         serviceAccountRef:
+  #           name: external-secrets
+  #           namespace: external-secrets-system

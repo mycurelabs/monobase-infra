@@ -18,5 +18,5 @@ maintainers:
     email: devops@example.com
 
 # Dependencies managed via separate ArgoCD Applications
-# See: argocd/applications/ for PostgreSQL
+# See: charts/argocd-applications/templates/ for PostgreSQL
 # This is a pure application chart with no sub-charts

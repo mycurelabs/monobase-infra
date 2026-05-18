@@ -1,0 +1,12 @@
+apiVersion: v2
+name: monitoring-resources
+description: Monitoring resources — PrometheusRules, ServiceMonitors, Grafana dashboards
+type: application
+version: 1.0.0
+appVersion: "1.0"
+keywords:
+  - monitoring
+  - prometheus
+  - grafana
+maintainers:
+  - name: MyCure Labs

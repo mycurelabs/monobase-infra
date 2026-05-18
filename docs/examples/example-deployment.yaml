@@ -1,0 +1,74 @@
+# Example deployment values file — schema reference for new deployments.
+# Copy to values/deployments/<client>-<env>.yaml and customize.
+#
+# The ApplicationSet auto-discover rule in charts/argocd-bootstrap/
+# excludes values/deployments/example-*.yaml from discovery, so this file
+# never spawns an ArgoCD Application.
+
+global:
+  domain: example.com
+  namespace: example-prod
+  environment: production
+
+  # Node pool selector — must match terraform module output
+  nodePool: "production"
+
+  # Shared gateway reference (lives in charts/argocd-infrastructure/templates/gateway.yaml
+  # or nginx-gateway.yaml depending on which Gateway API implementation is enabled)
+  gateway:
+    name: nginx-shared-gateway
+    namespace: nginx-gateway-system
+
+  # Cluster storage class (empty = cluster default)
+  storage:
+    provider: ""
+    className: ""
+
+# ===== CORE APPS =====
+# Each app key matches a chart in charts/ and an ApplicationSet template in
+# charts/argocd-applications/templates/. Set `enabled: true` and override any
+# image.tag / replicaCount / resources / gateway.hostname as needed.
+
+api:
+  enabled: false
+
+account:
+  enabled: false
+
+mycure:
+  enabled: false
+  image:
+    repository: ghcr.io/mycurelabs/mycureapp
+    tag: "10.0.0"
+  gateway:
+    hostname: ""  # defaults to mycure.{domain}
+
+hapihub:
+  enabled: false
+
+# Databases (use external managed DBs in production; in-cluster Bitnami subcharts
+# are for staging/preprod only)
+postgresql:
+  enabled: false
+mongodb:
+  enabled: false
+valkey:
+  enabled: false
+minio:
+  enabled: false
+
+# Email testing (preprod/staging only)
+mailpit:
+  enabled: false
+
+# Backup / DR
+backup:
+  enabled: false
+
+# Security
+podSecurityStandards:
+  enabled: true
+  level: restricted
+
+resourceQuotas:
+  enabled: false

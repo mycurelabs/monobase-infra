@@ -215,13 +215,15 @@ class TemplateValidator {
     const requiredDirs = [
       'charts/api/templates',
       'charts/account/templates',
-      'infrastructure/argocd',
-      'infrastructure/namespaces',
-      'infrastructure/security/networkpolicies',
-      'infrastructure/security/kyverno',
-      'infrastructure/security/falco',
-      'deployments/example-prod',
-      'deployments/example-staging',
+      'charts/argocd-bootstrap/templates',
+      'charts/argocd-applications/templates',
+      'charts/argocd-infrastructure/templates',
+      'charts/security-baseline/templates',  // NetworkPolicies live here
+      'charts/kyverno-resources/policies',
+      'charts/falco-resources/rules',
+      'values/cluster',
+      'values/deployments',
+      'values/infrastructure',
       'docs',
       'scripts'
     ];

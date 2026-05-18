@@ -1,0 +1,13 @@
+# Default values for velero-resources chart.
+
+namespace: velero
+
+externalSecrets:
+  enabled: false
+  secretStore: gcp-secretstore
+  refreshInterval: 1h
+  # GCP Secret Manager key that holds DigitalOcean Spaces access credentials
+  # (used to template velero-credentials Secret in AWS S3 format)
+  credentialsKey: monobase-digitalocean-spaces
+  # GCP Secret Manager key that holds the Kopia repository password
+  repoCredentialsKey: monobase-velero-repo-password

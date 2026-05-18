@@ -1,0 +1,10 @@
+apiVersion: v2
+name: storage-resources
+description: Cluster storage — StorageClass definitions for default and tiered volumes
+type: application
+version: 1.0.0
+appVersion: "1.0"
+keywords:
+  - storage
+maintainers:
+  - name: MyCure Labs

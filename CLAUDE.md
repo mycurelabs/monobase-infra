@@ -6,20 +6,30 @@ GitOps-driven with ArgoCD, Helm charts, and Terraform/OpenTofu for 6 cloud provi
 ## Repository Structure
 
 ```
-charts/           # 21 Helm charts (healthcare apps, core services, infrastructure)
-argocd/           # ArgoCD bootstrap + application templates
-  bootstrap/      # ApplicationSet auto-discover + infrastructure root
-  applications/   # Per-deployment app-of-apps templates
-  infrastructure/ # Cluster-wide infrastructure apps
-terraform/        # IaC modules for 6 providers
-  modules/        # aws-eks, azure-aks, gcp-gke, do-doks, on-prem-k3s, local-k3d
-values/           # Configuration values
-  deployments/    # Per-client deployment configs (e.g., mycure-production.yaml)
-  infrastructure/ # Cluster-wide infra config (main.yaml)
-infrastructure/   # Raw K8s manifests (monitoring, security, velero, secrets)
-scripts/          # Operational scripts (bootstrap, provision, secrets, admin)
-docs/             # Architecture, operations, security documentation
+charts/                            # All Helm charts (apps + infrastructure + argocd glue)
+  argocd-bootstrap/                # Templated infrastructure-root + ApplicationSet
+  argocd-applications/             # Per-app ArgoCD Application templates (one per chart)
+  argocd-infrastructure/           # Cluster-wide infra Application templates
+  {api,account,hapihub,mycure,…}/  # Application charts
+  cert-manager-issuers/, external-dns/, external-secrets-stores/,
+  gateway/, nginx-gateway/, security-baseline/, namespace/,
+  monitoring-resources/, falco-resources/, kyverno-resources/,
+  velero-resources/, storage-resources/, minio-httproute/
+terraform/
+  modules/                         # aws-eks, azure-aks, gcp-gke, do-doks, on-prem-k3s, local-k3d
+values/
+  cluster/                         # Terraform module call for the production cluster (DOKS)
+  deployments/                     # Per-client deployment configs (mycure-production.yaml, etc.)
+  infrastructure/                  # Cluster-wide infra config (single-file main.yaml)
+scripts/                           # Bun/TypeScript ops scripts (bootstrap, provision, secrets, admin,
+                                   # monitor-migration, render-parity, seed, onprem-backup-*)
+docs/                              # Architecture, operations, security docs
+  history/                         # Point-in-time records (DIFF.md, MIGRATION.md, FIXME.md, SKILLS_AND_AGENTS.md)
 ```
+
+The previous top-level `argocd/` and `infrastructure/` directories were removed
+in commit ███ (the medicard-shape migration); their contents now live under
+`charts/argocd-*/` and `charts/*-resources/`.
 
 ## Tool Management
 

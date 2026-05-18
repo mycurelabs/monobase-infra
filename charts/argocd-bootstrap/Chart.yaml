@@ -1,0 +1,13 @@
+apiVersion: v2
+name: argocd-bootstrap
+description: ArgoCD bootstrap configuration for infrastructure and application auto-discovery
+type: application
+version: 1.0.0
+appVersion: "1.0"
+keywords:
+  - argocd
+  - bootstrap
+  - gitops
+  - infrastructure
+maintainers:
+  - name: MyCure Labs
