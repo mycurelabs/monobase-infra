@@ -1,0 +1,54 @@
+{{- if .Values.mailpit.enabled }}
+# ArgoCD Application: Mailpit (Email Testing - Dev/Staging Only)
+# Sync Wave 2 - Deploy before applications
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ .Values.global.namespace }}-mailpit
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+
+  source:
+    repoURL: {{ .Values.argocd.repoURL }}
+    targetRevision: {{ .Values.argocd.targetRevision | default "main" }}
+    path: charts/mailpit
+    helm:
+      releaseName: mailpit
+      valuesObject:
+        global:
+          {{- toYaml .Values.global | nindent 10 }}
+        {{- toYaml .Values.mailpit | nindent 8 }}
+        {{- if .Values.global.nodePool }}
+        # Pass node pool scheduling to mailpit subchart
+        mailpit:
+          nodeSelector:
+            node-pool: {{ .Values.global.nodePool }}
+          tolerations:
+            - key: "node-pool"
+              operator: "Equal"
+              value: {{ .Values.global.nodePool | quote }}
+              effect: "NoSchedule"
+        {{- end }}
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: {{ .Values.global.namespace }}
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false
+    retry:
+      limit: 5
+      backoff:
+        duration: 10s
+        maxDuration: 5m
+{{- end }}

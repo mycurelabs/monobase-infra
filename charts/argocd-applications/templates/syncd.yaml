@@ -1,0 +1,47 @@
+{{- if .Values.syncd.enabled }}
+# ArgoCD Application: SyncD Real-time Synchronization
+# Sync Wave 3 - Deploy application after database
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ .Values.global.namespace }}-syncd
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+
+  source:
+    path: charts/syncd
+    repoURL: {{ .Values.argocd.repoURL }}
+    targetRevision: {{ .Values.argocd.targetRevision | default "main" }}
+    helm:
+      releaseName: syncd
+      valuesObject:
+        {{- $syncdValues := omit .Values.syncd "mongodb" "minio" "valkey" "mailpit" }}
+        {{- toYaml $syncdValues | nindent 8 }}
+        global: {{ .Values.global | toYaml | nindent 10 }}
+        minio: {{ mergeOverwrite (deepCopy .Values.minio) (.Values.syncd.minio | default dict) | toYaml | nindent 10 }}
+        mongodb: {{ mergeOverwrite (deepCopy .Values.mongodb) (.Values.syncd.mongodb | default dict) | toYaml | nindent 10 }}
+        valkey: {{ mergeOverwrite (deepCopy .Values.valkey) (.Values.syncd.valkey | default dict) | toYaml | nindent 10 }}
+        mailpit: {{ mergeOverwrite (deepCopy .Values.mailpit) (.Values.syncd.mailpit | default dict) | toYaml | nindent 10 }}
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: {{ .Values.global.namespace }}
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false
+    retry:
+      limit: 5
+      backoff:
+        duration: 10s
+        maxDuration: 5m
+{{- end }}

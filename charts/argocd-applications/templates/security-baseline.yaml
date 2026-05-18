@@ -1,0 +1,40 @@
+# ArgoCD Application: Security Baseline
+# Sync Wave 0 - Deploy NetworkPolicies and RBAC before applications
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ .Values.global.namespace }}-security-baseline
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+
+  source:
+    repoURL: {{ .Values.argocd.repoURL }}
+    targetRevision: {{ .Values.argocd.targetRevision | default "main" }}
+    path: charts/security-baseline
+    helm:
+      releaseName: security-baseline
+      valuesObject:
+        global:
+          namespace: {{ .Values.global.namespace }}
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: {{ .Values.global.namespace }}
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false  # Namespace created by Wave -1
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        maxDuration: 2m

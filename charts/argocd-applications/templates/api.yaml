@@ -1,0 +1,47 @@
+{{- if .Values.api.enabled }}
+# ArgoCD Application: Monobase API
+# Sync Wave 3 - Deploy application after database
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ .Values.global.namespace }}-api
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+
+  source:
+    path: charts/api
+    repoURL: {{ .Values.argocd.repoURL }}
+    targetRevision: {{ .Values.argocd.targetRevision | default "main" }}
+    helm:
+      releaseName: api
+      valuesObject:
+        {{- $apiValues := omit .Values.api "postgresql" "minio" "valkey" "mailpit" }}
+        {{- toYaml $apiValues | nindent 8 }}
+        global: {{ .Values.global | toYaml | nindent 10 }}
+        minio: {{ mergeOverwrite (deepCopy .Values.minio) (.Values.api.minio | default dict) | toYaml | nindent 10 }}
+        postgresql: {{ mergeOverwrite (deepCopy .Values.postgresql) (.Values.api.postgresql | default dict) | toYaml | nindent 10 }}
+        valkey: {{ mergeOverwrite (deepCopy .Values.valkey) (.Values.api.valkey | default dict) | toYaml | nindent 10 }}
+        mailpit: {{ mergeOverwrite (deepCopy .Values.mailpit) (.Values.api.mailpit | default dict) | toYaml | nindent 10 }}
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: {{ .Values.global.namespace }}
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false
+    retry:
+      limit: 5
+      backoff:
+        duration: 10s
+        maxDuration: 5m
+{{- end }}

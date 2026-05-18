@@ -186,11 +186,13 @@ async function render(mode: "before" | "after"): Promise<void> {
   }
 
   // 4. Per-chart renders against infrastructure values (catches infra chart drift).
+  //    Only argocd-bootstrap and argocd-infrastructure consume main.yaml directly.
+  //    argocd-applications consumes deployment-values (covered by step 1 _apps/).
   if (existsSync(infraValues)) {
     const infraOut = join(outRoot, "_infra");
     mkdirSync(infraOut, { recursive: true });
     for (const chart of charts) {
-      if (!chart.startsWith("argocd-")) continue; // only the argocd-* charts use main.yaml directly
+      if (chart !== "argocd-bootstrap" && chart !== "argocd-infrastructure") continue;
       const out = join(infraOut, `${chart}.yaml`);
       const r = await helmTemplate(
         chart,

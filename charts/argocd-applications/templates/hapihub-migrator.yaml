@@ -1,0 +1,47 @@
+{{- if and .Values.hapihubMigrator .Values.hapihubMigrator.enabled }}
+# ArgoCD Application: HapiHub Migrator
+# Sync Wave 4 - Deploy AFTER hapihub (wave 3) so the rest of the stack is healthy
+# before the migrator starts touching MongoDB and PostgreSQL.
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ .Values.global.namespace }}-hapihub-migrator
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "4"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+
+  source:
+    path: charts/hapihub-migrator
+    repoURL: {{ .Values.argocd.repoURL }}
+    targetRevision: {{ .Values.argocd.targetRevision | default "main" }}
+    helm:
+      releaseName: hapihub-migrator
+      valuesObject:
+        {{- $migratorValues := omit .Values.hapihubMigrator "postgresql" "mongodb" }}
+        {{- toYaml $migratorValues | nindent 8 }}
+        global: {{ .Values.global | toYaml | nindent 10 }}
+        postgresql: {{ mergeOverwrite (deepCopy (.Values.postgresql | default dict)) (.Values.hapihubMigrator.postgresql | default dict) | toYaml | nindent 10 }}
+        mongodb: {{ mergeOverwrite (deepCopy (.Values.mongodb | default dict)) (.Values.hapihubMigrator.mongodb | default dict) | toYaml | nindent 10 }}
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: {{ .Values.global.namespace }}
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false
+      - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 10s
+        maxDuration: 5m
+{{- end }}

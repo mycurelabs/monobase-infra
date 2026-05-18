@@ -1,0 +1,57 @@
+# ArgoCD Application: Namespace
+# Sync Wave -1 - Create namespace before everything else
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ .Values.global.namespace }}-namespace
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+
+  source:
+    repoURL: {{ .Values.argocd.repoURL }}
+    targetRevision: {{ .Values.argocd.targetRevision | default "main" }}
+    path: charts/namespace
+    helm:
+      values: |
+        namespace:
+          name: {{ .Values.global.namespace }}
+          labels:
+            app.kubernetes.io/name: {{ .Values.global.namespace }}
+            app.kubernetes.io/environment: {{ .Values.global.environment }}
+
+            # Pod Security Standards labels
+            pod-security.kubernetes.io/enforce: {{ .Values.podSecurityStandards.level | default "restricted" }}
+            pod-security.kubernetes.io/audit: {{ .Values.podSecurityStandards.level | default "restricted" }}
+            pod-security.kubernetes.io/warn: {{ .Values.podSecurityStandards.level | default "restricted" }}
+
+        {{- if .Values.resourceQuotas.enabled }}
+        resourceQuota:
+          enabled: true
+          limits:
+            cpu: {{ .Values.resourceQuotas.limits.cpu | quote }}
+            memory: {{ .Values.resourceQuotas.limits.memory | quote }}
+            persistentvolumeclaims: {{ .Values.resourceQuotas.limits.persistentvolumeclaims | quote }}
+            pods: {{ .Values.resourceQuotas.limits.pods | quote }}
+        {{- end }}
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: {{ .Values.global.namespace }}
+
+  syncPolicy:
+    automated:
+      prune: false  # Never auto-delete namespace
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+    retry:
+      limit: 3
+      backoff:
+        duration: 5s
+        maxDuration: 1m

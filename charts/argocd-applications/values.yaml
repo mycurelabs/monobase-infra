@@ -1,0 +1,8 @@
+# Default values for monobase-applications Helm chart
+# These are overridden by deployments/*/values.yaml files
+# Note: argocd.repoURL is injected from ApplicationSet bootstrap file
+
+global:
+  domain: example.com
+  namespace: example
+  environment: production
