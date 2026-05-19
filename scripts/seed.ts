@@ -3051,6 +3051,7 @@ const SEED_SUBSCRIPTION_PACKAGE = {
     dailyCensus:             { key: "dailyCensus",             type: "feature", base: true },
     salesReports:            { key: "salesReports",            type: "feature", base: true },
     chatSupport:             { key: "chatSupport",             type: "feature", base: true },
+    chat:                    { key: "chat",                    type: "feature", base: true },
     lis:                     { key: "lis",                     type: "feature", base: true },
     ris:                     { key: "ris",                     type: "feature", base: true },
     pme:                     { key: "pme",                     type: "feature", base: true },
@@ -3192,6 +3193,16 @@ async function seedSubscriptions(
       await api("PATCH", `/subscriptions/${facility.id}`, { status: "active" });
     } catch {
       // ignore — best effort
+    }
+
+    // PATCH `chat: true` separately so the false→true transition fires
+    // on-chat-enabled.ts which auto-provisions announcement channels for
+    // chain-root + every direct descendant branch. Idempotent: the hook
+    // uses deterministic conversation ids (`announcement:<orgId>`).
+    try {
+      await api("PATCH", `/subscriptions/${facility.id}`, { chat: true });
+    } catch {
+      // best effort — the chat module is non-critical for non-messaging clients
     }
 
     if (didCreate) created++;
@@ -6199,6 +6210,581 @@ async function listMembershipIdsForUser(uid: string): Promise<string[]> {
   }
 }
 
+// ---------------------------------------------------------------------------
+// HR + Messaging seed (hapihub ≥ 11.7.0 required for backdated clocks)
+// ---------------------------------------------------------------------------
+
+const PHT_OFFSET_MIN = -480; // PHT is UTC+8 → -480 minutes WEST of UTC (matches JS Date.getTimezoneOffset() convention)
+
+type ShiftPattern = {
+  dayOfWeek: number[];   // 1=Mon..7=Sun (PHT local)
+  startTime: string;     // "HH:mm"
+  endTime: string;       // "HH:mm"
+  graceMinutes: number;
+};
+
+function shiftForUser(user: SeedUser): ShiftPattern | null {
+  if (isServiceAccount(user) || user.superadmin) return null;
+  const r = new Set(user.roleIds);
+  if (r.has("doctor") || r.has("doctor_pme") || r.has("medical_head")) {
+    return { dayOfWeek: [1,2,3,4,5], startTime: "09:00", endTime: "18:00", graceMinutes: 15 };
+  }
+  if (r.has("nurse") || r.has("nurse_head")) {
+    return { dayOfWeek: [1,2,3,4,5], startTime: "07:00", endTime: "16:00", graceMinutes: 10 };
+  }
+  if (r.has("billing") || r.has("cashier") || r.has("frontdesk") || r.has("billing_encoder")) {
+    return { dayOfWeek: [1,2,3,4,5,6], startTime: "08:00", endTime: "17:00", graceMinutes: 10 };
+  }
+  if (r.has("med_tech") || r.has("lab_tech") || r.has("lab_qc")) {
+    return { dayOfWeek: [2,3,4,5,6], startTime: "08:00", endTime: "17:00", graceMinutes: 10 };
+  }
+  if (r.has("radiologic_tech") || r.has("imaging_tech") || r.has("imaging_qc")) {
+    return { dayOfWeek: [2,3,4,5,6], startTime: "08:00", endTime: "17:00", graceMinutes: 10 };
+  }
+  if (r.has("admin") || r.has("clinic_manager")) {
+    return { dayOfWeek: [1,2,3,4,5], startTime: "08:00", endTime: "17:00", graceMinutes: 15 };
+  }
+  return null;
+}
+
+function uniformInt(min: number, max: number): number {
+  return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+function parseHHMM(s: string): [number, number] {
+  const [h, m] = s.split(":").map(Number);
+  return [h, m];
+}
+
+// Build a Date whose UTC instant equals the desired PHT wall clock
+// (PHT = UTC+8, so subtract 8h from the wall clock).
+function localPhtDateAt(year: number, monthIdx: number, day: number, hh: number, mm: number): Date {
+  return new Date(Date.UTC(year, monthIdx, day, hh - 8, mm, 0, 0));
+}
+
+function startOfPrevMonthUtc(now: Date): Date {
+  const d = new Date(now);
+  d.setUTCDate(1);
+  d.setUTCMonth(d.getUTCMonth() - 1);
+  d.setUTCHours(0, 0, 0, 0);
+  return d;
+}
+
+// Run an async block in a different user's session, restoring the
+// previous cookie afterwards. Idempotent — `finally` always restores.
+async function withUser<T>(email: string, fn: () => Promise<T>): Promise<T> {
+  const saved = sessionCookie;
+  sessionCookie = "";
+  await signIn(email, PASSWORD);
+  try {
+    return await fn();
+  } finally {
+    sessionCookie = saved;
+  }
+}
+
+// Per-(user, branch-org) membership lookup. Returns null when the user
+// isn't a member of the org (shouldn't happen for seeded users + orgs).
+async function findMemberId(uid: string, organization: string): Promise<string | undefined> {
+  try {
+    const res = (await api(
+      "GET",
+      `/organization-members?uid=${encodeURIComponent(uid)}&organization=${encodeURIComponent(organization)}&%24limit=1`,
+    )) as { data?: Array<{ id: string }> } | Array<{ id: string }>;
+    const list = Array.isArray(res) ? res : res.data ?? [];
+    return list[0]?.id;
+  } catch {
+    return undefined;
+  }
+}
+
+async function findQueueIdByName(organization: string, name: string): Promise<string | undefined> {
+  try {
+    const res = (await api(
+      "GET",
+      `/queues?organization=${encodeURIComponent(organization)}&name=${encodeURIComponent(name)}&%24limit=1`,
+    )) as { data?: Array<{ id: string }> } | Array<{ id: string }>;
+    const list = Array.isArray(res) ? res : res.data ?? [];
+    return list[0]?.id;
+  } catch {
+    return undefined;
+  }
+}
+
+// Preflight: verify hapihub honors service-account startAt override.
+// Fails fast if running against hapihub < 11.7.0.
+async function assertServiceAccountTimestampOverride(
+  organization: string,
+  membership: string,
+  uid: string,
+): Promise<void> {
+  const past = new Date("2025-01-15T08:00:00Z");
+  const end = new Date("2025-01-15T17:00:00Z");
+  let probeId: string | undefined;
+  try {
+    const probe = (await api("POST", "/clock/clocks", {
+      type: "attendance",
+      organization,
+      uid,
+      membership,
+      startAt: past.toISOString(),
+      endAt: end.toISOString(),
+    })) as { id?: string; startAt?: string | Date };
+    probeId = probe.id;
+    const got = new Date(probe.startAt as any).getTime();
+    if (Math.abs(got - past.getTime()) > 5000) {
+      throw new Error(
+        `hapihub does not honor service-account startAt override (got ${probe.startAt}, want ${past.toISOString()}). ` +
+        `Bump hapihub to ≥ 11.7.0 in the target environment and retry.`,
+      );
+    }
+  } finally {
+    if (probeId) {
+      await api("DELETE", `/clock/clocks/${probeId}`).catch(() => { /* best effort */ });
+    }
+  }
+}
+
+async function seedHrSchedules(
+  facilities: Array<{ id: string; label: string }>,
+  userIds: Record<string, string>,
+): Promise<void> {
+  const spinner = ora("Seeding HR schedules (role-shaped shifts)...").start();
+  let created = 0;
+  let wiped = 0;
+  for (const user of USERS) {
+    const pattern = shiftForUser(user);
+    if (!pattern) continue;
+    const uid = userIds[user.email];
+    if (!uid) continue;
+    for (const facility of facilities) {
+      const membershipId = await findMemberId(uid, facility.id);
+      if (!membershipId) continue;
+      // Idempotency: wipe existing schedules for this membership first.
+      try {
+        const existing = (await api(
+          "GET",
+          `/hr/schedules?organization=${encodeURIComponent(facility.id)}&membership=${encodeURIComponent(membershipId)}&%24limit=100`,
+        )) as { data?: Array<{ id: string }> } | Array<{ id: string }>;
+        const rows = Array.isArray(existing) ? existing : existing.data ?? [];
+        for (const row of rows) {
+          await api("DELETE", `/hr/schedules/${row.id}`).catch(() => {});
+          wiped++;
+        }
+      } catch { /* best effort */ }
+      for (const dow of pattern.dayOfWeek) {
+        spinner.text = `[${facility.label}] ${user.email} day ${dow}`;
+        try {
+          await api("POST", "/hr/schedules", {
+            organization: facility.id,
+            membership: membershipId,
+            dayOfWeek: dow,
+            startTime: pattern.startTime,
+            endTime: pattern.endTime,
+            graceMinutes: pattern.graceMinutes,
+          });
+          created++;
+        } catch (err: unknown) {
+          spinner.warn(`schedule ${user.email}/${facility.label}/dow=${dow}: ${(err as Error).message.slice(0, 120)}`);
+        }
+      }
+    }
+  }
+  spinner.succeed(`HR schedules: ${created} created, ${wiped} stale rows wiped`);
+}
+
+async function seedHrClocks(
+  facilities: Array<{ id: string; label: string }>,
+  userIds: Record<string, string>,
+): Promise<void> {
+  const spinner = ora("Seeding HR clocks (backdated this month + previous month)...").start();
+
+  // Preflight against the first doctor's membership.
+  const probeEmail = USERS.find((u) => !isServiceAccount(u) && !u.superadmin && u.roleIds.includes("doctor"))?.email;
+  if (!probeEmail) throw new Error("seedHrClocks: no doctor user available for preflight");
+  const probeUid = userIds[probeEmail];
+  const probeOrg = facilities[0]?.id;
+  const probeMember = await findMemberId(probeUid, probeOrg!);
+  if (!probeMember) throw new Error(`seedHrClocks: no membership for ${probeEmail} in ${facilities[0]?.label}`);
+  spinner.text = "Preflight: verifying service-account timestamp override...";
+  await assertServiceAccountTimestampOverride(probeOrg!, probeMember, probeUid);
+
+  const now = new Date();
+  const rangeStart = startOfPrevMonthUtc(now);
+
+  let attendances = 0;
+  let breaks = 0;
+  let stations = 0;
+  let swept = 0;
+
+  for (const user of USERS) {
+    const pattern = shiftForUser(user);
+    if (!pattern) continue;
+    const uid = userIds[user.email];
+    if (!uid) continue;
+    const isDoctor = user.roleIds.some((r) => ["doctor", "doctor_pme", "medical_head"].includes(r));
+
+    for (const facility of facilities) {
+      const membershipId = await findMemberId(uid, facility.id);
+      if (!membershipId) continue;
+
+      // Sweep range for idempotency: wipe any existing clocks for this
+      // membership whose startAt falls in [rangeStart, now].
+      try {
+        const existing = (await api(
+          "GET",
+          `/clock/clocks?membership=${encodeURIComponent(membershipId)}&%24limit=500`,
+        )) as { data?: Array<{ id: string; startAt: string | number }> } | Array<{ id: string; startAt: string | number }>;
+        const rows = Array.isArray(existing) ? existing : existing.data ?? [];
+        for (const row of rows) {
+          const t = new Date(row.startAt as any).getTime();
+          if (t >= rangeStart.getTime() && t <= now.getTime() + 24 * 60 * 60 * 1000) {
+            await api("DELETE", `/clock/clocks/${row.id}`).catch(() => {});
+            swept++;
+          }
+        }
+      } catch { /* best effort */ }
+
+      // Doctor queue (for station presence). Pick the user's seeded
+      // per-doctor queue if present.
+      let doctorQueueId: string | undefined;
+      if (isDoctor) {
+        const spec = SEED_DOCTOR_QUEUES.find((q) => q.email === user.email);
+        if (spec) {
+          doctorQueueId = await findQueueIdByName(facility.id, spec.queueName);
+        }
+      }
+
+      // Walk weekdays from rangeStart → today (UTC). PHT is UTC+8, so a
+      // UTC-midnight Date is already 08:00 PHT the same day — UTC day-of-week
+      // matches PHT day-of-week for our window.
+      const cursor = new Date(rangeStart);
+      while (cursor.getTime() <= now.getTime()) {
+        const jsDow = cursor.getUTCDay(); // 0=Sun..6=Sat
+        const dow = ((jsDow + 6) % 7) + 1; // 1=Mon..7=Sun
+        if (!pattern.dayOfWeek.includes(dow)) {
+          cursor.setUTCDate(cursor.getUTCDate() + 1);
+          continue;
+        }
+
+        const yy = cursor.getUTCFullYear(), mo = cursor.getUTCMonth(), dd = cursor.getUTCDate();
+        const [sh, sm] = parseHHMM(pattern.startTime);
+        const [eh, em] = parseHHMM(pattern.endTime);
+        const baseStart = localPhtDateAt(yy, mo, dd, sh, sm);
+        const baseEnd   = localPhtDateAt(yy, mo, dd, eh, em);
+
+        const startJitter = uniformInt(-15, 30);
+        let startAt = new Date(baseStart.getTime() + startJitter * 60_000);
+        let endAt: Date | null = new Date(baseEnd.getTime() + uniformInt(-15, 30) * 60_000);
+
+        if (Math.random() < 1/15) startAt = new Date(baseStart.getTime() + uniformInt(45, 90) * 60_000);
+        if (Math.random() < 1/25) endAt = null;
+
+        // Today: only create if shift would have started, and leave open.
+        const isToday = (yy === now.getUTCFullYear() && mo === now.getUTCMonth() && dd === now.getUTCDate());
+        if (isToday) {
+          if (startAt.getTime() > now.getTime()) {
+            cursor.setUTCDate(cursor.getUTCDate() + 1);
+            continue;
+          }
+          endAt = null;
+        }
+
+        let attendanceId: string | undefined;
+        try {
+          spinner.text = `[${facility.label}] ${user.email} ${yy}-${String(mo+1).padStart(2,"0")}-${String(dd).padStart(2,"0")}`;
+          const att = (await api("POST", "/clock/clocks", {
+            type: "attendance",
+            organization: facility.id,
+            uid,
+            membership: membershipId,
+            startAt: startAt.toISOString(),
+            endAt: endAt?.toISOString() ?? null,
+          })) as { id: string };
+          attendanceId = att.id;
+          attendances++;
+        } catch (err) {
+          spinner.warn(`attendance ${user.email}/${facility.label}/${yy}-${mo+1}-${dd}: ${(err as Error).message.slice(0, 120)}`);
+          cursor.setUTCDate(cursor.getUTCDate() + 1);
+          continue;
+        }
+
+        if (endAt && attendanceId) {
+          // Lunch break ~12:00 PHT
+          const brStart = localPhtDateAt(yy, mo, dd, 12, uniformInt(0, 30));
+          const brEnd = new Date(brStart.getTime() + 45 * 60_000);
+          if (brStart.getTime() > startAt.getTime() && brEnd.getTime() < endAt.getTime()) {
+            try {
+              await api("POST", "/clock/clocks", {
+                type: "break",
+                organization: facility.id,
+                uid,
+                membership: membershipId,
+                parent: attendanceId,
+                startAt: brStart.toISOString(),
+                endAt: brEnd.toISOString(),
+                endReason: "manual",
+              });
+              breaks++;
+            } catch { /* best effort */ }
+          }
+
+          // Station clocks (doctors only)
+          if (isDoctor && doctorQueueId) {
+            const numStations = uniformInt(2, 4);
+            let cs = new Date(startAt.getTime() + 30 * 60_000);
+            const stationEnd = new Date(endAt.getTime() - 30 * 60_000);
+            const stationSpan = (stationEnd.getTime() - cs.getTime()) / numStations;
+            for (let i = 0; i < numStations && cs.getTime() < stationEnd.getTime(); i++) {
+              const sStart = new Date(cs);
+              const sEnd = new Date(cs.getTime() + stationSpan);
+              try {
+                await api("POST", "/clock/clocks", {
+                  type: "station",
+                  organization: facility.id,
+                  uid,
+                  membership: membershipId,
+                  parent: attendanceId,
+                  queue: doctorQueueId,
+                  startAt: sStart.toISOString(),
+                  endAt: sEnd.toISOString(),
+                });
+                stations++;
+              } catch { /* best effort */ }
+              cs = sEnd;
+            }
+          }
+        }
+
+        cursor.setUTCDate(cursor.getUTCDate() + 1);
+      }
+    }
+  }
+
+  // Trigger rollup self-heal for each chain-root (parent) facility.
+  // hr-reports/self-heal.ts rebuilds hr_daily_staff_summary on the fly
+  // for past days where attendance rows exist but no rollup row does.
+  const chainRoots = new Set<string>();
+  for (const f of facilities) {
+    chainRoots.add(f.id);
+  }
+  for (const orgId of chainRoots) {
+    await api(
+      "GET",
+      `/hr/aggregate?organization=${encodeURIComponent(orgId)}&period=this-month&tzOffsetMinutes=${PHT_OFFSET_MIN}`,
+    ).catch(() => {});
+    await api(
+      "GET",
+      `/hr/aggregate?organization=${encodeURIComponent(orgId)}&period=last-payroll&tzOffsetMinutes=${PHT_OFFSET_MIN}`,
+    ).catch(() => {});
+  }
+
+  spinner.succeed(
+    `HR clocks: ${attendances} attendances, ${breaks} breaks, ${stations} stations (${swept} stale rows swept)`,
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Messaging seed
+// ---------------------------------------------------------------------------
+
+const CHAT_LINES: string[] = [
+  "Px in cubicle 2 ready for read",
+  "Ms. Reyes' CBC came back, mild anemia",
+  "Need a quick consult on the wound dressing in queue 3",
+  "Heading to lunch, back at 1:00",
+  "Imaging request for chest X-ray sent",
+  "Endorsement for the afternoon shift — Bed 4 has pending labs",
+  "Has the courier picked up the lab samples?",
+  "Found a duplicate chart for px Cruz — merging now",
+  "Coming back from break, will pick up queue 2",
+  "Lab results uploaded to chart MR-00231",
+  "Quick sec — printer in cubicle 1 jammed again",
+  "Will need extra hands for the morning rush tomorrow",
+  "Px refused phlebotomy — flagged in encounter notes",
+  "New PEME batch arrived — 12 walk-ins for the morning",
+  "Doctor is running late, please advise patients",
+];
+
+const DM_PAIRS: Array<[string, string]> = [
+  ["doctor@mycure.test",     "nurse@mycure.test"],
+  ["doctor@mycure.test",     "pedia@mycure.test"],
+  ["familymd@mycure.test",   "nurse@mycure.test"],
+  ["nurse@mycure.test",      "cashier@mycure.test"],
+  ["laboratory@mycure.test", "imaging@mycure.test"],
+  ["doctor@mycure.test",     "laboratory@mycure.test"],
+];
+
+type GcSpec = { title: string; creator: string; participants: string[] };
+const GC_SPECS: GcSpec[] = [
+  {
+    title: "Doctors",
+    creator: "doctor@mycure.test",
+    participants: ["doctor@mycure.test", "pedia@mycure.test", "familymd@mycure.test", "admin@mycure.test"],
+  },
+  {
+    title: "Clinic Staff",
+    creator: "admin@mycure.test",
+    participants: [
+      "admin@mycure.test", "doctor@mycure.test", "pedia@mycure.test", "familymd@mycure.test",
+      "nurse@mycure.test", "cashier@mycure.test", "laboratory@mycure.test", "imaging@mycure.test",
+    ],
+  },
+  {
+    title: "Lab + Imaging",
+    creator: "laboratory@mycure.test",
+    participants: ["laboratory@mycure.test", "imaging@mycure.test", "doctor@mycure.test"],
+  },
+];
+
+// Best-effort message sender. Posts 15-28 messages alternating among the
+// participants, with one ref / mention / reply sprinkled in at fixed
+// positions for QA reproducibility.
+async function postMessages(
+  conversationId: string,
+  participantEmails: string[],
+  opts: { withRef?: string; withMention?: string },
+): Promise<string[]> {
+  const msgIds: string[] = [];
+  let firstMsgId: string | undefined;
+  const count = uniformInt(15, 28);
+  for (let i = 0; i < count; i++) {
+    const sender = participantEmails[i % participantEmails.length];
+    const body: any = {};
+    if (i === 0 && opts.withRef) {
+      body.content = [
+        { type: "text", value: "Looking at " },
+        { type: "ref", kind: "patient", id: opts.withRef },
+        { type: "text", value: " — any updates?" },
+      ];
+    } else if (i === 1 && opts.withMention) {
+      body.content = [
+        { type: "mention", id: opts.withMention },
+        { type: "text", value: " can you take this one?" },
+      ];
+    } else if (i === 2 && firstMsgId) {
+      body.content = [{ type: "text", value: CHAT_LINES[i % CHAT_LINES.length] }];
+      body.replyTo = firstMsgId;
+    } else {
+      body.content = [{ type: "text", value: CHAT_LINES[i % CHAT_LINES.length] }];
+    }
+
+    try {
+      const msg = await withUser(sender, () =>
+        api("POST", `/messaging/conversations/${conversationId}/messages`, body),
+      ) as { id?: string };
+      if (msg?.id) {
+        msgIds.push(msg.id);
+        if (!firstMsgId) firstMsgId = msg.id;
+      }
+    } catch { /* best effort */ }
+  }
+  return msgIds;
+}
+
+async function seedConversations(
+  userIds: Record<string, string>,
+  firstPatientId: string | undefined,
+): Promise<void> {
+  const spinner = ora("Seeding messaging conversations (DMs + GCs + announcements)...").start();
+
+  // Sweep existing non-announcement conversations (idempotency).
+  try {
+    const list = await withUser("admin@mycure.test", () =>
+      api("GET", "/messaging/conversations?%24limit=200"),
+    ) as { data?: Array<{ id: string; type: string }> } | Array<{ id: string; type: string }>;
+    const rows = Array.isArray(list) ? list : list.data ?? [];
+    for (const conv of rows) {
+      if (conv.type === "announcement") continue;
+      await withUser("admin@mycure.test", () =>
+        api("DELETE", `/messaging/conversations/${conv.id}`),
+      ).catch(() => {});
+    }
+  } catch { /* best effort */ }
+
+  // --- DMs ---
+  let dmCount = 0;
+  for (const [a, b] of DM_PAIRS) {
+    const aUid = userIds[a];
+    const bUid = userIds[b];
+    if (!aUid || !bUid) continue;
+    try {
+      const dm = await withUser(a, () =>
+        api("POST", "/messaging/conversations", { type: "dm", participants: [aUid, bUid] }),
+      ) as { id?: string };
+      if (dm?.id) {
+        await postMessages(dm.id, [a, b], { withRef: firstPatientId, withMention: bUid });
+        dmCount++;
+      }
+    } catch (err) {
+      spinner.warn(`DM ${a}↔${b}: ${(err as Error).message.slice(0, 120)}`);
+    }
+  }
+
+  // --- GCs ---
+  let gcCount = 0;
+  for (const spec of GC_SPECS) {
+    const creatorUid = userIds[spec.creator];
+    if (!creatorUid) continue;
+    const otherUids = spec.participants
+      .filter((e) => e !== spec.creator)
+      .map((e) => userIds[e])
+      .filter(Boolean);
+    if (!otherUids.length) continue;
+    try {
+      const gc = await withUser(spec.creator, () =>
+        api("POST", "/messaging/conversations", {
+          type: "gc",
+          title: spec.title,
+          participants: otherUids,
+        }),
+      ) as { id?: string };
+      if (gc?.id) {
+        const ids = await postMessages(gc.id, spec.participants, {
+          withRef: firstPatientId,
+          withMention: otherUids[0],
+        });
+        // Reaction (best-effort)
+        if (ids[0]) {
+          await withUser(spec.creator, () =>
+            api("POST", `/messaging/messages/${ids[0]}/react`, { emoji: "👍" }),
+          ).catch(() => {});
+        }
+        // Pin (best-effort)
+        if (ids[1]) {
+          await withUser(spec.creator, () =>
+            api("POST", `/messaging/conversations/${gc.id}/pin`, { messageId: ids[1] }),
+          ).catch(() => {});
+        }
+        gcCount++;
+      }
+    } catch (err) {
+      spinner.warn(`GC '${spec.title}': ${(err as Error).message.slice(0, 120)}`);
+    }
+  }
+
+  // --- Announcement welcome posts (announcement convs auto-provisioned by hook) ---
+  let announcementPosts = 0;
+  try {
+    const anns = await withUser("admin@mycure.test", () =>
+      api("GET", "/messaging/conversations?type=announcement&%24limit=20"),
+    ) as { data?: Array<{ id: string; title?: string }> } | Array<{ id: string; title?: string }>;
+    const rows = Array.isArray(anns) ? anns : anns.data ?? [];
+    for (const ann of rows) {
+      try {
+        await withUser("admin@mycure.test", () =>
+          api("POST", `/messaging/conversations/${ann.id}/messages`, {
+            content: [{ type: "text", value: `Welcome to ${ann.title ?? "Announcements"}. Use this channel for org-wide notices.` }],
+          }),
+        );
+        announcementPosts++;
+      } catch { /* best effort */ }
+    }
+  } catch { /* best effort */ }
+
+  spinner.succeed(`Conversations: ${dmCount} DMs, ${gcCount} GCs, ${announcementPosts} announcement posts`);
+}
+
 async function resetSeedData() {
   const spinner = ora("Resetting existing seed data...").start();
 
@@ -7150,6 +7736,67 @@ async function main() {
   // patient + the first N random patients, linked back via
   // medical-patients.account. Default N=5; --patient-accounts 0 to skip.
   const patientAccounts = await seedPatientAccounts(orgsToSeed, PATIENT_ACCOUNT_COUNT);
+
+  // Step 23: HR schedules (role-shaped shifts per user-membership). Required
+  // before clocks: the Reports page uses schedules to derive demand/coverage
+  // and late-arrival cutoffs.
+  await seedHrSchedules(orgsToSeed, userIds);
+
+  // Step 24: HR clocks (backdated this-month + previous-month). Service-
+  // account batch import (hapihub ≥ 11.7.0). Preflight asserts the override
+  // is honored before writing — fails fast against older hapihub.
+  await seedHrClocks(orgsToSeed, userIds);
+
+  // Step 25: Messaging conversations (DMs, GCs, refs, mentions, reactions,
+  // pins). Announcement channels are auto-provisioned by hapihub's
+  // on-chat-enabled hook when seedSubscriptions flipped `chat: true`.
+  const firstPatientId = await (async (): Promise<string | undefined> => {
+    try {
+      const parentId = orgsToSeed[0]?.id;
+      if (!parentId) return undefined;
+      const res = (await api(
+        "GET",
+        `/medical-patients?organization=${encodeURIComponent(parentId)}&%24limit=1`,
+      )) as { data?: Array<{ id: string }> } | Array<{ id: string }>;
+      const list = Array.isArray(res) ? res : res.data ?? [];
+      return list[0]?.id;
+    } catch {
+      return undefined;
+    }
+  })();
+  await seedConversations(userIds, firstPatientId);
+
+  // Post-flight: messaging surfaces for a regular user.
+  try {
+    const probeConvs = await withUser("doctor@mycure.test", () =>
+      api("GET", "/messaging/conversations?%24limit=20"),
+    ) as { data?: Array<{ type: string }> } | Array<{ type: string }>;
+    const types = new Set((Array.isArray(probeConvs) ? probeConvs : probeConvs.data ?? []).map((c) => c.type));
+    if (!types.has("dm") || !types.has("gc")) {
+      console.warn(chalk.yellow(`⚠ post-flight: doctor@mycure.test sees conversation types=[${[...types].join(", ")}] (expected dm + gc)`));
+    } else {
+      console.log(chalk.gray(`✓ doctor@mycure.test sees DM + GC conversations`));
+    }
+  } catch (err) {
+    console.warn(chalk.yellow(`⚠ messaging post-flight failed: ${(err as Error).message.slice(0, 200)}`));
+  }
+
+  // Post-flight: HR aggregate sanity check.
+  try {
+    const parentId = orgsToSeed[0]?.id;
+    const agg = (await api(
+      "GET",
+      `/hr/aggregate?organization=${encodeURIComponent(parentId!)}&period=this-month&tzOffsetMinutes=${PHT_OFFSET_MIN}`,
+    )) as { kpis?: { totalHoursWorked?: number } } | null;
+    const hours = agg?.kpis?.totalHoursWorked ?? 0;
+    if (hours > 0) {
+      console.log(chalk.gray(`✓ HR aggregate this-month totalHoursWorked=${Math.round(hours)}h`));
+    } else {
+      console.warn(chalk.yellow(`⚠ HR aggregate returned totalHoursWorked=0 — clocks may not have landed`));
+    }
+  } catch (err) {
+    console.warn(chalk.yellow(`⚠ HR aggregate post-flight failed: ${(err as Error).message.slice(0, 200)}`));
+  }
 
   // Per-type service breakdown for the summary
   const svcByType = SERVICE_TEMPLATES.reduce<Record<string, number>>((acc, t) => {
