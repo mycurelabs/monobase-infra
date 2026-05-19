@@ -6272,10 +6272,20 @@ function startOfPrevMonthUtc(now: Date): Date {
 
 // Run an async block in a different user's session, restoring the
 // previous cookie afterwards. Idempotent — `finally` always restores.
-async function withUser<T>(email: string, fn: () => Promise<T>): Promise<T> {
+// Pass `activeOrgId` to PATCH the better-auth session's active org id
+// before running the block (required by messaging endpoints which read
+// session.active_organization_id for chain-root resolution).
+async function withUser<T>(email: string, fn: () => Promise<T>, opts: { activeOrgId?: string } = {}): Promise<T> {
   const saved = sessionCookie;
   sessionCookie = "";
   await signIn(email, PASSWORD);
+  if (opts.activeOrgId) {
+    try {
+      await api("POST", "/auth/organization/set-active", { organizationId: opts.activeOrgId });
+    } catch {
+      // best-effort — older hapihub builds don't have the override endpoint
+    }
+  }
   try {
     return await fn();
   } finally {
@@ -6322,7 +6332,7 @@ async function assertServiceAccountTimestampOverride(
   const end = new Date("2025-01-15T17:00:00Z");
   let probeId: string | undefined;
   try {
-    const probe = (await api("POST", "/clock/clocks", {
+    const probe = (await api("POST", "/clocks", {
       type: "attendance",
       organization,
       uid,
@@ -6340,7 +6350,7 @@ async function assertServiceAccountTimestampOverride(
     }
   } finally {
     if (probeId) {
-      await api("DELETE", `/clock/clocks/${probeId}`).catch(() => { /* best effort */ });
+      await api("DELETE", `/clocks/${probeId}`).catch(() => { /* best effort */ });
     }
   }
 }
@@ -6399,15 +6409,27 @@ async function seedHrClocks(
 ): Promise<void> {
   const spinner = ora("Seeding HR clocks (backdated this month + previous month)...").start();
 
-  // Preflight against the first doctor's membership.
-  const probeEmail = USERS.find((u) => !isServiceAccount(u) && !u.superadmin && u.roleIds.includes("doctor"))?.email;
-  if (!probeEmail) throw new Error("seedHrClocks: no doctor user available for preflight");
-  const probeUid = userIds[probeEmail];
-  const probeOrg = facilities[0]?.id;
-  const probeMember = await findMemberId(probeUid, probeOrg!);
-  if (!probeMember) throw new Error(`seedHrClocks: no membership for ${probeEmail} in ${facilities[0]?.label}`);
-  spinner.text = "Preflight: verifying service-account timestamp override...";
-  await assertServiceAccountTimestampOverride(probeOrg!, probeMember, probeUid);
+  // Switch to service-account session for the duration — clock.ts gates
+  // the timestamp override on isServiceAccount=true (see commit 8e7a947f).
+  const savedSession = sessionCookie;
+  const serviceEmail = [...SERVICE_ACCOUNT_EMAILS][0];
+  if (!serviceEmail) {
+    spinner.fail("seedHrClocks: no service account configured; cannot backdate clocks");
+    throw new Error("seedHrClocks requires a service account in SERVICE_ACCOUNT_EMAILS");
+  }
+  sessionCookie = "";
+  await signIn(serviceEmail, PASSWORD);
+
+  try {
+    // Preflight against the first doctor's membership.
+    const probeEmail = USERS.find((u) => !isServiceAccount(u) && !u.superadmin && u.roleIds.includes("doctor"))?.email;
+    if (!probeEmail) throw new Error("seedHrClocks: no doctor user available for preflight");
+    const probeUid = userIds[probeEmail];
+    const probeOrg = facilities[0]?.id;
+    const probeMember = await findMemberId(probeUid, probeOrg!);
+    if (!probeMember) throw new Error(`seedHrClocks: no membership for ${probeEmail} in ${facilities[0]?.label}`);
+    spinner.text = "Preflight: verifying service-account timestamp override...";
+    await assertServiceAccountTimestampOverride(probeOrg!, probeMember, probeUid);
 
   const now = new Date();
   const rangeStart = startOfPrevMonthUtc(now);
@@ -6433,13 +6455,13 @@ async function seedHrClocks(
       try {
         const existing = (await api(
           "GET",
-          `/clock/clocks?membership=${encodeURIComponent(membershipId)}&%24limit=500`,
+          `/clocks?membership=${encodeURIComponent(membershipId)}&%24limit=500`,
         )) as { data?: Array<{ id: string; startAt: string | number }> } | Array<{ id: string; startAt: string | number }>;
         const rows = Array.isArray(existing) ? existing : existing.data ?? [];
         for (const row of rows) {
           const t = new Date(row.startAt as any).getTime();
           if (t >= rangeStart.getTime() && t <= now.getTime() + 24 * 60 * 60 * 1000) {
-            await api("DELETE", `/clock/clocks/${row.id}`).catch(() => {});
+            await api("DELETE", `/clocks/${row.id}`).catch(() => {});
             swept++;
           }
         }
@@ -6493,7 +6515,7 @@ async function seedHrClocks(
         let attendanceId: string | undefined;
         try {
           spinner.text = `[${facility.label}] ${user.email} ${yy}-${String(mo+1).padStart(2,"0")}-${String(dd).padStart(2,"0")}`;
-          const att = (await api("POST", "/clock/clocks", {
+          const att = (await api("POST", "/clocks", {
             type: "attendance",
             organization: facility.id,
             uid,
@@ -6515,7 +6537,7 @@ async function seedHrClocks(
           const brEnd = new Date(brStart.getTime() + 45 * 60_000);
           if (brStart.getTime() > startAt.getTime() && brEnd.getTime() < endAt.getTime()) {
             try {
-              await api("POST", "/clock/clocks", {
+              await api("POST", "/clocks", {
                 type: "break",
                 organization: facility.id,
                 uid,
@@ -6539,7 +6561,7 @@ async function seedHrClocks(
               const sStart = new Date(cs);
               const sEnd = new Date(cs.getTime() + stationSpan);
               try {
-                await api("POST", "/clock/clocks", {
+                await api("POST", "/clocks", {
                   type: "station",
                   organization: facility.id,
                   uid,
@@ -6582,6 +6604,9 @@ async function seedHrClocks(
   spinner.succeed(
     `HR clocks: ${attendances} attendances, ${breaks} breaks, ${stations} stations (${swept} stale rows swept)`,
   );
+  } finally {
+    sessionCookie = savedSession;
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -6644,6 +6669,7 @@ async function postMessages(
   conversationId: string,
   participantEmails: string[],
   opts: { withRef?: string; withMention?: string },
+  userOpts: { activeOrgId?: string } = {},
 ): Promise<string[]> {
   const msgIds: string[] = [];
   let firstMsgId: string | undefined;
@@ -6672,7 +6698,7 @@ async function postMessages(
     try {
       const msg = await withUser(sender, () =>
         api("POST", `/messaging/conversations/${conversationId}/messages`, body),
-      ) as { id?: string };
+      userOpts) as { id?: string };
       if (msg?.id) {
         msgIds.push(msg.id);
         if (!firstMsgId) firstMsgId = msg.id;
@@ -6685,20 +6711,22 @@ async function postMessages(
 async function seedConversations(
   userIds: Record<string, string>,
   firstPatientId: string | undefined,
+  chainRootOrgId: string,
 ): Promise<void> {
   const spinner = ora("Seeding messaging conversations (DMs + GCs + announcements)...").start();
+  const orgOpts = { activeOrgId: chainRootOrgId };
 
   // Sweep existing non-announcement conversations (idempotency).
   try {
     const list = await withUser("admin@mycure.test", () =>
       api("GET", "/messaging/conversations?%24limit=200"),
-    ) as { data?: Array<{ id: string; type: string }> } | Array<{ id: string; type: string }>;
+    orgOpts) as { data?: Array<{ id: string; type: string }> } | Array<{ id: string; type: string }>;
     const rows = Array.isArray(list) ? list : list.data ?? [];
     for (const conv of rows) {
       if (conv.type === "announcement") continue;
       await withUser("admin@mycure.test", () =>
         api("DELETE", `/messaging/conversations/${conv.id}`),
-      ).catch(() => {});
+      orgOpts).catch(() => {});
     }
   } catch { /* best effort */ }
 
@@ -6711,9 +6739,9 @@ async function seedConversations(
     try {
       const dm = await withUser(a, () =>
         api("POST", "/messaging/conversations", { type: "dm", participants: [aUid, bUid] }),
-      ) as { id?: string };
+      orgOpts) as { id?: string };
       if (dm?.id) {
-        await postMessages(dm.id, [a, b], { withRef: firstPatientId, withMention: bUid });
+        await postMessages(dm.id, [a, b], { withRef: firstPatientId, withMention: bUid }, orgOpts);
         dmCount++;
       }
     } catch (err) {
@@ -6738,23 +6766,23 @@ async function seedConversations(
           title: spec.title,
           participants: otherUids,
         }),
-      ) as { id?: string };
+      orgOpts) as { id?: string };
       if (gc?.id) {
         const ids = await postMessages(gc.id, spec.participants, {
           withRef: firstPatientId,
           withMention: otherUids[0],
-        });
-        // Reaction (best-effort)
+        }, orgOpts);
+        // Reaction (best-effort) — colon-suffix action endpoint per OAS
         if (ids[0]) {
           await withUser(spec.creator, () =>
-            api("POST", `/messaging/messages/${ids[0]}/react`, { emoji: "👍" }),
-          ).catch(() => {});
+            api("POST", `/messaging/messages/${ids[0]}:react`, { emoji: "👍" }),
+          orgOpts).catch(() => {});
         }
-        // Pin (best-effort)
+        // Pin (best-effort) — colon-suffix action endpoint per OAS
         if (ids[1]) {
           await withUser(spec.creator, () =>
-            api("POST", `/messaging/conversations/${gc.id}/pin`, { messageId: ids[1] }),
-          ).catch(() => {});
+            api("POST", `/messaging/conversations/${gc.id}:pin`, { messageId: ids[1] }),
+          orgOpts).catch(() => {});
         }
         gcCount++;
       }
@@ -6768,7 +6796,7 @@ async function seedConversations(
   try {
     const anns = await withUser("admin@mycure.test", () =>
       api("GET", "/messaging/conversations?type=announcement&%24limit=20"),
-    ) as { data?: Array<{ id: string; title?: string }> } | Array<{ id: string; title?: string }>;
+    orgOpts) as { data?: Array<{ id: string; title?: string }> } | Array<{ id: string; title?: string }>;
     const rows = Array.isArray(anns) ? anns : anns.data ?? [];
     for (const ann of rows) {
       try {
@@ -6776,7 +6804,7 @@ async function seedConversations(
           api("POST", `/messaging/conversations/${ann.id}/messages`, {
             content: [{ type: "text", value: `Welcome to ${ann.title ?? "Announcements"}. Use this channel for org-wide notices.` }],
           }),
-        );
+        orgOpts);
         announcementPosts++;
       } catch { /* best effort */ }
     }
@@ -7764,13 +7792,16 @@ async function main() {
       return undefined;
     }
   })();
-  await seedConversations(userIds, firstPatientId);
+  const chainRootOrgId = orgsToSeed[0]?.id;
+  if (chainRootOrgId) {
+    await seedConversations(userIds, firstPatientId, chainRootOrgId);
+  }
 
   // Post-flight: messaging surfaces for a regular user.
   try {
     const probeConvs = await withUser("doctor@mycure.test", () =>
       api("GET", "/messaging/conversations?%24limit=20"),
-    ) as { data?: Array<{ type: string }> } | Array<{ type: string }>;
+    { activeOrgId: chainRootOrgId }) as { data?: Array<{ type: string }> } | Array<{ type: string }>;
     const types = new Set((Array.isArray(probeConvs) ? probeConvs : probeConvs.data ?? []).map((c) => c.type));
     if (!types.has("dm") || !types.has("gc")) {
       console.warn(chalk.yellow(`⚠ post-flight: doctor@mycure.test sees conversation types=[${[...types].join(", ")}] (expected dm + gc)`));
@@ -7787,12 +7818,12 @@ async function main() {
     const agg = (await api(
       "GET",
       `/hr/aggregate?organization=${encodeURIComponent(parentId!)}&period=this-month&tzOffsetMinutes=${PHT_OFFSET_MIN}`,
-    )) as { kpis?: { totalHoursWorked?: number } } | null;
-    const hours = agg?.kpis?.totalHoursWorked ?? 0;
+    )) as { kpis?: { hoursWorked?: number } } | null;
+    const hours = agg?.kpis?.hoursWorked ?? 0;
     if (hours > 0) {
-      console.log(chalk.gray(`✓ HR aggregate this-month totalHoursWorked=${Math.round(hours)}h`));
+      console.log(chalk.gray(`✓ HR aggregate this-month hoursWorked=${Math.round(hours)}h`));
     } else {
-      console.warn(chalk.yellow(`⚠ HR aggregate returned totalHoursWorked=0 — clocks may not have landed`));
+      console.warn(chalk.yellow(`⚠ HR aggregate returned hoursWorked=0 — clocks may not have landed`));
     }
   } catch (err) {
     console.warn(chalk.yellow(`⚠ HR aggregate post-flight failed: ${(err as Error).message.slice(0, 200)}`));
