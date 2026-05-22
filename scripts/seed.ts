@@ -1786,6 +1786,22 @@ async function seedPatientAccounts(
     // login credential.
     results.push({ externalId: target.externalId, email, isFixed: target.isFixed, status: outcome });
 
+    // 2.5 Lorem headshot: patch picURL via the patient's own session
+    //     (personal-details PATCH requires the requester to own the row).
+    //     The personal-details row id equals the medical-patient id, so
+    //     we PATCH /personal-details/${target.patientId}.
+    try {
+      await api("PATCH", `/personal-details/${target.patientId}`, {
+        picURL: `https://i.pravatar.cc/300?u=${encodeURIComponent(email)}`,
+      });
+    } catch (err: unknown) {
+      const msg = (err as Error).message;
+      // Non-critical — the account itself still works.
+      console.warn(
+        chalk.yellow(`  ⚠  ${target.externalId}: picURL patch failed — ${msg.slice(0, 120)}`),
+      );
+    }
+
     // 3. Restore superadmin session for the PATCH calls (signing in as
     //    the patient gave us a patient session, which can't PATCH random
     //    accounts/patients).
@@ -3343,6 +3359,11 @@ async function seedUserProfiles(userIds: Record<string, string>): Promise<void> 
       nationality: profile.nationality,
       maritalStatus: profile.maritalStatus,
       address: profile.address,
+      // Lorem-style headshot via Pravatar (deterministic per email). The
+      // UserAvatar component (mycure HR / messaging) renders picURL with
+      // an initials fallback, so this lights up every staff card +
+      // conversation avatar with a realistic face.
+      picURL: `https://i.pravatar.cc/300?u=${encodeURIComponent(user.email)}`,
     };
     if (profile.doc_PRCLicenseNo)    body.doc_PRCLicenseNo = profile.doc_PRCLicenseNo;
     if (profile.doc_PRCLicenseExp)   body.doc_PRCLicenseExp = toEpoch(profile.doc_PRCLicenseExp);
@@ -6632,6 +6653,9 @@ const CHAT_LINES: string[] = [
 ];
 
 const DM_PAIRS: Array<[string, string]> = [
+  ["superadmin@mycure.test", "doctor@mycure.test"],
+  ["superadmin@mycure.test", "admin@mycure.test"],
+  ["superadmin@mycure.test", "nurse@mycure.test"],
   ["doctor@mycure.test",     "nurse@mycure.test"],
   ["doctor@mycure.test",     "pedia@mycure.test"],
   ["familymd@mycure.test",   "nurse@mycure.test"],
@@ -6643,15 +6667,20 @@ const DM_PAIRS: Array<[string, string]> = [
 type GcSpec = { title: string; creator: string; participants: string[] };
 const GC_SPECS: GcSpec[] = [
   {
+    title: "Leadership",
+    creator: "superadmin@mycure.test",
+    participants: ["superadmin@mycure.test", "admin@mycure.test", "doctor@mycure.test"],
+  },
+  {
     title: "Doctors",
     creator: "doctor@mycure.test",
-    participants: ["doctor@mycure.test", "pedia@mycure.test", "familymd@mycure.test", "admin@mycure.test"],
+    participants: ["doctor@mycure.test", "pedia@mycure.test", "familymd@mycure.test", "admin@mycure.test", "superadmin@mycure.test"],
   },
   {
     title: "Clinic Staff",
     creator: "admin@mycure.test",
     participants: [
-      "admin@mycure.test", "doctor@mycure.test", "pedia@mycure.test", "familymd@mycure.test",
+      "superadmin@mycure.test", "admin@mycure.test", "doctor@mycure.test", "pedia@mycure.test", "familymd@mycure.test",
       "nurse@mycure.test", "cashier@mycure.test", "laboratory@mycure.test", "imaging@mycure.test",
     ],
   },
