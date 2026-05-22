@@ -1786,22 +1786,6 @@ async function seedPatientAccounts(
     // login credential.
     results.push({ externalId: target.externalId, email, isFixed: target.isFixed, status: outcome });
 
-    // 2.5 Lorem headshot: patch picURL via the patient's own session
-    //     (personal-details PATCH requires the requester to own the row).
-    //     The personal-details row id equals the medical-patient id, so
-    //     we PATCH /personal-details/${target.patientId}.
-    try {
-      await api("PATCH", `/personal-details/${target.patientId}`, {
-        picURL: `https://i.pravatar.cc/300?u=${encodeURIComponent(email)}`,
-      });
-    } catch (err: unknown) {
-      const msg = (err as Error).message;
-      // Non-critical — the account itself still works.
-      console.warn(
-        chalk.yellow(`  ⚠  ${target.externalId}: picURL patch failed — ${msg.slice(0, 120)}`),
-      );
-    }
-
     // 3. Restore superadmin session for the PATCH calls (signing in as
     //    the patient gave us a patient session, which can't PATCH random
     //    accounts/patients).
@@ -6376,6 +6360,67 @@ async function assertServiceAccountTimestampOverride(
   }
 }
 
+// PATCH personal-details.picURL on every medical-patient in the seeded
+// facilities. Uses the service-account session because personal-details
+// PATCH compares row.id to ctx.actor.uid (which is the patient's account
+// uid, not the medical-patient id). Service account bypasses the check.
+async function seedPatientAvatars(
+  facilities: Array<{ id: string; label: string }>,
+): Promise<void> {
+  const spinner = ora("Seeding patient avatars (Pravatar)...").start();
+  const savedSession = sessionCookie;
+  const serviceEmail = [...SERVICE_ACCOUNT_EMAILS][0];
+  if (!serviceEmail) {
+    spinner.warn("seedPatientAvatars: no service account configured; skipping");
+    return;
+  }
+  sessionCookie = "";
+  try {
+    await signIn(serviceEmail, PASSWORD);
+  } catch (err) {
+    spinner.warn(`seedPatientAvatars: could not sign in as ${serviceEmail}: ${(err as Error).message.slice(0, 120)}`);
+    sessionCookie = savedSession;
+    return;
+  }
+
+  let patched = 0;
+  let skipped = 0;
+  try {
+    // Walk every facility's patients (they're scoped by facility in the
+    // medical-patients table).
+    const seen = new Set<string>();
+    for (const facility of facilities) {
+      const res = (await api(
+        "GET",
+        `/medical-patients?facility=${encodeURIComponent(facility.id)}&%24limit=500`,
+      )) as { data?: Array<{ id: string; externalId?: string }> } | Array<{ id: string; externalId?: string }>;
+      const rows = Array.isArray(res) ? res : res.data ?? [];
+      for (const row of rows) {
+        if (seen.has(row.id)) continue;
+        seen.add(row.id);
+        // Seed key: prefer externalId for stable cross-run determinism;
+        // fall back to id otherwise.
+        const seed = row.externalId || row.id;
+        try {
+          await api("PATCH", `/personal-details/${row.id}`, {
+            picURL: `https://i.pravatar.cc/300?u=${encodeURIComponent(seed)}`,
+          });
+          patched++;
+        } catch {
+          skipped++;
+        }
+      }
+    }
+  } finally {
+    sessionCookie = savedSession;
+  }
+  if (skipped > 0) {
+    spinner.warn(`Patient avatars: ${patched} patched, ${skipped} skipped`);
+  } else {
+    spinner.succeed(`Patient avatars: ${patched} patched`);
+  }
+}
+
 async function seedHrSchedules(
   facilities: Array<{ id: string; label: string }>,
   userIds: Record<string, string>,
@@ -7793,6 +7838,13 @@ async function main() {
   // patient + the first N random patients, linked back via
   // medical-patients.account. Default N=5; --patient-accounts 0 to skip.
   const patientAccounts = await seedPatientAccounts(orgsToSeed, PATIENT_ACCOUNT_COUNT);
+
+  // Step 22b: Lorem headshots for every patient (random + fixed). Uses the
+  // service-account session — the patient's own session is scoped to
+  // accounts.uid, but personal-details.id == medical-patient.id, so the
+  // patient can't PATCH their own row. Service account bypasses the
+  // owner-of-row check.
+  await seedPatientAvatars(orgsToSeed);
 
   // Step 23: HR schedules (role-shaped shifts per user-membership). Required
   // before clocks: the Reports page uses schedules to derive demand/coverage
