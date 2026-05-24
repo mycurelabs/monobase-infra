@@ -1,0 +1,35 @@
+{{- if and .Values.enabled .Values.gateway.enabled }}
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: {{ include "mycure-pxp.fullname" . }}
+  namespace: {{ include "mycure-pxp.namespace" . }}
+  labels:
+    {{- include "mycure-pxp.labels" . | nindent 4 }}
+spec:
+  parentRefs:
+    - name: {{ include "mycure-pxp.gateway.name" . }}
+      namespace: {{ include "mycure-pxp.gateway.namespace" . }}
+      {{- if .Values.gateway.sectionName }}
+      sectionName: {{ .Values.gateway.sectionName }}
+      {{- else }}
+      sectionName: https  # Default: attach to HTTPS listener
+      {{- end }}
+  hostnames:
+    {{- if .Values.gateway.hostnames }}
+    {{- range .Values.gateway.hostnames }}
+    - {{ . }}
+    {{- end }}
+    {{- else }}
+    - {{ include "mycure-pxp.gateway.hostname" . }}
+    {{- end }}
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      backendRefs:
+        - name: {{ include "mycure-pxp.fullname" . }}
+          port: {{ .Values.service.port }}
+          weight: 1
+{{- end }}
