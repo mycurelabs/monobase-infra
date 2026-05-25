@@ -118,7 +118,15 @@ mycure-dashboard:
     sectionName: https-lfh
 
   config:
-    API_URL: "https://hapihub.localfirsthealth.com"
+    # Point at hapihub-next (v11.9.1) — dashboard 0.7.0 uses v11-only routes
+    # (HR module, messaging, OAS-routed handlers). The canonical hapihub at
+    # https://hapihub.localfirsthealth.com is still v10 (Mongo) and missing
+    # those endpoints. The image baked-in default for HAPIHUB_URL is
+    # https://api.mycure.md which also points at v10, so we must override
+    # both env vars. Revert to https://hapihub.localfirsthealth.com once the
+    # v10→v11 cutover swaps that hostname onto v11.
+    API_URL: "https://hapihub-next.localfirsthealth.com"
+    HAPIHUB_URL: "https://hapihub-next.localfirsthealth.com"
 
   podDisruptionBudget:
     enabled: false
