@@ -156,6 +156,16 @@ mycure-pxp:
       cpu: 200m
       memory: 128Mi
 
+  # The pxp image's entrypoint sed-substitutes __PXP_RUNTIME_API_URL__ into
+  # /srv/*.{js,html} at container start, so /srv must be writable. Override
+  # the chart default (readOnlyRootFilesystem: true).
+  securityContext:
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop:
+        - ALL
+    readOnlyRootFilesystem: false
+
   gateway:
     hostname: ""  # defaults to mycure-pxp.preprod.localfirsthealth.com
     sectionName: https-preprod-lfh
