@@ -1093,20 +1093,7 @@ hapihubMigrator:
     pullPolicy: IfNotPresent
 
   # bulk (Phase 3) → cdc (Phase 4) → reverse-cdc (Phase 6, post-cutover)
-  # Temporarily set to `bulk` to backfill the 2026-04-06 → 2026-05-28 gap
-  # window that fell between forward-CDC stopping (reverse-cdc mode) and the
-  # 2026-05-28 restart (which had to skip the gap because the change-stream
-  # resume token was way past the oplog window). BULK_START_DATE filters the
-  # bulk worker's Mongo find() to `_cd >= that date`, so only docs created in
-  # the gap window get scanned. Per-row writes are ON CONFLICT UPSERT, so any
-  # row that was already replicated (pre-stop or via current forward CDC) is
-  # safe to re-touch.
-  #
-  # When bulk completes (or earlier on user signal), flip back to `mode: cdc`.
-  mode: bulk
-  env:
-    - name: BULK_START_DATE
-      value: "2026-04-06T21:39:00Z"
+  mode: cdc
 
   resources:
     requests:
