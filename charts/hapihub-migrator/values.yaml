@@ -21,6 +21,12 @@ global:
 # Disabled by default — flip to true in deployment values when starting MIGRATION.md Phase 2
 enabled: false
 
+# Sub-toggle for the long-lived CDC Deployment. Defaults to true so existing
+# consumers behave unchanged. Set to false in environments that only want to
+# stage the nightly CronJob (e.g. preprod) without running CDC.
+deployment:
+  enabled: true
+
 replicaCount: 1
 
 image:
@@ -112,6 +118,35 @@ config:
 
 # Free-form additional env vars (list of {name, value, valueFrom}).
 env: []
+
+# Nightly bulk-mode safety-net sweep over a trailing window.
+# Re-runs MODE=bulk against documents with _cd in the last N hours to
+# catch anything CDC may have missed. Idempotent (ON CONFLICT DO UPDATE),
+# safe alongside the running CDC Deployment — bulk and CDC share the
+# same upsert path; only reverse-cdc has a mutual-exclusion guard.
+#
+# The trailing window is computed at runtime by a small shell wrapper
+# (image is ubuntu:22.04, GNU date is available). MODE/EXIT_ON_BULK_END/
+# RESUME_MIGRATION are overridden in env: shadowing the ConfigMap.
+nightlyJob:
+  enabled: false                      # opt-in per deployment
+  schedule: "0 18 * * *"              # 02:00 PHT = 18:00 UTC (offset from Velero @ 02:00 UTC)
+  timeZone: "Etc/UTC"
+  lookbackHours: 48                   # trailing window size
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 7
+  startingDeadlineSeconds: 3600
+  backoffLimit: 1
+  ttlSecondsAfterFinished: 259200     # 3 days
+  activeDeadlineSeconds: 21600        # 6h hard cap
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      cpu: "2"
+      memory: 4Gi
 
 # Node pool scheduling (optional, inherits from global.nodePool)
 nodeSelector: {}

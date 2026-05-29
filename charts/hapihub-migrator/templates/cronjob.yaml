@@ -1,0 +1,138 @@
+{{- if and .Values.enabled .Values.nightlyJob.enabled }}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "hapihub-migrator.fullname" . }}-nightly
+  namespace: {{ include "hapihub-migrator.namespace" . }}
+  labels:
+    {{- include "hapihub-migrator.labels" . | nindent 4 }}
+    job-type: nightly-bulk-sweep
+spec:
+  schedule: {{ .Values.nightlyJob.schedule | quote }}
+  timeZone: {{ .Values.nightlyJob.timeZone | default "Etc/UTC" | quote }}
+  concurrencyPolicy: {{ .Values.nightlyJob.concurrencyPolicy | default "Forbid" }}
+  successfulJobsHistoryLimit: {{ .Values.nightlyJob.successfulJobsHistoryLimit | default 3 }}
+  failedJobsHistoryLimit: {{ .Values.nightlyJob.failedJobsHistoryLimit | default 7 }}
+  startingDeadlineSeconds: {{ .Values.nightlyJob.startingDeadlineSeconds | default 3600 }}
+  jobTemplate:
+    spec:
+      backoffLimit: {{ .Values.nightlyJob.backoffLimit | default 1 }}
+      ttlSecondsAfterFinished: {{ .Values.nightlyJob.ttlSecondsAfterFinished | default 259200 }}
+      activeDeadlineSeconds: {{ .Values.nightlyJob.activeDeadlineSeconds | default 21600 }}
+      template:
+        metadata:
+          annotations:
+            checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+            {{- with .Values.podAnnotations }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          labels:
+            {{- include "hapihub-migrator.selectorLabels" . | nindent 12 }}
+            job-type: nightly-bulk-sweep
+        spec:
+          {{- with .Values.imagePullSecrets }}
+          imagePullSecrets:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          serviceAccountName: {{ include "hapihub-migrator.serviceAccountName" . }}
+          enableServiceLinks: false
+          restartPolicy: Never
+          securityContext:
+            {{- toYaml .Values.podSecurityContext | nindent 12 }}
+          containers:
+          - name: {{ .Chart.Name }}-nightly
+            securityContext:
+              {{- toYaml .Values.securityContext | nindent 14 }}
+            image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+            imagePullPolicy: {{ .Values.image.pullPolicy }}
+            # Compute the trailing window at runtime. Image base is ubuntu:22.04,
+            # so GNU `date -d "N hours ago"` is available.
+            command: ["/bin/sh", "-c"]
+            args:
+            - |
+              set -eu
+              export BULK_START_DATE=$(date -u -d "${BULK_LOOKBACK_HOURS} hours ago" +%Y-%m-%dT%H:%M:%SZ)
+              export BULK_CUTOFF_DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+              export RUN_ID="nightly-sweep-$(date -u +%Y%m%d-%H%M%S)"
+              echo "nightly-sweep window: $BULK_START_DATE .. $BULK_CUTOFF_DATE (run_id=$RUN_ID)"
+              exec hapihub-migrator
+            envFrom:
+            - configMapRef:
+                name: {{ include "hapihub-migrator.fullname" . }}
+            env:
+            # ===== Nightly run overrides (env shadows envFrom in k8s) =====
+            - name: MODE
+              value: "bulk"
+            - name: EXIT_ON_BULK_END
+              value: "true"
+            - name: RESUME_MIGRATION
+              value: "false"
+            - name: BULK_LOOKBACK_HOURS
+              value: {{ .Values.nightlyJob.lookbackHours | default 48 | quote }}
+            # ===== PostgreSQL target =====
+            {{- if .Values.postgresql.enabled }}
+            - name: PG_USER
+              value: {{ .Values.postgresql.auth.username | default "postgres" | quote }}
+            - name: PG_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.postgresql.auth.existingSecret | default "postgresql" }}
+                  key: {{ .Values.postgresql.auth.passwordKey | default "postgres-password" }}
+            - name: PG_TARGET_URI
+              value: "postgres://$(PG_USER):$(PG_PASSWORD)@{{ include "hapihub-migrator.postgresql.host" . }}:{{ .Values.postgresql.port | default 5432 }}/{{ .Values.postgresql.auth.database | default "hapihub" }}"
+            {{- end }}
+            # ===== MongoDB source =====
+            {{- if .Values.mongodb.enabled }}
+            - name: MONGO_USER
+              value: {{ .Values.mongodb.username | default "root" | quote }}
+            - name: MONGO_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.mongodb.existingSecret | default "mongodb" }}
+                  key: {{ .Values.mongodb.passwordKey | default "mongodb-root-password" }}
+            - name: MONGO_SOURCE_URI
+              value: "mongodb://$(MONGO_USER):$(MONGO_PASSWORD)@{{ include "hapihub-migrator.mongodb.host" . }}:{{ .Values.mongodb.port | default 27017 }}/{{ .Values.mongodb.database | default "hapihub" }}?authSource={{ .Values.mongodb.authSource | default "admin" }}&replicaSet={{ .Values.mongodb.replicaSet | default "rs0" }}&directConnection=true"
+            {{- end }}
+            # ===== Encryption keys + any other ExternalSecret-sourced env =====
+            {{- if .Values.externalSecrets.enabled }}
+            {{- range .Values.externalSecrets.secrets }}
+            - name: {{ .secretKey }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "hapihub-migrator.fullname" $ }}-secrets
+                  key: {{ .secretKey }}
+            {{- end }}
+            {{- end }}
+            # ===== Custom env (free-form) =====
+            {{- with .Values.env }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+            resources:
+              {{- toYaml .Values.nightlyJob.resources | nindent 14 }}
+          {{- $nodePool := include "hapihub-migrator.nodePool" . -}}
+          {{- if or $nodePool .Values.nodeSelector }}
+          nodeSelector:
+            {{- if $nodePool }}
+            node-pool: {{ $nodePool }}
+            {{- end }}
+            {{- with .Values.nodeSelector }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          {{- end }}
+          {{- with .Values.affinity }}
+          affinity:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- if or $nodePool .Values.tolerations }}
+          tolerations:
+            {{- if $nodePool }}
+            - key: "node-pool"
+              operator: "Equal"
+              value: {{ $nodePool | quote }}
+              effect: "NoSchedule"
+            {{- end }}
+            {{- with .Values.tolerations }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          {{- end }}
+{{- end }}

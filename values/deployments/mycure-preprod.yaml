@@ -602,9 +602,40 @@ syncd:
 mycurev8:
   enabled: false
 
-# ===== DATABASE: MongoDB (disabled, stub required by chart template) =====
+# ===== DATABASE: MongoDB =====
+# Synthetic single-node replica set used solely as the source for the
+# hapihub-migrator nightly CronJob smoke test. Preprod is a CronJob
+# staging ground — no CDC, no data of consequence here. The argo template
+# always enforces architecture=replicaset, so a single-replica rs0 is
+# what we actually deploy.
 mongodb:
-  enabled: false
+  enabled: true
+
+  image:
+    repository: bitnamilegacy/mongodb
+    tag: 7.0.15-debian-12-r0
+
+  auth:
+    rootUser: root
+    existingSecret: mongodb
+
+  replicaCount: 1
+
+  arbiter:
+    enabled: false
+
+  persistence:
+    enabled: true
+    storageClass: ""
+    size: 5Gi
+
+  resources:
+    requests:
+      cpu: 50m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 1Gi
 
 # ===== DATABASE: PostgreSQL =====
 # Standalone (no read replica) in preprod: prod node pool can't fit a
@@ -800,6 +831,63 @@ cadence:
 
   config:
     RUST_LOG: "info"
+
+# ===== MIGRATION: HapiHub Migrator (CronJob staging only) =====
+# Preprod runs only the nightly bulk CronJob — not the long-lived CDC
+# Deployment. The synthetic mongodb above is empty, so each sweep walks
+# the configured collection list, processes 0 docs, and exits clean.
+# This validates image pull, secret/configmap wiring, env shadowing,
+# the runtime date wrapper, and the Job lifecycle against a real
+# ArgoCD-reconciled namespace before the same template ships to prod.
+hapihubMigrator:
+  enabled: true
+
+  image:
+    repository: ghcr.io/mycurelabs/hapihub-migrator
+    tag: "3.7.4"
+    pullPolicy: IfNotPresent
+
+  # No CDC in preprod — only the CronJob is exercised here.
+  deployment:
+    enabled: false
+
+  # Run every 6h in preprod for faster feedback than nightly.
+  nightlyJob:
+    enabled: true
+    schedule: "0 */6 * * *"
+    lookbackHours: 48
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: "1"
+        memory: 1Gi
+
+  postgresql:
+    enabled: true
+    serviceName: postgresql
+    port: 5432
+    auth:
+      database: hapihub
+      username: postgres
+      existingSecret: postgresql
+      passwordKey: postgres-password
+
+  mongodb:
+    enabled: true
+    serviceName: mongodb-headless
+    port: 27017
+    database: hapihub
+    username: root
+    replicaSet: rs0
+    authSource: admin
+    existingSecret: mongodb
+    passwordKey: mongodb-root-password
+
+  # No encryption keys in preprod — synthetic Mongo holds no encrypted data.
+  externalSecrets:
+    enabled: false
 
 # ===== BACKUP =====
 backup:
