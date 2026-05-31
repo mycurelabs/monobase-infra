@@ -76,6 +76,16 @@ nginxGatewayResources:
         port: 80
         protocol: HTTP
         hostname: "*.preprod.localfirsthealth.com"
+      # Demo localfirsthealth.com (low-traffic demo env, sibling of preprod)
+      - name: https-demo-lfh
+        port: 443
+        protocol: HTTPS
+        hostname: "*.demo.localfirsthealth.com"
+        tlsSecretName: nginx-gateway-tls-demo
+      - name: http-demo-lfh
+        port: 80
+        protocol: HTTP
+        hostname: "*.demo.localfirsthealth.com"
       # Production localfirsthealth.com
       - name: https-lfh
         port: 443
@@ -103,6 +113,10 @@ nginxGatewayResources:
         clusterIssuer: letsencrypt-mycure-cloudflare-prod  # DNS-01, wildcard
         dnsNames:
           - "*.preprod.localfirsthealth.com"
+      - secretName: nginx-gateway-tls-demo
+        clusterIssuer: letsencrypt-mycure-cloudflare-prod  # DNS-01, wildcard
+        dnsNames:
+          - "*.demo.localfirsthealth.com"
       - secretName: nginx-gateway-tls-prod
         clusterIssuer: letsencrypt-mycure-cloudflare-prod  # DNS-01
         dnsNames:
