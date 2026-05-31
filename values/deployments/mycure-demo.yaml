@@ -62,7 +62,10 @@ hapihub:
     - name: BETTER_AUTH_RATE_LIMIT_WINDOW
       value: "60"
     - name: BETTER_AUTH_RATE_LIMIT_MAX
-      value: "300"
+      # Raised from 300: the seed signs in many users in a burst (profile patch +
+      # per-conversation participant auth) and 300/60s threw 429s that skipped
+      # messaging + 7 staff profiles. 3000/60s is ample for a <=5-user demo.
+      value: "3000"
     - name: BETTER_AUTH_SESSION_COOKIE_CACHE_ENABLED
       value: "false"
   livenessProbe:
