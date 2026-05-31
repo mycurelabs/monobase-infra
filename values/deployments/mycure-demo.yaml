@@ -1,0 +1,283 @@
+# MyCure Demo Configuration  (DRAFT — review only, not yet pushed)
+#
+# Small, self-contained demo/sandbox environment for ~5 users. Runs ONLY the
+# three user-facing apps requested — hapihub (API), mycure (clinical web app),
+# mycure-dashboard (admin) — plus the minimum data deps hapihub needs
+# (PostgreSQL, Valkey, MinIO). Everything else is disabled.
+#
+# UNLIKE mycure-preprod, this env does NOT reuse prod GCP secrets or a cloned
+# prod dataset — it is meant to be seeded fresh with `scripts/seed.ts`. That
+# means it needs its OWN secret set (prefix `mycure-demo`), generated via
+# `bun scripts/secrets.ts` before first deploy (see runbook in chat).
+#
+# DECISIONS STILL NEEDED (marked TODO below): final env name, hostname/domain
+# strategy, and the secret set.
+#
+# Adding this file + push → ArgoCD ApplicationSet auto-creates `mycure-demo-root`
+# → namespace `mycure-demo` is created and these components deploy. Tear down:
+#   kubectl delete ns mycure-demo   (or `git rm` this file — preserveResourcesOnDeletion is on)
+
+global:
+  # TODO: confirm the env name. Namespace + ArgoCD app derive from this filename
+  # (mycure-demo → namespace mycure-demo, app mycure-demo-root).
+  domain: localfirsthealth.com
+  namespace: mycure-demo
+  environment: demo
+
+  nodePool: "staging"
+
+  # Fresh, ISOLATED secret set for this env (NOT prod's). Generate before deploy:
+  #   bun scripts/secrets.ts generate --project <gcp-project>   # creates mycure-demo-* keys
+  # (If you'd rather clone prod data like preprod does, set this to
+  #  "mycure-production" instead — but then you inherit prod Stripe/OAuth/ENC keys.)
+  secretPrefix: "mycure-demo"
+
+  gateway:
+    name: nginx-shared-gateway
+    namespace: nginx-gateway-system
+
+  storage:
+    provider: ""
+    className: ""
+
+# ===== HEALTHCARE: HapiHub API =====
+hapihub:
+  enabled: true
+
+  image:
+    repository: ghcr.io/mycurelabs/hapihub
+    tag: "11.16.0"
+    pullPolicy: IfNotPresent
+
+  replicaCount: 1
+
+  # Sized for ~5 users.
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
+
+  gateway:
+    # Single-level host on the existing *.localfirsthealth.com (https-lfh) cert
+    # — no new gateway listener/cert needed. TODO: confirm hostnames.
+    hostnames:
+      - hapihub-demo.localfirsthealth.com
+    sectionName: https-lfh
+    snippetsPolicy:
+      enabled: false
+
+  betterAuth:
+    passkey:
+      rpName: "Mycure (demo)"
+      rpId: "hapihub-demo.localfirsthealth.com"
+
+  config:
+    CORS_ORIGINS: "https://hapihub-demo.localfirsthealth.com,https://mycure-demo.localfirsthealth.com,https://dashboard-demo.localfirsthealth.com"
+    CORS_STRICT: "true"
+    CORS_ALLOW_LOCAL_NETWORK: "false"
+    CORS_ALLOW_MOBILE_APPS: "true"
+    ACCOUNTS_SERVICE_ACCOUNT_EMAILS: "service@mycure.md"
+
+  livenessProbe:
+    enabled: true
+  readinessProbe:
+    enabled: true
+  podDisruptionBudget:
+    enabled: false
+  autoscaling:
+    enabled: false
+
+  # Fresh secret set for this env. TODO: generate the mycure-demo-* GCP keys
+  # (scripts/secrets.ts) OR repoint remoteKeys at an existing non-prod set.
+  externalSecrets:
+    enabled: true
+    secretStore: gcp-secretstore
+    secretStoreKind: ClusterSecretStore
+    refreshInterval: 1h
+    secrets:
+      - { secretKey: PRIVATE_KEY, remoteKey: mycure-demo-private-key }
+      - { secretKey: PUBLIC_KEY, remoteKey: mycure-demo-public-key }
+      - { secretKey: AUTH_SECRET, remoteKey: mycure-demo-auth-secret }
+      - { secretKey: BETTER_AUTH_SECRET, remoteKey: mycure-demo-better-auth-secret }
+      - { secretKey: ENC_BILLING_INVOICES, remoteKey: mycure-demo-enc-billing-invoices }
+      - { secretKey: ENC_BILLING_ITEMS, remoteKey: mycure-demo-enc-billing-items }
+      - { secretKey: ENC_BILLING_PAYMENTS, remoteKey: mycure-demo-enc-billing-payments }
+      - { secretKey: ENC_MEDICAL_RECORDS, remoteKey: mycure-demo-enc-medical-records }
+      - { secretKey: ENC_PERSONAL_DETAILS, remoteKey: mycure-demo-enc-personal-details }
+      # Storage: point at in-cluster MinIO (see config below) instead of GCP, so
+      # no GCP bucket is required for a throwaway demo. If you prefer GCP, add the
+      # STORAGE_* remoteKeys like mycure-preprod.yaml does.
+
+  postgresql:
+    enabled: true
+    external: false
+    serviceName: postgresql
+    auth:
+      database: hapihub
+      username: postgres
+      existingSecret: postgresql
+
+# ===== HEALTHCARE: Frontend (mycure clinical web app) =====
+mycure:
+  enabled: true
+
+  image:
+    repository: ghcr.io/mycurelabs/mycureapp
+    tag: "10.18.0"
+    pullPolicy: IfNotPresent
+
+  replicaCount: 1
+  resources:
+    requests: { cpu: 25m, memory: 32Mi }
+    limits: { cpu: 200m, memory: 128Mi }
+
+  gateway:
+    hostname: "mycure-demo.localfirsthealth.com"
+    sectionName: https-lfh
+
+  config:
+    API_URL: "https://hapihub-demo.localfirsthealth.com"
+    HAPIHUB_URL: "https://hapihub-demo.localfirsthealth.com"
+
+  podDisruptionBudget:
+    enabled: false
+
+# ===== HEALTHCARE: MyCure Dashboard (admin web UI) =====
+mycure-dashboard:
+  enabled: true
+
+  image:
+    repository: ghcr.io/mycurelabs/dashboard
+    tag: "0.13.0"
+    pullPolicy: IfNotPresent
+
+  replicaCount: 1
+  resources:
+    requests: { cpu: 25m, memory: 32Mi }
+    limits: { cpu: 200m, memory: 128Mi }
+
+  gateway:
+    hostname: "dashboard-demo.localfirsthealth.com"
+    sectionName: https-lfh
+
+  config:
+    API_URL: "https://hapihub-demo.localfirsthealth.com"
+
+  podDisruptionBudget:
+    enabled: false
+
+# ===== Everything else: DISABLED (only the 3 apps + their data deps run) =====
+api: { enabled: false }
+account: { enabled: false }
+mycure-pxp: { enabled: false }
+mycurelocal: { enabled: false }
+mycure-myaccount: { enabled: false }
+mycure-deploydash: { enabled: false }
+hapihub-docs: { enabled: false }
+dentalemon: { enabled: false }
+dentalemon-website: { enabled: false }
+dentalemon-myaccount: { enabled: false }
+syncd: { enabled: false }
+cadence: { enabled: false }
+mycurev8: { enabled: false }
+# mongodb only feeds the migrator smoke test in preprod; hapihub itself is
+# Postgres-only, so the demo doesn't need it.
+mongodb: { enabled: false }
+hapihubMigrator: { enabled: false }
+backup: { enabled: false }
+
+# ===== DATABASE: PostgreSQL (hapihub's DB) =====
+postgresql:
+  enabled: true
+  fullnameOverride: "postgresql"
+  architecture: standalone
+  image:
+    repository: bitnamilegacy/postgresql
+    tag: 16.4.0-debian-12-r13
+  auth:
+    enabled: true
+    database: hapihub
+    username: postgres
+    existingSecret: postgresql
+    secretKeys:
+      adminPasswordKey: postgres-password
+  primary:
+    persistence:
+      enabled: true
+      storageClass: ""
+      size: 20Gi          # small — demo dataset
+    resources:
+      requests: { cpu: 250m, memory: 512Mi }
+      limits: { cpu: "1", memory: 2Gi }
+  podDisruptionBudget:
+    enabled: false
+
+# ===== CACHE: Valkey (sessions / rate-limit) =====
+valkey:
+  enabled: true
+  global:
+    security:
+      allowInsecureImages: true
+  auth:
+    existingSecret: valkey
+  architecture: standalone
+  image:
+    repository: bitnamilegacy/valkey
+    tag: 8.0.1-debian-12-r2
+  master:
+    persistence:
+      enabled: true
+      storageClass: ""
+      size: 2Gi
+    resources:
+      requests: { cpu: 50m, memory: 256Mi }
+      limits: { cpu: 250m, memory: 512Mi }
+
+# ===== STORAGE: MinIO (in-cluster object storage for file uploads) =====
+minio:
+  enabled: true
+  fullnameOverride: "minio"
+  image:
+    repository: bitnamilegacy/minio
+    tag: "2025.7.23-debian-12-r3"
+  mode: standalone
+  statefulset:
+    replicaCount: 1
+  auth:
+    existingSecret: minio
+  persistence:
+    enabled: true
+    storageClass: ""
+    size: 5Gi
+  resources:
+    requests: { cpu: 50m, memory: 128Mi }
+    limits: { cpu: 250m, memory: 512Mi }
+  defaultBuckets: "monobase-files"
+  buckets:
+    - name: "monobase-files"
+  region: "us-east-1"
+  # Internal only — no public route for the demo's object store.
+  gateway:
+    enabled: false
+
+# ===== EMAIL TESTING: Mailpit (catch outbound email — no real sends) =====
+mailpit:
+  enabled: true
+  resources:
+    requests: { cpu: 25m, memory: 32Mi }
+    limits: { cpu: 100m, memory: 64Mi }
+  gateway:
+    enabled: true
+    hostname: "mail-demo.localfirsthealth.com"
+    sectionName: https-lfh
+
+# ===== SECURITY =====
+podSecurityStandards:
+  enabled: true
+  level: restricted
+
+resourceQuotas:
+  enabled: false
