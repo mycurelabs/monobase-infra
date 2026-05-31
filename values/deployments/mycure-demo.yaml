@@ -57,15 +57,14 @@ hapihub:
     CORS_ALLOW_MOBILE_APPS: "true"
     ACCOUNTS_SERVICE_ACCOUNT_EMAILS: "service@mycure.md"
   env:
+    # better-auth rate limiting is DISABLED for this demo. The seed signs in as
+    # every staff user (profile patches) and per-conversation participants
+    # (messaging) in a burst; better-auth enforces a stricter per-path
+    # /sign-in/email throttle that the global *_MAX cannot override (verified:
+    # 429s persisted at MAX=3000), so disabling is the only lever that lets the
+    # seed complete messaging + profiles. Acceptable for a <=5-user demo.
     - name: BETTER_AUTH_RATE_LIMIT_ENABLED
-      value: "true"
-    - name: BETTER_AUTH_RATE_LIMIT_WINDOW
-      value: "60"
-    - name: BETTER_AUTH_RATE_LIMIT_MAX
-      # Raised from 300: the seed signs in many users in a burst (profile patch +
-      # per-conversation participant auth) and 300/60s threw 429s that skipped
-      # messaging + 7 staff profiles. 3000/60s is ample for a <=5-user demo.
-      value: "3000"
+      value: "false"
     - name: BETTER_AUTH_SESSION_COOKIE_CACHE_ENABLED
       value: "false"
   livenessProbe:
