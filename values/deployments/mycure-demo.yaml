@@ -1,0 +1,319 @@
+# MyCure Demo Configuration
+# Low-traffic demo environment (<=5 users), sibling of mycure-preprod on the
+# same DOKS cluster. Runs ONLY the three MyCure apps + their minimum backing
+# services: hapihub (API), mycure-dashboard (admin UI), mycure (mycureapp).
+# Postgres-only. Object storage is in-cluster MinIO (uploads never touch the
+# prod bucket). Stripe and Google OAuth are omitted; email is captured by
+# mailpit. ENC/auth keys are REUSED from mycure-production via secretPrefix
+# (accepted trade-off — see
+# docs/superpowers/specs/2026-05-31-mycure-demo-namespace-design.md §8).
+# Tear down with `kubectl delete ns mycure-demo`.
+
+global:
+  domain: demo.localfirsthealth.com
+  namespace: mycure-demo
+  environment: demo
+  nodePool: "staging"
+  secretPrefix: "mycure-production"   # provisions DB/valkey/minio secrets; hapihub reuses prod ENC/auth keys only
+  gateway:
+    name: nginx-shared-gateway
+    namespace: nginx-gateway-system
+  storage:
+    provider: ""
+    className: ""
+
+# ===== HEALTHCARE: HapiHub API =====
+hapihub:
+  enabled: true
+  image:
+    repository: ghcr.io/mycurelabs/hapihub
+    tag: "11.16.0"
+    pullPolicy: IfNotPresent
+  replicaCount: 1
+  resources:
+    requests:
+      cpu: 300m
+      memory: 768Mi
+    limits:
+      cpu: "1500m"
+      memory: 1536Mi
+  gateway:
+    hostnames:
+      - hapihub.demo.localfirsthealth.com
+    sectionName: https-demo-lfh
+    snippetsPolicy:
+      enabled: false
+  betterAuth:
+    passkey:
+      rpName: "Mycure (demo)"
+      rpId: "demo.localfirsthealth.com"
+  config:
+    CORS_ORIGINS: "https://hapihub.demo.localfirsthealth.com,https://mycure-dashboard.demo.localfirsthealth.com,https://mycure.demo.localfirsthealth.com"
+    CORS_STRICT: "true"
+    CORS_ALLOW_LOCAL_NETWORK: "false"
+    CORS_ALLOW_MOBILE_APPS: "true"
+    ACCOUNTS_SERVICE_ACCOUNT_EMAILS: "service@mycure.md"
+  env:
+    - name: BETTER_AUTH_RATE_LIMIT_ENABLED
+      value: "true"
+    - name: BETTER_AUTH_RATE_LIMIT_WINDOW
+      value: "60"
+    - name: BETTER_AUTH_RATE_LIMIT_MAX
+      value: "300"
+    - name: BETTER_AUTH_SESSION_COOKIE_CACHE_ENABLED
+      value: "false"
+  livenessProbe:
+    enabled: true
+  readinessProbe:
+    enabled: true
+  podDisruptionBudget:
+    enabled: false
+  autoscaling:
+    enabled: false
+  # Reuse ONLY the prod encryption + token-signing keys (Approach C). No
+  # STORAGE_* (MinIO is used instead), no STRIPE_* (Stripe disabled), no
+  # GOOGLE_* (email+password login). All these chart env refs are
+  # optional:true, so omitting the keys is safe.
+  externalSecrets:
+    enabled: true
+    secretStore: gcp-secretstore
+    secretStoreKind: ClusterSecretStore
+    refreshInterval: 1h
+    secrets:
+      - secretKey: ENC_BILLING_INVOICES
+        remoteKey: mycure-production-enc-billing-invoices
+      - secretKey: ENC_BILLING_ITEMS
+        remoteKey: mycure-production-enc-billing-items
+      - secretKey: ENC_BILLING_PAYMENTS
+        remoteKey: mycure-production-enc-billing-payments
+      - secretKey: ENC_MEDICAL_RECORDS
+        remoteKey: mycure-production-enc-medical-records
+      - secretKey: ENC_PERSONAL_DETAILS
+        remoteKey: mycure-production-enc-personal-details
+      - secretKey: PRIVATE_KEY
+        remoteKey: mycure-production-private-key
+      - secretKey: PUBLIC_KEY
+        remoteKey: mycure-production-public-key
+      - secretKey: AUTH_SECRET
+        remoteKey: mycure-production-auth-secret
+      - secretKey: BETTER_AUTH_SECRET
+        remoteKey: mycure-production-better-auth-secret
+  postgresql:
+    enabled: true
+    external: false
+    serviceName: postgresql
+    auth:
+      database: hapihub
+      username: postgres
+      existingSecret: postgresql
+
+# ===== HEALTHCARE: MyCure Dashboard (operator/admin web UI) =====
+mycure-dashboard:
+  enabled: true
+  image:
+    repository: ghcr.io/mycurelabs/dashboard
+    tag: "0.13.0"
+    pullPolicy: IfNotPresent
+  replicaCount: 1
+  resources:
+    requests:
+      cpu: 25m
+      memory: 48Mi
+    limits:
+      cpu: 150m
+      memory: 128Mi
+  gateway:
+    hostname: ""   # defaults to mycure-dashboard.demo.localfirsthealth.com
+    sectionName: https-demo-lfh
+  config:
+    API_URL: "https://hapihub.demo.localfirsthealth.com"
+  podDisruptionBudget:
+    enabled: false
+
+# ===== HEALTHCARE: Frontend Application (mycureapp) =====
+mycure:
+  enabled: true
+  image:
+    repository: ghcr.io/mycurelabs/mycureapp
+    tag: "10.18.0"
+    pullPolicy: IfNotPresent
+  replicaCount: 1
+  resources:
+    requests:
+      cpu: 25m
+      memory: 48Mi
+    limits:
+      cpu: 150m
+      memory: 128Mi
+  gateway:
+    hostname: ""   # defaults to mycure.demo.localfirsthealth.com
+    sectionName: https-demo-lfh
+  config:
+    API_URL: "https://hapihub.demo.localfirsthealth.com"
+    HAPIHUB_URL: "https://hapihub.demo.localfirsthealth.com"
+  podDisruptionBudget:
+    enabled: false
+
+# ===== DATABASE: PostgreSQL (standalone) =====
+postgresql:
+  enabled: true
+  fullnameOverride: "postgresql"
+  architecture: standalone
+  image:
+    repository: bitnamilegacy/postgresql
+    tag: 16.4.0-debian-12-r13
+  auth:
+    enabled: true
+    database: hapihub
+    username: postgres
+    existingSecret: postgresql
+    secretKeys:
+      adminPasswordKey: postgres-password
+  primary:
+    persistence:
+      enabled: true
+      storageClass: ""
+      size: 20Gi
+    resources:
+      requests:
+        cpu: 250m
+        memory: 512Mi
+      limits:
+        cpu: 1000m
+        memory: 1536Mi
+  podDisruptionBudget:
+    enabled: false
+
+# ===== CACHE: Valkey (Redis) =====
+valkey:
+  enabled: true
+  global:
+    security:
+      allowInsecureImages: true
+  auth:
+    existingSecret: valkey
+  architecture: standalone
+  image:
+    repository: bitnamilegacy/valkey
+    tag: 8.0.1-debian-12-r2
+  master:
+    persistence:
+      enabled: true
+      storageClass: ""
+      size: 2Gi
+    resources:
+      requests:
+        cpu: 50m
+        memory: 256Mi
+      limits:
+        cpu: 250m
+        memory: 512Mi
+
+# ===== STORAGE: MinIO Object Storage (in-cluster; keeps uploads off prod) =====
+minio:
+  enabled: true
+  fullnameOverride: "minio"
+  image:
+    repository: bitnamilegacy/minio
+    tag: "2025.7.23-debian-12-r3"
+  mode: standalone
+  statefulset:
+    replicaCount: 1
+  auth:
+    existingSecret: minio
+  persistence:
+    enabled: true
+    storageClass: ""
+    size: 5Gi
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  defaultBuckets: "monobase-files"
+  buckets:
+    - name: "monobase-files"
+  region: "us-east-1"
+  podSecurityContext:
+    enabled: true
+    fsGroup: 1001
+    fsGroupChangePolicy: "OnRootMismatch"
+  containerSecurityContext:
+    enabled: true
+    runAsUser: 1001
+    runAsGroup: 1001
+    runAsNonRoot: true
+    privileged: false
+    readOnlyRootFilesystem: true
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop:
+        - ALL
+    seccompProfile:
+      type: RuntimeDefault
+  # No public MinIO host needed: hapihub reaches MinIO via the in-cluster
+  # service (minio.mycure-demo.svc:9000). NOTE: the chart sets
+  # STORAGE_PUBLIC_ENDPOINT to that internal URL, so browser-side presigned
+  # upload/download is not reachable from outside — same as preprod. Out of
+  # scope here; expose MinIO publicly later if interactive uploads are needed.
+  gateway:
+    enabled: false
+
+# ===== EMAIL TESTING: Mailpit (captures all outbound mail) =====
+mailpit:
+  enabled: true
+  resources:
+    requests:
+      cpu: 25m
+      memory: 32Mi
+    limits:
+      cpu: 100m
+      memory: 64Mi
+  gateway:
+    enabled: true
+    hostname: "mail.demo.localfirsthealth.com"
+
+# ===== DISABLED COMPONENTS (enabled:false stubs required by app-of-apps templates) =====
+api:
+  enabled: false
+account:
+  enabled: false
+mycure-pxp:
+  enabled: false
+mycurelocal:
+  enabled: false
+mycure-myaccount:
+  enabled: false
+dentalemon-myaccount:
+  enabled: false
+mycure-deploydash:
+  enabled: false
+hapihub-docs:
+  enabled: false
+dentalemon-website:
+  enabled: false
+dentalemon:
+  enabled: false
+syncd:
+  enabled: false
+mycurev8:
+  enabled: false
+mongodb:
+  enabled: false
+cadence:
+  enabled: false
+hapihubMigrator:
+  enabled: false
+backup:
+  enabled: false
+
+# ===== SECURITY =====
+podSecurityStandards:
+  enabled: true
+  level: restricted
+
+# ===== RESOURCE QUOTAS =====
+resourceQuotas:
+  enabled: false
