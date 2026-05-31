@@ -38,7 +38,8 @@
 global:
   domain: demo.localfirsthealth.com
   namespace: mycure-demo
-  environment: demo
+  # Chart schemas restrict environment to development|staging|preprod|production ("demo" rejected); label only.
+  environment: staging
   nodePool: "staging"
   secretPrefix: "mycure-production"   # provisions DB/valkey/minio secrets; hapihub reuses prod ENC/auth keys only
   gateway:

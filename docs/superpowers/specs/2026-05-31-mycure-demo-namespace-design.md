@@ -16,7 +16,7 @@ It lands on the **same DOKS cluster** as `mycure-preprod`/`mycure-production`, r
 | Decision | Choice | Rationale |
 |---|---|---|
 | Tenant / repo | `mycure-infra` | Only repo with a `preprod` sibling; ArgoCD on the mycure DOKS cluster reads from this repo. |
-| Env name / namespace | `mycure-demo` (`global.environment: demo`) | Matches `{client}-{environment}` convention. |
+| Env name / namespace | `mycure-demo` (namespace + domain). NOTE: `global.environment` must be `staging` — chart schemas only allow development\|staging\|preprod\|production, so `demo` is rejected; it's just a label and the env identity comes from namespace/domain. | Matches `{client}-{environment}` convention for naming; `environment` label constrained by schema. |
 | Database backend | **PostgreSQL only** | Lightest footprint; platform's forward direction. Mongo + migrator + cadence dropped. |
 | Hostnames | New subdomain `*.demo.localfirsthealth.com` | Mirrors preprod's naming; wildcard TLS feasible via existing Cloudflare DNS-01 issuer. |
 | Secrets / storage | **Approach C — hardened reuse** | Reuse `mycure-production-*` **ENC + JWT/auth keys** via `secretPrefix` (so crypto/login work out of the box), but route object storage to **in-cluster MinIO** and **omit the Stripe / Google-OAuth / GCP-storage** secret keys. No prod bucket writes, no prod Stripe calls. Residual linkage: the demo namespace holds copies of prod's encryption + token-signing keys (see §8). |
@@ -41,7 +41,7 @@ Cloned from `mycure-preprod.yaml`, then trimmed. Key contents:
 global:
   domain: demo.localfirsthealth.com
   namespace: mycure-demo
-  environment: demo
+  environment: staging         # schema enum (development|staging|preprod|production); "demo" rejected — label only, identity is namespace/domain
   nodePool: "staging"          # same DOKS pool as preprod — see capacity caveat §10
   secretPrefix: "mycure-production"   # Approach C: provisions DB/valkey/minio secrets; hapihub reuses prod ENC/auth keys only
   gateway:
