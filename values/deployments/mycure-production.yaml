@@ -1148,6 +1148,17 @@ hapihubMigrator:
       - secretKey: ENC_PERSONAL_DETAILS
         remoteKey: mycure-production-enc-personal-details
 
+  # Nightly bulk safety-net sweep over a trailing 48h window. Re-runs
+  # MODE=bulk to catch documents the CDC replayer may have missed
+  # (collector disconnects, oplog truncation, key skew, etc.). Bulk is
+  # idempotent (ON CONFLICT DO UPDATE) and shares the upsert path with
+  # CDC — safe alongside the running Deployment. Validated end-to-end
+  # in preprod against tags 3.7.4 and 3.7.8.
+  nightlyJob:
+    enabled: true
+    schedule: "0 18 * * *"   # 02:00 Asia/Manila daily, offset from Velero @ 02:00 UTC
+    lookbackHours: 48
+
 # ===== BACKUP =====
 backup:
   enabled: false
