@@ -68,8 +68,6 @@ spec:
       - runtimeclasses
       - validatingwebhookconfigurations
       - mutatingwebhookconfigurations
-    excludedNamespaces:
-      - "*"
     storageLocation: default
     ttl: {{ .Values.velero.schedules.cluster.weekly.retention | default "2160h" }}
     snapshotVolumes: false
