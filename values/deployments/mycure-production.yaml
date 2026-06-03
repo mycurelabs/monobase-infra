@@ -759,7 +759,12 @@ syncd:
     tag: "5.130.36"
     pullPolicy: IfNotPresent
 
-  replicaCount: 1
+  # Scaled to 0: legacy on-prem hapihub sync clients are decommissioned.
+  # syncd's SECONDARY_PREFERRED reads land on the standalone (single-member)
+  # MongoDB primary shared with hapihub, saturating it and causing mycurev8
+  # request hangs. autoscaling disabled so the HPA (minReplicas: 1) does not
+  # scale it back up. Re-enable both if an on-prem client must reconnect.
+  replicaCount: 0
 
   resources:
     requests:
@@ -783,7 +788,7 @@ syncd:
     enabled: false
 
   autoscaling:
-    enabled: true
+    enabled: false # disabled so HPA does not override replicaCount: 0 (see note above)
     minReplicas: 1
     maxReplicas: 3
 
