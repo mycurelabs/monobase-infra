@@ -847,14 +847,9 @@ hapihubMigrator:
     tag: "3.7.9"
     pullPolicy: IfNotPresent
 
-  # Canary: run the CDC replayer in preprod so we can validate 3.7.9's
-  # schema-aware CDC delete dispatch (A) and the delete-on-apply
-  # changelog drain (C) against the synthetic Mongo before promoting
-  # to prod. Reverted to bulk + deployment.enabled: false in a
-  # follow-up commit once the canary observation is complete.
-  mode: cdc
+  # No CDC in preprod — only the CronJob is exercised here.
   deployment:
-    enabled: true
+    enabled: false
 
   # Run every 6h in preprod for faster feedback than nightly.
   nightlyJob:
