@@ -844,12 +844,16 @@ hapihubMigrator:
 
   image:
     repository: ghcr.io/mycurelabs/hapihub-migrator
-    tag: "3.7.9"
+    tag: "3.7.10"
     pullPolicy: IfNotPresent
 
-  # No CDC in preprod — only the CronJob is exercised here.
+  # Canary: flip CDC on temporarily to validate 3.7.10's pre-image
+  # extraction path against preprod's synthetic Mongo. Reverted to false
+  # together with the mode: cdc override once layer 1 + layer 2 are both
+  # confirmed working end-to-end.
+  mode: cdc
   deployment:
-    enabled: false
+    enabled: true
 
   # Run every 6h in preprod for faster feedback than nightly.
   nightlyJob:
