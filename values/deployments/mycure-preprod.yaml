@@ -182,7 +182,7 @@ hapihub:
 
   image:
     repository: ghcr.io/mycurelabs/hapihub
-    tag: "11.19.2"
+    tag: "11.19.3"
     pullPolicy: IfNotPresent
 
   replicaCount: 1
@@ -312,7 +312,7 @@ mycure:
 
   image:
     repository: ghcr.io/mycurelabs/mycureapp
-    tag: "10.22.0"
+    tag: "10.23.0"
     pullPolicy: IfNotPresent
 
   replicaCount: 1
