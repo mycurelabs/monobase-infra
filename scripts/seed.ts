@@ -314,6 +314,20 @@ const ROLE_PRIVILEGES: Record<string, string[]> = {
     "ris_orders", "ris_results",
     "ris_ordersSendout", "ris_ordersComplete", "ris_ordersVerify",
   ],
+  // "Receptionist" in the SDK role registry (organizations/constants:
+  // id 'frontdesk', name 'Receptionist'). Front-desk registration,
+  // queueing, appointments, and invoice creation; read-only on
+  // payments/services/lab/imaging.
+  frontdesk: [
+    "mf_patientCreate", "mf_patientRead", "mf_patientUpdate",
+    "queue_items", "queueMonitor", "mf_registrationKiosk", "aptmnt_items",
+    "med_records", "mf_encounters",
+    "bl_invoices", "bl_invoiceItems", "bl_paymentsRead", "mf_servicesRead",
+    "lis_testsRead", "lis_ordersRead", "lis_resultsRead",
+    "ris_testsRead", "ris_ordersRead", "ris_resultsRead",
+    "frm_templatesRead", "insurance_contractsRead",
+    "mf_dentalFixtures", "sms_send",
+  ],
 };
 
 // ---------------------------------------------------------------------------
@@ -369,6 +383,8 @@ const USERS: SeedUser[] = [
   { email: "familymd@mycure.test",   name: "Mateo Santos",    roleIds: ["doctor"],                                          superadmin: false },
   { email: "nurse@mycure.test",      name: "Maria Santos",    roleIds: ["nurse", "nurse_head", "frontdesk"],                superadmin: false },
   { email: "cashier@mycure.test",    name: "Ana Reyes",       roleIds: ["billing", "billing_encoder", "frontdesk"],         superadmin: false },
+  // Dedicated receptionist (primary role 'frontdesk' = "Receptionist").
+  { email: "reception@mycure.test",  name: "Liza Mendoza",    roleIds: ["frontdesk"],                                       superadmin: false },
   { email: "laboratory@mycure.test", name: "Pedro Bautista",  roleIds: ["med_tech", "lab_tech", "lab_qc"],                  superadmin: false },
   { email: "imaging@mycure.test",    name: "Rosa Villanueva", roleIds: ["radiologic_tech", "imaging_tech", "imaging_qc"],   superadmin: false },
 ];
@@ -586,6 +602,22 @@ const USER_PROFILES: Record<string, UserProfileExtras> = {
       region: "Region IV-A",
       country: "PHL",
       zipCode: "4103",
+    },
+  },
+  "reception@mycure.test": {
+    mobileNo: "+639171234010",
+    sex: "female",
+    dateOfBirth: "1995-07-30",
+    bloodType: "O+",
+    nationality: "Filipino",
+    maritalStatus: "single",
+    address: {
+      street1: "18 Kalayaan Ave, Brgy. Central",
+      city: "Quezon City",
+      province: "Metro Manila",
+      region: "NCR",
+      country: "PHL",
+      zipCode: "1100",
     },
   },
   "laboratory@mycure.test": {
