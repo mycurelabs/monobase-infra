@@ -1121,11 +1121,12 @@ hapihubMigrator:
 
   # Throttle (temporary): cut collector concurrency 4 → 1 to reduce the number of
   # concurrent OFFSET scans the migrator runs against postgresql-primary, which
-  # contend with hapihub-next app queries (user-reported slowness). Deep-merges
-  # over chart-default env (BATCH_SIZE / CDC_* unchanged). Migration keeps running,
-  # just gentler. Revert to "4" once the hapihub index migration / keyset
-  # pagination lands. See infra perf work.
-  env:
+  # contend with hapihub-next app queries (user-reported slowness). Goes under
+  # `config:` (chart renders .Values.config → ConfigMap → envFrom; deep-merges, so
+  # BATCH_SIZE / CDC_* / etc. are unchanged). NOTE: `.Values.env` is a free-form
+  # LIST, not the app env map — do not put these there. Migration keeps running,
+  # just gentler. Revert to "4" once the hapihub index migration / keyset pagination lands.
+  config:
     COLLECTION_CONCURRENCY: "1"
 
   resources:
