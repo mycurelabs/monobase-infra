@@ -67,6 +67,10 @@ spec:
           pgHbaConfiguration: |
             {{- .Values.postgresql.primary.pgHbaConfiguration | nindent 12 }}
           {{- end }}
+          {{- if and .Values.postgresql.primary .Values.postgresql.primary.extendedConfiguration }}
+          extendedConfiguration: |
+            {{- .Values.postgresql.primary.extendedConfiguration | nindent 12 }}
+          {{- end }}
           {{- if .Values.postgresql.podDisruptionBudget }}
           podDisruptionBudget:
             {{- toYaml .Values.postgresql.podDisruptionBudget | nindent 12 }}
@@ -91,6 +95,10 @@ spec:
           {{- if .Values.postgresql.readReplicas.resources }}
           resources:
             {{- toYaml .Values.postgresql.readReplicas.resources | nindent 12 }}
+          {{- end }}
+          {{- if .Values.postgresql.readReplicas.extendedConfiguration }}
+          extendedConfiguration: |
+            {{- .Values.postgresql.readReplicas.extendedConfiguration | nindent 12 }}
           {{- end }}
           {{- if .Values.postgresql.podDisruptionBudget }}
           podDisruptionBudget:
