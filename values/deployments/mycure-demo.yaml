@@ -51,7 +51,7 @@ hapihub:
       rpName: "Mycure (demo)"
       rpId: "demo.localfirsthealth.com"
   config:
-    CORS_ORIGINS: "https://hapihub.demo.localfirsthealth.com,https://mycure-dashboard.demo.localfirsthealth.com,https://mycure.demo.localfirsthealth.com"
+    CORS_ORIGINS: "https://hapihub.demo.localfirsthealth.com,https://mycure-dashboard.demo.localfirsthealth.com,https://mycure.demo.localfirsthealth.com,https://mycure-pxp.demo.localfirsthealth.com"
     CORS_STRICT: "true"
     CORS_ALLOW_LOCAL_NETWORK: "false"
     CORS_ALLOW_MOBILE_APPS: "true"
@@ -156,6 +156,38 @@ mycure:
   config:
     API_URL: "https://hapihub.demo.localfirsthealth.com"
     HAPIHUB_URL: "https://hapihub.demo.localfirsthealth.com"
+  podDisruptionBudget:
+    enabled: false
+
+# ===== HEALTHCARE: MyCure PXP (patient-facing web app) =====
+mycure-pxp:
+  enabled: true
+  image:
+    repository: ghcr.io/mycurelabs/pxp
+    tag: "2.0.1"
+    pullPolicy: IfNotPresent
+  replicaCount: 1
+  resources:
+    requests:
+      cpu: 25m
+      memory: 48Mi
+    limits:
+      cpu: 150m
+      memory: 128Mi
+  # The pxp image's entrypoint sed-substitutes __PXP_RUNTIME_API_URL__ into
+  # /srv/*.{js,html} at container start, so /srv must be writable. Override
+  # the chart default (readOnlyRootFilesystem: true).
+  securityContext:
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop:
+        - ALL
+    readOnlyRootFilesystem: false
+  gateway:
+    hostname: ""   # defaults to mycure-pxp.demo.localfirsthealth.com
+    sectionName: https-demo-lfh
+  config:
+    API_URL: "https://hapihub.demo.localfirsthealth.com"
   podDisruptionBudget:
     enabled: false
 
@@ -284,8 +316,6 @@ mailpit:
 api:
   enabled: false
 account:
-  enabled: false
-mycure-pxp:
   enabled: false
 mycurelocal:
   enabled: false
