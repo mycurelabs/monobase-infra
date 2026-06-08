@@ -1119,6 +1119,15 @@ hapihubMigrator:
   # bulk (Phase 3) → cdc (Phase 4) → reverse-cdc (Phase 6, post-cutover)
   mode: cdc
 
+  # Throttle (temporary): cut collector concurrency 4 → 1 to reduce the number of
+  # concurrent OFFSET scans the migrator runs against postgresql-primary, which
+  # contend with hapihub-next app queries (user-reported slowness). Deep-merges
+  # over chart-default env (BATCH_SIZE / CDC_* unchanged). Migration keeps running,
+  # just gentler. Revert to "4" once the hapihub index migration / keyset
+  # pagination lands. See infra perf work.
+  env:
+    COLLECTION_CONCURRENCY: "1"
+
   resources:
     requests:
       cpu: 50m
