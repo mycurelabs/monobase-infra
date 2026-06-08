@@ -100,7 +100,7 @@ mycure-dashboard:
 
   image:
     repository: ghcr.io/mycurelabs/dashboard
-    tag: "0.11.0"
+    tag: "0.14.0"
     pullPolicy: IfNotPresent
 
   replicaCount: 1
@@ -341,7 +341,7 @@ hapihubNext:
 
   image:
     repository: ghcr.io/mycurelabs/hapihub
-    tag: "11.19.3"
+    tag: "11.20.0"
     pullPolicy: IfNotPresent
 
   replicaCount: 3
@@ -481,7 +481,7 @@ mycure:
 
   image:
     repository: ghcr.io/mycurelabs/mycureapp
-    tag: "10.23.0"
+    tag: "10.24.0"
     pullPolicy: IfNotPresent
 
   replicaCount: 1
@@ -858,6 +858,16 @@ postgresql:
       limits:
         cpu: 2000m
         memory: 8Gi
+    # Perf tuning — replaces PG defaults (shared_buffers 128MB / work_mem 4MB)
+    # for the 35GB DB; sized to the 8Gi pod limit. See node-separation issue
+    # for the CPU-oversubscription follow-up. Applying restarts the primary.
+    extendedConfiguration: |
+      shared_buffers = 2GB
+      effective_cache_size = 5GB
+      work_mem = 16MB
+      maintenance_work_mem = 256MB
+      random_page_cost = 1.1
+      effective_io_concurrency = 200
 
   readReplicas:
     replicaCount: 1
@@ -872,6 +882,15 @@ postgresql:
       limits:
         cpu: 2000m
         memory: 8Gi
+    # Keep the replica's config in lockstep with the primary (idle today, but
+    # ready for read-offload and consistent on promotion). Restarts the replica.
+    extendedConfiguration: |
+      shared_buffers = 2GB
+      effective_cache_size = 5GB
+      work_mem = 16MB
+      maintenance_work_mem = 256MB
+      random_page_cost = 1.1
+      effective_io_concurrency = 200
 
   podDisruptionBudget:
     enabled: true
