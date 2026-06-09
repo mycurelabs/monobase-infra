@@ -328,6 +328,27 @@ const ROLE_PRIVILEGES: Record<string, string[]> = {
     "frm_templatesRead", "insurance_contractsRead",
     "mf_dentalFixtures", "sms_send",
   ],
+  // Pharmacist (SDK role id 'pharmacist'): inventory read + pharmacy POS
+  // (dispensing). Privileges mirror ORGANIZATION_MEMBER_ROLES exactly.
+  pharmacist: [
+    "wh_productsRead", "wh_productTypesRead", "wh_productCategoriesRead",
+    "wh_purchasesRead", "wh_transfersRead", "wh_receivingRead",
+    "wh_adjustmentsRead", "wh_packagingRead", "wh_stockAdjustmentReasonsRead",
+    "wh_pos",
+  ],
+  // Pharmacy Custodian (SDK role id 'pharmacy_custodian'): full inventory
+  // management — create/update on purchases, transfers, receiving,
+  // adjustments, packaging. Paired with 'pharmacist' on the demo pharmacy
+  // account to give read + manage inventory + POS.
+  pharmacy_custodian: [
+    "wh_productsRead", "wh_productTypesRead", "wh_productCategoriesRead",
+    "wh_purchasesCreate", "wh_purchasesRead", "wh_purchasesUpdate",
+    "wh_transfersCreate", "wh_transfersRead", "wh_transfersUpdate",
+    "wh_receivingCreate", "wh_receivingRead", "wh_receivingUpdate",
+    "wh_adjustmentsCreate", "wh_adjustmentsRead", "wh_adjustmentsUpdate",
+    "wh_packagingCreate", "wh_packagingRead", "wh_packagingUpdate",
+    "wh_stockAdjustmentReasonsRead",
+  ],
 };
 
 // ---------------------------------------------------------------------------
@@ -387,6 +408,9 @@ const USERS: SeedUser[] = [
   { email: "reception@mycure.test",  name: "Liza Mendoza",    roleIds: ["frontdesk"],                                       superadmin: false },
   { email: "laboratory@mycure.test", name: "Pedro Bautista",  roleIds: ["med_tech", "lab_tech", "lab_qc"],                  superadmin: false },
   { email: "imaging@mycure.test",    name: "Rosa Villanueva", roleIds: ["radiologic_tech", "imaging_tech", "imaging_qc"],   superadmin: false },
+  // Pharmacy / inventory custodian. 'pharmacist' (read + POS) + 'pharmacy_custodian'
+  // (full inventory management) = a pharmacy account with inventory privileges.
+  { email: "pharmacist@mycure.test", name: "Grace Tolentino", roleIds: ["pharmacist", "pharmacy_custodian"],                superadmin: false },
 ];
 
 // ---------------------------------------------------------------------------
@@ -618,6 +642,22 @@ const USER_PROFILES: Record<string, UserProfileExtras> = {
       region: "NCR",
       country: "PHL",
       zipCode: "1100",
+    },
+  },
+  "pharmacist@mycure.test": {
+    mobileNo: "+639171234011",
+    sex: "female",
+    dateOfBirth: "1990-03-14",
+    bloodType: "A+",
+    nationality: "Filipino",
+    maritalStatus: "married",
+    address: {
+      street1: "27 Mabini St, Brgy. Poblacion",
+      city: "Makati City",
+      province: "Metro Manila",
+      region: "NCR",
+      country: "PHL",
+      zipCode: "1210",
     },
   },
   "laboratory@mycure.test": {
