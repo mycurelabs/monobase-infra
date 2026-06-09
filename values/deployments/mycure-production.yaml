@@ -1065,7 +1065,7 @@ cadence:
     tag: "0.5.12"
     pullPolicy: Always
 
-  replicaCount: 1
+  replicaCount: 0
 
   # Resources matched to staging — the 0.5.x line's cursor-based baseline scan
   # + paginated catch-up + batched change-log queries cap peak RSS <500MB.
