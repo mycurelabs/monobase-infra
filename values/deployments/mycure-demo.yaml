@@ -164,7 +164,7 @@ mycure-pxp:
   enabled: true
   image:
     repository: ghcr.io/mycurelabs/pxp
-    tag: "2.0.2"
+    tag: "2.0.3"
     pullPolicy: IfNotPresent
   replicaCount: 1
   resources:
