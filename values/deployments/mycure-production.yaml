@@ -1110,6 +1110,7 @@ cadence:
 # replay; the changelog is the rollback forensic trail.
 hapihubMigrator:
   enabled: true # Phase 2 — bulk migration started 2026-04-07
+  replicaCount: 0
 
   image:
     repository: ghcr.io/mycurelabs/hapihub-migrator
@@ -1179,7 +1180,7 @@ hapihubMigrator:
   # CDC — safe alongside the running Deployment. Validated end-to-end
   # in preprod against tags 3.7.4 and 3.7.8.
   nightlyJob:
-    enabled: true
+    enabled: false
     schedule: "0 18 * * *"   # 02:00 Asia/Manila daily, offset from Velero @ 02:00 UTC
     lookbackHours: 48
 
