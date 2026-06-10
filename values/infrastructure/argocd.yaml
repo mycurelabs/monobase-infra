@@ -243,23 +243,6 @@ dex:
 
 # Configs
 configs:
-  # argocd-cm overrides
-  cm:
-    # Default is 180s — 3 minutes between Application reconciliations. When an
-    # image-tag bump lands on monobase-infra/main, the root app re-templates
-    # its child Applications (their spec.source.helm.valuesObject.image.tag
-    # changes), but each child still waits up to 180s for its OWN
-    # reconciliation tick to act on the new spec — so the deployed image lags
-    # the values-file commit by up to 3 minutes per app, even though ArgoCD
-    # already knows the desired state.
-    #
-    # Drop to 60s so the root → child cascade completes within ~1 minute
-    # without us needing to manually `argocd app sync` each child. Trade-off:
-    # ~3x more git-poll + reconcile traffic against the controller +
-    # repo-server; current cluster's controller is at 68% memory headroom so
-    # the budget is there.
-    timeout.reconciliation: 60s
-
   secret:
     createSecret: true
     # argocdServerAdminPassword: ""  # Set via External Secrets
