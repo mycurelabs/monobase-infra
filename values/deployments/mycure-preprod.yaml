@@ -787,7 +787,12 @@ mailpit:
       memory: 64Mi
 
   gateway:
-    enabled: true
+    # Public web UI route disabled (#5): preprod runs on cloned-prod data, and an
+    # unauthenticated HTTPRoute leaked reset tokens / OTPs / PHI to anyone with the
+    # URL. Access the inbox via: kubectl port-forward svc/mailpit-http 8025:80
+    # (the route attaches to nginx-shared-gateway; re-enable behind gateway auth —
+    # e.g. basic-auth — if a public URL is ever needed).
+    enabled: false
     hostname: "mail.preprod.localfirsthealth.com"
 
 # ===== P2P SYNC: Cadence =====
