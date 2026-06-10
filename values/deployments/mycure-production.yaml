@@ -1062,7 +1062,7 @@ cadence:
 
   image:
     repository: ghcr.io/mycurelabs/cadence
-    tag: "0.5.13"
+    tag: "0.5.14"
     pullPolicy: Always
 
   replicaCount: 1
