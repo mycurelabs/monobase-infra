@@ -1062,10 +1062,10 @@ cadence:
 
   image:
     repository: ghcr.io/mycurelabs/cadence
-    tag: "0.5.12"
+    tag: "0.5.13"
     pullPolicy: Always
 
-  replicaCount: 0
+  replicaCount: 1
 
   # Resources matched to staging — the 0.5.x line's cursor-based baseline scan
   # + paginated catch-up + batched change-log queries cap peak RSS <500MB.
@@ -1110,7 +1110,7 @@ cadence:
 # replay; the changelog is the rollback forensic trail.
 hapihubMigrator:
   enabled: true # Phase 2 — bulk migration started 2026-04-07
-  replicaCount: 0
+  replicaCount: 1  # re-enabled 2026-06-10 after cadence 0.5.13 keyset fix landed
 
   image:
     repository: ghcr.io/mycurelabs/hapihub-migrator
@@ -1180,7 +1180,7 @@ hapihubMigrator:
   # CDC — safe alongside the running Deployment. Validated end-to-end
   # in preprod against tags 3.7.4 and 3.7.8.
   nightlyJob:
-    enabled: false
+    enabled: true  # re-enabled 2026-06-10 after cadence 0.5.13 keyset fix landed
     schedule: "0 18 * * *"   # 02:00 Asia/Manila daily, offset from Velero @ 02:00 UTC
     lookbackHours: 48
 
