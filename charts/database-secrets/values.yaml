@@ -11,3 +11,9 @@ global:
   # for ephemeral prod-mirror envs that restore real data and must decrypt it
   # with the original credentials.
   secretPrefix: ""
+
+# MinIO credentials ExternalSecret toggle. Forwarded from the deployment values
+# by the database-secrets ArgoCD Application. Default off: the secret is only
+# synced where MinIO is actually enabled (preprod/demo); prod uses GCS.
+minio:
+  enabled: false
