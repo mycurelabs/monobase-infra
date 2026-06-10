@@ -1067,15 +1067,23 @@ cadence:
 
   replicaCount: 1
 
-  # Resources matched to staging — the 0.5.x line's cursor-based baseline scan
-  # + paginated catch-up + batched change-log queries cap peak RSS <500MB.
+  # Resources sized to the empirically-observed memory floor (2026-06-10
+  # incident, monobase-infra#10). After §A.2/§B/§D/§E shipped in 0.5.14-0.5.17
+  # the catch-up code path is fully optimized (UPSERT type-coercion fix,
+  # bounded max_lamports_by_doc, bounded mpsc producer queue, per-collection
+  # lamport_map). The residual ~1.7 GiB plateau on prod is non-catch-up
+  # runtime state — iroh transport, tokio runtime, fred/valkey client pool,
+  # loro CRDT, allocator fragmentation — that isn't addressable at the app
+  # layer. Preprod plateaus at ~1.2 GiB; prod's heavier peer + workload
+  # extrapolates to ~1.7 GiB. 4 GiB gives ~2x headroom before the next
+  # workload step kicks the cycle back on.
   resources:
     requests:
       cpu: 200m
-      memory: 512Mi
+      memory: 1Gi
     limits:
       cpu: "2"
-      memory: 2Gi
+      memory: 4Gi
 
   gateway:
     hostname: ""
