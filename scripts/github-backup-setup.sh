@@ -36,12 +36,14 @@ INCLUDE_FORKS=0
 THROTTLE_LIMIT=5000
 THROTTLE_PAUSE=0.72
 NOTIFY_ON=both                                  # both | failure-only | success-only | off
+PROGRESS_INTERVAL=30min                         # heartbeat cadence while a backup runs; 0/off disables
 
 CONFIG_DIR=/etc/mycure-github-backup
 TOKEN_FILE=$CONFIG_DIR/token
 VENV_DIR=/opt/mycure-github-backup/venv
 SERVICE_NAME=mycure-github-backup
 VERIFY_SERVICE_NAME=mycure-github-backup-verify
+PROGRESS_SERVICE_NAME=mycure-github-backup-progress
 RUN_BIN=/usr/local/sbin/mycure-github-backup-run
 VERIFY_BIN=/usr/local/sbin/mycure-github-backup-verify
 NOTIFY_BIN=/usr/local/sbin/mycure-github-backup-notify
@@ -76,6 +78,8 @@ Flags:
   --throttle-limit=N          github-backup --throttle-limit    (default: $THROTTLE_LIMIT)
   --throttle-pause=SEC        github-backup --throttle-pause    (default: $THROTTLE_PAUSE)
   --notify-on=MODE            both | failure-only | success-only | off  (default: $NOTIFY_ON)
+  --progress-interval=DUR     heartbeat cadence while a backup runs, e.g. 30min, 1h;
+                              0/off disables progress pings        (default: $PROGRESS_INTERVAL)
   -h, --help                  this help
 
 Environment (required):
@@ -106,6 +110,7 @@ while [[ $# -gt 0 ]]; do
     --throttle-limit=*)           THROTTLE_LIMIT="${1#*=}";            shift;;
     --throttle-pause=*)           THROTTLE_PAUSE="${1#*=}";            shift;;
     --notify-on=*)                NOTIFY_ON="${1#*=}";                 shift;;
+    --progress-interval=*)        PROGRESS_INTERVAL="${1#*=}";         shift;;
     --discord-webhook-url=*)      DISCORD_WEBHOOK_URL="${1#*=}";       shift;;
     -h|--help)                    usage; exit 0;;
     *) err "unknown flag: $1 (see --help)";;
@@ -116,6 +121,13 @@ case "$NOTIFY_ON" in
   both|failure-only|success-only|off) ;;
   *) err "--notify-on must be one of: both | failure-only | success-only | off";;
 esac
+
+# Progress heartbeats fire only when notifications are on and an interval is set.
+PROGRESS_ENABLED=1
+case "$PROGRESS_INTERVAL" in
+  0|off|none|"") PROGRESS_ENABLED=0 ;;
+esac
+[[ "$NOTIFY_ON" == "off" ]] && PROGRESS_ENABLED=0
 
 # ---------- preflight ----------
 need_root
@@ -249,6 +261,7 @@ url=\$(<"\$WEBHOOK_FILE")
 kind="\${1:-}"
 case "\$kind" in
   start)          title=":hourglass_flowing_sand: GitHub org backup started"; color=3447003;  want_duration=0; want_repos=0; SERVICE_NAME=$SERVICE_NAME ;;
+  progress)       title=":satellite: GitHub org backup in progress";         color=3447003;  want_duration=1; want_repos=1; SERVICE_NAME=$SERVICE_NAME ;;
   success)        title=":white_check_mark: GitHub org backup succeeded";     color=3066993;  want_duration=1; want_repos=1; SERVICE_NAME=$SERVICE_NAME ;;
   failure)        title=":x: GitHub org backup FAILED";                       color=15158332; want_duration=1; want_repos=1; SERVICE_NAME=$SERVICE_NAME ;;
   verify-start)   title=":mag: GitHub backup verification started";           color=3447003;  want_duration=0; want_repos=0; SERVICE_NAME=$VERIFY_SERVICE_NAME ;;
@@ -266,8 +279,17 @@ elapsed="unknown"
 repos="see log"
 size="see log"
 if [[ "\$want_duration" == "1" ]] && command -v systemctl >/dev/null; then
-  start_ts=\$(systemctl show "\$SERVICE_NAME.service" -p ActiveEnterTimestampMonotonic --value 2>/dev/null || echo 0)
-  end_ts=\$(systemctl show "\$SERVICE_NAME.service" -p InactiveEnterTimestampMonotonic --value 2>/dev/null || echo 0)
+  # Run start = when the unit left 'inactive'. For a Type=oneshot service this
+  # is the right anchor: ActiveEnterTimestamp isn't set while it's still
+  # 'activating' (the whole run), and is only set briefly at the end.
+  start_ts=\$(systemctl show "\$SERVICE_NAME.service" -p InactiveExitTimestampMonotonic --value 2>/dev/null || echo 0)
+  if [[ "\$kind" == "progress" ]]; then
+    # Service is still running — measure elapsed against "now" (monotonic µs
+    # from /proc/uptime), since InactiveEnterTimestamp isn't set yet.
+    end_ts=\$(awk '{printf "%d", \$1 * 1000000}' /proc/uptime 2>/dev/null || echo 0)
+  else
+    end_ts=\$(systemctl show "\$SERVICE_NAME.service" -p InactiveEnterTimestampMonotonic --value 2>/dev/null || echo 0)
+  fi
   if [[ "\$end_ts" -gt "\$start_ts" ]] && [[ "\$start_ts" -gt 0 ]]; then
     delta_us=\$((end_ts - start_ts))
     elapsed=\$(awk -v u="\$delta_us" 'BEGIN{s=u/1000000; printf (s>=3600)?"%dh%dm":(s>=60)?"%dm%ds":"%ds", (s>=3600)?int(s/3600):(s>=60)?int(s/60):int(s), (s>=3600)?int((s%3600)/60):(s>=60)?int(s%60):0}')
@@ -278,6 +300,16 @@ if [[ "\$want_repos" == "1" ]] && [[ -d "\$BACKUP_DIR" ]]; then
   [[ "\$repos" -gt 0 ]] || repos="see log"
   size=\$(du -sh "\$BACKUP_DIR" 2>/dev/null | awk '{print \$1}')
   [[ -n "\$size" ]] || size="see log"
+fi
+# For a progress ping with no explicit note, surface the repo currently being
+# processed (best-effort; needs journal read access, which the progress service
+# has as it runs as root).
+if [[ "\$kind" == "progress" ]] && [[ -z "\$extra" ]] && command -v journalctl >/dev/null; then
+  # \`|| cur=""\` is essential: under set -e/pipefail a no-match grep would
+  # otherwise abort the whole notifier (and the progress unit would fail).
+  cur=\$(journalctl --namespace=$LOG_NAMESPACE -u "\$SERVICE_NAME.service" -n 300 --no-pager -o cat 2>/dev/null \
+    | grep -oE "Cloning [^ ]+|Retrieving $ORG/[^ ]+" | tail -1) || cur=""
+  [[ -n "\$cur" ]] && extra="\$cur"
 fi
 
 if command -v jq >/dev/null; then
@@ -424,6 +456,17 @@ case "$NOTIFY_ON" in
   off)           notify_start="";                                 notify_success="";                                  failure_onfailure="" ;;
 esac
 
+# Progress heartbeat: start a timer when the backup starts and stop it when the
+# backup ends (success or failure), so periodic "in progress" pings fire for the
+# duration of a run and never while idle. ExecStopPost runs on both exit paths.
+if [[ "$PROGRESS_ENABLED" -eq 1 ]]; then
+  progress_start="ExecStartPre=-/usr/bin/systemctl --no-block start ${PROGRESS_SERVICE_NAME}.timer"
+  progress_stop="ExecStopPost=-/usr/bin/systemctl --no-block stop ${PROGRESS_SERVICE_NAME}.timer"
+else
+  progress_start=""
+  progress_stop=""
+fi
+
 cat > "$SYSTEMD_DIR/$SERVICE_NAME.service" <<UNIT
 [Unit]
 Description=Back up the $ORG GitHub organization to $BACKUP_DIR
@@ -438,8 +481,10 @@ Group=$SERVICE_USER
 LogNamespace=$LOG_NAMESPACE
 SyslogIdentifier=$SERVICE_NAME
 $notify_start
+$progress_start
 ExecStart=$RUN_BIN
 $notify_success
+$progress_stop
 
 # Hard cap so a runaway backup doesn't burn an entire day.
 TimeoutStartSec=4h
@@ -476,6 +521,41 @@ Unit=$SERVICE_NAME.service
 [Install]
 WantedBy=timers.target
 UNIT
+
+# ---------- systemd progress heartbeat service + timer ----------
+# Fires a Discord "in progress" ping every $PROGRESS_INTERVAL while a backup
+# runs. The service guards on the backup being live (a Type=oneshot unit is in
+# the 'activating' state while ExecStart runs, so we accept active OR
+# activating). The timer carries no [Install] — it is started/stopped by the
+# backup service's ExecStartPre/ExecStopPost, so it only ticks during a run.
+if [[ "$PROGRESS_ENABLED" -eq 1 ]]; then
+  log "writing systemd unit $PROGRESS_SERVICE_NAME.service (heartbeat every $PROGRESS_INTERVAL)"
+  cat > "$SYSTEMD_DIR/$PROGRESS_SERVICE_NAME.service" <<UNIT
+[Unit]
+Description=Send a progress notification for a running $ORG GitHub backup
+
+[Service]
+Type=oneshot
+LogNamespace=$LOG_NAMESPACE
+SyslogIdentifier=$PROGRESS_SERVICE_NAME
+ExecStart=/usr/bin/env bash -c 'state=\$(systemctl show -p ActiveState --value $SERVICE_NAME.service); [[ "\$state" == active || "\$state" == activating ]] && exec $NOTIFY_BIN progress || exit 0'
+UNIT
+
+  log "writing systemd timer $PROGRESS_SERVICE_NAME.timer"
+  cat > "$SYSTEMD_DIR/$PROGRESS_SERVICE_NAME.timer" <<UNIT
+[Unit]
+Description=Heartbeat timer for a running $ORG GitHub backup
+
+[Timer]
+OnActiveSec=$PROGRESS_INTERVAL
+OnUnitActiveSec=$PROGRESS_INTERVAL
+Unit=$PROGRESS_SERVICE_NAME.service
+UNIT
+else
+  # Progress disabled — remove any units left from a previous install so a
+  # re-run with --progress-interval=0 (or --notify-on=off) reconciles cleanly.
+  rm -f "$SYSTEMD_DIR/$PROGRESS_SERVICE_NAME.service" "$SYSTEMD_DIR/$PROGRESS_SERVICE_NAME.timer"
+fi
 
 # ---------- systemd verify service + timer ----------
 log "writing systemd unit $VERIFY_SERVICE_NAME.service"
@@ -572,6 +652,11 @@ verify_next=$(systemctl list-timers --no-legend --no-pager "$VERIFY_SERVICE_NAME
 echo "  next verify   : ${verify_next:-see: systemctl list-timers}"
 if [[ -f "$WEBHOOK_FILE" ]]; then
   echo "  notifications : Discord webhook configured (mode: $NOTIFY_ON)"
+  if [[ "$PROGRESS_ENABLED" -eq 1 ]]; then
+    echo "  progress ping : every $PROGRESS_INTERVAL while a backup runs"
+  else
+    echo "  progress ping : disabled"
+  fi
 else
   echo "  notifications : disabled (set DISCORD_WEBHOOK_URL to enable)"
 fi

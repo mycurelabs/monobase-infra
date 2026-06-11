@@ -94,6 +94,7 @@ sudo GITHUB_TOKEN=… scripts/github-backup-setup.sh \
 | `--include-forks` | off | Also back up forked repos. |
 | `--throttle-limit=N` / `--throttle-pause=SEC` | `5000` / `0.72` | github-backup API rate-limit controls. |
 | `--notify-on=MODE` | `both` | `both` / `failure-only` / `success-only` / `off`. |
+| `--progress-interval=DUR` | `30min` | Heartbeat cadence while a backup runs (e.g. `30min`, `1h`); `0`/`off` disables progress pings. |
 | `--discord-webhook-url=URL` | (env var) | Same as `DISCORD_WEBHOOK_URL`; stored at `/etc/mycure-github-backup/discord-webhook.url`. |
 
 Before enabling the timers, the script does a credential dry-run against `https://api.github.com/orgs/<org>` and fails fast with a clear message on `401` (bad/expired token), `403` (missing scope / rate-limited), or `404` (wrong org / token can't see it).
@@ -101,6 +102,8 @@ Before enabling the timers, the script does a credential dry-run against `https:
 ### Optional: Discord notifications
 
 Identical model to the data mirror. If `DISCORD_WEBHOOK_URL` is set (or `--discord-webhook-url`), the script installs `/usr/local/sbin/mycure-github-backup-notify` and wires `start`/`success`/`failure` (and `verify-*`) into the units, plus a one-shot `test` ping at the end of setup. Each embed includes host FQDN, run duration, **repo count**, and total backup size. Disable without removing the URL via `--notify-on=off`.
+
+**Progress heartbeats.** The initial full backup is long-running (hours). To avoid a multi-hour silence between `start` and `success`/`failure`, the script also installs `mycure-github-backup-progress.service` + `.timer`, which post a recurring blue "in progress" embed (elapsed, repos so far, size, current repo) every `--progress-interval` (default **30 min**). The timer is **started by the backup service and stopped when it ends**, so pings fire only for the duration of a run, never while idle. The verify pass is short and gets no heartbeat. Disable with `--progress-interval=0` (start/success/failure pings are unaffected).
 
 ---
 
@@ -165,6 +168,7 @@ Logs go to a dedicated `mycure-github-backup` journald namespace with size caps 
 | `/etc/systemd/system/mycure-github-backup-failure.service` | 0644 | root | OnFailure → notifier. |
 | `/etc/systemd/system/mycure-github-backup-verify.{service,timer}` | 0644 | root | Weekly verify units. |
 | `/etc/systemd/system/mycure-github-backup-verify-failure.service` | 0644 | root | OnFailure → notifier. |
+| `/etc/systemd/system/mycure-github-backup-progress.{service,timer}` | 0644 | root | Progress heartbeat (only when progress enabled). |
 | `/etc/systemd/journald@mycure-github-backup.conf` | 0644 | root | Bounded journal namespace. |
 | `/var/backups/mycure-github/` | 0750 | mycure-ghbackup | Backup target. |
 
@@ -193,9 +197,11 @@ sudo GITHUB_TOKEN=… scripts/github-backup-setup.sh \
 ```sh
 sudo systemctl disable --now mycure-github-backup.timer mycure-github-backup.service \
                               mycure-github-backup-verify.timer mycure-github-backup-verify.service
+sudo systemctl stop mycure-github-backup-progress.timer 2>/dev/null || true
 sudo rm -rf /etc/mycure-github-backup \
             /etc/systemd/system/mycure-github-backup.* \
             /etc/systemd/system/mycure-github-backup-verify.* \
+            /etc/systemd/system/mycure-github-backup-progress.* \
             /etc/systemd/journald@mycure-github-backup.conf \
             /usr/local/sbin/mycure-github-backup-run \
             /usr/local/sbin/mycure-github-backup-verify \
