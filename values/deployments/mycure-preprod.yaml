@@ -856,6 +856,13 @@ hapihubMigrator:
   deployment:
     enabled: false
 
+  # Reverse-sync canary (PG → MongoDB): apply scoped to two low-risk tables
+  # while the write path bakes. Widen `tables`, then drop it, as stages pass.
+  reverseCdc:
+    enabled: true
+    apply: true
+    tables: "clocks,counters"
+
   # Run every 6h in preprod for faster feedback than nightly.
   nightlyJob:
     enabled: true
