@@ -22,6 +22,19 @@ Complete backup procedures, restore operations, and disaster recovery plans.
 
 Tier 4 is a pull-only `rclone` mirror of the Velero bucket onto on-prem hosts. Defense-in-depth for "DO sgp1 is unreachable" or "primary backup repo compromised" scenarios. Restore is slower (requires a recovery cluster or `kopia` extraction). See [ONPREM_BACKUP_SETUP.md](ONPREM_BACKUP_SETUP.md) for adding a new mirror host and [RESTORE_FROM_ONPREM.md](RESTORE_FROM_ONPREM.md) for the recovery procedure.
 
+> The 4 tiers above protect **production data** (Kubernetes PVs / Velero). They do **not** cover source code — see the separate section below.
+
+---
+
+## Source-code & project backup (GitHub)
+
+A separate concern from the data tiers: an off-cloud backup of the **`mycurelabs` GitHub organization** so a lost, compromised, or deleted org — or a GitHub outage — doesn't mean lost source history. It is the source-code analogue of the tier-4 on-prem data mirror.
+
+- **What:** every org repo's code (all branches/tags/refs, as bare mirrors), wikis, issues, PRs, releases + assets, and metadata.
+- **How:** [`scripts/github-backup-setup.sh`](../../scripts/github-backup-setup.sh) wraps [`github-backup`](https://github.com/josegonzalez/python-github-backup) in a daily systemd timer on an off-cloud host, with a weekly `git fsck` integrity pass and Discord notifications — the same scaffolding as the data mirror.
+- **Restore:** `git push --mirror` a bare repo back to a fresh remote (lossless for code/wikis; issues/PRs/releases are archived as JSON — see runbook for the metadata caveat).
+- **Runbook:** [GITHUB_BACKUP_SETUP.md](GITHUB_BACKUP_SETUP.md).
+
 ---
 
 ## Backup Operations
