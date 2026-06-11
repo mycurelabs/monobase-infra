@@ -2,8 +2,8 @@ apiVersion: v2
 name: hapihub-migrator
 description: HapiHub MongoDB→PostgreSQL migration tool (bulk + CDC + verify)
 type: application
-version: 0.1.0
-appVersion: "3.7.0"
+version: 0.2.0
+appVersion: "3.8.0"
 keywords:
   - hapihub
   - migration

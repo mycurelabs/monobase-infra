@@ -148,6 +148,53 @@ nightlyJob:
       cpu: "2"
       memory: 4Gi
 
+# Reverse-sync Deployment (PG → MongoDB realtime apply). Runs ALONGSIDE the
+# forward CDC Deployment as a separate single-replica Deployment + Service
+# (hapihub-migrator-reverse). MODE=reverse-cdc; `apply: false` keeps it
+# capture-only (today's behavior in a second pod), `apply: true` starts the
+# reverse replayer draining _pg_changelog into cloud MongoDB under
+# syncd-compatible latest-wins. `tables` (comma-separated PG table names)
+# restricts the APPLY scope for canary rollouts — out-of-scope events are
+# consumed without applying so the buffer still drains.
+reverseCdc:
+  enabled: false                 # opt-in per deployment
+  apply: false                   # true = capture + apply; false = capture-only
+  tables: ""                     # e.g. "clocks,counters" for a canary
+  batchSize: 200                 # _pg_changelog poll batch
+  pollIntervalMs: 1000
+  env: []                        # free-form extra env
+  resources:
+    requests:
+      cpu: 50m
+      memory: 256Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
+
+# Reverse nightly safety-net sweep (PG → MongoDB, MODE=reverse-bulk) over a
+# trailing updated_at window. Idempotent via the latest-wins _sl tie-skip.
+reverseNightlyJob:
+  enabled: false                 # opt-in per deployment
+  schedule: "0 20 * * *"         # 04:00 PHT = 20:00 UTC (offset from forward nightly @18:00 + Velero @02:00 UTC)
+  timeZone: "Etc/UTC"
+  windowHours: 26                # trailing window (covers a 24h cadence with slack)
+  tables: ""                     # optional scope, same semantics as reverseCdc.tables
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 7
+  startingDeadlineSeconds: 3600
+  backoffLimit: 1
+  ttlSecondsAfterFinished: 259200
+  activeDeadlineSeconds: 21600
+  env: []
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
+
 # Node pool scheduling (optional, inherits from global.nodePool)
 nodeSelector: {}
 tolerations: []

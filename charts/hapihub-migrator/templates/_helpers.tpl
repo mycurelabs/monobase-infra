@@ -102,3 +102,13 @@ Returns empty string if disabled or not configured.
   {{- .Values.global.nodePool -}}
 {{- end -}}
 {{- end -}}
+
+{{/*
+Reverse-sync selector labels — distinct app.kubernetes.io/name so the
+forward Service (which selects the plain selectorLabels) can never route
+to reverse pods, and vice versa.
+*/}}
+{{- define "hapihub-migrator.reverseSelectorLabels" -}}
+app.kubernetes.io/name: {{ include "hapihub-migrator.name" . }}-reverse
+app.kubernetes.io/instance: {{ .Release.Name }}
+{{- end }}
