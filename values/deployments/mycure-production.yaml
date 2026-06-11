@@ -966,17 +966,19 @@ valkey:
       enabled: true
       storageClass: ""
       size: 4Gi
-    # Resource sizing inherited from staging (2026-04-06 lessons):
-    # 512Mi -> 277 restarts in 27h, 1Gi still OOMs during AOF replay,
-    # 2Gi gives real headroom. CPU bumped so initial replay doesn't
+    # Resource sizing history: 512Mi -> 277 restarts in 27h (staging,
+    # 2026-04-06); 1Gi still OOMs during AOF replay; 2Gi OOM-crashlooped
+    # 2026-06-11 with a 1.6G AOF (cadence change-log growth). 4Gi unblocks,
+    # but the dataset grows unboundedly — needs change-log trimming/TTL
+    # before this limit is hit again. CPU at 1 core so AOF replay doesn't
     # starve the liveness probe.
     resources:
       requests:
-        cpu: 100m
-        memory: 1Gi
-      limits:
-        cpu: 500m
+        cpu: 250m
         memory: 2Gi
+      limits:
+        cpu: 1000m
+        memory: 4Gi
 
 # ===== STORAGE: MinIO Object Storage =====
 minio:
