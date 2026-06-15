@@ -849,7 +849,7 @@ hapihubMigrator:
 
   image:
     repository: ghcr.io/mycurelabs/hapihub-migrator
-    tag: "3.8.0"
+    tag: "3.8.1"
     pullPolicy: IfNotPresent
 
   # No CDC in preprod — only the CronJob is exercised here.
