@@ -22,11 +22,13 @@ What is captured per repo (incrementally, via `github-backup --all --private --a
 | Wiki (if any) | bare git repo at `repositories/<name>/wiki/` |
 | Issues + comments | JSON under `repositories/<name>/issues/` |
 | Pull requests + comments + reviews + commits | JSON under `repositories/<name>/pulls/` |
-| Releases + release assets (binaries) | under `repositories/<name>/releases/` |
-| Labels, milestones, hooks | JSON under `repositories/<name>/` |
+| Release **metadata** (tags, notes) | under `repositories/<name>/releases/` |
+| Labels, milestones, hooks, discussions | JSON under `repositories/<name>/` |
 | Issue/PR comment attachments | under `.../attachments/` |
 
-> **Why `--private` is mandatory:** `github-backup --all` is comprehensive but **explicitly excludes private repos, forks, LFS, and attachments**. Most `mycurelabs` repos are private, so the runner always passes `--private --attachments`. Without `--private` the backup would silently capture almost nothing. LFS objects and forks are opt-in (`--include-lfs`, `--include-forks`).
+> **Why `--private` is mandatory:** github-backup's resource flags (and `--all`) **exclude private repos, forks, LFS, and attachments** by default. Most `mycurelabs` repos are private, so the runner always passes `--private --attachments`. Without `--private` the backup would silently capture almost nothing.
+
+> **Release binary assets are excluded by default.** The runner enumerates resources explicitly and includes `--releases` (metadata) but **not** `--assets` (the uploaded binaries/build artifacts). Those can be many GB for a single repo — enough to blow past the run timeout and balloon disk use — and aren't source. Pass `--include-assets` to include them (and raise `--run-timeout` accordingly). LFS objects and forks are likewise opt-in (`--include-lfs`, `--include-forks`).
 
 ---
 
@@ -94,6 +96,8 @@ sudo GITHUB_TOKEN=… scripts/github-backup-setup.sh \
 | `--include-forks` | off | Also back up forked repos. |
 | `--throttle-limit=N` / `--throttle-pause=SEC` | `5000` / `0.72` | github-backup API rate-limit controls. |
 | `--notify-on=MODE` | `both` | `both` / `failure-only` / `success-only` / `off`. |
+| `--include-assets` | off | Also download release **binary** assets (can be many GB; metadata kept regardless). |
+| `--run-timeout=DUR` | `12h` | systemd `TimeoutStartSec` for a backup run; a wedged run is killed after this. |
 | `--progress-interval=DUR` | `30min` | Heartbeat cadence while a backup runs (e.g. `30min`, `1h`); `0`/`off` disables progress pings. |
 | `--discord-webhook-url=URL` | (env var) | Same as `DISCORD_WEBHOOK_URL`; stored at `/etc/mycure-github-backup/discord-webhook.url`. |
 
@@ -103,7 +107,7 @@ Before enabling the timers, the script does a credential dry-run against `https:
 
 Identical model to the data mirror. If `DISCORD_WEBHOOK_URL` is set (or `--discord-webhook-url`), the script installs `/usr/local/sbin/mycure-github-backup-notify` and wires `start`/`success`/`failure` (and `verify-*`) into the units, plus a one-shot `test` ping at the end of setup. Each embed includes host FQDN, run duration, **repo count**, and total backup size. Disable without removing the URL via `--notify-on=off`.
 
-**Progress heartbeats.** The initial full backup is long-running (hours). To avoid a multi-hour silence between `start` and `success`/`failure`, the script also installs `mycure-github-backup-progress.service` + `.timer`, which post a recurring blue "in progress" embed (elapsed, repos so far, size, current repo) every `--progress-interval` (default **30 min**). The timer is **started by the backup service and stopped when it ends**, so pings fire only for the duration of a run, never while idle. The verify pass is short and gets no heartbeat. Disable with `--progress-interval=0` (start/success/failure pings are unaffected).
+**Progress heartbeats.** The initial full backup is long-running (hours). To avoid a multi-hour silence between `start` and `success`/`failure`, the script also installs `mycure-github-backup-progress.service` + `.timer`, which post a recurring blue "in progress" embed (elapsed, repos so far, size, current repo) every `--progress-interval` (default **30 min**). The timer is permanently enabled and ticks on a fixed cadence, but the service **guards on the backup unit's state** and sends a webhook only while a backup is actually `active`/`activating` — so no pings while idle. (It is intentionally *not* started/stopped by the backup unit, which runs as the unprivileged `mycure-ghbackup` user and can't control systemd timers.) The verify pass is short and gets no heartbeat. Disable with `--progress-interval=0` (start/success/failure pings are unaffected).
 
 ---
 
@@ -241,6 +245,8 @@ Bulk-restore by looping over `repositories/*/repository`. Wikis restore the same
 | Setup fails "GitHub returned 404 for org" | Wrong `--org`, or token can't see it | Check the org name; confirm `read:org`. |
 | Backup runs but repo count is ~0 | `--private` not applied (old/edited runner) | Re-run the setup script; the runner always passes `--private`. |
 | `github-backup: command not found` style errors | venv didn't build (Python < 3.10) | Confirm `python3 --version` ≥ 3.10. |
+| Backup result `timeout`; never completes; size balloons | A repo with huge release **binary assets** (or LFS) is eating the run | Assets are excluded by default — re-run setup so the runner drops `--assets`; reclaim space with `find <backup-dir>/repositories -mindepth 2 -maxdepth 2 -type d -name releases -exec rm -rf {} +` (metadata re-fetches). Raise `--run-timeout` only if you genuinely need `--include-assets`. |
+| `repo-count.baseline` empty | No backup has completed end-to-end yet | The baseline is written only at the end of a successful run; fix whatever aborts the run (often the timeout/assets row above). |
 | Verify fails with `CORRUPT:` lines | On-disk git corruption / bit-rot | Re-run the backup service to re-fetch; if persistent, investigate disk health. |
 | Verify fails with "repo count dropped" | Repos removed/renamed upstream, or a partial run | Confirm intentional; otherwise check the last backup's logs. |
 

@@ -33,6 +33,8 @@ VERIFY_TIMER_ON_CALENDAR="Sun *-*-* 04:00:00 UTC"
 GITHUB_BACKUP_VERSION=0.62.1
 INCLUDE_LFS=0
 INCLUDE_FORKS=0
+INCLUDE_ASSETS=0                                # release *binary* assets (can be huge); metadata always kept
+RUN_TIMEOUT=12h                                 # systemd TimeoutStartSec for a backup run
 THROTTLE_LIMIT=5000
 THROTTLE_PAUSE=0.72
 NOTIFY_ON=both                                  # both | failure-only | success-only | off
@@ -75,6 +77,9 @@ Flags:
   --github-backup-version=VER github-backup PyPI version        (default: $GITHUB_BACKUP_VERSION)
   --include-lfs               also pull Git LFS objects (slower)
   --include-forks             also back up forked repos
+  --include-assets            also download release *binary* assets (can be GBs;
+                              release metadata is always kept regardless)
+  --run-timeout=DUR           systemd TimeoutStartSec for a backup run (default: $RUN_TIMEOUT)
   --throttle-limit=N          github-backup --throttle-limit    (default: $THROTTLE_LIMIT)
   --throttle-pause=SEC        github-backup --throttle-pause    (default: $THROTTLE_PAUSE)
   --notify-on=MODE            both | failure-only | success-only | off  (default: $NOTIFY_ON)
@@ -107,6 +112,8 @@ while [[ $# -gt 0 ]]; do
     --github-backup-version=*)    GITHUB_BACKUP_VERSION="${1#*=}";     shift;;
     --include-lfs)                INCLUDE_LFS=1;                       shift;;
     --include-forks)              INCLUDE_FORKS=1;                     shift;;
+    --include-assets)             INCLUDE_ASSETS=1;                    shift;;
+    --run-timeout=*)              RUN_TIMEOUT="${1#*=}";               shift;;
     --throttle-limit=*)           THROTTLE_LIMIT="${1#*=}";            shift;;
     --throttle-pause=*)           THROTTLE_PAUSE="${1#*=}";            shift;;
     --notify-on=*)                NOTIFY_ON="${1#*=}";                 shift;;
@@ -339,15 +346,19 @@ curl -sS -m 15 -X POST -H 'Content-Type: application/json' -d "\$payload" "\$url
 NOTIFY
 
 # ---------- backup runner script ----------
-# github-backup's --all is comprehensive but EXCLUDES private repos, forks,
-# LFS, and attachments. Most org repos are private, so --private is mandatory;
-# --attachments captures issue/PR comment uploads.
+# Resources are enumerated explicitly rather than via --all, so we can include
+# release *metadata* (--releases) while excluding release *binary assets*
+# (--assets) — the latter can be many GB per repo (build artifacts) and is the
+# usual cause of runaway size / timeouts. --private is mandatory (most org repos
+# are private; --all/enumeration excludes private clones otherwise).
 log "installing backup runner at $RUN_BIN"
 install -m 0755 /dev/stdin "$RUN_BIN" <<RUN
 #!/usr/bin/env bash
 # Pull the entire $ORG GitHub organization to $BACKUP_DIR using github-backup.
-# Captures: code (bare/mirror), wikis, issues, PRs + comments/reviews,
-# releases + assets, labels, milestones, hooks, attachments. Incremental.
+# Captures: code (bare/mirror), wikis, issues, PRs + comments/commits,
+# releases (metadata), labels, milestones, hooks, discussions, attachments.
+# Release binary assets are excluded unless --include-assets was set at setup.
+# Incremental.
 set -euo pipefail
 
 TOKEN_FILE=$TOKEN_FILE
@@ -356,14 +367,24 @@ REPO_COUNT_FILE=$REPO_COUNT_FILE
 
 [[ -r "\$TOKEN_FILE" ]] || { echo "missing/unreadable \$TOKEN_FILE" >&2; exit 1; }
 
-# Build the argument list. --all is comprehensive but excludes private repos,
-# attachments, LFS, and forks — add the ones we want explicitly.
+# Enumerated resource set == everything \`--all\` covers, minus \`--assets\`.
 args=(
   "$ORG"
   --organization
   --token "\$(cat "\$TOKEN_FILE")"
   --output-directory "\$BACKUP_DIR"
-  --all
+  --repositories
+  --wikis
+  --issues
+  --issue-comments
+  --pulls
+  --pull-comments
+  --pull-commits
+  --labels
+  --milestones
+  --hooks
+  --discussions
+  --releases
   --private
   --attachments
   --incremental
@@ -372,8 +393,9 @@ args=(
   --throttle-pause $THROTTLE_PAUSE
   --log-level info
 )
-[[ $INCLUDE_LFS   -eq 1 ]] && args+=(--lfs)
-[[ $INCLUDE_FORKS -eq 1 ]] && args+=(--fork)
+[[ $INCLUDE_ASSETS -eq 1 ]] && args+=(--assets)
+[[ $INCLUDE_LFS    -eq 1 ]] && args+=(--lfs)
+[[ $INCLUDE_FORKS  -eq 1 ]] && args+=(--fork)
 
 "$VENV_DIR/bin/github-backup" "\${args[@]}"
 
@@ -456,17 +478,6 @@ case "$NOTIFY_ON" in
   off)           notify_start="";                                 notify_success="";                                  failure_onfailure="" ;;
 esac
 
-# Progress heartbeat: start a timer when the backup starts and stop it when the
-# backup ends (success or failure), so periodic "in progress" pings fire for the
-# duration of a run and never while idle. ExecStopPost runs on both exit paths.
-if [[ "$PROGRESS_ENABLED" -eq 1 ]]; then
-  progress_start="ExecStartPre=-/usr/bin/systemctl --no-block start ${PROGRESS_SERVICE_NAME}.timer"
-  progress_stop="ExecStopPost=-/usr/bin/systemctl --no-block stop ${PROGRESS_SERVICE_NAME}.timer"
-else
-  progress_start=""
-  progress_stop=""
-fi
-
 cat > "$SYSTEMD_DIR/$SERVICE_NAME.service" <<UNIT
 [Unit]
 Description=Back up the $ORG GitHub organization to $BACKUP_DIR
@@ -481,13 +492,12 @@ Group=$SERVICE_USER
 LogNamespace=$LOG_NAMESPACE
 SyslogIdentifier=$SERVICE_NAME
 $notify_start
-$progress_start
 ExecStart=$RUN_BIN
 $notify_success
-$progress_stop
 
-# Hard cap so a runaway backup doesn't burn an entire day.
-TimeoutStartSec=4h
+# Hard cap so a wedged backup doesn't run forever. Sized for the throttled
+# (~5000 req/hr) full sweep; a healthy run finishes well inside this.
+TimeoutStartSec=$RUN_TIMEOUT
 Nice=10
 IOSchedulingClass=best-effort
 IOSchedulingPriority=7
@@ -523,11 +533,14 @@ WantedBy=timers.target
 UNIT
 
 # ---------- systemd progress heartbeat service + timer ----------
-# Fires a Discord "in progress" ping every $PROGRESS_INTERVAL while a backup
-# runs. The service guards on the backup being live (a Type=oneshot unit is in
-# the 'activating' state while ExecStart runs, so we accept active OR
-# activating). The timer carries no [Install] — it is started/stopped by the
-# backup service's ExecStartPre/ExecStopPost, so it only ticks during a run.
+# Fires a Discord "in progress" ping every $PROGRESS_INTERVAL, but ONLY while a
+# backup is actually running: the service guards on the backup unit's state and
+# no-ops (no webhook) otherwise. The timer is permanently enabled and ticks on a
+# fixed cadence — we deliberately do NOT start/stop it from the backup service,
+# because that service runs as the unprivileged $SERVICE_USER and cannot control
+# systemd units (it would fail with "Interactive authentication required").
+# A Type=oneshot backup unit sits in 'activating' for its whole run, so the
+# guard accepts both 'active' and 'activating'.
 if [[ "$PROGRESS_ENABLED" -eq 1 ]]; then
   log "writing systemd unit $PROGRESS_SERVICE_NAME.service (heartbeat every $PROGRESS_INTERVAL)"
   cat > "$SYSTEMD_DIR/$PROGRESS_SERVICE_NAME.service" <<UNIT
@@ -547,13 +560,17 @@ UNIT
 Description=Heartbeat timer for a running $ORG GitHub backup
 
 [Timer]
-OnActiveSec=$PROGRESS_INTERVAL
+OnBootSec=$PROGRESS_INTERVAL
 OnUnitActiveSec=$PROGRESS_INTERVAL
 Unit=$PROGRESS_SERVICE_NAME.service
+
+[Install]
+WantedBy=timers.target
 UNIT
 else
-  # Progress disabled — remove any units left from a previous install so a
+  # Progress disabled — stop/remove any units left from a previous install so a
   # re-run with --progress-interval=0 (or --notify-on=off) reconciles cleanly.
+  systemctl disable --now "$PROGRESS_SERVICE_NAME.timer" >/dev/null 2>&1 || true
   rm -f "$SYSTEMD_DIR/$PROGRESS_SERVICE_NAME.service" "$SYSTEMD_DIR/$PROGRESS_SERVICE_NAME.timer"
 fi
 
@@ -635,6 +652,10 @@ systemctl enable --now "$SERVICE_NAME.timer" >/dev/null
 log "$SERVICE_NAME.timer enabled"
 systemctl enable --now "$VERIFY_SERVICE_NAME.timer" >/dev/null
 log "$VERIFY_SERVICE_NAME.timer enabled"
+if [[ "$PROGRESS_ENABLED" -eq 1 ]]; then
+  systemctl enable --now "$PROGRESS_SERVICE_NAME.timer" >/dev/null
+  log "$PROGRESS_SERVICE_NAME.timer enabled (pings every $PROGRESS_INTERVAL while a backup runs)"
+fi
 
 # ---------- summary ----------
 echo
@@ -643,7 +664,9 @@ echo "  organization  : $ORG"
 echo "  backup dir    : $BACKUP_DIR"
 echo "  tool          : github-backup==$GITHUB_BACKUP_VERSION ($VENV_DIR)"
 echo "  service user  : $SERVICE_USER"
-echo "  captures      : code (bare) + wikis + issues + PRs + releases + assets + metadata$( [[ $INCLUDE_LFS -eq 1 ]] && printf ' + LFS' )$( [[ $INCLUDE_FORKS -eq 1 ]] && printf ' + forks' )"
+echo "  captures      : code (bare) + wikis + issues + PRs + releases(meta) + labels + milestones + hooks + discussions + attachments$( [[ $INCLUDE_ASSETS -eq 1 ]] && printf ' + release-assets' )$( [[ $INCLUDE_LFS -eq 1 ]] && printf ' + LFS' )$( [[ $INCLUDE_FORKS -eq 1 ]] && printf ' + forks' )"
+[[ $INCLUDE_ASSETS -eq 0 ]] && echo "  (release binary assets excluded — pass --include-assets to include them)"
+echo "  run timeout   : $RUN_TIMEOUT"
 echo "  backup timer  : $TIMER_ON_CALENDAR"
 backup_next=$(systemctl list-timers --no-legend --no-pager "$SERVICE_NAME.timer" 2>/dev/null | awk '{print $1, $2, $3}' | head -1)
 echo "  next backup   : ${backup_next:-see: systemctl list-timers}"
