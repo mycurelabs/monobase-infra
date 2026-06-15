@@ -1130,6 +1130,16 @@ hapihubMigrator:
   # bulk (Phase 3) → cdc (Phase 4) → reverse-cdc (Phase 6, post-cutover)
   mode: cdc
 
+  # ===== Reverse PG→Mongo (Phase B) — staged gated rollout (infra#11) =====
+  # Stage 2: CAPTURE-ONLY. Installs the _pg_changelog capture triggers; the
+  # reverse replayer does NOT run (apply:false) so there are NO Mongo writes.
+  # The forward worker (3.8.1, above) sets the suppress_capture GUC, so forward
+  # CDC writes are NOT captured (no echo). Keep this stage brief — capture-only
+  # does not drain _pg_changelog — then flip apply:true (Stage 3, scoped).
+  reverseCdc:
+    enabled: true
+    apply: false
+
   resources:
     requests:
       cpu: 50m
