@@ -27,7 +27,7 @@ What is captured per repo (incrementally, via `github-backup --all --private --a
 | Issue/PR comment attachments | under `.../attachments/` |
 
 > **Why `--private` is mandatory:** github-backup's resource flags (and `--all`) **exclude private repos, forks, LFS, and attachments** by default. Most `mycurelabs` repos are private, so the runner always passes `--private --attachments`. Without `--private` the backup would silently capture almost nothing.
-
+>
 > **Release binary assets are excluded by default.** The runner enumerates resources explicitly and includes `--releases` (metadata) but **not** `--assets` (the uploaded binaries/build artifacts). Those can be many GB for a single repo — enough to blow past the run timeout and balloon disk use — and aren't source. Pass `--include-assets` to include them (and raise `--run-timeout` accordingly). LFS objects and forks are likewise opt-in (`--include-lfs`, `--include-forks`).
 
 ---
