@@ -868,6 +868,27 @@ hapihubMigrator:
     apply: true
     tables: "clocks,counters,services,medicines,organizations"
 
+  # Reverse safety-net sweep (MODE=reverse-bulk, PG → MongoDB). Scoped to a
+  # small NON-encrypted set to keep the recurring cost low (the real-time
+  # reverseCdc canary above already covers the wider set) and to stay clear
+  # of encrypted collections preprod can't key. windowHours is deliberately
+  # wide here because preprod has no live write traffic — a 26h trailing
+  # window (the prod default) would sweep nothing; 90d lets the safety-net
+  # actually re-check the near-static dataset. Latest-wins makes re-runs
+  # no-ops. Offset 30m from the forward nightly (0 */6).
+  reverseNightlyJob:
+    enabled: true
+    schedule: "30 */6 * * *"
+    windowHours: 2160
+    tables: "counters,organizations"
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: "1"
+        memory: 1Gi
+
   # Run every 6h in preprod for faster feedback than nightly.
   nightlyJob:
     enabled: true
