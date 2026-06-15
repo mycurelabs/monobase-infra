@@ -856,12 +856,17 @@ hapihubMigrator:
   deployment:
     enabled: false
 
-  # Reverse-sync canary (PG → MongoDB): apply scoped to two low-risk tables
-  # while the write path bakes. Widen `tables`, then drop it, as stages pass.
+  # Reverse-sync canary (PG → MongoDB): apply scope widened past the initial
+  # clocks,counters pair after an end-to-end round-trip proved apply works
+  # (PG update → _pg_changelog → Mongo upsert, errors=0). Added tables are all
+  # NON-encrypted — preprod has no ENC_* keys (externalSecrets disabled), so
+  # encrypted collections (personal_details, billing_invoices/items/payments,
+  # medical_records) stay out of scope here. Widen further / drop `tables`
+  # as later stages pass.
   reverseCdc:
     enabled: true
     apply: true
-    tables: "clocks,counters"
+    tables: "clocks,counters,services,medicines,organizations"
 
   # Run every 6h in preprod for faster feedback than nightly.
   nightlyJob:
