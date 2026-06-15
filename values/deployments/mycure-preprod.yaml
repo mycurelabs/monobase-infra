@@ -801,7 +801,7 @@ cadence:
 
   image:
     repository: ghcr.io/mycurelabs/cadence
-    tag: "0.5.18"
+    tag: "0.5.19"
     pullPolicy: Always
 
   replicaCount: 1
