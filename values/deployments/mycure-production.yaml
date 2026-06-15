@@ -965,7 +965,14 @@ valkey:
     persistence:
       enabled: true
       storageClass: ""
-      size: 4Gi
+      # 2026-06-15: bumped 4Gi → 32Gi after the 4Gi PVC filled (cadence
+      # change-log growth), out-of-space write corrupted AOF seqs 13/15/16,
+      # valkey crashlooped 213× over 22h → fleet-wide sync outage. PVC
+      # patched live, AOF repaired via valkey-check-aof --fix, this value
+      # bumped to reconcile the STS template. The underlying root cause
+      # (unbounded change-log growth) is unchanged — 32Gi just moves the
+      # deadline. See: cadence change-log TTL/trim follow-up issue.
+      size: 32Gi
     # Resource sizing history: 512Mi -> 277 restarts in 27h (staging,
     # 2026-04-06); 1Gi still OOMs during AOF replay; 2Gi OOM-crashlooped
     # 2026-06-11 with a 1.6G AOF (cadence change-log growth). 4Gi unblocks,
