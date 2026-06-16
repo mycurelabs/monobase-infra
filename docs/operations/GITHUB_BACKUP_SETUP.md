@@ -94,10 +94,10 @@ sudo GITHUB_TOKEN=… scripts/github-backup-setup.sh \
 | `--github-backup-version=VER` | pinned in script | `github-backup` PyPI version (installed into a dedicated venv). |
 | `--include-lfs` | off | Also pull Git LFS objects (installs `git-lfs`; slower). |
 | `--include-forks` | off | Also back up forked repos. |
-| `--throttle-limit=N` / `--throttle-pause=SEC` | `5000` / `0.72` | github-backup API rate-limit controls. |
+| `--throttle-limit=N` / `--throttle-pause=SEC` | `5000` / `0.3` | github-backup API rate-limit controls. The pause applies to every request *and* attachment download; `0.3` keeps well under GitHub limits while not throttling the attachment-download phase (which dominates wall-clock on attachment-heavy repos). |
 | `--notify-on=MODE` | `both` | `both` / `failure-only` / `success-only` / `off`. |
 | `--include-assets` | off | Also download release **binary** assets (can be many GB; metadata kept regardless). |
-| `--run-timeout=DUR` | `12h` | systemd `TimeoutStartSec` for a backup run; a wedged run is killed after this. |
+| `--run-timeout=DUR` | `24h` | systemd `TimeoutStartSec` for a backup run; a wedged run is killed after this. The first full pass over an attachment-heavy org can take many hours; later incremental runs are fast. |
 | `--progress-interval=DUR` | `30min` | Heartbeat cadence while a backup runs (e.g. `30min`, `1h`); `0`/`off` disables progress pings. |
 | `--discord-webhook-url=URL` | (env var) | Same as `DISCORD_WEBHOOK_URL`; stored at `/etc/mycure-github-backup/discord-webhook.url`. |
 

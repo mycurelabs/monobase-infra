@@ -34,9 +34,14 @@ GITHUB_BACKUP_VERSION=0.62.1
 INCLUDE_LFS=0
 INCLUDE_FORKS=0
 INCLUDE_ASSETS=0                                # release *binary* assets (can be huge); metadata always kept
-RUN_TIMEOUT=12h                                 # systemd TimeoutStartSec for a backup run
+RUN_TIMEOUT=24h                                 # systemd TimeoutStartSec; first full pass over an attachment-heavy org exceeds 12h
 THROTTLE_LIMIT=5000
-THROTTLE_PAUSE=0.72
+# 0.72s/req (3600/5000) evenly spreads the API budget, but measurement showed
+# the run uses only ~750 req/hr (85% of the 5000/hr budget idle) — the real
+# wall-clock cost is downloading issue/PR attachments, to which this pause also
+# applies. 0.3s keeps us far under any GitHub abuse threshold while ~halving the
+# attachment-phase time. --throttle-limit still auto-waits if we near the limit.
+THROTTLE_PAUSE=0.3
 NOTIFY_ON=both                                  # both | failure-only | success-only | off
 PROGRESS_INTERVAL=30min                         # heartbeat cadence while a backup runs; 0/off disables
 
