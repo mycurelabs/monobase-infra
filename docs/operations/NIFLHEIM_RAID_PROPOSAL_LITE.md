@@ -10,13 +10,23 @@
 
 ## TL;DR
 
-The full RAID proposal is the right long-term answer. This document presents a **budget alternative** at roughly **30%** of that cost, for the case where management wants to extend the life of the existing hardware with a single targeted purchase instead of a 4-drive rebuild.
+The full RAID proposal is the right long-term answer. This document presents **budget alternatives**, for the case where management wants to extend the life of the existing hardware with a single targeted purchase instead of a 4-drive rebuild.
 
-We recommend **Lite-2 below: keep the existing drive, add one NAS-grade HDD, and run a nightly cron-rsync mirror between them**. This delivers the two most important practical wins of the full proposal — replacing the SMR primary and surviving a single drive failure — at **~₱10,000 all-in**.
+Three tiers are presented, in increasing order of cost and risk reduction:
+
+| Tier | What it is | Cost | Survives 1 drive failure? | Reusable on RAID upgrade? |
+|---|---|---:|:---:|:---:|
+| ⚠️ Lite-0 | Bigger consumer SMR drive (same class as today) | **₱5,000 – 9,500** | No | **No (throwaway)** |
+| Lite-1 | Single NAS-grade CMR drive | **₱9,700 – 10,500** | No | Yes |
+| ⭐ **Lite-2 (recommended)** | NAS-grade CMR + nightly soft mirror | **₱10,000 – 11,000** | **Yes** (≤24 h RPO) | Yes |
+
+The recommendation is **Lite-2** — for an extra ₱500–1,000 over Lite-1 you get real protection against the most likely real-world failure (one drive dying), and an extra ~₱1,000–5,000 over Lite-0 you stop spending money you will have to spend again when we eventually upgrade to RAID.
+
+### Lite-2 (recommended budget option) at a glance
 
 | Item | Number |
 |---|---:|
-| **Recommended one-time cost (all-in)** | **₱9,700 – ₱11,000** |
+| **One-time cost (all-in)** | **₱9,700 – ₱11,000** |
 | Failure tolerance after change | 1 drive failure, with up to **24 h of data lag** on the surviving copy |
 | Silent data corruption (bit-rot) detection | **No** (gap remains — same as today) |
 | Usable capacity | 4 TB primary, 2 TB mirror (vs ~300 GB used today → multi-year runway) |
@@ -40,9 +50,26 @@ If budget allows the full proposal, **the full proposal is still the recommendat
 
 ---
 
-## The two budget options
+## The three budget options
 
-### Lite-1 — Single-drive replacement (cheapest)
+### ⚠️ Lite-0 — Rock-bottom: same drive class, larger capacity (NOT recommended, presented for completeness)
+
+Buy the **same consumer SMR-class drive as today**, just bigger. Replace the existing 2 TB Seagate Barracuda with a 4 TB Seagate Barracuda (ST4000DM004) or equivalent consumer HDD. No UPS, no NAS-grade drive, no mirror.
+
+| Item | Detail |
+|---|---|
+| What changes | Existing 2 TB consumer SMR replaced by a 4 TB consumer SMR (same drive family) |
+| Failure model after change | **Same as today** — SPOF on a consumer SMR drive |
+| What improves | Capacity only — 2 TB → 4 TB |
+| Capacity after change | 4 TB |
+| Cost all-in | **₱5,000 – ₱9,500** (drive only; street price varies wildly Shopee → Lazada) |
+| Reusable in future RAID upgrade? | **No** — SMR drives are explicitly disqualified from any RAID array we would build. **This spend is throwaway** the moment we go to Lite-2 or the full proposal. |
+
+**Why this is included:** if budget is rock-bottom and the only goal is "more storage now, defer everything else", this is the floor. We do not endorse it — the existing drive being SMR is one of the two structural problems the full proposal aims to fix, and Lite-0 keeps that problem in place. But it is the cheapest possible action that touches the host at all.
+
+**When this would be considered:** absolutely cannot spend more than ~₱5–10k right now, AND the team accepts that we will pay this again later when we upgrade to a proper solution.
+
+### Lite-1 — Single-drive replacement (CMR upgrade, no mirror)
 
 Swap the existing SMR drive for one NAS-grade CMR drive. Keep the same single-disk architecture as today.
 
@@ -74,12 +101,13 @@ The ₱500–₱1,000 delta over Lite-1 buys real protection against a single-dr
 
 ## Decision matrix (lite variants vs. full proposal)
 
-| Option | Layout | Drives | Usable | Failures tolerated | Bit-rot detection | Data lag on surviving copy | All-in cost |
-|---|---|---|---:|:---:|:---:|:---:|---:|
-| Lite-1 | Single drive replace | 1 × WD Red Plus 4 TB | 4 TB | 0 | No | n/a (no mirror) | **₱9,700 – 10,500** |
-| ⭐ **Lite-2** | **Single + nightly rsync mirror** | **1 × WD Red Plus 4 TB + existing 2 TB** | **4 TB** | **1** | **No** | **up to 24 h** | **₱10,000 – 11,000** |
-| Full **A** | RAID 1 mirror | 2 × WD Red Plus 4 TB | 4 TB | 1 | Yes (ZFS) | 0 (synchronous) | ₱19,000 – 22,000 |
-| Full **C** (recommended in [full proposal](NIFLHEIM_RAID_PROPOSAL.md)) | ZFS RAIDZ2 | 4 × WD Red Plus 4 TB | 8 TB | **2** | **Yes** | 0 (synchronous) | ₱33,000 – 36,500 |
+| Option | Layout | Drives | Usable | Failures tolerated | Bit-rot detection | Data lag on surviving copy | Reusable on RAID upgrade? | All-in cost |
+|---|---|---|---:|:---:|:---:|:---:|:---:|---:|
+| ⚠️ Lite-0 | Single consumer SMR replace | 1 × Seagate Barracuda 4 TB (SMR) | 4 TB | 0 | No | n/a (no mirror) | **No (throwaway)** | **₱5,000 – 9,500** |
+| Lite-1 | Single CMR replace | 1 × WD Red Plus 4 TB | 4 TB | 0 | No | n/a (no mirror) | Yes (becomes a RAID drive) | **₱9,700 – 10,500** |
+| ⭐ **Lite-2** | **Single + nightly rsync mirror** | **1 × WD Red Plus 4 TB + existing 2 TB** | **4 TB** | **1** | **No** | **up to 24 h** | **Yes (CMR drive becomes a RAID drive)** | **₱10,000 – 11,000** |
+| Full **A** | RAID 1 mirror | 2 × WD Red Plus 4 TB | 4 TB | 1 | Yes (ZFS) | 0 (synchronous) | n/a (already RAID) | ₱19,000 – 22,000 |
+| Full **C** (recommended in [full proposal](NIFLHEIM_RAID_PROPOSAL.md)) | ZFS RAIDZ2 | 4 × WD Red Plus 4 TB | 8 TB | **2** | **Yes** | 0 (synchronous) | n/a (already RAID) | ₱33,000 – 36,500 |
 
 ### How to read the "data lag" column
 
@@ -114,7 +142,7 @@ If management chooses Lite-2 today and the full proposal later, **the new 4 TB W
 
 | Item | Qty | PHP unit | Subtotal | Source |
 |---|---:|---:|---:|---|
-| WD Red Plus 4 TB NAS HDD (WD40EFPX) | 1 | ₱6,900 | ₱6,900 | [benson.ph](https://benson.ph/products/western-digital-wd-red-plus-nas-hard-drive-3-5-internal-drives), [pcworx.ph](https://pcworx.ph/products/western-digital-wd40efpx-68c4tn0-3-5-2tb-sata-hdd-red-plus), [dynaquestpc.com](https://dynaquestpc.com/products/western-digital-wd-red-plus-4tb-256mb-5400rpm-wd40efpx-hard-drive-for-nas) |
+| WD Red Plus 4 TB NAS HDD (WD40EFPX) | 1 | ₱6,900 | ₱6,900 | [benson.ph](https://benson.ph/products/western-digital-wd-red-plus-nas-hard-drive-3-5-internal-drives), [pcworx.ph](https://pcworx.ph/products/western-digital-wd40efpx-68c6cn0-4tb-red-plus-3-5-sata-hdd), [dynaquestpc.com](https://dynaquestpc.com/products/western-digital-wd-red-plus-4tb-256mb-5400rpm-wd40efpx-hard-drive-for-nas) |
 | APC Back-UPS BX650LI-MS 650VA AVR | 1 | ₱2,799 | ₱2,799 | [asianic.com.ph](https://asianic.com.ph/product/apc-backups-650va-bx650lims-230v-avr) |
 | SATA III data cable, 0.5 m (with latch) | 1 | ~₱150 | ~₱150 | Shopee/Lazada |
 | 3.5" mounting bracket | 1 | ~₱200 | ~₱200 | Shopee/Lazada |
@@ -126,6 +154,14 @@ The UPS is included because power-loss during a write is the most common real-wo
 ### If choosing Lite-1 instead
 
 Drop the existing drive entirely from the BOM and use only the new 4 TB drive. Cost: same minus ~₱200 in mounting hardware ≈ **₱9,700 – ₱10,500**.
+
+### If choosing ⚠️ Lite-0 (rock-bottom) instead
+
+| Item | Qty | PHP | Source |
+|---|---:|---:|---|
+| Seagate Barracuda 4 TB (ST4000DM004) — consumer SMR | 1 | ₱5,000 – 9,500 | [Shopee (search)](https://shopee.ph/list/seagate%20barracuda%204tb) · [Lazada (search)](https://www.lazada.com.ph/catalog/?q=seagate+barracuda+4tb) |
+
+That is the entire BOM. No UPS, no mirror, no NAS-grade drive. Street price on Shopee resellers is typically ₱5,000–6,500; Lazada authorized retailers run ₱8,000–9,500. **This drive must be retired at the next RAID build** — it is not eligible for inclusion in either ZFS or mdadm arrays.
 
 ---
 

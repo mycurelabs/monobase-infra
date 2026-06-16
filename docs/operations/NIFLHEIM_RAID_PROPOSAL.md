@@ -98,7 +98,7 @@ Option C delivers the same ₱/TB as the bare-minimum mirror **while also giving
 
 | Item | Qty | PHP unit | Subtotal | Source |
 |---|---:|---:|---:|---|
-| WD Red Plus 4 TB NAS HDD (WD40EFPX) | 4 | ₱6,900 | **₱27,600** | [benson.ph](https://benson.ph/products/western-digital-wd-red-plus-nas-hard-drive-3-5-internal-drives) (alternates: [pcworx.ph](https://pcworx.ph/products/western-digital-wd40efpx-68c4tn0-3-5-2tb-sata-hdd-red-plus), [dynaquestpc.com](https://dynaquestpc.com/products/western-digital-wd-red-plus-4tb-256mb-5400rpm-wd40efpx-hard-drive-for-nas)) |
+| WD Red Plus 4 TB NAS HDD (WD40EFPX) | 4 | ₱6,900 | **₱27,600** | [benson.ph](https://benson.ph/products/western-digital-wd-red-plus-nas-hard-drive-3-5-internal-drives) (alternates: [pcworx.ph](https://pcworx.ph/products/western-digital-wd40efpx-68c6cn0-4tb-red-plus-3-5-sata-hdd), [dynaquestpc.com](https://dynaquestpc.com/products/western-digital-wd-red-plus-4tb-256mb-5400rpm-wd40efpx-hard-drive-for-nas)) |
 
 **Purchasing note**: buy from **two different sellers and request different production batches** (ship dates / serial-number ranges) to reduce the risk of correlated failure. Drives from the same batch sometimes fail close in time. Mixing in 1–2 Seagate IronWolf 4 TB drives (₱8,700 each) instead of all WD is acceptable and arguably safer.
 
@@ -213,9 +213,8 @@ For the engineer executing the change:
 |---|---|---|
 | Benson.ph | <https://benson.ph/products/western-digital-wd-red-plus-nas-hard-drive-3-5-internal-drives> | Lowest WD Red Plus prices observed across capacities |
 | PCWorx | <https://pcworx.ph/products/seagate-st2000vn003-2tb-ironwolf-hard-disk-drive> | Stock in Muntinlupa + Pampanga |
-| Thinking Tools | <https://shop.tti.com.ph/hdd-sea-sata-st8000vn004> | Cheapest IronWolf 8 TB (Cebu) |
-| DynaQuest PC | <https://dynaquestpc.com/products/western-digital-wd-red-plus-2tb-wd20efpx-nas-hard-drive-3-5> | Carries WD20EFPX / WD40EFPX (status varies) |
-| Netcodex | <https://netcodex.ph/product/western-digital-red-plus-3-5%E2%80%B3-2tb-sata-hdd-for-nas-hard-disk-drive/> | Alternate WD Red Plus source; GCash supported |
+| Thinking Tools | <https://shop.tti.com.ph/?s=ironwolf&post_type=product> | IronWolf 8 TB (Cebu) — link is search; specific SKU URLs rotate |
+| DynaQuest PC | <https://dynaquestpc.com/products/western-digital-wd-red-plus-4tb-256mb-5400rpm-wd40efpx-hard-drive-for-nas> | Carries WD40EFPX (status varies) |
 | Asianic Distributors | <https://asianic.com.ph/product/apc-backups-650va-bx650lims-230v-avr> | APC authorized distributor for the recommended UPS |
 | Lazada PH | <https://www.lazada.com.ph/tag/wd-red-plus/> | Spot-buy cables, brackets, RAM, Cat6 cable |
 | Shopee PH | <https://shopee.ph/list/apc%20650va%20ups> | Same as Lazada; verify seller rating |
