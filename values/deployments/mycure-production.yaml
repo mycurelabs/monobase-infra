@@ -1214,6 +1214,24 @@ hapihubMigrator:
     schedule: "0 18 * * *"   # 02:00 Asia/Manila daily, offset from Velero @ 02:00 UTC
     lookbackHours: 48
 
+  # Reverse-bulk nightly safety net (MODE=reverse-bulk, PG → Mongo). The reverse
+  # analog of nightlyJob above: sweeps PG rows updated in the trailing window and
+  # upserts them to Mongo (latest-wins, re-encrypting encrypted collections),
+  # catching anything the realtime reverse replayer missed (worker downtime,
+  # capture gaps). Full scope (no `tables`) to match the realtime reverse-apply.
+  # Offset from the forward nightly (18:00) and Velero (02:00).
+  reverseNightlyJob:
+    enabled: true
+    schedule: "0 20 * * *"   # 20:00 UTC daily
+    windowHours: 26
+    resources:
+      requests:
+        cpu: 200m
+        memory: 512Mi
+      limits:
+        cpu: "2"
+        memory: 4Gi
+
 # ===== BACKUP =====
 backup:
   enabled: false
