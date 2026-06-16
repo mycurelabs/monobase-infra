@@ -1138,17 +1138,17 @@ hapihubMigrator:
   mode: cdc
 
   # ===== Reverse PG→Mongo (Phase B) — staged gated rollout (infra#11) =====
-  # Stage 3b: WIDENED to ALL NON-ENCRYPTED reverse-scoped tables (71). The 5
-  # encrypted collections (personal_details, medical_records, billing_invoices,
-  # billing_items, billing_payments) are deliberately EXCLUDED — encrypted-PII
-  # reverse-apply to prod Mongo is the final gated stage. Forward (3.8.1) sets
-  # suppress_capture so forward writes aren't recaptured (no echo); latest-wins
-  # makes any stray echo a safe skip. Backlog already truncated; replayer keeps
-  # _pg_changelog ~0. To go full, drop `tables` (applies all incl. encrypted).
+  # Stage 4 (FULL): `tables` filter dropped → reverse-apply covers ALL
+  # reverse-scoped collections, INCLUDING the 5 encrypted ones (personal_details,
+  # medical_records, billing_invoices, billing_items, billing_payments). PG
+  # plaintext is re-encrypted with the prod ENC_* keys before writing to Mongo
+  # (AES-CBC, deterministic; keys verified at startup; ciphertext+_eh validated
+  # end-to-end in preprod). Forward (3.8.1) sets suppress_capture (no echo);
+  # latest-wins skips anything Mongo already has. Stages 1→3b preceded this.
   reverseCdc:
     enabled: true
     apply: true
-    tables: "accounts,organizations,organization_members,organization_members_archived,services,services_archived,service_providers,diagnostic_tests,diagnostic_packages,diagnostic_analyzers,diagnostic_measures,medicines,medicine_formulations,medicine_configurations,inventory_products,inventory_variants,inventory_suppliers,inventory_stock_configurations,inventory_configurations,form_templates,insurance_contracts,insurance_coverages,insurance_loas,medical_patients,medical_encounters,services_performeds,inventory_transactions,inventory_stocks,inventory_trackers,activity_logs,billing_customers,account_configurations,account_invitations,billing_expenses,billing_promos,billing_soas,billing_invoice_agts,billing_prices,billing_providers,billing_credit_accounts,billing_credit_transactions,billing_return_transactions,billing_void_transactions,diagnostic_orders,diagnostic_order_tests,diagnostic_order_tests_reports,email_providers,export_requests,notifications,pharmacy_medication_orders,prm_messages,prm_conversations,prm_recipients,prm_templates,prm_providers,queues,queue_items,bookings,booking_events,booking_slots,booking_exceptions,storage_files,storage_links,action_codes,fixtures,subscriptions,subscription_packages,inventory_variant_reports,counters,clocks,public_profiles"
+    # no `tables` → apply ALL reverse-scoped (incl. encrypted) = full reverse sync
 
   resources:
     requests:
