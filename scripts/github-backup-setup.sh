@@ -402,7 +402,28 @@ args=(
 [[ $INCLUDE_LFS    -eq 1 ]] && args+=(--lfs)
 [[ $INCLUDE_FORKS  -eq 1 ]] && args+=(--fork)
 
-"$VENV_DIR/bin/github-backup" "\${args[@]}"
+# Retry loop. A multi-hour run shouldn't die on a transient network blip (e.g.
+# a momentary DNS failure resolving github.com): github-backup has no internal
+# retry and aborts the whole run on the first such error. It is incremental and
+# skip-existing, so re-invoking after a failure resumes cheaply (cached clones
+# and attachments are skipped). Only fail the service if every attempt fails.
+attempts=6
+delay=120
+n=1
+while :; do
+  set +e
+  "$VENV_DIR/bin/github-backup" "\${args[@]}"
+  rc=\$?
+  set -e
+  [[ \$rc -eq 0 ]] && break
+  if [[ \$n -ge \$attempts ]]; then
+    echo "github-backup failed after \$n attempts (last exit=\$rc)" >&2
+    exit "\$rc"
+  fi
+  echo "github-backup attempt \$n exited \$rc — retrying in \${delay}s…" >&2
+  sleep "\$delay"
+  n=\$((n + 1))
+done
 
 # Record how many repos we hold so the verify pass can detect an
 # unexpected drop (deleted/renamed org, token scope loss, partial run).
