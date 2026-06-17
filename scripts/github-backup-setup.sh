@@ -56,7 +56,10 @@ VERIFY_BIN=/usr/local/sbin/mycure-github-backup-verify
 NOTIFY_BIN=/usr/local/sbin/mycure-github-backup-notify
 SYSTEMD_DIR=/etc/systemd/system
 WEBHOOK_FILE=$CONFIG_DIR/discord-webhook.url
-REPO_COUNT_FILE=$CONFIG_DIR/repo-count.baseline
+# Run-state written by the (unprivileged) runner at the end of each backup, so
+# it must live where the service user can write — the backup dir, not root-owned
+# /etc. Re-derived after arg parsing so --backup-dir is honoured.
+REPO_COUNT_FILE=$BACKUP_DIR/.repo-count.baseline
 LOG_NAMESPACE=mycure-github-backup
 JOURNALD_NAMESPACE_CONFIG=/etc/systemd/journald@${LOG_NAMESPACE}.conf
 JOURNAL_MAX_USE=500M
@@ -140,6 +143,9 @@ case "$PROGRESS_INTERVAL" in
   0|off|none|"") PROGRESS_ENABLED=0 ;;
 esac
 [[ "$NOTIFY_ON" == "off" ]] && PROGRESS_ENABLED=0
+
+# Re-derive paths that depend on flag-overridable values.
+REPO_COUNT_FILE=$BACKUP_DIR/.repo-count.baseline
 
 # ---------- preflight ----------
 need_root

@@ -164,7 +164,7 @@ Logs go to a dedicated `mycure-github-backup` journald namespace with size caps 
 | `/opt/mycure-github-backup/venv/` | 0755 | root | Pinned `github-backup` Python venv. |
 | `/etc/mycure-github-backup/token` | 0640 | root:mycure-ghbackup | The GitHub PAT. |
 | `/etc/mycure-github-backup/discord-webhook.url` | 0640 | root:mycure-ghbackup | Discord webhook (only when set). |
-| `/etc/mycure-github-backup/repo-count.baseline` | 0644 | mycure-ghbackup | Repo count from the last successful backup. |
+| `/var/backups/mycure-github/.repo-count.baseline` | 0644 | mycure-ghbackup | Repo count from the last successful backup (run-state; lives in the backup dir so the unprivileged runner can write it). |
 | `/usr/local/sbin/mycure-github-backup-run` | 0755 | root | Backup runner (invokes `github-backup`). |
 | `/usr/local/sbin/mycure-github-backup-verify` | 0755 | root | Weekly `git fsck` + count check. |
 | `/usr/local/sbin/mycure-github-backup-notify` | 0755 | root | Discord notifier. |
