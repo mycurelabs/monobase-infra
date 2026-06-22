@@ -986,6 +986,20 @@ valkey:
       limits:
         cpu: 1000m
         memory: 4Gi
+    # 2026-06-22: cap valkey at 80% of container limit (3.2 GiB of 4 GiB)
+    # with `noeviction`. Once cadence 0.5.21 is wired up, hitting this cap
+    # produces `OOM command not allowed when used_memory > 'maxmemory'` on
+    # writes — which cadence catches in `append_change`, retries with
+    # backoff, and uses to drive the memory-aware trim task's emergency
+    # mode. Without this cap, valkey grows unbounded inside the container
+    # until the k8s SIGKILL (exitCode 137) kicks in mid-AOF-replay and
+    # we cycle into LOAD→OOM→LOAD. With this cap, OOM becomes app-
+    # observable and recoverable. See cadence 0.5.21 + monobase-mycure#1543.
+    extraFlags:
+      - "--maxmemory"
+      - "3221225472"  # 3 GiB (75% of 4 GiB limit; gives ~1 GiB AOF-rewrite headroom)
+      - "--maxmemory-policy"
+      - "noeviction"
 
 # ===== STORAGE: MinIO Object Storage =====
 minio:
