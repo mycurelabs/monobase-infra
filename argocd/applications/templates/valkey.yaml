@@ -44,6 +44,9 @@ spec:
           resourcesPreset: "none"
           resources: {{ .Values.valkey.master.resources | toYaml | nindent 12 }}
           {{- end }}
+          {{- if .Values.valkey.master.extraFlags }}
+          extraFlags: {{ .Values.valkey.master.extraFlags | toYaml | nindent 12 }}
+          {{- end }}
           {{- if .Values.global.nodePool }}
           nodeSelector:
             node-pool: {{ .Values.global.nodePool }}

@@ -707,6 +707,14 @@ valkey:
       limits:
         cpu: 500m
         memory: 2Gi
+    # Cap at 75% of container memory limit (1.5 GiB of 2 GiB). Pairs with
+    # cadence 0.5.21's memory-aware trim: when valkey returns OOM,
+    # append_change retries with backoff and the trim task escalates.
+    extraFlags:
+      - "--maxmemory"
+      - "1610612736"  # 1.5 GiB
+      - "--maxmemory-policy"
+      - "noeviction"
 
 # ===== STORAGE: MinIO Object Storage =====
 minio:
