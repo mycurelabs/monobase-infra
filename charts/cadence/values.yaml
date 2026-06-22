@@ -150,6 +150,11 @@ cadenceConfig:
   collectionsBlacklist:
     - "--drizzle-migrations"
     - "-migration-checkpoints"
+    # 2026-06-22: million-row low-value table; baseline scan grinds for hours
+    # and blocks the watcher's sequential per-table loop, starving every other
+    # collection. Skip entirely until pg_poll gets per-table parallelism or
+    # timeouts. See monobase-mycure#1543 follow-up + memory project_cadence_0521_rollout_state.
+    - "activity-logs"
   # Per-collection sync priority (higher = sent first during catch-up).
   # "*" is the default for unlisted collections. Mirror of
   # services/hapihub/cadence.yml in monobase-mycure — keep in sync.
