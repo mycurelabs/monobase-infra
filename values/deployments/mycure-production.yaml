@@ -1074,7 +1074,11 @@ cadence:
     tag: "0.5.20"
     pullPolicy: Always
 
-  replicaCount: 1
+  # 2026-06-22 OUTAGE PAUSE — scaled to 0 until cadence 0.5.21 ships with
+  # memory-aware trim + NOSCRIPT-safe Lua. 0.5.20's count-based trim cannot
+  # keep up with the baseline-scan write storm (~50k writes/sec → valkey OOM
+  # in 2-3 min). Restore to 1 after 0.5.21 deploys. See monobase-mycure#1543.
+  replicaCount: 0
 
   # Resources sized to the empirically-observed memory floor (2026-06-10
   # incident, monobase-infra#10). After §A.2/§B/§D/§E shipped in 0.5.14-0.5.17
