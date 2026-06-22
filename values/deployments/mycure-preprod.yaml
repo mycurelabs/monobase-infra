@@ -114,7 +114,7 @@ mycure-dashboard:
 
   image:
     repository: ghcr.io/mycurelabs/dashboard
-    tag: "0.14.5"
+    tag: "0.14.7"
     pullPolicy: IfNotPresent
 
   replicaCount: 1
@@ -182,7 +182,7 @@ hapihub:
 
   image:
     repository: ghcr.io/mycurelabs/hapihub
-    tag: "11.20.18"
+    tag: "11.20.19"
     pullPolicy: IfNotPresent
 
   replicaCount: 1
@@ -787,12 +787,12 @@ mailpit:
       memory: 64Mi
 
   gateway:
-    # Public web UI route disabled (#5): preprod runs on cloned-prod data, and an
-    # unauthenticated HTTPRoute leaked reset tokens / OTPs / PHI to anyone with the
-    # URL. Access the inbox via: kubectl port-forward svc/mailpit-http 8025:80
-    # (the route attaches to nginx-shared-gateway; re-enable behind gateway auth —
-    # e.g. basic-auth — if a public URL is ever needed).
-    enabled: false
+    # Public web UI route RE-ENABLED 2026-06-22 per request — intentionally with NO auth.
+    # WARNING (#5): preprod runs on cloned-prod data, so this inbox exposes real reset
+    # tokens / OTPs / PHI to anyone with the URL. Deliberate testing convenience, not a
+    # regression. Put it behind gateway auth (NGF AuthenticationFilter basic-auth) if it
+    # outlives short-lived testing. Exposure-free alt: kubectl port-forward svc/mailpit-http 8025:80
+    enabled: true
     hostname: "mail.preprod.localfirsthealth.com"
 
 # ===== P2P SYNC: Cadence =====
