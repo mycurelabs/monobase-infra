@@ -960,16 +960,17 @@ cadence:
 
   image:
     repository: ghcr.io/mycurelabs/cadence
-    tag: "0.5.24"
+    tag: "0.5.25"
     pullPolicy: Always
 
-  # 2026-06-23: CADENCE_PER_COLLECTION_WORKERS=true crashes at boot due
-  # to a connection storm — 147 collections × 1 fresh tokio_postgres
-  # connection each at the same moment overruns the PG connection limit
-  # and the pod hits liveness-probe failure before it can settle. Phase
-  # 1a needs a Semaphore concurrency cap before it's safe to enable.
-  # Tracked in a follow-up cadence PR. Until then preprod soaks the
-  # serial-mode 0.5.24 (still gets the poll-deadline + moka leak fixes).
+  # Phase 1a: per-collection watcher workers, throttled by the 0.5.25
+  # Semaphore cap (min(num_cpus*2, 16)) so the boot connection storm
+  # that crashlooped this pod on 2026-06-23 can't recur. Preprod-only
+  # soak until parallel mode is proven; prod stays serial-mode in this
+  # PR. See mycurelabs/monobase-mycure#1918 + #1922.
+  env:
+    - name: CADENCE_PER_COLLECTION_WORKERS
+      value: "true"
 
   replicaCount: 1
 
