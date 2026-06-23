@@ -812,13 +812,13 @@ cadence:
     tag: "0.5.24"
     pullPolicy: Always
 
-  # Phase 1a: per-collection watcher workers. Spawned as N independent
-  # tokio tasks (one per collection) so a slow PG poll on one table
-  # can't starve the rest. Default off in the chart; preprod soaks
-  # before flipping prod. See mycurelabs/monobase-mycure#1918.
-  env:
-    - name: CADENCE_PER_COLLECTION_WORKERS
-      value: "true"
+  # 2026-06-23: CADENCE_PER_COLLECTION_WORKERS=true crashes at boot due
+  # to a connection storm — 147 collections × 1 fresh tokio_postgres
+  # connection each at the same moment overruns the PG connection limit
+  # and the pod hits liveness-probe failure before it can settle. Phase
+  # 1a needs a Semaphore concurrency cap before it's safe to enable.
+  # Tracked in a follow-up cadence PR. Until then preprod soaks the
+  # serial-mode 0.5.24 (still gets the poll-deadline + moka leak fixes).
 
   replicaCount: 1
 
