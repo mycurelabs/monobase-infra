@@ -475,3 +475,7 @@ monitoring:
       smarthost: ""  # SMTP server (e.g., smtp.gmail.com:587)
       from: ""  # From email address
       to: ""  # To email address
+
+# Tailscale egress to the vanaheim workstation Ollama (medical-AI preprod inference)
+ollamaEgress:
+  enabled: true

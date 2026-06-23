@@ -1,0 +1,167 @@
+# Default values for OpenMed chart
+# Override these values in values/deployments/*.yaml
+
+global:
+  domain: example.com
+  namespace: example-prod
+  environment: production
+  gateway:
+    name: shared-gateway
+    namespace: gateway-system
+  storage:
+    provider: ""
+    className: ""
+
+enabled: true
+
+replicaCount: 1
+
+image:
+  repository: ghcr.io/mycurelabs/openmed
+  pullPolicy: IfNotPresent
+  tag: "latest"
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+podAnnotations: {}
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  fsGroup: 1000
+  seccompProfile:
+    type: RuntimeDefault
+
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+  readOnlyRootFilesystem: false
+
+service:
+  type: ClusterIP
+  port: 8920
+  targetPort: 8920
+  annotations: {}
+
+# Gateway: disabled — openmed is ClusterIP only, no public HTTPRoute
+gateway:
+  enabled: false
+  hostname: ""
+
+# Larger memory defaults due to model serving requirements
+resources:
+  requests:
+    cpu: 500m
+    memory: 768Mi
+  limits:
+    cpu: "2"
+    memory: 2Gi
+
+livenessProbe:
+  enabled: true
+  httpGet:
+    path: /health
+    port: 8920
+  initialDelaySeconds: 30
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3
+
+readinessProbe:
+  enabled: true
+  httpGet:
+    path: /health
+    port: 8920
+  initialDelaySeconds: 20
+  periodSeconds: 5
+  timeoutSeconds: 3
+  failureThreshold: 2
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 3
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+
+podDisruptionBudget:
+  enabled: false
+  minAvailable: 1
+
+nodeSelector: {}
+tolerations: []
+affinity:
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        podAffinityTerm:
+          labelSelector:
+            matchExpressions:
+              - key: app.kubernetes.io/name
+                operator: In
+                values:
+                  - openmed
+          topologyKey: kubernetes.io/hostname
+
+# Application configuration (ConfigMap)
+config:
+  NODE_ENV: production
+  LOG_LEVEL: info
+  PORT: "8920"
+  HF_HOME: /models   # Hugging Face model cache mount point
+
+# External Secrets
+externalSecrets:
+  enabled: false
+  secretStore: ""      # Defaults to <namespace>-secretstore
+  refreshInterval: 1h
+  secrets: []
+
+# PersistentVolumeClaim for Hugging Face model cache
+# Mounted at /models (HF_HOME=/models)
+persistence:
+  enabled: true
+  existingClaim: ""    # Set to use an existing PVC instead of creating one
+  size: 3Gi
+  accessMode: ReadWriteOnce
+  storageClassName: "" # Defaults to global.storage.className or longhorn
+
+# Network Policy
+networkPolicy:
+  enabled: true
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - namespaceSelector: {}
+      ports:
+        - protocol: TCP
+          port: 8920
+  egress:
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: TCP
+          port: 53
+        - protocol: UDP
+          port: 53
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: TCP
+          port: 443    # HuggingFace Hub download
+
+serviceMonitor:
+  enabled: false
+  interval: 30s
+  path: /metrics

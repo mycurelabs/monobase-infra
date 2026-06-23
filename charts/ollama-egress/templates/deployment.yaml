@@ -1,0 +1,31 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ollama-egress
+  namespace: {{ .Values.namespace }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: ollama-egress }
+  template:
+    metadata:
+      labels: { app: ollama-egress }
+    spec:
+      containers:
+        - name: ts
+          image: {{ .Values.tailscaleImage }}
+          env:
+            - { name: TS_AUTHKEY, valueFrom: { secretKeyRef: { name: ollama-egress-authkey, key: TS_AUTHKEY } } }
+            - { name: TS_USERSPACE, value: "false" }
+            - { name: TS_STATE_DIR, value: "/tmp" }
+            - { name: TS_KUBE_SECRET, value: "" }
+            - { name: TS_EXTRA_ARGS, value: "--hostname={{ .Values.hostname }}" }
+          securityContext:
+            capabilities: { add: ["NET_ADMIN"] }
+        # socat sidecar forwards the cluster Service traffic to vanaheim over the tailnet
+        # (TS_DEST_IP alone only DNATs tailnet-side traffic, not the cluster Service path).
+        - name: forward
+          image: {{ .Values.socatImage }}
+          args: ["TCP-LISTEN:{{ .Values.port }},fork,reuseaddr","TCP:{{ .Values.destIP }}:{{ .Values.port }}"]
+          ports:
+            - containerPort: {{ .Values.port }}

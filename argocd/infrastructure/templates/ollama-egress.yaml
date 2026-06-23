@@ -1,0 +1,36 @@
+{{- if .Values.ollamaEgress.enabled }}
+# ArgoCD Application: ollama-egress
+# Sync Wave 1 — Tailscale egress to the vanaheim workstation's Ollama (medical-AI inference backend).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: ollama-egress
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: {{ .Values.argocd.repoURL }}
+    targetRevision: {{ .Values.argocd.targetRevision }}
+    path: charts/ollama-egress
+    helm:
+      releaseName: ollama-egress
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: tailscale
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false
+      - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 10s
+        maxDuration: 5m
+{{- end }}

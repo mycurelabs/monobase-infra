@@ -1,0 +1,180 @@
+# Default values for Medley chart
+# Override these values in values/deployments/*.yaml
+
+global:
+  domain: example.com
+  namespace: example-prod
+  environment: production
+  gateway:
+    name: shared-gateway
+    namespace: gateway-system
+  storage:
+    provider: ""
+    className: ""
+
+enabled: true
+
+replicaCount: 1
+
+image:
+  repository: ghcr.io/mycurelabs/medley
+  pullPolicy: IfNotPresent
+  tag: "latest"
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+podAnnotations: {}
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  fsGroup: 1000
+  seccompProfile:
+    type: RuntimeDefault
+
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+  readOnlyRootFilesystem: false
+
+service:
+  type: ClusterIP
+  port: 8970
+  targetPort: 8970
+  annotations: {}
+
+# Gateway: disabled — medley is ClusterIP only, no public HTTPRoute
+gateway:
+  enabled: false
+  hostname: ""
+
+resources:
+  requests:
+    cpu: 250m
+    memory: 512Mi
+  limits:
+    cpu: "1"
+    memory: 1Gi
+
+livenessProbe:
+  enabled: true
+  httpGet:
+    path: /healthz
+    port: 8970
+  initialDelaySeconds: 20
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3
+
+readinessProbe:
+  enabled: true
+  httpGet:
+    path: /healthz
+    port: 8970
+  initialDelaySeconds: 10
+  periodSeconds: 5
+  timeoutSeconds: 3
+  failureThreshold: 2
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 5
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+
+podDisruptionBudget:
+  enabled: false
+  minAvailable: 1
+
+nodeSelector: {}
+tolerations: []
+affinity:
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        podAffinityTerm:
+          labelSelector:
+            matchExpressions:
+              - key: app.kubernetes.io/name
+                operator: In
+                values:
+                  - medley
+          topologyKey: kubernetes.io/hostname
+
+# Application configuration (ConfigMap)
+# Secrets (e.g. MEDLEY_HISTORY_KEY) are mounted via externalSecrets below.
+config:
+  NODE_ENV: production
+  LOG_LEVEL: info
+  PORT: "8970"
+  HAPIHUB_URL: ""
+  OLLAMA_URL: ""       # Set to secured external GPU Ollama endpoint
+  MEDGEMMA_URL: ""
+  OPENMED_URL: ""
+  MEDLEY_CHAT_MODEL: ""
+  MEDLEY_CORS_ORIGINS: ""
+
+# External Secrets — MEDLEY_HISTORY_KEY pulled from GCP Secret Manager
+externalSecrets:
+  enabled: true
+  secretStore: ""      # Defaults to <namespace>-secretstore
+  refreshInterval: 1h
+  secrets: []          # Override in deployment values with MEDLEY_HISTORY_KEY entry
+
+# Network Policy
+networkPolicy:
+  enabled: true
+  policyTypes:
+    - Ingress
+    - Egress
+  # ollamaEgress.cidr: CIDR of the external Ollama GPU endpoint.
+  # Set to the actual IP range in the deployment values file.
+  # Placeholder: replace <<EXTERNAL_OLLAMA_URL_PLACEHOLDER>> with real host.
+  ollamaEgress:
+    enabled: true
+    cidr: "0.0.0.0/0"   # TODO: tighten to the actual Ollama host CIDR
+    port: 11434
+  ingress:
+    - from:
+        - namespaceSelector: {}
+      ports:
+        - protocol: TCP
+          port: 8970
+  egress:
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: TCP
+          port: 5432   # PostgreSQL
+        - protocol: TCP
+          port: 6379   # Valkey
+        - protocol: TCP
+          port: 7500   # hapihub in-cluster
+        - protocol: TCP
+          port: 8940   # medgemma-worker in-cluster
+        - protocol: TCP
+          port: 8920   # openmed in-cluster
+        - protocol: TCP
+          port: 53
+        - protocol: UDP
+          port: 53
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: TCP
+          port: 443
+
+serviceMonitor:
+  enabled: false
+  interval: 30s
+  path: /metrics
