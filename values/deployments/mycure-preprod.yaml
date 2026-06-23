@@ -960,7 +960,7 @@ cadence:
 
   image:
     repository: ghcr.io/mycurelabs/cadence
-    tag: "0.5.25"
+    tag: "0.5.26"
     pullPolicy: Always
 
   # Phase 1a: per-collection watcher workers, throttled by the 0.5.25
@@ -974,19 +974,17 @@ cadence:
 
   replicaCount: 1
 
-  # Resources match prod (4Gi limit / 1Gi request) so preprod can soak
-  # the per-collection-workers mode at realistic capacity. 2Gi here OOMed
-  # under the parallel watcher's per-task LRU allocations during boot
-  # baseline-scan (2026-06-23). Follow-up cadence PR will divide LRU
-  # capacity by num_collections in parallel mode, after which we can
-  # consider stepping preprod back down.
+  # 0.5.26 (#1923) divides per-task LRU capacity by num_collections in
+  # parallel mode, capping per-task LRU at ~watcher_lru_capacity/N. The
+  # earlier 4Gi bump (monobase-infra#30) is no longer needed; step back
+  # down to 2Gi to match staging sizing.
   resources:
     requests:
       cpu: 200m
-      memory: 1Gi
+      memory: 512Mi
     limits:
       cpu: "2"
-      memory: 4Gi
+      memory: 2Gi
 
   gateway:
     hostname: ""
