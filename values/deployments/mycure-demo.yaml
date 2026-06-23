@@ -117,7 +117,7 @@ mycure-dashboard:
   enabled: true
   image:
     repository: ghcr.io/mycurelabs/dashboard
-    tag: "0.14.3"
+    tag: "0.14.4"
     pullPolicy: IfNotPresent
   replicaCount: 1
   resources:
