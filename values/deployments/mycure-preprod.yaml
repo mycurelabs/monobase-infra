@@ -494,7 +494,7 @@ medley:
 
   image:
     repository: ghcr.io/mycurelabs/medley
-    tag: "0.1.1"
+    tag: "0.1.2"
     pullPolicy: IfNotPresent
 
   replicaCount: 1
@@ -518,6 +518,8 @@ medley:
     OPENMED_URL: "http://openmed:8920"
     MEDLEY_CHAT_MODEL: "qwen3.5:9b"
     MEDLEY_CORS_ORIGINS: "https://medleyapp.preprod.localfirsthealth.com"
+    # Model picker presets (FE Settings page). On-prem default + bring-your-own-key cloud options.
+    MEDLEY_MODEL_PRESETS: '[{"id":"onprem-qwen","label":"On-prem Qwen 3.5 9B","provider":"ollama","model":"qwen3.5:9b"},{"id":"openai-gpt4o","label":"OpenAI GPT-4o (your key)","provider":"openai-compatible","model":"gpt-4o","baseUrl":"https://api.openai.com/v1","requiresKey":true},{"id":"anthropic-sonnet","label":"Claude Sonnet 4.6 (your key)","provider":"anthropic","model":"claude-sonnet-4-6","requiresKey":true}]'
 
   externalSecrets:
     enabled: true
@@ -538,7 +540,7 @@ medleyapp:
 
   image:
     repository: ghcr.io/mycurelabs/medleyapp
-    tag: "0.1.2"
+    tag: "0.1.3"
     pullPolicy: IfNotPresent
 
   replicaCount: 1
