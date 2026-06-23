@@ -809,7 +809,7 @@ cadence:
 
   image:
     repository: ghcr.io/mycurelabs/cadence
-    tag: "0.5.21"
+    tag: "0.5.22"
     pullPolicy: Always
 
   replicaCount: 1
