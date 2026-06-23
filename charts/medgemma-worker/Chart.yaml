@@ -1,0 +1,19 @@
+apiVersion: v2
+name: medgemma-worker
+description: MedGemma Worker - Medical vision AI inference worker (Hono/Bun backend)
+type: application
+version: 1.0.0
+appVersion: "0.1.0"
+keywords:
+  - medgemma
+  - ai
+  - medical
+  - vision
+  - hono
+  - bun
+home: https://github.com/mycurelabs/monobase-infra
+sources:
+  - https://github.com/mycurelabs/monobase
+maintainers:
+  - name: MyCure Labs
+    email: devops@mycure.md

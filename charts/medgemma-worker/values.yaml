@@ -1,0 +1,162 @@
+# Default values for MedGemma Worker chart
+# Override these values in values/deployments/*.yaml
+
+global:
+  domain: example.com
+  namespace: example-prod
+  environment: production
+  gateway:
+    name: shared-gateway
+    namespace: gateway-system
+  storage:
+    provider: ""
+    className: ""
+
+enabled: true
+
+replicaCount: 1
+
+image:
+  repository: ghcr.io/mycurelabs/medgemma-worker
+  pullPolicy: IfNotPresent
+  tag: "latest"
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+podAnnotations: {}
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  fsGroup: 1000
+  seccompProfile:
+    type: RuntimeDefault
+
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+  readOnlyRootFilesystem: false
+
+service:
+  type: ClusterIP
+  port: 8940
+  targetPort: 8940
+  annotations: {}
+
+# Gateway: disabled — medgemma-worker is ClusterIP only, no public HTTPRoute
+gateway:
+  enabled: false
+  hostname: ""
+
+resources:
+  requests:
+    cpu: 250m
+    memory: 512Mi
+  limits:
+    cpu: "1"
+    memory: 1Gi
+
+livenessProbe:
+  enabled: true
+  httpGet:
+    path: /health
+    port: 8940
+  initialDelaySeconds: 20
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3
+
+readinessProbe:
+  enabled: true
+  httpGet:
+    path: /health
+    port: 8940
+  initialDelaySeconds: 10
+  periodSeconds: 5
+  timeoutSeconds: 3
+  failureThreshold: 2
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 5
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+
+podDisruptionBudget:
+  enabled: false
+  minAvailable: 1
+
+nodeSelector: {}
+tolerations: []
+affinity:
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        podAffinityTerm:
+          labelSelector:
+            matchExpressions:
+              - key: app.kubernetes.io/name
+                operator: In
+                values:
+                  - medgemma-worker
+          topologyKey: kubernetes.io/hostname
+
+# Application configuration (ConfigMap)
+config:
+  NODE_ENV: production
+  LOG_LEVEL: info
+  PORT: "8940"
+
+# External Secrets
+externalSecrets:
+  enabled: false
+  secretStore: ""      # Defaults to <namespace>-secretstore
+  refreshInterval: 1h
+  secrets: []
+
+# Network Policy
+networkPolicy:
+  enabled: true
+  policyTypes:
+    - Ingress
+    - Egress
+  # ollamaEgress.cidr: CIDR of the external Ollama GPU endpoint.
+  # Set to the actual IP range in the deployment values file.
+  ollamaEgress:
+    enabled: true
+    cidr: "0.0.0.0/0"   # TODO: tighten to the actual Ollama host CIDR
+    port: 11434
+  ingress:
+    - from:
+        - namespaceSelector: {}
+      ports:
+        - protocol: TCP
+          port: 8940
+  egress:
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: TCP
+          port: 53
+        - protocol: UDP
+          port: 53
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: TCP
+          port: 443
+
+serviceMonitor:
+  enabled: false
+  interval: 30s
+  path: /metrics

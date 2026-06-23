@@ -1,0 +1,18 @@
+apiVersion: v2
+name: medley
+description: Medley - Medical AI Gateway service (Hono/Bun backend)
+type: application
+version: 1.0.0
+appVersion: "0.1.0"
+keywords:
+  - medley
+  - ai
+  - medical
+  - hono
+  - bun
+home: https://github.com/mycurelabs/monobase-infra
+sources:
+  - https://github.com/mycurelabs/monobase
+maintainers:
+  - name: MyCure Labs
+    email: devops@mycure.md

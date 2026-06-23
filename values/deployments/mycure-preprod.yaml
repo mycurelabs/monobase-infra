@@ -209,7 +209,14 @@ hapihub:
       rpId: "preprod.localfirsthealth.com"
 
   config:
-    CORS_ORIGINS: "https://hapihub.preprod.localfirsthealth.com,https://mycure.preprod.localfirsthealth.com,https://mycurelocal.preprod.localfirsthealth.com,https://mycure-myaccount.preprod.localfirsthealth.com,https://mycure-deploydash.preprod.localfirsthealth.com,https://mycure-dashboard.preprod.localfirsthealth.com,https://mycure-pxp.preprod.localfirsthealth.com,https://dentalemon.preprod.localfirsthealth.com,https://dentalemon-myaccount.preprod.localfirsthealth.com,https://dentalemon-website.preprod.localfirsthealth.com,https://mycure-pr--*.web.app"
+    CORS_ORIGINS: "https://hapihub.preprod.localfirsthealth.com,https://mycure.preprod.localfirsthealth.com,https://mycurelocal.preprod.localfirsthealth.com,https://mycure-myaccount.preprod.localfirsthealth.com,https://mycure-deploydash.preprod.localfirsthealth.com,https://mycure-dashboard.preprod.localfirsthealth.com,https://mycure-pxp.preprod.localfirsthealth.com,https://dentalemon.preprod.localfirsthealth.com,https://dentalemon-myaccount.preprod.localfirsthealth.com,https://dentalemon-website.preprod.localfirsthealth.com,https://mycure-pr--*.web.app,https://medleyapp.preprod.localfirsthealth.com"
+    # ---- Phase 2: medical-AI integration (uncomment when medley+medgemma-worker+openmed are enabled) ----
+    # INGESTION_ENABLED: "true"
+    # OPENMED_ENABLED: "true"
+    # MEDGEMMA_URL: "http://medgemma-worker:8940"
+    # OLLAMA_URL: "http://ollama.tailscale.svc.cluster.local:11434"  # TODO: set to the secured external GPU Ollama endpoint
+    # OPENMED_URL: "http://openmed:8920"
+    # EMBED_MODEL: "nomic-embed-text"
     CORS_STRICT: "true"
     CORS_ALLOW_LOCAL_NETWORK: "false"
     CORS_ALLOW_MOBILE_APPS: "true"
@@ -475,6 +482,150 @@ hapihub-docs:
   gateway:
     hostname: "docs.preprod.localfirsthealth.com"
     sectionName: https-preprod-lfh
+
+  podDisruptionBudget:
+    enabled: false
+
+# ===== MEDICAL AI: Medley AI Gateway =====
+# Phase 1: enabled — ClusterIP only, reachable at http://medley:8970 in-cluster.
+# MEDLEY_HISTORY_KEY pulled from GCP Secret Manager (mycure-preprod-medley-history-key).
+medley:
+  enabled: true
+
+  image:
+    repository: ghcr.io/mycurelabs/medley
+    tag: "0.1.0"
+    pullPolicy: IfNotPresent
+
+  replicaCount: 1
+
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
+
+  gateway:
+    enabled: false  # ClusterIP only — no public HTTPRoute
+
+  config:
+    HAPIHUB_URL: "http://hapihub:7500"
+    # TODO: set to the secured external GPU Ollama endpoint before enabling medgemma-worker
+    OLLAMA_URL: "http://ollama.tailscale.svc.cluster.local:11434"
+    MEDGEMMA_URL: "http://medgemma-worker:8940"
+    OPENMED_URL: "http://openmed:8920"
+    MEDLEY_CHAT_MODEL: "qwen3.5:9b"
+    MEDLEY_CORS_ORIGINS: "https://medleyapp.preprod.localfirsthealth.com"
+
+  externalSecrets:
+    enabled: true
+    secretStore: gcp-secretstore
+    secretStoreKind: ClusterSecretStore
+    refreshInterval: 1h
+    secrets:
+      - secretKey: MEDLEY_HISTORY_KEY
+        remoteKey: mycure-preprod-medley-history-key
+
+  podDisruptionBudget:
+    enabled: false
+
+# ===== MEDICAL AI: MedleyApp Frontend (Caddy SPA) =====
+# Phase 1: enabled — public HTTPRoute via https-preprod-lfh.
+medleyapp:
+  enabled: true
+
+  image:
+    repository: ghcr.io/mycurelabs/medleyapp
+    tag: "0.1.0"
+    pullPolicy: IfNotPresent
+
+  replicaCount: 1
+
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 128Mi
+
+  gateway:
+    hostname: ""  # defaults to medleyapp.preprod.localfirsthealth.com
+    sectionName: https-preprod-lfh
+
+  config:
+    API_URL: "https://hapihub.preprod.localfirsthealth.com"
+    HAPIHUB_URL: "https://hapihub.preprod.localfirsthealth.com"
+
+  podDisruptionBudget:
+    enabled: false
+
+# ===== MEDICAL AI: MedGemma Worker =====
+# Phase 2: disabled — requires external Ollama GPU endpoint.
+# Enable after http://ollama.tailscale.svc.cluster.local:11434 is resolved and
+# hapihub Phase-2 env vars (INGESTION_ENABLED, OPENMED_ENABLED, etc.) are uncommented.
+medgemmaWorker:
+  enabled: false
+
+  image:
+    repository: ghcr.io/mycurelabs/medgemma-worker
+    tag: "0.1.0"
+    pullPolicy: IfNotPresent
+
+  replicaCount: 1
+
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
+
+  gateway:
+    enabled: false  # ClusterIP only
+
+  config:
+    # TODO: set to the secured external GPU Ollama endpoint
+    OLLAMA_URL: "http://ollama.tailscale.svc.cluster.local:11434"
+    MEDGEMMA_MODEL: "hf.co/unsloth/medgemma-4b-it-GGUF:Q4_K_M"
+
+  podDisruptionBudget:
+    enabled: false
+
+# ===== MEDICAL AI: OpenMed Model Server =====
+# Phase 2: disabled — requires PVC (3Gi) for HF model cache + external Ollama.
+# PVC (openmed-model-cache, ReadWriteOnce, 3Gi) is created by charts/openmed/templates/pvc.yaml
+# when persistence.enabled=true. Models are persisted across restarts at /models (HF_HOME).
+openmed:
+  enabled: false
+
+  image:
+    repository: ghcr.io/mycurelabs/openmed
+    tag: "0.1.0"
+    pullPolicy: IfNotPresent
+
+  replicaCount: 1
+
+  resources:
+    requests:
+      cpu: 500m
+      memory: 768Mi
+    limits:
+      cpu: "1"
+      memory: 2Gi
+
+  gateway:
+    enabled: false  # ClusterIP only
+
+  config:
+    OPENMED_PRELOAD: "disease,pharma"
+
+  persistence:
+    enabled: true
+    size: 3Gi
 
   podDisruptionBudget:
     enabled: false

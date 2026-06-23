@@ -1,0 +1,4 @@
+apiVersion: v2
+name: ollama-egress
+description: Tailscale egress from the cluster to the vanaheim workstation's Ollama (medical-AI inference)
+version: 0.1.0
