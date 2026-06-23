@@ -1,4 +1,4 @@
-{{- if .Values.medley.enabled }}
+{{- if (.Values.medley | default dict).enabled }}
 # ArgoCD Application: Medley AI Gateway
 # Sync Wave 3 - Deploy after core services
 
