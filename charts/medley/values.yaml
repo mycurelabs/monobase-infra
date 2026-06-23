@@ -165,6 +165,8 @@ networkPolicy:
         - protocol: TCP
           port: 8920   # openmed in-cluster
         - protocol: TCP
+          port: 11434  # ollama egress Service (tailscale ns) — in-cluster pod needs namespaceSelector, not ipBlock
+        - protocol: TCP
           port: 53
         - protocol: UDP
           port: 53
