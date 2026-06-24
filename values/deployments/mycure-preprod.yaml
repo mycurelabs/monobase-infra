@@ -624,6 +624,17 @@ openmed:
 
   config:
     OPENMED_PRELOAD: "disease,pharma"
+    PYTHONUNBUFFERED: "1"  # stream uvicorn/model-load logs (otherwise buffered + invisible)
+
+  # openmed preloads NER/ICD-10 models from HuggingFace on first boot (downloaded to the PVC),
+  # which takes minutes — far longer than the chart's 60s liveness grace. Without this it gets
+  # liveness-killed mid-load and never converges. Generous initialDelay = de-facto startup grace;
+  # readiness (unchanged) still gates Service membership until it actually serves.
+  livenessProbe:
+    enabled: true
+    initialDelaySeconds: 600
+    periodSeconds: 15
+    failureThreshold: 4
 
   persistence:
     enabled: true
