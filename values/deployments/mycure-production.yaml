@@ -363,6 +363,17 @@ hapihubNext:
     # whether to move it here or keep it on the legacy side.
     snippetsPolicy:
       enabled: false
+    # Issue #44: storage/file/link URLs are minted from EXTERNAL_ADDRESS, which
+    # for hapihub-next is the v10 host (hapihub.localfirsthealth.com) → 404.
+    # EXTERNAL_ADDRESS is ALSO better-auth's baseURL, so it can't be changed
+    # without breaking auth. Instead, route only /storage on the v10 host to
+    # this v11 service (v10 serves no /storage there). Fixes the URLs with zero
+    # auth impact. (Long-term: wire storage.downloadURLHost in hapihub code.)
+    storageRoute:
+      enabled: true
+      sectionName: https-lfh
+      hostnames:
+        - hapihub.localfirsthealth.com
 
   betterAuth:
     passkey:

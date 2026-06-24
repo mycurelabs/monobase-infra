@@ -1,0 +1,37 @@
+{{- /*
+Optional extra HTTPRoute that points /storage on a (legacy) hostname at THIS
+release's service. Used by hapihub-next (issue #44): storage/file/link URLs are
+minted from EXTERNAL_ADDRESS, which for hapihub-next resolves to the v10 host
+(hapihub.<domain>). EXTERNAL_ADDRESS is ALSO better-auth's baseURL, so it can't
+be changed without breaking auth. Routing only /storage on that host to this v11
+service fixes the URLs without touching EXTERNAL_ADDRESS. The v10 release serves
+no /storage traffic on that host, so this is non-disruptive (more-specific path
+match wins over the v10 route's PathPrefix: /).
+*/ -}}
+{{- if and .Values.enabled .Values.gateway.storageRoute .Values.gateway.storageRoute.enabled }}
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: {{ include "hapihub.fullname" . }}-storage
+  namespace: {{ include "hapihub.namespace" . }}
+  labels:
+    {{- include "hapihub.labels" . | nindent 4 }}
+spec:
+  parentRefs:
+    - name: {{ include "hapihub.gateway.name" . }}
+      namespace: {{ include "hapihub.gateway.namespace" . }}
+      sectionName: {{ .Values.gateway.storageRoute.sectionName | default .Values.gateway.sectionName }}
+  hostnames:
+    {{- range .Values.gateway.storageRoute.hostnames }}
+    - {{ . }}
+    {{- end }}
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /storage
+      backendRefs:
+        - name: {{ include "hapihub.fullname" . }}
+          port: {{ .Values.service.port }}
+          weight: 1
+{{- end }}
