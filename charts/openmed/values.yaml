@@ -155,11 +155,15 @@ networkPolicy:
           port: 53
         - protocol: UDP
           port: 53
+    # HuggingFace Hub is EXTERNAL to the cluster, so it needs an ipBlock — a
+    # namespaceSelector only matches in-cluster pods and never reaches HF, so
+    # the model download would hang. (DNS above stays namespaceSelector for kube-dns.)
     - to:
-        - namespaceSelector: {}
+        - ipBlock:
+            cidr: 0.0.0.0/0
       ports:
         - protocol: TCP
-          port: 443    # HuggingFace Hub download
+          port: 443    # HuggingFace Hub download (external)
 
 serviceMonitor:
   enabled: false
