@@ -1166,6 +1166,28 @@ cadence:
     enabled: true
     serviceName: "valkey-primary"
 
+  # Phase 3.4: opt prod into the PG-native partitioned changelog. Dual-
+  # write soak — Valkey stays authoritative for reads (`readFrom:
+  # valkey`); cadence writes every change-log entry to BOTH stores so
+  # PG's `cadence` schema fills with parity data. Once the prod
+  # divergence counter holds at 0 for >5 days AND preprod's `readFrom:
+  # pg` flip has soaked for >24h, a follow-up PR flips this to "pg" too.
+  #
+  # Motivation: today (2026-06-24 09:36 UTC) prod cadence OOM-cycled
+  # the Valkey instance — pressure 3071/3072 MB, emergency trim 100k
+  # entries, append_change script failures cascaded, pod restarted.
+  # That's the exact failure mode Phase 3 targets. Enabling dual-write
+  # gets PG-backed durability in place; Phase 4 eventually removes
+  # the Valkey changelog write path entirely.
+  #
+  # Failure mode: if PG is unreachable, Valkey writes still succeed
+  # and `cadence:dual_write_divergence_total` on /metrics increments.
+  # Sync is never blocked by a PG outage during this phase.
+  pgChangelog:
+    enabled: true
+    readFrom: "valkey"
+    retentionDays: 7
+
   config:
     RUST_LOG: "info"
 
