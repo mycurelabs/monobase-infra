@@ -66,8 +66,6 @@ Gateway hostname - defaults to api.{global.domain}
 {{- define "hapihub.gateway.hostname" -}}
 {{- if .Values.gateway.hostname }}
 {{- .Values.gateway.hostname }}
-{{- else if .Values.gateway.hostnames }}
-{{- index .Values.gateway.hostnames 0 }}
 {{- else }}
 {{- printf "hapihub.%s" .Values.global.domain }}
 {{- end }}

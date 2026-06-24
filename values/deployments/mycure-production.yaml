@@ -355,10 +355,6 @@ hapihubNext:
       memory: 2Gi
 
   gateway:
-    # Singular hostname drives EXTERNAL_ADDRESS (storage/link URLs) — issue #44.
-    # Without it the chart helper falls back to hapihub.<domain> (the v10 host).
-    # HTTPRoute routing uses the plural hostnames[] below.
-    hostname: hapihub-next.localfirsthealth.com
     hostnames:
       - hapihub-next.localfirsthealth.com
     sectionName: https-lfh # Use localfirsthealth.com HTTPS listener
