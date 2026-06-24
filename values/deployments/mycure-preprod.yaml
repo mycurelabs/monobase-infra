@@ -628,6 +628,7 @@ openmed:
   persistence:
     enabled: true
     size: 3Gi
+    storageClassName: do-block-storage  # DOKS CSI — the chart default 'longhorn' doesn't exist here
 
   podDisruptionBudget:
     enabled: false
