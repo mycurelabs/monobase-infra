@@ -155,6 +155,12 @@ networkPolicy:
       ports:
         - protocol: TCP
           port: 443
+        # The on-prem Ollama is reached via the in-cluster egress Service
+        # (ollama.tailscale.svc). That's pod-to-pod traffic, so it needs a
+        # namespaceSelector rule — an ipBlock (see ollamaEgress above) does NOT
+        # match the cluster Service path. Mirrors the medley chart fix (PR #28).
+        - protocol: TCP
+          port: 11434
 
 serviceMonitor:
   enabled: false

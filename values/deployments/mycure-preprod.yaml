@@ -210,13 +210,13 @@ hapihub:
 
   config:
     CORS_ORIGINS: "https://hapihub.preprod.localfirsthealth.com,https://mycure.preprod.localfirsthealth.com,https://mycurelocal.preprod.localfirsthealth.com,https://mycure-myaccount.preprod.localfirsthealth.com,https://mycure-deploydash.preprod.localfirsthealth.com,https://mycure-dashboard.preprod.localfirsthealth.com,https://mycure-pxp.preprod.localfirsthealth.com,https://dentalemon.preprod.localfirsthealth.com,https://dentalemon-myaccount.preprod.localfirsthealth.com,https://dentalemon-website.preprod.localfirsthealth.com,https://mycure-pr--*.web.app,https://medleyapp.preprod.localfirsthealth.com"
-    # ---- Phase 2: medical-AI integration (uncomment when medley+medgemma-worker+openmed are enabled) ----
-    # INGESTION_ENABLED: "true"
-    # OPENMED_ENABLED: "true"
-    # MEDGEMMA_URL: "http://medgemma-worker:8940"
-    # OLLAMA_URL: "http://ollama.tailscale.svc.cluster.local:11434"  # TODO: set to the secured external GPU Ollama endpoint
-    # OPENMED_URL: "http://openmed:8920"
-    # EMBED_MODEL: "nomic-embed-text"
+    # ---- Phase 2: medical-AI integration (medgemma-worker + openmed enabled below) ----
+    INGESTION_ENABLED: "true"
+    OPENMED_ENABLED: "true"
+    MEDGEMMA_URL: "http://medgemma-worker:8940"
+    OLLAMA_URL: "http://ollama.tailscale.svc.cluster.local:11434"
+    OPENMED_URL: "http://openmed:8920"
+    EMBED_MODEL: "bge-m3"  # bge-m3 is what Ollama serves for embeddings (NOT nomic-embed-text)
     CORS_STRICT: "true"
     CORS_ALLOW_LOCAL_NETWORK: "false"
     CORS_ALLOW_MOBILE_APPS: "true"
@@ -565,11 +565,11 @@ medleyapp:
     enabled: false
 
 # ===== MEDICAL AI: MedGemma Worker =====
-# Phase 2: disabled — requires external Ollama GPU endpoint.
-# Enable after http://ollama.tailscale.svc.cluster.local:11434 is resolved and
-# hapihub Phase-2 env vars (INGESTION_ENABLED, OPENMED_ENABLED, etc.) are uncommented.
+# Phase 2: enabled — vision extraction (prescription/lab images) for document-ingestion.
+# Reaches the on-prem Ollama via the in-cluster egress Service (ollama.tailscale.svc); the
+# chart NetworkPolicy allows 11434 via namespaceSelector (not ipBlock — that path is in-cluster).
 medgemmaWorker:
-  enabled: false
+  enabled: true
 
   image:
     repository: ghcr.io/mycurelabs/medgemma-worker
@@ -598,11 +598,11 @@ medgemmaWorker:
     enabled: false
 
 # ===== MEDICAL AI: OpenMed Model Server =====
-# Phase 2: disabled — requires PVC (3Gi) for HF model cache + external Ollama.
-# PVC (openmed-model-cache, ReadWriteOnce, 3Gi) is created by charts/openmed/templates/pvc.yaml
-# when persistence.enabled=true. Models are persisted across restarts at /models (HF_HOME).
+# Phase 2: enabled — PHI de-id / NER / ICD-10 for document-ingestion.
+# Pulls its models from HuggingFace on first start (egress 443 via ipBlock in the chart NP) into a
+# 3Gi PVC (openmed-model-cache, RWO) mounted at /models (HF_HOME), persisted across restarts.
 openmed:
-  enabled: false
+  enabled: true
 
   image:
     repository: ghcr.io/mycurelabs/openmed
