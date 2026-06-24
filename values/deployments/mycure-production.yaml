@@ -385,6 +385,18 @@ hapihubNext:
       value: "300"
     - name: BETTER_AUTH_SESSION_COOKIE_CACHE_ENABLED
       value: "false"
+    # Email: Postmark transactional (OTP, magic links, verification, resets)
+    - name: EMAIL_PROVIDER
+      value: "postmark"
+    - name: POSTMARK_API_KEY
+      valueFrom:
+        secretKeyRef:
+          name: hapihub-next-secrets
+          key: POSTMARK_API_KEY
+    - name: EMAIL_FROM_EMAIL
+      value: "no-reply@mycure.md"
+    - name: EMAIL_FROM_NAME
+      value: "MyCure"
 
   livenessProbe:
     enabled: true
@@ -458,6 +470,9 @@ hapihubNext:
         remoteKey: mycure-production-auth-secret
       - secretKey: BETTER_AUTH_SECRET
         remoteKey: mycure-production-better-auth-secret
+      # Email (Postmark) — OTP, magic links, verification, password resets
+      - secretKey: POSTMARK_API_KEY
+        remoteKey: mycure-production-postmark-api-key
 
   mongodb:
     # v11 is Postgres-only. Disabling Mongo here makes the chart skip
@@ -481,7 +496,7 @@ mycure:
 
   image:
     repository: ghcr.io/mycurelabs/mycureapp
-    tag: "10.25.22"
+    tag: "10.25.23"
     pullPolicy: IfNotPresent
 
   replicaCount: 1
