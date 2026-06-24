@@ -355,6 +355,10 @@ hapihubNext:
       memory: 2Gi
 
   gateway:
+    # Singular hostname drives EXTERNAL_ADDRESS (storage/link URLs) — issue #44.
+    # better-auth URL is pinned separately via BETTER_AUTH_URL in env so this
+    # does NOT move the auth baseURL (which previously caused a 401 outage).
+    hostname: hapihub-next.localfirsthealth.com
     hostnames:
       - hapihub-next.localfirsthealth.com
     sectionName: https-lfh # Use localfirsthealth.com HTTPS listener
@@ -397,6 +401,11 @@ hapihubNext:
       value: "no-reply@mycure.md"
     - name: EMAIL_FROM_NAME
       value: "MyCure"
+    # Pin better-auth baseURL to the working host so the EXTERNAL_ADDRESS
+    # change (issue #44 storage fix) does NOT move auth. auth.ts uses
+    # config.url (BETTER_AUTH_URL) before externalAddress.
+    - name: BETTER_AUTH_URL
+      value: "https://hapihub.localfirsthealth.com"
 
   livenessProbe:
     enabled: true
