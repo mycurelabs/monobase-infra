@@ -28,6 +28,10 @@ spec:
       labels:
         {{- include "openmed.selectorLabels" . | nindent 8 }}
     spec:
+      # Disable the legacy Docker-link service env vars: the `openmed` Service otherwise injects
+      # OPENMED_PORT=tcp://<clusterIP>:8920, clobbering the app's own OPENMED_PORT=8920 (config.py
+      # does int(OPENMED_PORT) → ValueError). openmed uses DNS, not these vars. Matches hapihub.
+      enableServiceLinks: false
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
