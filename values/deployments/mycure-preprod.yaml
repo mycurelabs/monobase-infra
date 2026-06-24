@@ -974,7 +974,7 @@ cadence:
 
   image:
     repository: ghcr.io/mycurelabs/cadence
-    tag: "0.5.26"
+    tag: "0.5.29"
     pullPolicy: Always
 
   # Phase 1a: per-collection watcher workers, throttled by the 0.5.25
