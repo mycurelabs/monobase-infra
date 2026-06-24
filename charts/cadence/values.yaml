@@ -248,6 +248,30 @@ valkey:
     existingSecret: "valkey"     # Bitnami chart creates this secret
     secretKey: "valkey-password"
 
+# Phase 3 (cadence 0.5.29+): PG-native partitioned changelog. When enabled,
+# cadence dual-writes every change-log entry to both Valkey and a
+# cadence-owned `cadence` schema in the same PG as `postgresql.*`. Valkey
+# remains authoritative until `readFrom: pg` is flipped after the preprod
+# soak. Off by default — opt in per-environment.
+#
+# See services/cadence README and mycurelabs/monobase-mycure#1947 for the
+# rollout playbook.
+pgChangelog:
+  enabled: false
+  # When enabled but `url` is empty, the deployment template defaults the
+  # DSN to the same hapihub PG (postgresql.* above). Set explicitly to
+  # point at a different host.
+  url: ""
+  # "valkey" (default — dual-write only) or "pg" (PG-authoritative reads).
+  # Only flip to "pg" after `dual_write_divergence_total = 0` across a
+  # multi-day soak.
+  readFrom: "valkey"
+  # Drop partitions older than this many days during daily maintenance.
+  # Aligned with the Valkey changelog retention; a peer offline longer
+  # reconnects via the below-trim-floor primary-reader snapshot path
+  # (shipped in 0.5.20).
+  retentionDays: 7
+
 # Service Monitor for Prometheus (if monitoring enabled)
 serviceMonitor:
   enabled: false

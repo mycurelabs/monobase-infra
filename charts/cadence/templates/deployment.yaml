@@ -103,6 +103,18 @@ spec:
         - name: CADENCE_VALKEY_URL
           value: "redis://:$(VALKEY_PASSWORD)@{{ include "cadence.valkey.host" . }}:{{ .Values.valkey.port | default 6379 }}"
         {{- end }}
+        # Phase 3 PG-native changelog. When enabled, cadence dual-writes
+        # changelog entries to both Valkey and a cadence-owned PG schema.
+        # `readFrom` selects the authoritative read source. Defaults the
+        # DSN to the hapihub PG (same DB; cadence writes its own schema).
+        {{- if (.Values.pgChangelog | default dict).enabled }}
+        - name: CADENCE_PG_CHANGELOG_URL
+          value: {{ default (printf "postgres://$(POSTGRESQL_USER):$(POSTGRESQL_PASSWORD)@%s:5432/%s" (include "cadence.postgresql.host" .) (include "cadence.postgresql.database" .)) .Values.pgChangelog.url | quote }}
+        - name: CADENCE_CHANGELOG_READ_FROM
+          value: {{ .Values.pgChangelog.readFrom | default "valkey" | quote }}
+        - name: CADENCE_CHANGELOG_RETENTION_DAYS
+          value: {{ .Values.pgChangelog.retentionDays | default 7 | quote }}
+        {{- end }}
         # Load secrets from External Secrets Operator
         {{- if .Values.externalSecrets.enabled }}
         {{- range .Values.externalSecrets.secrets }}

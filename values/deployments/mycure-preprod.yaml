@@ -1018,6 +1018,22 @@ cadence:
     enabled: true
     serviceName: "valkey-primary"
 
+  # Phase 3.2 (cadence 0.5.29+, mycurelabs/monobase-mycure#1947):
+  # PG-native partitioned changelog dual-write soak. Cadence writes every
+  # change-log entry to both Valkey and the cadence-owned PG schema in
+  # the same `hapihub` DB. Valkey remains authoritative (`readFrom:
+  # valkey`); the schema is created idempotently via refinery migrations
+  # at boot. Watch `dual_write_divergence_total` — must stay at 0 across
+  # the 5-day soak before flipping `readFrom: pg` in a follow-up PR.
+  #
+  # No risk to current sync: if PG is unreachable the dual-write side
+  # fails open (Valkey writes succeed, divergence counter increments,
+  # WARN logged). Requires cadence image tag >= 0.5.29.
+  pgChangelog:
+    enabled: true
+    readFrom: "valkey"
+    retentionDays: 7
+
   config:
     RUST_LOG: "info"
 
