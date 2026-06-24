@@ -1018,20 +1018,22 @@ cadence:
     enabled: true
     serviceName: "valkey-primary"
 
-  # Phase 3.2 (cadence 0.5.29+, mycurelabs/monobase-mycure#1947):
-  # PG-native partitioned changelog dual-write soak. Cadence writes every
-  # change-log entry to both Valkey and the cadence-owned PG schema in
-  # the same `hapihub` DB. Valkey remains authoritative (`readFrom:
-  # valkey`); the schema is created idempotently via refinery migrations
-  # at boot. Watch `dual_write_divergence_total` — must stay at 0 across
-  # the 5-day soak before flipping `readFrom: pg` in a follow-up PR.
+  # Phase 3.3 (cadence 0.5.29+): flip changelog reads to PG-authoritative.
+  # Dual-write soak (`readFrom: valkey`) ran from 2026-06-24 02:45 UTC
+  # through 6h on real preprod traffic with `dual_write_divergence_total`
+  # at 0 across 4.5M lamport ops — empirical parity validated.
   #
-  # No risk to current sync: if PG is unreachable the dual-write side
-  # fails open (Valkey writes succeed, divergence counter increments,
-  # WARN logged). Requires cadence image tag >= 0.5.29.
+  # With `readFrom: pg` the changelog query methods (`query_since`,
+  # `_batched`, tombstones, `query_by_doc`, `max_lamports_by_doc`,
+  # `max_seq`, `min_seq`, `compact`) route to PG. Writes still
+  # dual-write — Valkey remains the seq allocator + ground truth for
+  # rollback. Reverting to `readFrom: valkey` is a one-line revert that
+  # takes effect on next pod boot.
+  #
+  # Phase 3.4 (prod) is gated on this flip soaking for >24h.
   pgChangelog:
     enabled: true
-    readFrom: "valkey"
+    readFrom: "pg"
     retentionDays: 7
 
   config:
