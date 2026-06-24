@@ -16,6 +16,11 @@ enabled: true
 
 replicaCount: 1
 
+# Recreate — single ReadWriteOnce model-cache PVC means two pods can't coexist,
+# so a RollingUpdate would deadlock on PVC attach. Terminate old before new.
+strategy:
+  type: Recreate
+
 image:
   repository: ghcr.io/mycurelabs/openmed
   pullPolicy: IfNotPresent

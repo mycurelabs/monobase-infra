@@ -10,6 +10,11 @@ spec:
   {{- if not .Values.autoscaling.enabled }}
   replicas: {{ .Values.replicaCount }}
   {{- end }}
+  # Recreate: openmed mounts a single ReadWriteOnce model-cache PVC, so two pods can never run at
+  # once — a RollingUpdate deadlocks (new pod can't attach the PVC the old pod still holds). Terminate
+  # the old pod before starting the new one.
+  strategy:
+    type: {{ .Values.strategy.type | default "Recreate" }}
   selector:
     matchLabels:
       {{- include "openmed.selectorLabels" . | nindent 6 }}
