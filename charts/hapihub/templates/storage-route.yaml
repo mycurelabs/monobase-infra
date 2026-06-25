@@ -1,12 +1,16 @@
 {{- /*
-Optional extra HTTPRoute that points /storage on a (legacy) hostname at THIS
-release's service. Used by hapihub-next (issue #44): storage/file/link URLs are
-minted from EXTERNAL_ADDRESS, which for hapihub-next resolves to the v10 host
-(hapihub.<domain>). EXTERNAL_ADDRESS is ALSO better-auth's baseURL, so it can't
-be changed without breaking auth. Routing only /storage on that host to this v11
-service fixes the URLs without touching EXTERNAL_ADDRESS. The v10 release serves
-no /storage traffic on that host, so this is non-disruptive (more-specific path
-match wins over the v10 route's PathPrefix: /).
+Optional extra HTTPRoute that points specific path prefixes on a (legacy)
+hostname at THIS release's service. Used by hapihub-next (issue #44): clients
+and minted URLs target EXTERNAL_ADDRESS, which for hapihub-next resolves to the
+v10 host (hapihub.<domain>). EXTERNAL_ADDRESS is ALSO better-auth's baseURL, so
+it can't be changed without breaking auth. Routing only the v11-only paths on
+that host to this v11 service fixes them without touching EXTERNAL_ADDRESS.
+
+Paths default to [/storage]; mycure-production also adds /device-telemetry so
+maestroapp installs (whose sync-token iss + VITE_API_SERVER both point at the
+v10 host) can reach the device-telemetry service that lives only on v11. The
+v10 release serves none of these paths on that host, so this is non-disruptive
+(more-specific path match wins over the v10 route's PathPrefix: /).
 */ -}}
 {{- if and .Values.enabled .Values.gateway.storageRoute .Values.gateway.storageRoute.enabled }}
 apiVersion: gateway.networking.k8s.io/v1
@@ -27,9 +31,11 @@ spec:
     {{- end }}
   rules:
     - matches:
+        {{- range .Values.gateway.storageRoute.paths | default (list "/storage") }}
         - path:
             type: PathPrefix
-            value: /storage
+            value: {{ . }}
+        {{- end }}
       backendRefs:
         - name: {{ include "hapihub.fullname" . }}
           port: {{ .Values.service.port }}
