@@ -1115,7 +1115,7 @@ cadence:
 
   image:
     repository: ghcr.io/mycurelabs/cadence
-    tag: "0.5.37"
+    tag: "0.5.36"
     pullPolicy: Always
 
   # Phase 1 fix: spawn one watcher task per collection so a slow
