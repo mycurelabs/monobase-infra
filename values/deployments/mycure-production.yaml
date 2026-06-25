@@ -1183,9 +1183,18 @@ cadence:
   # Failure mode: if PG is unreachable, Valkey writes still succeed
   # and `cadence:dual_write_divergence_total` on /metrics increments.
   # Sync is never blocked by a PG outage during this phase.
+  # Phase 3.5: flip prod changelog reads to PG-authoritative.
+  # Empirical soak (2026-06-24 → 2026-06-25):
+  #   - preprod readFrom=pg ran 16h on 7.6M ops, 0 divergence, 0 restarts
+  #   - prod dual-write (readFrom=valkey) ran 14h on 548k ops, 0 divergence
+  #   - PG `cadence.changelog` has 770k+ rows, daily partitions rolling
+  # Writes still dual-write so Valkey stays as the seq allocator +
+  # rollback ground truth. Phase 4 removes the Valkey changelog write
+  # path entirely once readFrom=pg has soaked enough that we're
+  # comfortable.
   pgChangelog:
     enabled: true
-    readFrom: "valkey"
+    readFrom: "pg"
     retentionDays: 7
 
   config:
