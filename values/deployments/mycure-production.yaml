@@ -374,6 +374,13 @@ hapihubNext:
       sectionName: https-lfh
       hostnames:
         - hapihub.localfirsthealth.com
+      # v11-only paths to forward from the v10 host to hapihub-next.
+      # /device-telemetry: maestroapp installs' sync-token iss + VITE_API_SERVER
+      # both point at the v10 host, but the device-telemetry service lives only
+      # on v11. v10 returns 404 for these paths, so forwarding is non-disruptive.
+      paths:
+        - /storage
+        - /device-telemetry
 
   betterAuth:
     passkey:
