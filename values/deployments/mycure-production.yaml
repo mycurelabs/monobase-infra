@@ -344,6 +344,10 @@ hapihubNext:
     tag: "11.20.29"
     pullPolicy: IfNotPresent
 
+  # Daily cleanup of expired Better Auth sessions (they never self-delete).
+  pruneExpiredSessions:
+    enabled: true
+
   replicaCount: 3
 
   resources:
