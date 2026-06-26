@@ -856,8 +856,10 @@ syncd:
 
 # ===== DATABASE: PostgreSQL (HA, Tier 4.2) =====
 # Replication mode: 1 primary + 1 read replica with streaming replication.
-# Sized for the migrated 11.x dataset (~35GB useful from MongoDB) plus
-# 18 months growth headroom. See plan: tier 4.2 in DIFF.md.
+# Migrator dual-write grew the DB to ~187GB (5x the original ~35GB MongoDB
+# projection), filling the 200Gi volumes on 2026-06-25 and crashlooping the
+# primary (disk-full during WAL redo). Bumped 200Gi -> 300Gi. Growth rate
+# needs review — this will refill. See plan: tier 4.2 in DIFF.md.
 postgresql:
   enabled: true
 
@@ -883,7 +885,7 @@ postgresql:
     persistence:
       enabled: true
       storageClass: ""
-      size: 200Gi
+      size: 300Gi
     resources:
       requests:
         cpu: 250m
@@ -907,7 +909,7 @@ postgresql:
     persistence:
       enabled: true
       storageClass: ""
-      size: 200Gi
+      size: 300Gi
     resources:
       requests:
         cpu: 100m
