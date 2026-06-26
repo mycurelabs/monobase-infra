@@ -259,9 +259,9 @@ hapihub:
     secrets:
       # Google OAuth
       - secretKey: GOOGLE_CLIENT_ID
-        remoteKey: mycure-production-google-oauth-client-id
+        remoteKey: mycure-preprod-google-oauth-client-id
       - secretKey: GOOGLE_CLIENT_SECRET
-        remoteKey: mycure-production-google-oauth-client-secret
+        remoteKey: mycure-preprod-google-oauth-client-secret
       - secretKey: STRIPE_SECRET_KEY
         remoteKey: mycure-preprod-stripe-secret-key
       # Encryption keys
