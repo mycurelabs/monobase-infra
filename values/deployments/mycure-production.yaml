@@ -165,7 +165,7 @@ mycure-pxp:
     sectionName: https-lfh
 
   config:
-    API_URL: "https://hapihub.localfirsthealth.com"
+    API_URL: "https://hapihub-next.localfirsthealth.com"
 
   podDisruptionBudget:
     enabled: false
@@ -393,6 +393,7 @@ hapihubNext:
     CORS_ALLOW_LOCAL_NETWORK: "false"
     CORS_ALLOW_MOBILE_APPS: "true"
     ACCOUNTS_SERVICE_ACCOUNT_EMAILS: "service@mycure.md"
+    APPLE_APP_BUNDLE_IDENTIFIER: "com.mycure.pxp"
 
   env:
     - name: BETTER_AUTH_RATE_LIMIT_ENABLED

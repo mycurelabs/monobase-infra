@@ -56,6 +56,7 @@ hapihub:
     CORS_ALLOW_LOCAL_NETWORK: "false"
     CORS_ALLOW_MOBILE_APPS: "true"
     ACCOUNTS_SERVICE_ACCOUNT_EMAILS: "service@mycure.md"
+    APPLE_APP_BUNDLE_IDENTIFIER: "com.mycure.pxp"
   env:
     # better-auth rate limiting is DISABLED for this demo. The seed signs in as
     # every staff user (profile patches) and per-conversation participants
