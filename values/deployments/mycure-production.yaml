@@ -1202,25 +1202,6 @@ cadence:
     enabled: true
     readFrom: "pg"
     retentionDays: 7
-    # 2026-06-26 ops mitigation: cap statement_timeout=10s on cadence's
-    # PG-changelog connections to bound the worst-case query duration.
-    # `max_lamports_by_doc_for_collection` was running 11+ minutes on
-    # the 78GB d25 partition even with a covering index (it scans the
-    # full collection's lamport history per call, ~830 calls/sec under
-    # peer-reconnect churn), pool-saturating and triggering Phase 4a's
-    # load-bearing `append_change` to fail (~42 errors / 60 min observed).
-    # With this timeout PG kills the slow query at 10s; cadence's existing
-    # fallback ("max_lamports_by_doc_for_collection failed; falling back
-    # to lamport=1") kicks in. Pool drains; appends succeed.
-    #
-    # Side effect: primary-DB-replayed rows get stamped lamport=1, so they
-    # always lose LWW vs peer-originated changes. Acceptable during
-    # catchup — peers' writes are expected to win against historical
-    # primary-DB baseline rows.
-    #
-    # URL template overrides the chart default. `options=-c%20...` is
-    # libpq's per-connection settings syntax (URL-encoded space + equals).
-    url: "postgres://$(POSTGRESQL_USER):$(POSTGRESQL_PASSWORD)@postgresql-primary.mycure-production.svc.cluster.local:5432/hapihub?options=-c%20statement_timeout%3D10000"
 
   config:
     RUST_LOG: "info"
