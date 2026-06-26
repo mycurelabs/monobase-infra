@@ -52,9 +52,17 @@ spec:
             {{- toYaml . | nindent 12 }}
             {{- end }}
           {{- end }}
-          {{- with .Values.tolerations }}
+          {{- if or $nodePool .Values.tolerations }}
           tolerations:
+            {{- if $nodePool }}
+            - key: "node-pool"
+              operator: "Equal"
+              value: {{ $nodePool | quote }}
+              effect: "NoSchedule"
+            {{- end }}
+            {{- with .Values.tolerations }}
             {{- toYaml . | nindent 12 }}
+            {{- end }}
           {{- end }}
           securityContext:
             {{- toYaml .Values.podSecurityContext | nindent 12 }}
