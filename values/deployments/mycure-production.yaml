@@ -1118,7 +1118,7 @@ cadence:
 
   image:
     repository: ghcr.io/mycurelabs/cadence
-    tag: "0.5.36"
+    tag: "0.5.39"
     pullPolicy: Always
 
   # Phase 1 fix: spawn one watcher task per collection so a slow
@@ -1202,7 +1202,10 @@ cadence:
   pgChangelog:
     enabled: true
     readFrom: "pg"
-    retentionDays: 7
+    # 2026-06-26: dropped 7→2 after the 158 GB d25 reseed event.
+    # Cost: peers offline >2 days fall below the lamport trim floor
+    # and must do a snapshot-based resume (existing code path).
+    retentionDays: 2
 
   config:
     RUST_LOG: "info"
