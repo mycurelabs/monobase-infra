@@ -341,7 +341,7 @@ hapihubNext:
 
   image:
     repository: ghcr.io/mycurelabs/hapihub
-    tag: "11.20.31"
+    tag: "11.20.32"
     pullPolicy: IfNotPresent
 
   # Daily cleanup of expired Better Auth sessions (they never self-delete).
@@ -398,6 +398,10 @@ hapihubNext:
     CORS_ALLOW_MOBILE_APPS: "true"
     ACCOUNTS_SERVICE_ACCOUNT_EMAILS: "service@mycure.md"
     APPLE_APP_BUNDLE_IDENTIFIER: "com.mycure.pxp"
+    # Issue #44: mint storage file/link URLs on hapihub-next's own host instead of
+    # the v10 host (EXTERNAL_ADDRESS, which is also Better Auth's baseURL and can't
+    # change). Requires hapihub >= 11.20.32 (which wires storage.downloadURLHost).
+    STORAGE_DOWNLOAD_URL_HOST: "https://hapihub-next.localfirsthealth.com"
 
   env:
     - name: BETTER_AUTH_RATE_LIMIT_ENABLED
