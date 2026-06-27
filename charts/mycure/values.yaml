@@ -101,6 +101,8 @@ affinity: {}
 config:
   API_URL: ""  # Set to HapiHub public URL (e.g., https://hapihub.example.com)
   HAPIHUB_URL: ""  # Set to HapiHub public URL (e.g., https://hapihub.example.com)
+  POSTHOG_KEY: ""  # PostHog project API key (phc_...). Leave blank to disable analytics for this env.
+  POSTHOG_HOST: ""  # PostHog host; blank defaults to https://us.i.posthog.com
 
 networkPolicy:
   enabled: true

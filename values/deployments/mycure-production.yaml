@@ -547,6 +547,11 @@ mycure:
     # v11 takes over hapihub.localfirsthealth.com.
     API_URL: "https://hapihub-next.localfirsthealth.com"
     HAPIHUB_URL: "https://hapihub-next.localfirsthealth.com"
+    # PostHog product analytics. Public project key (phc_...), safe to commit —
+    # it ships to the browser anyway. Blank on demo/preprod keeps analytics off
+    # there. Host blank → defaults to https://us.i.posthog.com (free plan, US).
+    POSTHOG_KEY: "phc_yHbJY82kkxQ5YGUc6Z6J438SYxQfCrSJCptG2LkhM9yE"
+    POSTHOG_HOST: ""
 
   podDisruptionBudget:
     enabled: false
