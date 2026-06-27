@@ -1234,7 +1234,15 @@ cadence:
 # write on the allowlist into `_pg_changelog`. Capture-only — no MongoDB
 # replay; the changelog is the rollback forensic trail.
 hapihubMigrator:
-  enabled: true # Phase 2 — bulk migration started 2026-04-07
+  # PAUSED 2026-06-27 — the migrator (forward CDC + reverse + nightly bulk) is the
+  # dominant writer feeding cadence's pgChangelog (confirmed: billing-invoices 51M
+  # rows / 936K invoices = ~55x re-log/day, single local-origin peer, 0 client-peer
+  # traffic). Pausing it stops the changelog disk-fill while the write-gating fix
+  # (IS DISTINCT FROM) is shipped. Reverse-cdc triggers torn down manually so
+  # _pg_changelog stops growing. Safe: ~12.5d oplog window + 48h nightly backstop +
+  # latest-wins idempotent re-sync; both DBs keep their own data. Re-enable after
+  # the fix lands (~2 days). See mycurelabs/monobase-infra#63.
+  enabled: false # was: true # Phase 2 — bulk migration started 2026-04-07
   replicaCount: 1  # re-enabled 2026-06-10 after cadence 0.5.13 keyset fix landed
 
   image:
