@@ -676,7 +676,7 @@ mycurev8:
 
   image:
     repository: ghcr.io/mycurelabs/mycureapp
-    tag: "8.24.11"
+    tag: "8.24.12"
     pullPolicy: IfNotPresent
 
   replicaCount: 1
