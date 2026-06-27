@@ -1127,7 +1127,21 @@ mailpit:
 
 # ===== P2P SYNC: Cadence — Tier 4.4 =====
 cadence:
-  enabled: true
+  # PAUSED 2026-06-27 — holding measure to stop the cadence.changelog disk-fill
+  # while the root-cause fix is built. cadence is the changelog WRITER (its
+  # watcher logs every PG row-change field-by-field), so disabling it is the
+  # definitive way to stop the growth — confirmed after ruling out the migrator
+  # (changelog kept growing ~9k rows/sec with the migrator fully off; the churn
+  # is billing-items/invoices/queue-items/analytics re-logged ~68x/30s, a
+  # watcher re-log loop and/or hapihub-next background-job churn). SAFE: cadence
+  # is a separate P2P sync layer — hapihub-next API / login / web app read PG
+  # directly and are UNAFFECTED. Only offline-first embedded clients lose
+  # realtime sync; they keep working locally and RECONCILE on restart (watcher
+  # re-scans PG → snapshot/incremental per-peer watermark; client offline edits
+  # push up via LWW; converges to current state, no data loss). Re-enable AFTER
+  # the watcher/churn fix lands, else the catch-up burst re-floods. See
+  # mycurelabs/monobase-infra#63.
+  enabled: false # was: true
 
   image:
     repository: ghcr.io/mycurelabs/cadence
