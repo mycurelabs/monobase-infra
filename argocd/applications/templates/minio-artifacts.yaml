@@ -46,7 +46,13 @@ spec:
             tag: {{ (index .Values "minio-artifacts").image.tag | default "2025.7.23-debian-12-r3" }}
           # The provisioning Job's os-shell init container defaults to
           # docker.io/bitnami/os-shell, which 404s since Bitnami moved images to
-          # bitnamilegacy/ (Aug 2025). Point it at the legacy mirror too.
+          # bitnamilegacy/ (Aug 2025). Point it at the legacy mirror.
+          # Chart 14.10.5 reads `volumePermissions.image`; newer 14.x renamed it to
+          # `defaultInitContainers.volumePermissions.image`. Set both so a chart
+          # bump within the `14.x.x` range can't reintroduce the broken image.
+          volumePermissions:
+            image:
+              repository: bitnamilegacy/os-shell
           defaultInitContainers:
             volumePermissions:
               image:
