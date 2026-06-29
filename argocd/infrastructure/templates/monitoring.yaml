@@ -59,9 +59,28 @@ spec:
             runAsUser: 1000
             fsGroup: 2000
 
-        # Alertmanager configuration (disabled for resource-constrained staging)
+        # Alertmanager configuration
         alertmanager:
-          enabled: false
+          enabled: {{ .Values.monitoring.alertmanager.enabled }}
+          image:
+            repository: bitnamilegacy/alertmanager
+          persistence:
+            enabled: true
+            storageClass: ""
+            size: 2Gi
+          resources:
+            requests:
+              cpu: "10m"
+              memory: "32Mi"
+            limits:
+              cpu: "50m"
+              memory: "64Mi"
+          # Config (route + Postmark email receiver) is supplied externally via the
+          # alertmanager-config ExternalSecret in infrastructure/monitoring/, so the
+          # Postmark API token (which is BOTH the SMTP username and password) stays in
+          # GCP Secret Manager. Operator reads secret:
+          #   alertmanager-monitoring-kube-prometheus-alertmanager (key alertmanager.yaml)
+          externalConfig: true
         
         # Blackbox Exporter
         blackboxExporter:

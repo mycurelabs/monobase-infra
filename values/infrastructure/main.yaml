@@ -461,20 +461,12 @@ monitoring:
       enabled: true
       hostname: ""  # Uses grafana.{domain}
   
-  # Alertmanager configuration
+  # Alertmanager (wired into kube-prometheus via templates/monitoring.yaml).
+  # Config + Postmark token are provided via the alertmanager-config ExternalSecret
+  # (infrastructure/monitoring/alertmanager-config-externalsecret.yaml), NOT here,
+  # because Postmark's SMTP username is the secret API token (no smtp_auth_username_file).
   alertmanager:
     enabled: true
-    storageClass: ""  # Auto-detect
-    
-    # Slack notifications (optional)
-    slack:
-      webhookUrl: ""  # Set to Slack webhook URL for alerts
-    
-    # Email notifications (optional)
-    email:
-      smarthost: ""  # SMTP server (e.g., smtp.gmail.com:587)
-      from: ""  # From email address
-      to: ""  # To email address
 
 # Tailscale egress to the vanaheim workstation Ollama (medical-AI preprod inference)
 ollamaEgress:
