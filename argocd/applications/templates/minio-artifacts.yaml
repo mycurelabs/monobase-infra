@@ -64,6 +64,28 @@ spec:
             extraCommands:
               - mc mb --ignore-existing provisioning/artifacts
               - mc anonymous set download provisioning/artifacts
+            # Least-privilege publisher policy + user for CI. CI authenticates
+            # with THIS scoped user (PutObject/GetObject on the artifacts bucket),
+            # never the MinIO root creds — so a leaked CI key can't reach admin,
+            # other buckets, or delete objects. The password is sourced from the
+            # minio-artifacts-ci secret (ExternalSecret), never plaintext in git.
+            policies:
+              - name: minio-artifacts-publisher
+                statements:
+                  - effect: "Allow"
+                    resources:
+                      - "arn:aws:s3:::artifacts"
+                    actions:
+                      - "s3:ListBucket"
+                      - "s3:GetBucketLocation"
+                  - effect: "Allow"
+                    resources:
+                      - "arn:aws:s3:::artifacts/*"
+                    actions:
+                      - "s3:PutObject"
+                      - "s3:GetObject"
+            usersExistingSecrets:
+              - minio-artifacts-ci
           persistence:
             enabled: true
             storageClass: {{ (index .Values "minio-artifacts").persistence.storageClass | default "" }}
