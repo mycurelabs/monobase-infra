@@ -84,7 +84,9 @@ spec:
         kubelet:
           serviceMonitor:
             relabelings:
-              - targetLabel: metrics_path
+              # action: replace is the CRD default; spelled out to avoid Argo drift.
+              - action: replace
+                targetLabel: metrics_path
                 replacement: /metrics
 
         # Alertmanager configuration
