@@ -906,7 +906,7 @@ postgresql:
         memory: 4Gi
       limits:
         cpu: 2000m
-        memory: 8Gi
+        memory: 12Gi  # bumped 8Gi->12Gi 2026-06-29: primary was at ~95% mem (7.6/8Gi), OOM-kill headroom
     # Perf tuning — replaces PG defaults (shared_buffers 128MB / work_mem 4MB)
     # for the 35GB DB; sized to the 8Gi pod limit. See node-separation issue
     # for the CPU-oversubscription follow-up. Applying restarts the primary.
