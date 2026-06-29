@@ -1124,6 +1124,31 @@ minio:
     rateLimit:
       enabled: false
 
+# ===== ARTIFACTS STORE: public-read MinIO for desktop releases =====
+# Dedicated MinIO serving Tauri auto-updater manifests + installers at
+# artifacts.localfirsthealth.com. Replaces the legacy downloads.mycure.md box.
+minio-artifacts:
+  enabled: true
+
+  image:
+    repository: bitnamilegacy/minio
+    tag: "2025.7.23-debian-12-r3"
+
+  persistence:
+    size: 10Gi
+
+  resources:
+    requests:
+      cpu: 50m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+  gateway:
+    hostname: ""  # defaults to artifacts.localfirsthealth.com
+    sectionName: https-lfh
+
 # ===== EMAIL TESTING: Mailpit =====
 mailpit:
   enabled: false

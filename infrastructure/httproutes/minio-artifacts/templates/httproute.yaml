@@ -1,0 +1,26 @@
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: minio-artifacts
+  namespace: {{ .Values.namespace }}
+spec:
+  parentRefs:
+    - name: {{ .Values.gateway.name }}
+      namespace: {{ .Values.gateway.namespace }}
+      sectionName: {{ .Values.gateway.sectionName }}
+  hostnames:
+    - {{ .Values.hostname }}
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      # No path rewrite: MinIO runs with MINIO_DOMAIN={{ .Values.minioDomain }} so a
+      # host-style request to {{ .Values.hostname }} resolves to bucket `artifacts`
+      # with the path as the object key — public URLs stay clean
+      # (/maestroapp/...) AND authenticated S3 writes keep a stable signed path
+      # (a gateway rewrite would break SigV4). CI writes path-style to the same host.
+      backendRefs:
+        - name: minio-artifacts
+          port: 9000
+          weight: 1
