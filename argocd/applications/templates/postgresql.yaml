@@ -100,6 +100,13 @@ spec:
           extendedConfiguration: |
             {{- .Values.postgresql.readReplicas.extendedConfiguration | nindent 12 }}
           {{- end }}
+          {{- if .Values.postgresql.readReplicas.customStartupProbe }}
+          # Gates liveness until the initial pg_basebackup completes. Without
+          # this, a large re-clone (139GB+) is SIGKILLed by liveness every ~90s
+          # and restarts forever. See disk-full incident 2026-06-25.
+          customStartupProbe:
+            {{- toYaml .Values.postgresql.readReplicas.customStartupProbe | nindent 12 }}
+          {{- end }}
           {{- if .Values.postgresql.podDisruptionBudget }}
           podDisruptionBudget:
             {{- toYaml .Values.postgresql.podDisruptionBudget | nindent 12 }}

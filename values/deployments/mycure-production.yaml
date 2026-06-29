@@ -940,6 +940,21 @@ postgresql:
       maintenance_work_mem = 256MB
       random_page_cost = 1.1
       effective_io_concurrency = 200
+    # Startup probe gates liveness during the initial pg_basebackup. The DB is
+    # ~140GB, so a re-clone takes ~90min — the default liveness probe would
+    # SIGKILL the pod every ~90s and restart the clone forever. 180min ceiling
+    # (720 * 15s). See disk-full / replica re-clone incident 2026-06-25.
+    customStartupProbe:
+      exec:
+        command:
+          - /bin/sh
+          - -c
+          - exec pg_isready -U postgres -d dbname=hapihub -h 127.0.0.1 -p 5432
+      initialDelaySeconds: 30
+      periodSeconds: 15
+      timeoutSeconds: 5
+      failureThreshold: 720
+      successThreshold: 1
 
   podDisruptionBudget:
     enabled: true
