@@ -1,0 +1,10 @@
+hostname: artifacts.example.com
+namespace: default
+# Parent domain MinIO is configured with (MINIO_DOMAIN). A host-style request to
+# <bucket>.<minioDomain> resolves to that bucket, so artifacts.<minioDomain>
+# serves the `artifacts` bucket with clean object-key paths (no /bucket prefix).
+minioDomain: example.com
+gateway:
+  name: nginx-shared-gateway
+  namespace: nginx-gateway-system
+  sectionName: https-lfh
