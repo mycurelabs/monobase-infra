@@ -677,7 +677,7 @@ mycure-deploydash:
 
 # ===== HEALTHCARE: Frontend Application (v8 Legacy) =====
 mycurev8:
-  enabled: false  # decommissioned 2026-06-29 (legacy v8 frontend taken down)
+  enabled: true  # re-enabled 2026-06-29 (legacy v8 frontend brought back)
 
   image:
     repository: ghcr.io/mycurelabs/mycureapp
