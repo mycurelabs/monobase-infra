@@ -44,6 +44,13 @@ spec:
           image:
             repository: {{ (index .Values "minio-artifacts").image.repository | default "bitnamilegacy/minio" }}
             tag: {{ (index .Values "minio-artifacts").image.tag | default "2025.7.23-debian-12-r3" }}
+          # The provisioning Job's os-shell init container defaults to
+          # docker.io/bitnami/os-shell, which 404s since Bitnami moved images to
+          # bitnamilegacy/ (Aug 2025). Point it at the legacy mirror too.
+          defaultInitContainers:
+            volumePermissions:
+              image:
+                repository: bitnamilegacy/os-shell
           mode: standalone
           statefulset:
             replicaCount: 1
