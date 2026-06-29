@@ -182,7 +182,7 @@ hapihub:
 
   image:
     repository: ghcr.io/mycurelabs/hapihub
-    tag: "11.20.33"
+    tag: "11.20.34"
     pullPolicy: IfNotPresent
 
   # Daily cleanup of expired Better Auth sessions (they never self-delete).
