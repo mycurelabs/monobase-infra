@@ -972,20 +972,17 @@ mailpit:
 
 # ===== P2P SYNC: Cadence =====
 cadence:
-  # PAUSED 2026-06-29 — mirror of prod's 06-27 holding measure (PR ~mid-June).
-  # Preprod PG hit 100% disk today; cadence_y2026m06d26 alone was 125 GB
-  # of re-logged billing-items/queue-items/analytics rows (same watcher
-  # re-log loop / hapihub-next background-job churn that forced the prod
-  # pause). Dropped d26 manually 09:30 UTC to reclaim 124 GB (100% → 38%);
-  # this pause prevents the next d27/d28/d29 from refilling. Re-enable
-  # AFTER the watcher/churn fix lands — until then preprod has no offline
-  # sync, but the API + login + web app read PG directly and are UNAFFECTED.
-  # See monobase-infra#63.
-  enabled: false # was: true
+  # Re-enabled 2026-06-29 on 0.5.41 (mono#2065) which fixes the watermark
+  # epoch-walk that produced the 06-27 prod and 06-29 preprod disk-fills.
+  # PgPollWatcher.watermarks no longer falls back to 1970-01-01 when a
+  # baseline scan fails — it seeds from MAX(updated_at) of the table
+  # instead, eliminating the full-table re-log loop. Prod stays paused
+  # until preprod soak (~1 h) confirms zero billing-items run-away.
+  enabled: true
 
   image:
     repository: ghcr.io/mycurelabs/cadence
-    tag: "0.5.40"
+    tag: "0.5.41"
     pullPolicy: Always
 
   # Phase 1a: per-collection watcher workers, throttled by the 0.5.25
