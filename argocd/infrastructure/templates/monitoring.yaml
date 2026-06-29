@@ -59,6 +59,34 @@ spec:
             runAsUser: 1000
             fsGroup: 2000
 
+          # ponytail: managed control plane (DOKS) — kube-proxy/scheduler/controller-manager
+          # are NOT scrapeable, so their *Down rules fire forever on absent() metrics.
+          # Disable those rule groups. Re-enable per-flag if deployed to on-prem k3s.
+          defaultRules:
+            create: true
+            rules:
+              kubeProxy: false
+              kubeControllerManager: false
+              kubeSchedulerAlerting: false
+              kubeSchedulerRecording: false
+
+        # ServiceMonitors for the non-scrapeable managed control-plane components.
+        kubeProxy:
+          enabled: false
+        kubeScheduler:
+          enabled: false
+        kubeControllerManager:
+          enabled: false
+
+        # KubeletDown fires falsely: the bundled rule matches up{job="kubelet",
+        # metrics_path="/metrics"} but this chart's kubelet ServiceMonitor emits no
+        # metrics_path label. Add it back so the rule sees the (healthy) targets.
+        kubelet:
+          serviceMonitor:
+            relabelings:
+              - targetLabel: metrics_path
+                replacement: /metrics
+
         # Alertmanager configuration
         alertmanager:
           enabled: {{ .Values.monitoring.alertmanager.enabled }}
