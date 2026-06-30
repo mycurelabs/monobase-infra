@@ -677,7 +677,7 @@ mycure-deploydash:
 
 # ===== HEALTHCARE: Frontend Application (v8 Legacy) =====
 mycurev8:
-  enabled: false  # disabled 2026-06-29 (legacy v8 frontend taken down again)
+  enabled: true  # 2026-06-29: internal-only via private host (below)
 
   image:
     repository: ghcr.io/mycurelabs/mycureapp
@@ -695,7 +695,9 @@ mycurev8:
       memory: 128Mi
 
   gateway:
-    hostname: ""
+    # Internal-only host. Single-label so the existing *.localfirsthealth.com
+    # cert + https-lfh listener cover it; NOT the public mycurev8.lfh host.
+    hostname: "mycurev8-private.localfirsthealth.com"
     sectionName: https-lfh # Use localfirsthealth.com HTTPS listener
 
   config:
