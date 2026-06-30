@@ -136,6 +136,11 @@ mycure-dashboard:
   podDisruptionBudget:
     enabled: false
 
+# ===== INTERNAL TOOL: NocoDB (no-code DB UI for business, issue #2041) =====
+# Disabled in demo; enabled on preprod only for now.
+nocodb:
+  enabled: false
+
 # ===== HEALTHCARE: Frontend Application (mycureapp) =====
 mycure:
   enabled: true

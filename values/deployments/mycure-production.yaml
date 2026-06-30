@@ -131,6 +131,13 @@ mycure-dashboard:
   podDisruptionBudget:
     enabled: false
 
+# ===== INTERNAL TOOL: NocoDB (no-code DB UI for business, issue #2041) =====
+# Disabled until validated on preprod. Production rollout (separate PR) flips this
+# on and adds an ExternalSecret for a stable NC_AUTH_JWT_SECRET + admin bootstrap,
+# plus a dedicated read-only Postgres role for the data source.
+nocodb:
+  enabled: false
+
 # ===== HEALTHCARE: MyCure PXP (patient-facing web app) =====
 mycure-pxp:
   enabled: true
