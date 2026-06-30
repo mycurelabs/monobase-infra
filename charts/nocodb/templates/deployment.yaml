@@ -1,0 +1,84 @@
+{{- if .Values.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "nocodb.fullname" . }}
+  namespace: {{ include "nocodb.namespace" . }}
+  labels:
+    {{- include "nocodb.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  # RWO PVC can't attach to old+new pods at once; rolling update would deadlock.
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "nocodb.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "nocodb.selectorLabels" . | nindent 8 }}
+    spec:
+      containers:
+      - name: {{ .Chart.Name }}
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        ports:
+        - name: http
+          containerPort: {{ .Values.service.targetPort }}
+          protocol: TCP
+        livenessProbe:
+          httpGet:
+            path: {{ .Values.probePath }}
+            port: http
+          initialDelaySeconds: 30
+          periodSeconds: 15
+        readinessProbe:
+          httpGet:
+            path: {{ .Values.probePath }}
+            port: http
+          initialDelaySeconds: 15
+          periodSeconds: 10
+        resources:
+          {{- toYaml .Values.resources | nindent 12 }}
+        {{- if .Values.config }}
+        env:
+        {{- range $key, $value := .Values.config }}
+        - name: {{ $key }}
+          value: {{ $value | quote }}
+        {{- end }}
+        {{- end }}
+        volumeMounts:
+        - name: data
+          mountPath: /usr/app/data
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: {{ include "nocodb.fullname" . }}-data
+      {{- $nodePool := include "nocodb.nodePool" . -}}
+      {{- if or $nodePool .Values.nodeSelector }}
+      nodeSelector:
+        {{- if $nodePool }}
+        node-pool: {{ $nodePool }}
+        {{- end }}
+        {{- with .Values.nodeSelector }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- if or $nodePool .Values.tolerations }}
+      tolerations:
+        {{- if $nodePool }}
+        - key: "node-pool"
+          operator: "Equal"
+          value: {{ $nodePool | quote }}
+          effect: "NoSchedule"
+        {{- end }}
+        {{- with .Values.tolerations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      {{- end }}
+{{- end }}

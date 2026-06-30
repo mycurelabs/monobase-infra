@@ -1,0 +1,6 @@
+apiVersion: v2
+name: nocodb
+description: Self-hosted NocoDB (no-code DB UI) for business to browse Postgres data
+type: application
+version: 0.1.0
+appVersion: "2026.06.2"

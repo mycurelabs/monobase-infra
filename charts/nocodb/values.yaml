@@ -1,0 +1,49 @@
+global:
+  domain: example.com
+  namespace: example
+  gateway:
+    name: shared-gateway
+    namespace: gateway-system
+
+enabled: true
+replicaCount: 1
+
+image:
+  repository: nocodb/nocodb
+  tag: "2026.06.2"
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 8080
+
+# SQLite metadata + attachments live here; PVC keeps them across pod restarts.
+persistence:
+  size: 5Gi
+  storageClass: ""  # "" = DO default (do-block-storage)
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 512Mi
+  limits:
+    cpu: 1000m
+    memory: 1536Mi
+
+gateway:
+  enabled: true
+  hostname: ""        # defaults to nocodb.{global.domain}
+  sectionName: ""     # e.g. https-preprod-lfh
+
+# Plain (non-secret) env. NC_DB / NC_AUTH_JWT_SECRET / NC_ADMIN_* are intentionally
+# absent for preprod: SQLite metadata default, first signup becomes super-admin,
+# auto-generated JWT is fine for an ephemeral env.
+config:
+  NC_DISABLE_PG_DATA_REFLECTION: "true"
+
+probePath: /api/health
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
