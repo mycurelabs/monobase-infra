@@ -19,8 +19,16 @@ spec:
       labels:
         {{- include "nocodb.selectorLabels" . | nindent 8 }}
     spec:
+      {{- with .Values.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       containers:
       - name: {{ .Chart.Name }}
+        {{- with .Values.securityContext }}
+        securityContext:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
         image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
         imagePullPolicy: {{ .Values.image.pullPolicy }}
         ports:
@@ -41,12 +49,13 @@ spec:
           periodSeconds: 10
         resources:
           {{- toYaml .Values.resources | nindent 12 }}
-        {{- if .Values.config }}
         env:
+        # Non-root uid can't write the image default HOME (/root); point it at the PVC.
+        - name: HOME
+          value: /usr/app/data
         {{- range $key, $value := .Values.config }}
         - name: {{ $key }}
           value: {{ $value | quote }}
-        {{- end }}
         {{- end }}
         volumeMounts:
         - name: data
