@@ -1299,7 +1299,7 @@ hapihubMigrator:
 
   image:
     repository: ghcr.io/mycurelabs/hapihub-migrator
-    tag: "3.9.2"  # #2063 fwd <= + reverse mirror (same-second ties apply incoming); both verified end-to-end on preprod
+    tag: "3.9.3"  # #2092: legacy billing-invoices → billing_legacy_invoices (was mis-mapped to billing_invoices); + billing.invoices → billing_invoices. Reverse map follows registry.
     pullPolicy: IfNotPresent
 
   # bulk (Phase 3) → cdc (Phase 4) → reverse-cdc (Phase 6, post-cutover)
