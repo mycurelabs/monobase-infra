@@ -36,13 +36,32 @@ gateway:
   hostname: ""        # defaults to nocodb.{global.domain}
   sectionName: ""     # e.g. https-preprod-lfh
 
+# Namespace enforces the restricted PodSecurity standard, so NocoDB must run
+# non-root. fsGroup makes the PVC group-writable for the runAsUser; HOME is
+# pointed at the PVC (env below) because the image's default /root isn't writable
+# for a non-root uid. Verified: nocodb 2026.06.2 boots clean as uid 1000.
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  runAsGroup: 1000
+  fsGroup: 1000
+  seccompProfile:
+    type: RuntimeDefault
+
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+  # readOnlyRootFilesystem intentionally NOT set: NocoDB writes to its cwd/tmp.
+
 # Plain (non-secret) env. NC_DB / NC_AUTH_JWT_SECRET / NC_ADMIN_* are intentionally
 # absent for preprod: SQLite metadata default, first signup becomes super-admin,
 # auto-generated JWT is fine for an ephemeral env.
 config:
   NC_DISABLE_PG_DATA_REFLECTION: "true"
 
-probePath: /api/health
+probePath: /api/v1/health
 
 nodeSelector: {}
 tolerations: []
