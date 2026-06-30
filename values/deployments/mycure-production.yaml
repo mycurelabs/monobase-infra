@@ -1299,7 +1299,7 @@ hapihubMigrator:
 
   image:
     repository: ghcr.io/mycurelabs/hapihub-migrator
-    tag: "3.9.1"  # #2063: latest-wins guard <→<= (same-second updates no longer dropped); verified end-to-end on preprod
+    tag: "3.9.2"  # #2063 fwd <= + reverse mirror (same-second ties apply incoming); both verified end-to-end on preprod
     pullPolicy: IfNotPresent
 
   # bulk (Phase 3) → cdc (Phase 4) → reverse-cdc (Phase 6, post-cutover)
