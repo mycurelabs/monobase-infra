@@ -60,6 +60,11 @@ securityContext:
 # auto-generated JWT is fine for an ephemeral env.
 config:
   NC_DISABLE_PG_DATA_REFLECTION: "true"
+  # Allow connecting an external data source on a private/cluster address
+  # (the hapihub Postgres is an in-cluster ClusterIP, host "postgresql").
+  # Without this, NocoDB's SSRF guard rejects it: "Connection to internal
+  # hosts is not allowed".
+  NC_ALLOW_LOCAL_EXTERNAL_DBS: "true"
 
 probePath: /api/v1/health
 
