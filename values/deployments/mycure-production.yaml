@@ -908,7 +908,10 @@ postgresql:
     persistence:
       enabled: true
       storageClass: ""
-      size: 300Gi
+      # 400Gi: emergency-expanded live on 2026-06-29 during a changelog-spike
+      # disk-fill; this reconciles repo+STS template to the live PVC. Read
+      # replica stays 300Gi. See disk-full incident notes.
+      size: 400Gi
     resources:
       requests:
         cpu: 250m
@@ -942,6 +945,11 @@ postgresql:
         memory: 8Gi
     # Keep the replica's config in lockstep with the primary (idle today, but
     # ready for read-offload and consistent on promotion). Restarts the replica.
+    # primary_slot_name pins the replica to a persistent physical slot
+    # (pg_read_replica) so the primary retains WAL until the replica consumes it
+    # — prevents the "WAL segment already removed" death the replica hit on
+    # 2026-06-25. Capped on the primary by max_slot_wal_keep_size=80GB so a dead
+    # replica can't refill the primary disk.
     extendedConfiguration: |
       shared_buffers = 2GB
       effective_cache_size = 5GB
@@ -949,6 +957,7 @@ postgresql:
       maintenance_work_mem = 256MB
       random_page_cost = 1.1
       effective_io_concurrency = 200
+      primary_slot_name = 'pg_read_replica'
     # Startup probe gates liveness during the initial pg_basebackup. The DB is
     # ~140GB, so a re-clone takes ~90min — the default liveness probe would
     # SIGKILL the pod every ~90s and restart the clone forever. 180min ceiling
