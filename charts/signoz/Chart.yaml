@@ -1,0 +1,24 @@
+apiVersion: v2
+name: signoz
+description: SigNoz observability platform with Gateway API integration
+type: application
+version: 1.0.0
+appVersion: "0.130.1"
+keywords:
+  - observability
+  - signoz
+  - tracing
+  - logs
+  - metrics
+home: https://github.com/mycurelabs/monobase-infra
+sources:
+  - https://github.com/SigNoz/signoz
+maintainers:
+  - name: MyCure Labs
+    email: devops@mycure.md
+
+dependencies:
+  - name: signoz
+    version: "0.130.1"
+    repository: https://charts.signoz.io
+    condition: enabled

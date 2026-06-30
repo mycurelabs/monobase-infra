@@ -1,0 +1,60 @@
+# Default values for the SigNoz chart wrapper.
+# Override in deployment-specific values (values/infrastructure/main.yaml -> signoz:).
+
+# Global configuration (shared across charts)
+global:
+  domain: example.com
+  namespace: signoz
+  environment: production
+  gateway:
+    name: shared-gateway
+    namespace: gateway-system
+
+enabled: false # Master enable/disable for SigNoz + HTTPRoute
+
+nameOverride: ""
+fullnameOverride: ""
+
+# Gateway API exposure for the SigNoz UI (signoz.{global.domain})
+gateway:
+  enabled: true
+  hostname: "" # empty -> signoz.{global.domain}
+  hostnames: []
+
+# ===== Upstream SigNoz chart values (signoz/signoz) =====
+# Nested under 'signoz:' so they pass to the subchart dependency.
+# NOTE: storageClass intentionally omitted -> chart default (null) uses the
+# cluster default provisioner (do-block-storage on DOKS). Do not set "" — that
+# disables dynamic provisioning.
+signoz:
+  # Central app: UI + query service (internal SQLite metadata store on a PVC)
+  signoz:
+    persistence:
+      enabled: true
+      size: 2Gi
+    resources:
+      requests:
+        cpu: "100m"
+        memory: "200Mi"
+      limits:
+        cpu: "1"
+        memory: "1Gi"
+
+  # ClickHouse — the telemetry store. Sized for real use (team owns ClickHouse ops).
+  clickhouse:
+    persistence:
+      enabled: true
+      size: 50Gi
+    resources:
+      requests:
+        cpu: "200m"
+        memory: "1Gi"
+      limits:
+        cpu: "2"
+        memory: "4Gi"
+
+  # Optional heavy components we don't need for this deployment.
+  redpanda:
+    enabled: false
+  postgresql:
+    enabled: false

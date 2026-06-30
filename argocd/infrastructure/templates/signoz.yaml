@@ -1,0 +1,49 @@
+{{- if .Values.signoz.enabled }}
+# ArgoCD Application: SigNoz (unified observability — metrics + traces + logs + alerting)
+# Consolidation target replacing Prometheus/Grafana/AlertManager — see issue #2064.
+# Sync Wave 1 - After external-secrets (wave 1) / alongside other infra apps.
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: signoz
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+
+  source:
+    path: charts/signoz
+    repoURL: {{ .Values.argocd.repoURL }}
+    targetRevision: {{ .Values.argocd.targetRevision }}
+    helm:
+      releaseName: signoz
+      valuesObject:
+        global:
+          domain: {{ .Values.gateway.domain }}
+          namespace: signoz
+          gateway:
+            name: {{ .Values.gateway.gateway.name }}
+            namespace: {{ .Values.gateway.gateway.namespace }}
+        {{- toYaml .Values.signoz | nindent 8 }}
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: signoz
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 10s
+        maxDuration: 5m
+{{- end }}

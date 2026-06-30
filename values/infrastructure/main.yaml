@@ -468,6 +468,48 @@ monitoring:
   alertmanager:
     enabled: true
 
+# SigNoz - unified observability platform (metrics + traces + logs + alerting).
+# Consolidation target replacing the Prometheus/Grafana/AlertManager stack above —
+# see issue #2064. Deployed via charts/signoz wrapper (argocd templates/signoz.yaml).
+# Kept DISABLED until ClickHouse capacity (general pool) + go-live steps are ready;
+# runs in parallel with monitoring during cutover, which is removed only after parity.
+signoz:
+  enabled: false
+
+  gateway:
+    enabled: true
+    hostname: ""  # Uses signoz.{domain}
+
+  # Upstream signoz/signoz chart values (nested under 'signoz:' for the subchart).
+  # storageClass omitted on purpose -> cluster default provisioner (do-block-storage).
+  signoz:
+    signoz:
+      persistence:
+        enabled: true
+        size: 2Gi
+      resources:
+        requests:
+          cpu: "100m"
+          memory: "200Mi"
+        limits:
+          cpu: "1"
+          memory: "1Gi"
+    clickhouse:
+      persistence:
+        enabled: true
+        size: 50Gi
+      resources:
+        requests:
+          cpu: "200m"
+          memory: "1Gi"
+        limits:
+          cpu: "2"
+          memory: "4Gi"
+    redpanda:
+      enabled: false
+    postgresql:
+      enabled: false
+
 # Tailscale egress to the vanaheim workstation Ollama (medical-AI preprod inference)
 ollamaEgress:
   enabled: true
