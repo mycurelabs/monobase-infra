@@ -1167,25 +1167,22 @@ mailpit:
 
 # ===== P2P SYNC: Cadence — Tier 4.4 =====
 cadence:
-  # PAUSED 2026-06-27 — holding measure to stop the cadence.changelog disk-fill
-  # while the root-cause fix is built. cadence is the changelog WRITER (its
-  # watcher logs every PG row-change field-by-field), so disabling it is the
-  # definitive way to stop the growth — confirmed after ruling out the migrator
-  # (changelog kept growing ~9k rows/sec with the migrator fully off; the churn
-  # is billing-items/invoices/queue-items/analytics re-logged ~68x/30s, a
-  # watcher re-log loop and/or hapihub-next background-job churn). SAFE: cadence
-  # is a separate P2P sync layer — hapihub-next API / login / web app read PG
-  # directly and are UNAFFECTED. Only offline-first embedded clients lose
-  # realtime sync; they keep working locally and RECONCILE on restart (watcher
-  # re-scans PG → snapshot/incremental per-peer watermark; client offline edits
-  # push up via LWW; converges to current state, no data loss). Re-enable AFTER
-  # the watcher/churn fix lands, else the catch-up burst re-floods. See
-  # mycurelabs/monobase-infra#63.
-  enabled: false # was: true
+  # Re-enabled 2026-06-30 on 0.5.41 (mono#2065) which fixes the
+  # PgPollWatcher watermark epoch-walk that caused the 06-27 disk-fill.
+  # Watermark no longer falls back to 1970-01-01 when a baseline scan
+  # fails — it seeds from MAX(updated_at) of the table instead,
+  # eliminating the full-table re-log loop. Preprod soaked clean on
+  # 0.5.41 yesterday: zero billing-items rows in cadence.changelog over
+  # 60-min observation window, watermark-seed warnings fired for all 7
+  # known-bad collections (billing-items/invoices/payments,
+  # inventory-transactions, medical-encounters, services-performeds,
+  # queue-items). See infra#71 (preprod re-enable) + monobase-infra#63
+  # for the full incident timeline.
+  enabled: true
 
   image:
     repository: ghcr.io/mycurelabs/cadence
-    tag: "0.5.40"
+    tag: "0.5.41"
     pullPolicy: Always
 
   # Phase 1 fix: spawn one watcher task per collection so a slow
