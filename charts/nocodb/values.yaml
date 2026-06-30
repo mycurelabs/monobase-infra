@@ -68,6 +68,31 @@ config:
 
 probePath: /api/v1/health
 
+# Post-install Job that pre-adds the read-only Postgres data source (no
+# declarative source config exists in NocoDB — it lives in NocoDB's metadata).
+# Idempotent. Needs a `<release>-bootstrap` secret (admin-email, admin-password,
+# ro-password) — provided by the ExternalSecret below — plus the existing PG
+# admin secret to create the read-only role.
+bootstrap:
+  enabled: false
+  baseTitle: "MYCURE hapihub (read-only)"
+  sourceAlias: hapihub
+  searchPath: public      # comma-separated for multiple schemas
+  roUser: nocodb_ro
+  pg:
+    host: postgresql
+    port: 5432
+    database: hapihub
+    adminUser: postgres
+    adminSecret:
+      name: postgresql
+      key: postgres-password
+  externalSecrets:
+    secretStore: gcp-secretstore
+    secretStoreKind: ClusterSecretStore
+    refreshInterval: 1h
+    # remote GCP keys: <secretPrefix>-nocodb-{admin-email,admin-password,ro-password}
+
 nodeSelector: {}
 tolerations: []
 affinity: {}

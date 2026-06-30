@@ -173,6 +173,12 @@ nocodb:
     NC_PUBLIC_URL: "https://nocodb.preprod.localfirsthealth.com"
     NC_DISABLE_PG_DATA_REFLECTION: "true"
 
+  # Pre-add the read-only hapihub data source on deploy (idempotent post-install
+  # Job). Admin + RO creds come from GCP via ExternalSecret (keys
+  # mycure-production-nocodb-* — preprod reuses the production secretPrefix).
+  bootstrap:
+    enabled: true
+
 # ===== HEALTHCARE: MyCure PXP (patient-facing web app) =====
 mycure-pxp:
   enabled: true
