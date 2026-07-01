@@ -1,0 +1,4 @@
+# Generated/local artifacts — never commit
+vanaheim/.admin-creds
+vanaheim/pours/
+vanaheim/casting.yaml.lock

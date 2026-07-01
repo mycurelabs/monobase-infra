@@ -1,0 +1,65 @@
+# Tailscale egress: cluster -> vanaheim OTLP (4317), for the SigNoz on-prem PoC (#2096).
+# Mirrors charts/ollama-egress (tailscale node + socat sidecar), but as throwaway PoC
+# manifests in the existing privileged `tailscale` namespace. Reuses the ollama authkey.
+apiVersion: external-secrets.io/v1beta1
+kind: ExternalSecret
+metadata:
+  name: signoz-egress-authkey
+  namespace: tailscale
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    name: gcp-secretstore
+    kind: ClusterSecretStore
+  target:
+    name: signoz-egress-authkey
+    creationPolicy: Owner
+  data:
+    - secretKey: TS_AUTHKEY
+      remoteRef:
+        key: mycure-preprod-tailscale-ollama-authkey
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: signoz-egress
+  namespace: tailscale
+  labels: { app: signoz-egress }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: signoz-egress }
+  template:
+    metadata:
+      labels: { app: signoz-egress }
+    spec:
+      containers:
+        - name: ts
+          image: tailscale/tailscale:v1.84.3
+          env:
+            - { name: TS_AUTHKEY, valueFrom: { secretKeyRef: { name: signoz-egress-authkey, key: TS_AUTHKEY } } }
+            - { name: TS_USERSPACE, value: "false" }
+            - { name: TS_STATE_DIR, value: "/tmp" }
+            - { name: TS_KUBE_SECRET, value: "" }
+            - { name: TS_EXTRA_ARGS, value: "--hostname=signoz-egress" }
+          securityContext:
+            capabilities: { add: ["NET_ADMIN"] }
+        # socat forwards the cluster Service port to vanaheim over the tailnet.
+        # NB: target is vanaheim's NATIVE bridge :14317 (a host-network socat that
+        # re-exposes SigNoz's docker-published 127.0.0.1:4317). Docker-published ports
+        # are NOT reachable over tailscale — only native listeners are (like Ollama).
+        - name: forward
+          image: alpine/socat:latest
+          args: ["TCP-LISTEN:4317,fork,reuseaddr", "TCP:100.120.88.93:14317"]
+          ports:
+            - containerPort: 4317
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: signoz-otlp
+  namespace: tailscale
+spec:
+  selector: { app: signoz-egress }
+  ports:
+    - { name: otlp-grpc, port: 4317, targetPort: 4317, protocol: TCP }

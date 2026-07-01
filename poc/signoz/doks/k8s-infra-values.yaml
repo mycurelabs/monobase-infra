@@ -1,0 +1,12 @@
+# SigNoz k8s-infra collector -> ships DOKS metrics + logs to vanaheim SigNoz
+# over the tailscale egress (poc/signoz/cluster/signoz-egress.yaml). PoC #2096.
+clusterName: mycure-production
+otelCollectorEndpoint: signoz-otlp.tailscale.svc.cluster.local:4317
+otelInsecure: true
+# Use the gRPC OTLP exporter (host:port, no scheme) -> matches the :4317 egress.
+# (Chart default is the OTLP-HTTP exporter, which needs an http:// scheme + :4318.)
+presets:
+  otlpExporter:
+    enabled: true
+  otlphttpExporter:
+    enabled: false
