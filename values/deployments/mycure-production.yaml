@@ -932,6 +932,18 @@ postgresql:
       maintenance_work_mem = 256MB
       random_page_cost = 1.1
       effective_io_concurrency = 200
+    # Cross-DB spread: never co-locate the PG primary with MongoDB. Both are
+    # heavy (PG ~1.5core/8.6Gi, Mongo ~6Gi) and had piled onto one prod node,
+    # saturating it (CPU 105%) and causing 15-16s queries. `required` is safe:
+    # 4 prod nodes, 3 DB pods. Overrides the chart's default self-only preset.
+    # Applying reschedules the primary (brief write blip) — trigger in a window.
+    affinity:
+      podAntiAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchLabels:
+                app.kubernetes.io/name: mongodb
+            topologyKey: kubernetes.io/hostname
 
   readReplicas:
     replicaCount: 1
@@ -961,6 +973,23 @@ postgresql:
       random_page_cost = 1.1
       effective_io_concurrency = 200
       primary_slot_name = 'pg_read_replica'
+    # Prefer to keep the read replica off the primary and Mongo nodes too, so
+    # all three DBs spread. Soft (preferred) — the replica is idle/less critical,
+    # and a hard rule could wedge scheduling if a node is drained.
+    affinity:
+      podAntiAffinity:
+        preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                  - key: app.kubernetes.io/name
+                    operator: In
+                    values: [postgresql, mongodb]
+                  - key: app.kubernetes.io/component
+                    operator: NotIn
+                    values: [read]
+              topologyKey: kubernetes.io/hostname
     # Startup probe gates liveness during the initial pg_basebackup. The DB is
     # ~140GB, so a re-clone takes ~90min — the default liveness probe would
     # SIGKILL the pod every ~90s and restart the clone forever. 180min ceiling
@@ -1025,6 +1054,17 @@ mongodb:
     limits:
       cpu: 3000m
       memory: 6Gi
+
+  # Cross-DB spread: mirror of the PG primary rule — Mongo never shares a node
+  # with any PostgreSQL pod. Keeps the two heavy DBs apart on 4 prod nodes.
+  # Applying reschedules Mongo (brief blip) — trigger in a maintenance window.
+  affinity:
+    podAntiAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        - labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: postgresql
+          topologyKey: kubernetes.io/hostname
 
   podDisruptionBudget:
     enabled: false
