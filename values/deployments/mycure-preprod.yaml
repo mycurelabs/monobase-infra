@@ -1097,7 +1097,7 @@ cadence:
 # the runtime date wrapper, and the Job lifecycle against a real
 # ArgoCD-reconciled namespace before the same template ships to prod.
 hapihubMigrator:
-  enabled: true
+  enabled: false # migrator stopped 2026-07-02
 
   image:
     repository: ghcr.io/mycurelabs/hapihub-migrator

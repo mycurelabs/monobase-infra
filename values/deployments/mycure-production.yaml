@@ -1303,7 +1303,7 @@ cadence:
 # write on the allowlist into `_pg_changelog`. Capture-only — no MongoDB
 # replay; the changelog is the rollback forensic trail.
 hapihubMigrator:
-  enabled: true # Phase 2 — bulk migration started 2026-04-07
+  enabled: false # migrator stopped 2026-07-02 (was: Phase 2 bulk started 2026-04-07)
   replicaCount: 1  # re-enabled 2026-06-10 after cadence 0.5.13 keyset fix landed
 
   image:
