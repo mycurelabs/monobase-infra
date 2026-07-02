@@ -360,10 +360,13 @@ hapihubNext:
   resources:
     requests:
       cpu: 500m
-      memory: 768Mi
+      memory: 1Gi
     limits:
       cpu: "2"
-      memory: 2Gi
+      # 2Gi caused a persistent OOMKill loop (exit 137, ~90 restarts/replica)
+      # under slow-query memory spikes. 4Gi gives headroom while DB latency is
+      # addressed separately (prod DBs co-located on one node).
+      memory: 4Gi
 
   gateway:
     hostnames:
