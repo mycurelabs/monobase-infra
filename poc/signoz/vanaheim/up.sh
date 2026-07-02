@@ -28,19 +28,35 @@ fi
 # 4) One-time onboarding (admin/org). REQUIRED: without an org, SigNoz's opamp server
 #    refuses to push the OTLP receiver config to the collector ("cannot create agent
 #    without orgId") and ingestion silently fails. Creds saved locally (gitignored).
+#    SigNoz has no bootstrap flag/env/CLI (checked `signoz server|metastore --help`),
+#    so the register API is the only seed path. Idempotent on SERVER state:
+#      fresh            -> {"status":"success"}
+#      already seeded   -> HTTP 400 "self-registration is disabled"
 CREDS=.admin-creds
-if [ ! -f "$CREDS" ]; then
-  for _ in $(seq 1 30); do curl -fsS -o /dev/null "$UI" && break || sleep 2; done
-  PW="$(openssl rand -base64 15)"
-  resp="$(curl -sS -X POST "$UI/api/v1/register" -H 'Content-Type: application/json' \
-    -d "{\"name\":\"admin\",\"orgName\":\"mycure\",\"email\":\"admin@mycure.local\",\"password\":\"$PW\"}" || true)"
-  if printf '%s' "$resp" | grep -q '"status":"success"'; then
-    printf 'email=admin@mycure.local\npassword=%s\n' "$PW" > "$CREDS"; chmod 600 "$CREDS"
-    echo ">> admin/org created; creds -> $CREDS"
-    docker restart signoz-ingester-1 >/dev/null   # re-handshake opamp -> binds OTLP receiver
-  else
-    echo ">> register skipped/failed (already set up?): $(printf '%s' "$resp" | head -c 120)"
-  fi
+# wait for the API/backend (not just the UI) to be ready
+for _ in $(seq 1 40); do curl -fsS -o /dev/null "$UI/api/v1/version" && break || sleep 3; done
+# SigNoz enforces a complex password (>=12, upper+lower+digit+special) — build one that
+# always satisfies it (random core + guaranteed one of each class).
+PW="Sig$(openssl rand -hex 10)!Aa9"
+resp="$(curl -sS -X POST "$UI/api/v1/register" -H 'Content-Type: application/json' \
+  -d "{\"name\":\"admin\",\"orgName\":\"mycure\",\"email\":\"admin@mycure.local\",\"password\":\"$PW\"}" || true)"
+if printf '%s' "$resp" | grep -q '"status":"success"'; then
+  printf 'email=admin@mycure.local\npassword=%s\n' "$PW" > "$CREDS"; chmod 600 "$CREDS"
+  echo ">> seeded admin/org 'mycure'; creds -> $CREDS"
+  # No restart needed: the collector's opamp client retries (~30s) and picks up the
+  # freshly-seeded org config on its own. Wait until OTLP actually accepts.
+  printf ">> waiting for OTLP receiver to bind"
+  for _ in $(seq 1 30); do
+    if docker run --rm --network host ghcr.io/open-telemetry/opentelemetry-collector-contrib/telemetrygen:latest \
+         traces --otlp-endpoint localhost:4317 --otlp-insecure --traces 1 >/dev/null 2>&1; then
+      printf " — up.\n"; break
+    fi
+    printf "."; sleep 5
+  done
+elif printf '%s' "$resp" | grep -q 'self-registration is disabled'; then
+  echo ">> org already seeded (skip)."
+else
+  echo ">> register: unexpected response: $(printf '%s' "$resp" | head -c 160)"
 fi
 
 echo ">> SigNoz UI:   $UI   (tailnet: http://100.120.88.93:8080)"
