@@ -61,6 +61,10 @@ spec:
             value: {{ .Values.global.nodePool | quote }}
             effect: "NoSchedule"
         {{- end }}
+        {{- if .Values.mongodb.affinity }}
+        affinity:
+          {{- toYaml .Values.mongodb.affinity | nindent 10 }}
+        {{- end }}
 
   destination:
     server: https://kubernetes.default.svc

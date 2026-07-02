@@ -84,6 +84,10 @@ spec:
               value: {{ .Values.global.nodePool | quote }}
               effect: "NoSchedule"
           {{- end }}
+          {{- if and .Values.postgresql.primary .Values.postgresql.primary.affinity }}
+          affinity:
+            {{- toYaml .Values.postgresql.primary.affinity | nindent 12 }}
+          {{- end }}
 
         {{- if .Values.postgresql.readReplicas }}
         readReplicas:
@@ -119,6 +123,10 @@ spec:
               operator: "Equal"
               value: {{ .Values.global.nodePool | quote }}
               effect: "NoSchedule"
+          {{- end }}
+          {{- if .Values.postgresql.readReplicas.affinity }}
+          affinity:
+            {{- toYaml .Values.postgresql.readReplicas.affinity | nindent 12 }}
           {{- end }}
         {{- end }}
 
