@@ -107,8 +107,10 @@ spec:
           # Guard the denominator: container_spec_memory_limit_bytes is 0 when no limit
           # is set, so the old expr gave +Inf% and fired for every pod. The `> 0` filter
           # keeps only containers that declare a memory limit; container!="" drops the
-          # pod/cgroup aggregate series.
-          expr: (container_memory_usage_bytes{container!=""} / (container_spec_memory_limit_bytes{container!=""} > 0)) * 100 > 90
+          # pod/cgroup aggregate series. Stateful DBs (mongodb/postgresql/valkey/minio)
+          # legitimately sit near their limit for cache and won't OOM from it — excluded
+          # to cut noise; app pods (incl. prometheus, external-dns) still covered.
+          expr: (container_memory_usage_bytes{container!="",container!~"mongodb|postgresql|valkey|minio"} / (container_spec_memory_limit_bytes{container!="",container!~"mongodb|postgresql|valkey|minio"} > 0)) * 100 > 90
           for: 5m
           labels:
             severity: warning

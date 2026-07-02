@@ -47,10 +47,10 @@ spec:
           resources:
             requests:
               cpu: "100m"
-              memory: "400Mi"  # Increased from 200Mi - prevent OOM (actual usage: 324Mi)
+              memory: "512Mi"  # Bumped from 400Mi — was pegged at the 768Mi limit
             limits:
               cpu: "500m"
-              memory: "768Mi"  # Optimized from 1Gi (actual usage: 533Mi = 69%)
+              memory: "1Gi"    # Bumped from 768Mi — Prometheus was at 100% and OOM-risk
           
           # Security context
           securityContext:
