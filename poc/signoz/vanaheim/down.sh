@@ -3,6 +3,7 @@
 set -euo pipefail
 export PATH="$HOME/.local/bin:$PATH"
 DATADIR="${SIGNOZ_POC_DATADIR:-$(cd "$(dirname "$0")" && pwd)}"
+tailscale serve --https=443 off >/dev/null 2>&1 || true   # stop sharing the UI on the tailnet
 docker rm -f signoz-tailnet-bridge >/dev/null 2>&1 || true
 COMPOSE="$DATADIR/pours/deployment/compose.yaml"
 if [ -f "$COMPOSE" ]; then

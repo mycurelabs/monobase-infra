@@ -59,7 +59,17 @@ else
   echo ">> register: unexpected response: $(printf '%s' "$resp" | head -c 160)"
 fi
 
-echo ">> SigNoz UI:   $UI   (tailnet: http://100.120.88.93:8080)"
+# 5) Share the UI on the tailnet over HTTPS (private — tailnet members only).
+#    Idempotent. Prereqs (one-time, admin console): tailnet "HTTPS Certificates"
+#    feature enabled + `sudo tailscale set --operator=$USER`. If not ready, serve
+#    prints an enable link; we surface it instead of failing.
+TSDNS="$(tailscale status --json 2>/dev/null | python3 -c 'import sys,json;print(json.load(sys.stdin)["Self"]["DNSName"].rstrip("."))' 2>/dev/null || true)"
+if ! tailscale serve status 2>/dev/null | grep -q '127.0.0.1:8080'; then
+  tailscale serve --bg 8080 2>&1 | grep -iE 'https://|enable|visit|login.tailscale' || true
+fi
+[ -n "$TSDNS" ] && echo ">> Team URL:    https://${TSDNS}/   (tailnet members only, HTTPS)"
+
+echo ">> SigNoz UI:   $UI   (local on vanaheim)"
 echo ">> OTLP ingest: 100.120.88.93:${BRIDGE_PORT} (gRPC, for tailnet peers)"
 [ -f "$CREDS" ] && echo ">> admin login in $CREDS"
 docker ps --filter name=signoz --format 'table {{.Names}}\t{{.Status}}'

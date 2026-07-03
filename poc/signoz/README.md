@@ -37,8 +37,13 @@ DOKS pods ─▶ signoz-k8s-infra (OTel collector, ns signoz-poc)
 # 2) DOKS: tailscale egress + k8s-infra collector -> ships to vanaheim
 ./doks/up.sh
 ```
-- **UI:** http://localhost:8080 on vanaheim (or http://100.120.88.93:8080 over the tailnet).
-- **Admin login:** `vanaheim/.admin-creds` (gitignored).
+- **Team URL (share this):** **https://vanaheim.tail06ec7f.ts.net/** — HTTPS via `tailscale serve`,
+  reachable by **tailnet members only** (private; prod telemetry is not on the public internet).
+  Teammates just install Tailscale and join `tail06ec7f`. Local on the box: http://localhost:8080.
+  - One-time tailnet setup (admin console): enable **DNS → HTTPS Certificates**, and on vanaheim
+    `sudo tailscale set --operator=$USER`. `up.sh` then enables serve automatically.
+  - **Team access to SigNoz:** invite teammates in **Settings → Members** (per-user accounts,
+    recommended), or share the admin login from `vanaheim/.admin-creds` (gitignored).
 - **Traces:** infra ships metrics+logs; to see traces, point any OTel-instrumented app at
   `100.120.88.93:14317` (verified with `telemetrygen`). Real app traces = monobase-mycure OTel SDK work.
 
