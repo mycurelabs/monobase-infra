@@ -355,10 +355,10 @@ hapihubNext:
   pruneExpiredSessions:
     enabled: true
 
-  # 4th replica: OOM-kill stopgap for mono#2129/mono#2114 — kills continue at
-  # ~130/day (fan-out fix PRs not yet shipped), extra replica reduces the
-  # blast-radius of each kill during clinic peak hours.
-  replicaCount: 4
+  # NOTE: replicaCount is ignored — autoscaling.enabled: true below means the
+  # HPA owns the replica count (chart omits spec.replicas). Scale via
+  # autoscaling.minReplicas/maxReplicas.
+  replicaCount: 3
 
   resources:
     requests:
@@ -460,8 +460,12 @@ hapihubNext:
 
   autoscaling:
     enabled: true
-    minReplicas: 1
-    maxReplicas: 3
+    minReplicas: 2
+    # maxReplicas 3 → 5: OOM-kill stopgap for mono#2129/mono#2114. HPA has been
+    # pinned at max (CPU ~92% vs 70% target) while pods OOM-crashloop ~130x/day;
+    # extra replicas shrink each kill's blast-radius during clinic peak hours
+    # until the fan-out fix PRs (mono#2119/#2121/#2127) ship.
+    maxReplicas: 5
 
   externalSecrets:
     enabled: true
