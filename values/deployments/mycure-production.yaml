@@ -348,7 +348,7 @@ hapihubNext:
 
   image:
     repository: ghcr.io/mycurelabs/hapihub
-    tag: "11.20.37"
+    tag: "11.20.38" # #2139: cap pg-boss pool (PGBOSS_POOL_MAX=3 default) — frees ~35 PG connections
     pullPolicy: IfNotPresent
 
   # Daily cleanup of expired Better Auth sessions (they never self-delete).
