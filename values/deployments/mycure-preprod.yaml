@@ -1014,17 +1014,19 @@ mailpit:
 
 # ===== P2P SYNC: Cadence =====
 cadence:
-  # Re-enabled 2026-06-29 on 0.5.41 (mono#2065) which fixes the watermark
-  # epoch-walk that produced the 06-27 prod and 06-29 preprod disk-fills.
-  # PgPollWatcher.watermarks no longer falls back to 1970-01-01 when a
-  # baseline scan fails — it seeds from MAX(updated_at) of the table
-  # instead, eliminating the full-table re-log loop. Prod stays paused
-  # until preprod soak (~1 h) confirms zero billing-items run-away.
+  # 0.6.0 soak (mono#2103 Fix 1 + infra#77 Fix 3): DB-owned updated_at
+  # triggers + (updated_at, id) keyset index installed by ensure_sync_infra
+  # at watcher boot (mono#2126), and fail-closed explicit allowlist — "*"
+  # is now a boot error, unconfigured collections are dropped at the
+  # receive path (mono#2128). Watcher knobs default watcher_grace_ms=5000 /
+  # watcher_ensure_pg_ddl=true; override via CADENCE_WATCHER_GRACE_MS /
+  # CADENCE_WATCHER_ENSURE_PG_DDL env if needed. Prod stays on 0.5.41
+  # until 24h soak + the mono#2103 NULL-growth gate clear.
   enabled: true
 
   image:
     repository: ghcr.io/mycurelabs/cadence
-    tag: "0.5.41"
+    tag: "0.6.0"
     pullPolicy: Always
 
   # Phase 1a: per-collection watcher workers, throttled by the 0.5.25
