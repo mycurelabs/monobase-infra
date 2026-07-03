@@ -355,12 +355,19 @@ hapihubNext:
   pruneExpiredSessions:
     enabled: true
 
-  replicaCount: 3
+  # 4th replica: OOM-kill stopgap for mono#2129/mono#2114 — kills continue at
+  # ~130/day (fan-out fix PRs not yet shipped), extra replica reduces the
+  # blast-radius of each kill during clinic peak hours.
+  replicaCount: 4
 
   resources:
     requests:
       cpu: 500m
-      memory: 1Gi
+      # 2560Mi matches the real working set (pods cycle 0.5→3.8Gi before each
+      # OOM kill). At 1Gi the scheduler packed a replica onto the node hosting
+      # postgresql-primary (production-3cl5of, observed 105% CPU / 98% mem);
+      # honest requests push replicas onto the idle production nodes instead.
+      memory: 2560Mi
     limits:
       cpu: "2"
       # 2Gi caused a persistent OOMKill loop (exit 137, ~90 restarts/replica)
