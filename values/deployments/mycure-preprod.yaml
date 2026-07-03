@@ -1014,11 +1014,13 @@ mailpit:
 
 # ===== P2P SYNC: Cadence =====
 cadence:
-  # 0.6.0 soak (mono#2103 Fix 1 + infra#77 Fix 3): DB-owned updated_at
+  # 0.6.1 soak (mono#2103 Fix 1 + infra#77 Fix 3): DB-owned updated_at
   # triggers + (updated_at, id) keyset index installed by ensure_sync_infra
   # at watcher boot (mono#2126), and fail-closed explicit allowlist — "*"
   # is now a boot error, unconfigured collections are dropped at the
-  # receive path (mono#2128). Watcher knobs default watcher_grace_ms=5000 /
+  # receive path (mono#2128); 0.6.1 adds the DDL advisory lock, symmetric
+  # receive-gate normalization and drops the boot-time backdated warn
+  # (mono#2132). Watcher knobs default watcher_grace_ms=5000 /
   # watcher_ensure_pg_ddl=true; override via CADENCE_WATCHER_GRACE_MS /
   # CADENCE_WATCHER_ENSURE_PG_DDL env if needed. Prod stays on 0.5.41
   # until 24h soak + the mono#2103 NULL-growth gate clear.
@@ -1026,7 +1028,7 @@ cadence:
 
   image:
     repository: ghcr.io/mycurelabs/cadence
-    tag: "0.6.0"
+    tag: "0.6.1"
     pullPolicy: Always
 
   # Phase 1a: per-collection watcher workers, throttled by the 0.5.25
