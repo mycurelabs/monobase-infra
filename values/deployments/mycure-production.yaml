@@ -414,6 +414,13 @@ hapihubNext:
     STORAGE_DOWNLOAD_URL_HOST: "https://hapihub-next.localfirsthealth.com"
 
   env:
+    # #2114 OOM stopgap: JSC sizes heap-growth heuristics off machine RAM, not
+    # the cgroup — under burst allocation the heap overshoots the container
+    # limit before a full GC runs. Force it to see 3GiB (limit is 4Gi; the
+    # remaining ~1GiB covers non-JSC memory: Buffers, in-pod Chromium/export
+    # workers — RUN_WORKERS=true here).
+    - name: BUN_JSC_forceRAMSize
+      value: "3221225472"
     - name: BETTER_AUTH_RATE_LIMIT_ENABLED
       value: "true"
     - name: BETTER_AUTH_RATE_LIMIT_WINDOW
