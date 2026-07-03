@@ -1,0 +1,69 @@
+{{- /*
+  Gated on BOTH hapihubNext.enabled and hapihubNextWorker.enabled — the
+  worker is a derivative of the hapihub-next release and meaningless
+  without it. `(default dict)` keeps nil-safe on deployments that omit
+  either block.
+*/ -}}
+{{- if and ((.Values.hapihubNext | default dict).enabled) ((.Values.hapihubNextWorker | default dict).enabled) }}
+# ArgoCD Application: HapiHub Next Worker (background jobs off the API pods)
+#
+# Third Helm release of the hapihub chart. Runs the SAME image/config as
+# hapihub-next but exists solely to consume pg-boss jobs (exports, email,
+# document ingestion, PDF conversion): RUN_WORKERS=true here and
+# RUN_WORKERS=false on the API release (mono#2114 — a single export/PDF
+# job landing on an API pod ballooned it to the memory limit; job memory
+# must not evict request-serving pods).
+#
+# Values = deep-merge of the hapihubNext block with the small
+# hapihubNextWorker override block, so image bumps and config changes to
+# hapihub-next flow to the worker automatically. Overrides disable all
+# traffic-facing extras (gateway/HTTPRoute, storageRoute, prune cronjob,
+# HPA) — the worker gets a Service and probes only.
+#
+# Sync wave 3, alongside the other hapihub releases.
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ .Values.global.namespace }}-hapihub-next-worker
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+
+  source:
+    path: charts/hapihub
+    repoURL: {{ .Values.argocd.repoURL }}
+    targetRevision: {{ .Values.argocd.targetRevision | default "main" }}
+    helm:
+      releaseName: hapihub-next-worker
+      valuesObject:
+        {{- $base := omit .Values.hapihubNext "mongodb" "minio" "valkey" "mailpit" }}
+        {{- $overrides := omit .Values.hapihubNextWorker "enabled" }}
+        {{- $merged := mergeOverwrite (deepCopy $base) $overrides }}
+        {{- toYaml $merged | nindent 8 }}
+        global: {{ .Values.global | toYaml | nindent 10 }}
+        minio: {{ mergeOverwrite (deepCopy .Values.minio) (.Values.hapihubNext.minio | default dict) | toYaml | nindent 10 }}
+        mongodb: {{ mergeOverwrite (deepCopy .Values.mongodb) (.Values.hapihubNext.mongodb | default dict) | toYaml | nindent 10 }}
+        valkey: {{ mergeOverwrite (deepCopy .Values.valkey) (.Values.hapihubNext.valkey | default dict) | toYaml | nindent 10 }}
+        mailpit: {{ mergeOverwrite (deepCopy .Values.mailpit) (.Values.hapihubNext.mailpit | default dict) | toYaml | nindent 10 }}
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: {{ .Values.global.namespace }}
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false
+    retry:
+      limit: 5
+      backoff:
+        duration: 10s
+        maxDuration: 5m
+{{- end }}
