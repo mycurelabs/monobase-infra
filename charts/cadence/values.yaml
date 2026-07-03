@@ -124,27 +124,23 @@ persistence:
 
 # Cadence config file (mounted as /app/cadence.yml)
 cadenceConfig:
+  # 2026-07-03 (monobase-infra#77): explicit ALLOWLIST — the "*" wildcard
+  # auto-discovery is removed. Wildcard made every public.* table a synced
+  # collection by default (134 tables on prod), so every new hapihub table
+  # silently entered cadence's per-poll scan loop until an operator noticed
+  # (root cause of the 06-25 reseed / 06-27+06-29 disk-fill incident class).
+  # Only collections that embedded clients actually consume belong here.
+  # Verified consumers (2026-07-03 audit): accounts + personal-details.
+  # personal-details-history was removed: dead weight since 0.5.40 — the
+  # "*-history" blacklist glob prunes it at boot (0 changelog rows since).
+  # NOTE: compatible with cadence 0.5.41 (resolve_wildcard no-ops without
+  # "*"). From cadence 0.6.0 a "*" entry is a boot error.
   collections:
-    "*":
-      strategy: lww
-      scope_rules:
-        facility: organization
-        organization: organization
-        warehouse: organization
-        account: organization
-        created_by: user
     accounts:
       strategy: lww
       scope_columns:
         user: id
-    # Use kebab-case for explicit entries; the wildcard resolver dedupes
-    # against snake_case (added in cadence 0.5.39, see monobase-mycure#2019).
     personal-details:
-      strategy: lww
-      scope_columns:
-        user: id
-        organization: facility
-    personal-details-history:
       strategy: lww
       scope_columns:
         user: id
@@ -164,43 +160,14 @@ cadenceConfig:
     - "*-history"             # personal-details-history, medical-records-history, ...
     - "*-history-archive-*"   # *_history_archive_YYYYMMDD rotated snapshots
   # Per-collection sync priority (higher = sent first during catch-up).
-  # "*" is the default for unlisted collections. Mirror of
+  # "*" is the fallback default for anything not listed. Mirror of
   # services/hapihub/cadence.yml in monobase-mycure — keep in sync.
-  # Keys are kebab-case (the on-wire collection name); the applier path
-  # snake-converts internally for PG queries.
+  # Trimmed to the allowlist (2026-07-03, monobase-infra#77) — priorities
+  # for collections that no longer sync were dead config.
   priorities:
     "*": 50
-    user: 200
-    account: 200
-    session: 200
     accounts: 200
-    account-configurations: 190
-    organization: 180
-    organizations: 180
-    organization-members: 170
     personal-details: 180
-    personal-details-history: 170
-    medical-patients: 150
-    medical-encounters: 140
-    medical-records: 140
-    medical-records-history: 130
-    diagnostic-orders: 130
-    diagnostic-order-tests: 130
-    billing-invoices: 120
-    billing-items: 110
-    billing-payments: 110
-    billing-customers: 110
-    bookings: 90
-    queue-items: 90
-    queues: 90
-    services: 80
-    services-performeds: 80
-    notifications: 30
-    prm-conversations: 30
-    prm-messages: 30
-    webhook-deliveries: 20
-    webhook-subscriptions: 20
-    activity-logs: 0
 
 # Application configuration (ConfigMap env vars)
 config:
