@@ -419,6 +419,10 @@ hapihubNext:
     # the v10 host (EXTERNAL_ADDRESS, which is also Better Auth's baseURL and can't
     # change). Requires hapihub >= 11.20.32 (which wires storage.downloadURLHost).
     STORAGE_DOWNLOAD_URL_HOST: "https://hapihub-next.localfirsthealth.com"
+    # mono#2114: background jobs (exports, email, doc-ingestion, PDF/Chromium)
+    # moved to the hapihub-next-worker release below — a single export/PDF
+    # job landing on an API pod ballooned it toward the memory limit.
+    RUN_WORKERS: "false"
 
   env:
     # #2114 OOM stopgap: JSC sizes heap-growth heuristics off machine RAM, not
@@ -540,6 +544,38 @@ hapihubNext:
       database: hapihub
       username: postgres
       existingSecret: postgresql
+
+# hapihub-next-worker: background-job consumer for hapihub-next
+# (mono#2114). Deep-merged onto the hapihubNext block by the
+# hapihub-next-worker ArgoCD app template — image/config/secrets flow from
+# hapihubNext automatically; only the deltas live here.
+hapihubNextWorker:
+  enabled: true
+
+  replicaCount: 1
+
+  config:
+    RUN_WORKERS: "true"
+
+  # No external traffic: keep the Service (probes) but no routes.
+  gateway:
+    enabled: false
+    storageRoute:
+      enabled: false
+    snippetsPolicy:
+      enabled: false
+
+  # The API release owns the daily session-prune cronjob.
+  pruneExpiredSessions:
+    enabled: false
+
+  # Fixed single replica — job throughput does not need an HPA, and pg-boss
+  # handles multi-consumer anyway if this is ever raised.
+  autoscaling:
+    enabled: false
+
+  podDisruptionBudget:
+    enabled: false
 
 # ===== HEALTHCARE: Frontend Application =====
 mycure:
