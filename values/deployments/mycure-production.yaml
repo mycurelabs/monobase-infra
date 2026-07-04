@@ -1282,22 +1282,21 @@ mailpit:
 
 # ===== P2P SYNC: Cadence — Tier 4.4 =====
 cadence:
-  # Re-enabled 2026-06-30 on 0.5.41 (mono#2065) which fixes the
-  # PgPollWatcher watermark epoch-walk that caused the 06-27 disk-fill.
-  # Watermark no longer falls back to 1970-01-01 when a baseline scan
-  # fails — it seeds from MAX(updated_at) of the table instead,
-  # eliminating the full-table re-log loop. Preprod soaked clean on
-  # 0.5.41 yesterday: zero billing-items rows in cadence.changelog over
-  # 60-min observation window, watermark-seed warnings fired for all 7
-  # known-bad collections (billing-items/invoices/payments,
-  # inventory-transactions, medical-encounters, services-performeds,
-  # queue-items). See infra#71 (preprod re-enable) + monobase-infra#63
-  # for the full incident timeline.
+  # 0.6.1 (mono#2103 Fix 1 + infra#77 Fix 3): DB-owned updated_at triggers
+  # + (updated_at, id) keyset index installed by ensure_sync_infra at
+  # watcher boot behind a PG advisory lock (mono#2126 + #2132), and
+  # fail-closed explicit allowlist — "*" is a boot error, unconfigured
+  # collections dropped at the receive path (mono#2128). Gates cleared
+  # 2026-07-04: NULL-growth = 0 new rows in 24h on all 7 tracked prod
+  # tables (hapihub 11.20.37 writer fix), and 24h preprod soak clean
+  # (zero restarts, changelog ⊆ allowlist, RSS 324Mi). Canary proofs on
+  # preprod: raw UPDATE detected in 5s, open-txn detected post-COMMIT
+  # only, unconfigured table → zero changelog rows.
   enabled: true
 
   image:
     repository: ghcr.io/mycurelabs/cadence
-    tag: "0.5.41"
+    tag: "0.6.1"
     pullPolicy: Always
 
   # Phase 1 fix: spawn one watcher task per collection so a slow
