@@ -253,3 +253,56 @@ spec:
           annotations:
             summary: "Certificate {{ $labels.name }} expiring imminently"
             description: "Certificate expires in {{ $value | humanize }} days"
+
+---
+# Cadence full-config sync program guardrails (plan item 0.5, 2026-07-06).
+# Platform-level signals only — counter-based rules (drop totals, index
+# build failures) ride the cadence 0.7.0 prometheus exposition and land
+# with that rollout.
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: cadence-sync-guardrails
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: prometheus-rules
+    app.kubernetes.io/component: monitoring
+    prometheus: kube-prometheus
+spec:
+  groups:
+    - name: cadence-sync
+      interval: 60s
+      rules:
+        - alert: HapihubPostgresVolumeFilling
+          # The June d25 incident hit 94% before anyone looked. The changelog
+          # is the main growth driver once the allowlist widens.
+          expr: |
+            kubelet_volume_stats_used_bytes{namespace=~"mycure-(preprod|production)", persistentvolumeclaim=~"data-postgresql.*"}
+              / kubelet_volume_stats_capacity_bytes{namespace=~"mycure-(preprod|production)", persistentvolumeclaim=~"data-postgresql.*"} > 0.70
+          for: 15m
+          labels:
+            severity: warning
+          annotations:
+            summary: "PostgreSQL PVC {{ $labels.namespace }}/{{ $labels.persistentvolumeclaim }} over 70%"
+            description: "Check cadence.changelog partition growth first (per-collection rollback lever: remove the offending collection from the env values cadenceConfig)."
+
+        - alert: HapihubPostgresVolumeCritical
+          expr: |
+            kubelet_volume_stats_used_bytes{namespace=~"mycure-(preprod|production)", persistentvolumeclaim=~"data-postgresql.*"}
+              / kubelet_volume_stats_capacity_bytes{namespace=~"mycure-(preprod|production)", persistentvolumeclaim=~"data-postgresql.*"} > 0.85
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: "PostgreSQL PVC {{ $labels.namespace }}/{{ $labels.persistentvolumeclaim }} over 85% — page"
+            description: "Changelog growth runbook: services/hapihub/docs + cadence retentionDays; d25 recipe in monobase-mycure history."
+
+        - alert: CadenceRestartLoop
+          expr: |
+            increase(kube_pod_container_status_restarts_total{namespace=~"mycure-(preprod|production)", pod=~"cadence-.*"}[1h]) > 3
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "cadence in {{ $labels.namespace }} restarted >3x in 1h"
+            description: "Watcher consecutive-failure exits or boot crashes; check ensure_sync_infra logs and PG availability."
