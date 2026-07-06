@@ -205,6 +205,14 @@ postgresql:
     username: postgres
     existingSecret: ""
 
+# Valkey response cache (hapihub 11.20.44+, mono#2231). When enabled (and the
+# shared valkey app is deployed), the pod gets REDIS_URL (valkey-primary +
+# password from the `valkey` secret) and CACHE_ENABLED=true. Which endpoints
+# are cached is declared in hapihub's OpenAPI specs via `x-cache` — this flag
+# only turns the machinery on. Opt in per-environment.
+cache:
+  enabled: false
+
 # Service Monitor for Prometheus (if monitoring enabled)
 serviceMonitor:
   enabled: false

@@ -224,8 +224,15 @@ hapihub:
 
   image:
     repository: ghcr.io/mycurelabs/hapihub
-    tag: "11.20.39"
+    tag: "11.20.44"
     pullPolicy: IfNotPresent
+
+  # Valkey response cache (mono#2231) — preprod is the pilot environment.
+  # Cached endpoints are declared via x-cache in hapihub's OpenAPI specs
+  # (phase 1: fixtures 12h, services 5m, personal-details 5m). Kill switch:
+  # set false here, or `kubectl exec deploy/hapihub -- hapihub cache flush`.
+  cache:
+    enabled: true
 
   # Daily cleanup of expired Better Auth sessions (they never self-delete).
   pruneExpiredSessions:

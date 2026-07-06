@@ -178,6 +178,10 @@ PostgreSQL username
 
 {{/*
 Valkey (Redis) URL - constructs connection URL from Valkey dependency
+NOTE: legacy/unused — points at a chart-local valkey that is never deployed.
+Kept only so clusters without cache.enabled render unchanged (no rollout).
+The real wiring (valkey-primary + password) is in containerEnv under
+cache.enabled, mirroring the cadence chart.
 */}}
 {{- define "hapihub.valkey.url" -}}
 {{- if .Values.valkey.enabled -}}
@@ -185,6 +189,16 @@ Valkey (Redis) URL - constructs connection URL from Valkey dependency
 {{- $namespace := include "hapihub.namespace" . -}}
 redis://{{ $release }}-valkey-master.{{ $namespace }}.svc.cluster.local:6379
 {{- end -}}
+{{- end }}
+
+{{/*
+Valkey host — the shared in-cluster Valkey (same instance cadence uses).
+Bitnami standalone exposes `valkey-primary`; override via valkey.serviceName.
+*/}}
+{{- define "hapihub.valkey.host" -}}
+{{- $serviceName := .Values.valkey.serviceName | default "valkey-primary" -}}
+{{- $namespace := include "hapihub.namespace" . -}}
+{{- printf "%s.%s.svc.cluster.local" $serviceName $namespace -}}
 {{- end }}
 
 {{/*
@@ -320,7 +334,20 @@ so a scheduled `hapihub backfill` boots with the identical environment.
 - name: BETTER_AUTH_PASSKEY_RP_ID
   value: {{ .Values.betterAuth.passkey.rpId | default .Values.global.domain | quote }}
 # Service URLs from dependencies
-{{- if .Values.valkey.enabled }}
+{{- if and .Values.valkey.enabled ((.Values.cache | default dict).enabled) }}
+# Response cache (hapihub#2231): shared Valkey with password from the
+# `valkey` secret, cadence pattern. Only rendered when cache.enabled so
+# clusters that haven't opted in keep a byte-identical manifest.
+- name: VALKEY_PASSWORD
+  valueFrom:
+    secretKeyRef:
+      name: {{ ((.Values.valkey.auth | default dict).existingSecret) | default "valkey" }}
+      key: {{ ((.Values.valkey.auth | default dict).secretKey) | default "valkey-password" }}
+- name: REDIS_URL
+  value: "redis://:$(VALKEY_PASSWORD)@{{ include "hapihub.valkey.host" . }}:{{ .Values.valkey.port | default 6379 }}"
+- name: CACHE_ENABLED
+  value: "true"
+{{- else if .Values.valkey.enabled }}
 - name: REDIS_URL
   value: {{ include "hapihub.valkey.url" . | quote }}
 {{- end }}
