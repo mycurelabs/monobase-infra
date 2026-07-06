@@ -1296,7 +1296,10 @@ cadence:
 
   image:
     repository: ghcr.io/mycurelabs/cadence
-    tag: "0.6.1"
+    # 0.6.2: ensure_sync_infra runs in a background task (poll-deadline-
+    # immune), index-before-backfill, advisory lock rescoped to fast DDL —
+    # fixes the mono#2172 livelock hit during the 0.6.1 prod deploy.
+    tag: "0.6.2"
     pullPolicy: Always
 
   # Phase 1 fix: spawn one watcher task per collection so a slow
