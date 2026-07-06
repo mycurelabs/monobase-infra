@@ -1302,6 +1302,38 @@ cadence:
     tag: "0.6.2"
     pullPolicy: Always
 
+  # ── cadenceConfig: OWNED HERE (per-env), not in the chart ─────────────
+  # The chart's cadenceConfig is only a safe standalone baseline (the same
+  # 2 collections). Each env values file carries the COMPLETE block: Helm
+  # deep-merges maps, so a partial override cannot REMOVE a chart-default
+  # key — always edit the full block here. This is the wave/rollout control
+  # point for the full-config sync program (plan: cadence bidirectional
+  # full-config sync). Keep in lockstep with services/hapihub/cadence.yml
+  # in monobase-mycure (parity check: scripts/check-cadence-config.ts
+  # --against this file).
+  cadenceConfig:
+    collections:
+      accounts:
+        strategy: lww
+        scope_columns:
+          user: id
+      personal-details:
+        strategy: lww
+        scope_columns:
+          user: id
+          organization: facility
+    collectionsBlacklist:
+      - "--drizzle-migrations"
+      - "-migration-checkpoints"
+      - "activity-logs"
+      - "*-history"             # personal-details-history, medical-records-history, ...
+      - "*-history-archive-*"   # *_history_archive_YYYYMMDD rotated snapshots
+    priorities:
+      "*": 50
+      accounts: 200
+      personal-details: 180
+
+
   # Phase 1 fix: spawn one watcher task per collection so a slow
   # baseline scan of any single table (e.g. analytics-daily-counts
   # at 763k rows + 60s deadline) doesn't trigger the 10-consecutive-

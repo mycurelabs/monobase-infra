@@ -123,6 +123,12 @@ persistence:
   mountPath: /app/data
 
 # Cadence config file (mounted as /app/cadence.yml)
+#
+# OWNERSHIP (2026-07-06): the LIVE config is owned by each env's values file
+# (values/deployments/mycure-<env>.yaml → cadence.cadenceConfig). This block
+# is only a safe standalone baseline for chart-only installs and MUST remain
+# a strict subset of every env config (Helm deep-merges maps — a key present
+# here cannot be removed by an env override). Do not add collections here.
 cadenceConfig:
   # 2026-07-03 (monobase-infra#77): explicit ALLOWLIST — the "*" wildcard
   # auto-discovery is removed. Wildcard made every public.* table a synced
