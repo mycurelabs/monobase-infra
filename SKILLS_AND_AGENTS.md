@@ -13,7 +13,7 @@ All kubectl/helm/argocd commands use this priority order:
 
 ---
 
-## Skills (5 skills, 23 operations)
+## Skills (4 skills, 21 operations)
 
 ### ArgoCD (`/argocd`)
 
@@ -70,15 +70,6 @@ Terraform/OpenTofu modules for 6 providers.
 | `destroy` | Destroy infrastructure | Yes |
 | `init` | Initialize module | No |
 
-### HapiHub Backfill (`/hapihub-backfill`)
-
-Run hapihub analytics rollup backfills (`hapihub backfill`) via `kubectl exec` against the v11 `hapihub-next` deployment. Idempotent, bounded, disposable.
-
-| Operation | Command | Destructive |
-|-----------|---------|-------------|
-| `list` | List registered backfills (`hapihub backfill --list`) | No |
-| `run` | Run a backfill (`hapihub backfill <name>`) | No (idempotent; rollup is disposable) |
-
 ---
 
 ## Agents (1)
@@ -131,5 +122,4 @@ Destructive operations:
 | `.claude/skills/k8s/SKILL.md` | Kubernetes skill definition |
 | `.claude/skills/helm/SKILL.md` | Helm skill definition |
 | `.claude/skills/iac/SKILL.md` | IaC skill definition |
-| `.claude/skills/hapihub-backfill/SKILL.md` | HapiHub analytics backfill skill definition |
 | `.claude/agents/sre-expert.md` | SRE Expert agent definition |

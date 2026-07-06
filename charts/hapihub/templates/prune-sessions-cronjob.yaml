@@ -1,9 +1,11 @@
 {{- if and .Values.enabled .Values.pruneExpiredSessions.enabled }}
 # Daily prune of expired Better Auth sessions. Better Auth never deletes
 # expired session rows (it only checks expiry at read time), so they accumulate
-# forever. Runs the canonical `hapihub backfill prune-expired-sessions` — a
-# bounded, idempotent `DELETE FROM "session" WHERE "expires_at" < now()` that
-# only touches already-expired rows, so it never logs anyone out.
+# forever. Runs a plain psql `DELETE FROM "session" WHERE "expires_at" < now()`
+# — bounded, idempotent, only touches already-expired rows, so it never logs
+# anyone out. (Was `hapihub backfill prune-expired-sessions`; that CLI was
+# removed from the hapihub binary — mono#2167 follow-up.)
+# Assumes in-cluster PostgreSQL (postgresql.external: false), like containerEnv.
 apiVersion: batch/v1
 kind: CronJob
 metadata:
@@ -26,11 +28,10 @@ spec:
       activeDeadlineSeconds: {{ .Values.pruneExpiredSessions.activeDeadlineSeconds | default 600 }}
       template:
         metadata:
+          {{- with .Values.podAnnotations }}
           annotations:
-            checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
-            {{- with .Values.podAnnotations }}
             {{- toYaml . | nindent 12 }}
-            {{- end }}
+          {{- end }}
           labels:
             {{- include "hapihub.selectorLabels" . | nindent 12 }}
             job-type: prune-expired-sessions
@@ -70,12 +71,25 @@ spec:
           - name: {{ .Chart.Name }}-prune-sessions
             securityContext:
               {{- toYaml .Values.securityContext | nindent 14 }}
-            image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
-            imagePullPolicy: {{ .Values.image.pullPolicy }}
-            command: ["hapihub"]
-            args: ["backfill", "prune-expired-sessions"]
+            # Same image the in-cluster PG statefulset runs — already on nodes.
+            image: {{ .Values.pruneExpiredSessions.image | default "docker.io/bitnamilegacy/postgresql:16.4.0-debian-12-r13" | quote }}
+            imagePullPolicy: IfNotPresent
+            command: ["/bin/sh", "-ec"]
+            args:
+              - |
+                psql "$DATABASE_URI" -v ON_ERROR_STOP=1 \
+                  -c 'DELETE FROM "session" WHERE "expires_at" < now();'
             resources:
               {{- toYaml .Values.pruneExpiredSessions.resources | nindent 14 }}
             env:
-            {{- include "hapihub.containerEnv" . | nindent 12 }}
+            # Mirrors the DATABASE_URI composition in hapihub.containerEnv.
+            - name: POSTGRESQL_USER
+              value: {{ include "hapihub.postgresql.username" . | quote }}
+            - name: POSTGRESQL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.postgresql.auth.existingSecret | default "postgresql" }}
+                  key: postgres-password
+            - name: DATABASE_URI
+              value: "postgres://$(POSTGRESQL_USER):$(POSTGRESQL_PASSWORD)@{{ include "hapihub.postgresql.host" . }}:5432/{{ include "hapihub.postgresql.database" . }}"
 {{- end }}

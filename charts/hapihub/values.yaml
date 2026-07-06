@@ -219,19 +219,20 @@ serviceMonitor:
   interval: 30s
   path: /metrics
 
-# Daily CronJob that runs `hapihub backfill prune-expired-sessions` to delete
-# expired Better Auth session rows (Better Auth never removes them itself).
-# Idempotent + bounded; only deletes already-expired rows, never logs anyone
-# out. Reuses the same container env as the Deployment via hapihub.containerEnv.
+# Daily CronJob that psql-DELETEs expired Better Auth session rows (Better
+# Auth never removes them itself). Idempotent + bounded; only deletes
+# already-expired rows, never logs anyone out. Runs the in-cluster PG client
+# image; DATABASE_URI composed the same way as hapihub.containerEnv.
 # Opt in per-environment.
 pruneExpiredSessions:
   enabled: false
   schedule: "0 3 * * *"   # 03:00 daily
   timeZone: "Etc/UTC"
+  # image: override the psql client image (defaults to the in-cluster PG image)
   resources:
     requests:
-      cpu: 100m
-      memory: 256Mi
+      cpu: 25m
+      memory: 32Mi
     limits:
-      cpu: 500m
-      memory: 768Mi
+      cpu: 100m
+      memory: 128Mi
