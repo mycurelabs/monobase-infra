@@ -348,7 +348,7 @@ hapihubNext:
 
   image:
     repository: ghcr.io/mycurelabs/hapihub
-    tag: "11.20.40" # #2190: export-pager loop fix + poison-export circuit breaker (was #2139 pg-boss pool cap)
+    tag: "11.20.41" # #2199: storage ?content raw bytes + email-attachment fix (was #2190 export-pager loop)
     pullPolicy: IfNotPresent
 
   # Daily cleanup of expired Better Auth sessions (they never self-delete).
