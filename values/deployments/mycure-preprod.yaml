@@ -224,7 +224,7 @@ hapihub:
 
   image:
     repository: ghcr.io/mycurelabs/hapihub
-    tag: "11.20.47" # #2233: backfill CLI removed (one-off fixes = operator SQL); prune CronJob already psql-based
+    tag: "11.20.48" # #2255: queue-scoped cache invalidation (phase 2 of #2231)
     pullPolicy: IfNotPresent
 
   # Valkey response cache (mono#2231) — preprod is the pilot environment.
