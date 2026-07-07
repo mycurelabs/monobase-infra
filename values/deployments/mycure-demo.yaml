@@ -146,7 +146,7 @@ mycure:
   enabled: true
   image:
     repository: ghcr.io/mycurelabs/mycureapp
-    tag: "10.25.73"
+    tag: "10.25.74"
     pullPolicy: IfNotPresent
   replicaCount: 1
   resources:
