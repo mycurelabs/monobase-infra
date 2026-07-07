@@ -348,8 +348,17 @@ hapihubNext:
 
   image:
     repository: ghcr.io/mycurelabs/hapihub
-    tag: "11.20.43" # #2201+#2205: OOM flight recorder + 64MB body cap + external-list $limit ceiling (deduped log)
+    tag: "11.20.47" # mono#2231 x-cache Valkey response cache (+#2233 backfill-CLI removal); NEVER deploy 11.20.44 (stale binary)
     pullPolicy: IfNotPresent
+
+  # Valkey response cache (mono#2231). Soaked on preprod 2026-07-07: 2h driven
+  # load, 36k reqs, 79% hit rate, 303/303 write→read freshness assertions,
+  # 0 client errors. Cached endpoints are declared via x-cache in hapihub's
+  # OpenAPI specs (phase 1: fixtures 12h, services 5m, personal-details 5m).
+  # Kill switches: set false here, or
+  # `kubectl exec deploy/hapihub-next -- hapihub cache flush`.
+  cache:
+    enabled: true
 
   # Daily cleanup of expired Better Auth sessions (they never self-delete).
   pruneExpiredSessions:
