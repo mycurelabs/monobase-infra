@@ -990,15 +990,26 @@ postgresql:
       size: 400Gi
     resources:
       requests:
-        cpu: 250m
-        memory: 4Gi
+        # 2026-07-07 node-reservation bump (mono#2129 follow-up): the primary
+        # actually uses ~1.3 cores / 11.5Gi but requested only 250m/4Gi, so the
+        # scheduler saw a "mostly free" node and co-located app pods on it
+        # during the #2114 incident (node hit 105% CPU). Honest requests
+        # de-facto reserve the node (~13.7Gi allocatable) without taints.
+        cpu: 1000m
+        memory: 12Gi
       limits:
         cpu: 2000m
         memory: 12Gi  # bumped 8Gi->12Gi 2026-06-29: primary was at ~95% mem (7.6/8Gi), OOM-kill headroom
     # Perf tuning — replaces PG defaults (shared_buffers 128MB / work_mem 4MB)
     # for the 35GB DB; sized to the 8Gi pod limit. See node-separation issue
     # for the CPU-oversubscription follow-up. Applying restarts the primary.
+    #
+    # shared_preload_libraries: bitnami's default is 'pgaudit' — keep it and
+    # add pg_stat_statements (mono#2129 follow-up: query attribution was
+    # impossible during the incident). Requires the restart this block already
+    # implies; CREATE EXTENSION pg_stat_statements in the hapihub DB after.
     extendedConfiguration: |
+      shared_preload_libraries = 'pgaudit, pg_stat_statements'
       shared_buffers = 2GB
       effective_cache_size = 5GB
       work_mem = 16MB
@@ -1039,6 +1050,7 @@ postgresql:
     # 2026-06-25. Capped on the primary by max_slot_wal_keep_size=80GB so a dead
     # replica can't refill the primary disk.
     extendedConfiguration: |
+      shared_preload_libraries = 'pgaudit, pg_stat_statements'
       shared_buffers = 2GB
       effective_cache_size = 5GB
       work_mem = 16MB
