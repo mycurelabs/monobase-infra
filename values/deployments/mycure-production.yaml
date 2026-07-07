@@ -363,16 +363,16 @@ hapihubNext:
   resources:
     requests:
       cpu: 500m
-      # 2560Mi matches the real working set (pods cycle 0.5→3.8Gi before each
-      # OOM kill). At 1Gi the scheduler packed a replica onto the node hosting
-      # postgresql-primary (production-3cl5of, observed 105% CPU / 98% mem);
-      # honest requests push replicas onto the idle production nodes instead.
-      memory: 2560Mi
+      # Right-sized post mono#2114 fix (11.20.43): steady working set is
+      # 0.5–0.6Gi through business hours with rare ~1.1Gi transients
+      # (25h clean observation, 2026-07-07). The incident-era 2560Mi
+      # emergency request over-reserved ~2.5x and held an extra node.
+      memory: 1Gi
     limits:
       cpu: "2"
       # 2Gi caused a persistent OOMKill loop (exit 137, ~90 restarts/replica)
-      # under slow-query memory spikes. 4Gi gives headroom while DB latency is
-      # addressed separately (prod DBs co-located on one node).
+      # under slow-query memory spikes (pre-#2114-fix). 4Gi retained as spike
+      # headroom for reports/exports; BUN_JSC_forceRAMSize caps the JS heap.
       memory: 4Gi
 
   gateway:
@@ -464,12 +464,11 @@ hapihubNext:
 
   autoscaling:
     enabled: true
+    # min 2 for HA; max 4 keeps one burst replica over the pre-incident 3.
+    # (Incident-era max 5 right-sized after the mono#2114 fix — post-fix the
+    # HPA idles at 2 with CPU ~35% of target.)
     minReplicas: 2
-    # maxReplicas 3 → 5: OOM-kill stopgap for mono#2129/mono#2114. HPA has been
-    # pinned at max (CPU ~92% vs 70% target) while pods OOM-crashloop ~130x/day;
-    # extra replicas shrink each kill's blast-radius during clinic peak hours
-    # until the fan-out fix PRs (mono#2119/#2121/#2127) ship.
-    maxReplicas: 5
+    maxReplicas: 4
 
   externalSecrets:
     enabled: true
@@ -557,6 +556,17 @@ hapihubNextWorker:
   enabled: true
 
   replicaCount: 1
+
+  # Explicit resources — the worker app deep-merges hapihubNext values, so
+  # without this it would inherit the API release's 1Gi request. The worker
+  # runs exports/PDF-Chromium which legitimately spike; keep a 2Gi request.
+  resources:
+    requests:
+      cpu: 500m
+      memory: 2Gi
+    limits:
+      cpu: "2"
+      memory: 4Gi
 
   config:
     RUN_WORKERS: "true"
