@@ -1010,7 +1010,7 @@ cadence:
 
   image:
     repository: ghcr.io/mycurelabs/cadence
-    tag: "0.7.1"
+    tag: "0.7.2"
     pullPolicy: Always
 
   # ── cadenceConfig: OWNED HERE (per-env), not in the chart ─────────────
@@ -1029,6 +1029,11 @@ cadence:
   # `bun scripts/check-cadence-config.ts --against <this file>`).
   # PROD stays at the 2-collection allowlist until the M2 exit review.
   # Per-collection rollback: delete the collection entry here + sync.
+  # ── cadenceConfig: OWNED HERE (per-env) — M2 FULL-CONFIG REHEARSAL ────
+  # 96 collections (3 better-auth org tables deferred 2026-07-10 — no
+  # updated_at column, mono#2303). GENERATED from monobase-mycure
+  # cadence.yml; parity: bun scripts/check-cadence-config.ts --against
+  # <this file>. Prod stays 2-collection until M2 exit review.
   cadenceConfig:
     collections:
       account:
@@ -1264,10 +1269,6 @@ cadence:
         strategy: lww
         scope_columns:
           organization: warehouse
-      invitation:
-        strategy: lww
-        scope_columns:
-          organization: organization_id
       legal-acceptances:
         strategy: lww
         scope_columns:
@@ -1298,10 +1299,6 @@ cadence:
         strategy: lww
       medicines:
         strategy: lww
-      member:
-        strategy: lww
-        scope_columns:
-          organization: organization_id
       message-references:
         strategy: lww
         scope_columns:
@@ -1310,10 +1307,6 @@ cadence:
         strategy: lww
         scope_columns:
           organization: organization
-      organization:
-        strategy: lww
-        scope_columns:
-          organization: id
       organization-members:
         strategy: lww
         scope_columns:
@@ -1505,15 +1498,12 @@ cadence:
       inventory-suppliers: 100
       inventory-transactions: 100
       inventory-variants: 100
-      invitation: 180
       license-packages: 80
       medical-encounters: 150
       medical-patients: 170
       medical-records: 150
       medicine-formulations: 80
       medicines: 80
-      member: 180
-      organization: 180
       organization-members: 180
       organization-partners: 180
       organizations: 180
