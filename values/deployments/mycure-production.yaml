@@ -1336,7 +1336,7 @@ cadence:
     # 0.6.2: ensure_sync_infra runs in a background task (poll-deadline-
     # immune), index-before-backfill, advisory lock rescoped to fast DDL —
     # fixes the mono#2172 livelock hit during the 0.6.1 prod deploy.
-    tag: "0.7.5"
+    tag: "0.7.6"
     pullPolicy: Always
 
   # ── cadenceConfig: OWNED HERE (per-env), not in the chart ─────────────
@@ -1349,9 +1349,12 @@ cadence:
   # in monobase-mycure (parity check: scripts/check-cadence-config.ts
   # --against this file).
   # ── cadenceConfig: OWNED HERE (per-env) — M4 FULL-CONFIG CUTOVER ──────
-  # 96 collections (2026-07-10), GENERATED from monobase-mycure
-  # cadence.yml (parity: bun scripts/check-cadence-config.ts --against
-  # <this file>). Rehearsed on preprod (M2 exit: PASS — see mono program).
+  # 97 collections (billing-legacy-invoices promoted from blacklist
+  # 2026-07-10, mono#2328 — active invoice plane for V8 clients; 3
+  # better-auth org tables still deferred, mono#2303). GENERATED from
+  # monobase-mycure cadence.yml (parity: bun scripts/check-cadence-config.ts
+  # --against <this file>). 0.7.6 = resumable catch-up + changelog-scale
+  # watermarks (mono#2320, PR mono#2331); rehearsed on preprod 2026-07-10.
   # Per-collection ROLLBACK: delete the entry here + Replace-mode root
   # sync (map-key removal needs Replace — see ArgoCD wart memory).
   cadenceConfig:
@@ -1412,6 +1415,10 @@ cadence:
         strategy: lww
         scope_columns:
           organization: facility
+      billing-legacy-invoices:
+        strategy: lww
+        scope_columns:
+          organization: organization
       billing-payment-methods:
         strategy: lww
         scope_columns:
@@ -1650,8 +1657,8 @@ cadence:
       personal-details:
         strategy: lww
         scope_columns:
-          user: id
           organization: facility
+          user: id
       pharmacy-medication-orders:
         strategy: lww
         scope_columns:
@@ -1743,7 +1750,6 @@ cadence:
     - -pg-changelog
     - analytics-daily-counts
     - api-key
-    - billing-legacy-invoices
     - billing-merchants
     - billing-providers
     - booking-slots
@@ -1767,6 +1773,7 @@ cadence:
     - verification
     - webhook-deliveries
     priorities:
+      '*': 50
       account: 200
       account-configurations: 180
       account-invitations: 180
@@ -1781,6 +1788,7 @@ cadence:
       billing-invoice-agts: 120
       billing-invoices: 120
       billing-items: 120
+      billing-legacy-invoices: 120
       billing-payment-methods: 120
       billing-payments: 120
       billing-prices: 120
@@ -1835,7 +1843,6 @@ cadence:
       queues: 100
       subscription-packages: 80
       user: 200
-      '*': 50
 
   env:
     - name: CADENCE_PER_COLLECTION_WORKERS
