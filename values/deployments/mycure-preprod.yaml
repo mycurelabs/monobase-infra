@@ -1010,7 +1010,7 @@ cadence:
 
   image:
     repository: ghcr.io/mycurelabs/cadence
-    tag: "0.7.5"
+    tag: "0.7.6"
     pullPolicy: Always
 
   # ── cadenceConfig: OWNED HERE (per-env), not in the chart ─────────────
@@ -1029,11 +1029,13 @@ cadence:
   # `bun scripts/check-cadence-config.ts --against <this file>`).
   # PROD stays at the 2-collection allowlist until the M2 exit review.
   # Per-collection rollback: delete the collection entry here + sync.
-  # ── cadenceConfig: OWNED HERE (per-env) — M2 FULL-CONFIG REHEARSAL ────
-  # 96 collections (3 better-auth org tables deferred 2026-07-10 — no
-  # updated_at column, mono#2303). GENERATED from monobase-mycure
-  # cadence.yml; parity: bun scripts/check-cadence-config.ts --against
-  # <this file>. Prod stays 2-collection until M2 exit review.
+  # ── cadenceConfig: OWNED HERE (per-env) — FULL CONFIG (0.7.6) ─────────
+  # 97 collections (billing-legacy-invoices promoted from blacklist
+  # 2026-07-10, mono#2328 — active invoice plane for V8 clients; 3
+  # better-auth org tables still deferred, mono#2303). GENERATED from
+  # monobase-mycure cadence.yml; parity: bun scripts/check-cadence-config.ts
+  # --against <this file>. 0.7.6 = resumable catch-up + changelog-scale
+  # watermarks (mono#2320, PR mono#2331).
   cadenceConfig:
     collections:
       account:
@@ -1092,6 +1094,10 @@ cadence:
         strategy: lww
         scope_columns:
           organization: facility
+      billing-legacy-invoices:
+        strategy: lww
+        scope_columns:
+          organization: organization
       billing-payment-methods:
         strategy: lww
         scope_columns:
@@ -1330,8 +1336,8 @@ cadence:
       personal-details:
         strategy: lww
         scope_columns:
-          user: id
           organization: facility
+          user: id
       pharmacy-medication-orders:
         strategy: lww
         scope_columns:
@@ -1423,7 +1429,6 @@ cadence:
     - -pg-changelog
     - analytics-daily-counts
     - api-key
-    - billing-legacy-invoices
     - billing-merchants
     - billing-providers
     - booking-slots
@@ -1447,6 +1452,7 @@ cadence:
     - verification
     - webhook-deliveries
     priorities:
+      '*': 50
       account: 200
       account-configurations: 180
       account-invitations: 180
@@ -1461,6 +1467,7 @@ cadence:
       billing-invoice-agts: 120
       billing-invoices: 120
       billing-items: 120
+      billing-legacy-invoices: 120
       billing-payment-methods: 120
       billing-payments: 120
       billing-prices: 120
@@ -1515,7 +1522,6 @@ cadence:
       queues: 100
       subscription-packages: 80
       user: 200
-      '*': 50
 
   env:
     - name: CADENCE_PER_COLLECTION_WORKERS
