@@ -138,46 +138,10 @@ mycure-dashboard:
     enabled: false
 
 # ===== INTERNAL TOOL: NocoDB (no-code DB UI for business, issue #2041) =====
-# Self-hosted, single replica, SQLite metadata on a PVC. Business connects the
-# hapihub Postgres as a READ-ONLY data source via the UI (NC_DISABLE_PG_DATA_
-# REFLECTION=true stops NocoDB creating schemas in the connected DB). No NC_DB /
-# NC_ADMIN_* / JWT secret here: first signup becomes super-admin and an
-# auto-generated JWT is fine for this ephemeral env. Prod adds those via an
-# ExternalSecret.
+# Moved to the demo namespace (issue #2097) — demo is the persistent sibling; preprod is
+# spun up per-rehearsal. Re-enable here only for preprod-specific rehearsals.
 nocodb:
-  enabled: true
-
-  image:
-    repository: nocodb/nocodb
-    tag: "2026.06.2"
-    pullPolicy: IfNotPresent
-
-  replicaCount: 1
-
-  resources:
-    requests:
-      cpu: 100m
-      memory: 512Mi
-    limits:
-      cpu: 1000m
-      memory: 1536Mi
-
-  persistence:
-    size: 5Gi
-
-  gateway:
-    hostname: ""  # defaults to nocodb.preprod.localfirsthealth.com
-    sectionName: https-preprod-lfh
-
-  config:
-    NC_PUBLIC_URL: "https://nocodb.preprod.localfirsthealth.com"
-    NC_DISABLE_PG_DATA_REFLECTION: "true"
-
-  # Pre-add the read-only hapihub data source on deploy (idempotent post-install
-  # Job). Admin + RO creds come from GCP via ExternalSecret (keys
-  # mycure-production-nocodb-* — preprod reuses the production secretPrefix).
-  bootstrap:
-    enabled: true
+  enabled: false
 
 # ===== HEALTHCARE: MyCure PXP (patient-facing web app) =====
 mycure-pxp:
