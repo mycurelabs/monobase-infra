@@ -1853,13 +1853,17 @@ cadence:
   # layer. Preprod plateaus at ~1.2 GiB; prod's heavier peer + workload
   # extrapolates to ~1.7 GiB. 4 GiB gives ~2x headroom before the next
   # workload step kicks the cycle back on.
+  # 2026-07-10 (M4 full-config cutover): 96 collections × primary-reader-on-
+  # every-catch-up (baseline not persisted to changelog) blew past the 4Gi
+  # limit → OOMKilled (exit 137). Bumped 4Gi→12Gi / req 1→3Gi to stop the
+  # crash loop while the catch-up memory profile is retuned for 96 collections.
   resources:
     requests:
       cpu: 200m
-      memory: 1Gi
+      memory: 3Gi
     limits:
       cpu: "2"
-      memory: 4Gi
+      memory: 12Gi
 
   gateway:
     hostname: ""
