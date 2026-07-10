@@ -137,9 +137,43 @@ mycure-dashboard:
     enabled: false
 
 # ===== INTERNAL TOOL: NocoDB (no-code DB UI for business, issue #2041) =====
-# Disabled in demo; enabled on preprod only for now.
+# Self-hosted, single replica, SQLite metadata on a PVC. An idempotent post-install
+# Job pre-adds the hapihub Postgres as a READ-ONLY data source
+# (NC_DISABLE_PG_DATA_REFLECTION=true stops NocoDB creating schemas in the connected
+# DB). Admin + RO creds come from GCP via ExternalSecret (keys mycure-production-nocodb-*
+# — demo reuses the production secretPrefix). Home for the tool as of issue #2097 (moved
+# off ephemeral preprod). Points at demo's own PG (schema present, data minimal).
 nocodb:
-  enabled: false
+  enabled: true
+
+  image:
+    repository: nocodb/nocodb
+    tag: "2026.06.2"
+    pullPolicy: IfNotPresent
+
+  replicaCount: 1
+
+  resources:
+    requests:
+      cpu: 100m
+      memory: 512Mi
+    limits:
+      cpu: 1000m
+      memory: 1536Mi
+
+  persistence:
+    size: 5Gi
+
+  gateway:
+    hostname: ""  # defaults to nocodb.demo.localfirsthealth.com
+    sectionName: https-demo-lfh
+
+  config:
+    NC_PUBLIC_URL: "https://nocodb.demo.localfirsthealth.com"
+    NC_DISABLE_PG_DATA_REFLECTION: "true"
+
+  bootstrap:
+    enabled: true
 
 # ===== HEALTHCARE: Frontend Application (mycureapp) =====
 mycure:
