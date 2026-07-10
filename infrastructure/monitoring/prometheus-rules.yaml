@@ -306,3 +306,41 @@ spec:
           annotations:
             summary: "cadence in {{ $labels.namespace }} restarted >3x in 1h"
             description: "Watcher consecutive-failure exits or boot crashes; check ensure_sync_infra logs and PG availability."
+
+---
+# Cadence counter alerts (0.7.x exposition; pairs with cadence-sync-guardrails)
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: cadence-sync-counters
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: prometheus-rules
+    app.kubernetes.io/component: monitoring
+    prometheus: kube-prometheus
+spec:
+  groups:
+    - name: cadence-counters
+      interval: 60s
+      rules:
+        - alert: CadenceWorkerQuarantined
+          expr: cadence_watcher_workers_quarantined > 0
+          for: 5m
+          labels: {severity: warning}
+          annotations:
+            summary: "cadence watcher worker(s) quarantined in {{ $labels.namespace }}"
+            description: "A collection stopped syncing after repeated failures; check logs, then restart the pod after fixing the cause."
+        - alert: CadenceUnconfiguredDropsGrowing
+          expr: rate(cadence_unconfigured_collection_dropped_total[10m]) > 0.1
+          for: 15m
+          labels: {severity: warning}
+          annotations:
+            summary: "cadence dropping unconfigured-collection frames in {{ $labels.namespace }}"
+            description: "A peer is pushing collections outside the allowlist (fleet config skew — check maestroapp versions vs hub config)."
+        - alert: CadenceInfraRetriesPersisting
+          expr: increase(cadence_watcher_infra_retries_total[30m]) > 2
+          for: 30m
+          labels: {severity: warning}
+          annotations:
+            summary: "cadence ensure_sync_infra retrying persistently in {{ $labels.namespace }}"
+            description: "Some collection cannot complete DDL setup (steady retry at the 15m cap); its data is on the degraded legacy path."

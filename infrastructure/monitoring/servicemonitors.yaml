@@ -66,3 +66,25 @@ spec:
     - port: metrics
       interval: 30s
       path: /metrics
+
+---
+# Cadence /prometheus exposition (0.7.0+). JSON /metrics is untouched;
+# the text-format endpoint is a separate route.
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: cadence
+  namespace: monitoring
+  labels:
+    prometheus: kube-prometheus
+    release: monitoring
+spec:
+  namespaceSelector:
+    matchNames: [mycure-preprod, mycure-production]
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: cadence
+  endpoints:
+    - port: http
+      path: /prometheus
+      interval: 60s
