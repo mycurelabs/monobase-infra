@@ -99,7 +99,13 @@ spec:
           - CreateNamespace=true              # Auto-create namespace if missing
           - PrunePropagationPolicy=foreground # Delete in correct order
           - PruneLast=true                    # Prune after new resources are healthy
-          - ServerSideApply=true              # Avoids resourceVersion conflicts on large Application CRDs
+          # ServerSideApply removed 2026-07-10: root apps only manage small child
+          # Application manifests (KBs — nowhere near the 256KB last-applied limit
+          # SSA exists to dodge), and SSA collides with the sync engine's force
+          # path: recurring "error validating options: --force cannot be used with
+          # --server-side" apply failures aborted root syncs across prod/demo
+          # (2026-07-10; hapihub-next, security-baseline). Client-side apply
+          # accepts the force pairing, so root syncs complete.
 
         retry:
           limit: 5
