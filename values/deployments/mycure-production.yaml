@@ -1016,6 +1016,9 @@ postgresql:
       maintenance_work_mem = 256MB
       random_page_cost = 1.1
       effective_io_concurrency = 200
+      # M4 cutover (2026-07-10): 96 cadence workers connect at boot; default 100
+      # was exhausted on the preprod rehearsal. Restart PG to apply.
+      max_connections = 300
     # Cross-DB spread: never co-locate the PG primary with MongoDB. Both are
     # heavy (PG ~1.5core/8.6Gi, Mongo ~6Gi) and had piled onto one prod node,
     # saturating it (CPU 105%) and causing 15-16s queries. `required` is safe:
@@ -1057,6 +1060,9 @@ postgresql:
       maintenance_work_mem = 256MB
       random_page_cost = 1.1
       effective_io_concurrency = 200
+      # M4 cutover (2026-07-10): 96 cadence workers connect at boot; default 100
+      # was exhausted on the preprod rehearsal. Restart PG to apply.
+      max_connections = 300
       primary_slot_name = 'pg_read_replica'
     # Prefer to keep the read replica off the primary and Mongo nodes too, so
     # all three DBs spread. Soft (preferred) — the replica is idle/less critical,
@@ -1330,7 +1336,7 @@ cadence:
     # 0.6.2: ensure_sync_infra runs in a background task (poll-deadline-
     # immune), index-before-backfill, advisory lock rescoped to fast DDL —
     # fixes the mono#2172 livelock hit during the 0.6.1 prod deploy.
-    tag: "0.6.2"
+    tag: "0.7.5"
     pullPolicy: Always
 
   # ── cadenceConfig: OWNED HERE (per-env), not in the chart ─────────────
@@ -1342,39 +1348,495 @@ cadence:
   # full-config sync). Keep in lockstep with services/hapihub/cadence.yml
   # in monobase-mycure (parity check: scripts/check-cadence-config.ts
   # --against this file).
+  # ── cadenceConfig: OWNED HERE (per-env) — M4 FULL-CONFIG CUTOVER ──────
+  # 96 collections (2026-07-10), GENERATED from monobase-mycure
+  # cadence.yml (parity: bun scripts/check-cadence-config.ts --against
+  # <this file>). Rehearsed on preprod (M2 exit: PASS — see mono program).
+  # Per-collection ROLLBACK: delete the entry here + Replace-mode root
+  # sync (map-key removal needs Replace — see ArgoCD wart memory).
   cadenceConfig:
     collections:
+      account:
+        strategy: lww
+        scope_columns:
+          user: user_id
+      account-configurations:
+        strategy: lww
+        scope_columns:
+          user: uid
+      account-invitations:
+        strategy: lww
+        scope_columns:
+          user: created_by
+      account-onboarding:
+        strategy: lww
+        scope_columns:
+          user: id
       accounts:
         strategy: lww
         scope_columns:
           user: id
+      action-codes:
+        strategy: lww
+      announcement-acknowledgments:
+        strategy: lww
+        scope_columns:
+          user: user_id
+      announcements:
+        strategy: lww
+      billing-accounting-transactions:
+        strategy: lww
+        scope_columns:
+          organization: organization
+      billing-coupons:
+        strategy: lww
+        scope_columns:
+          organization: organization
+      billing-credit-transactions:
+        strategy: lww
+        scope_columns:
+          organization: organization
+      billing-expenses:
+        strategy: lww
+        scope_columns:
+          organization: facility
+      billing-invoice-agts:
+        strategy: lww
+        scope_columns:
+          organization: facility
+      billing-invoices:
+        strategy: lww
+        scope_columns:
+          organization: organization
+      billing-items:
+        strategy: lww
+        scope_columns:
+          organization: facility
+      billing-payment-methods:
+        strategy: lww
+        scope_columns:
+          organization: organization
+      billing-payments:
+        strategy: lww
+        scope_columns:
+          organization: facility
+      billing-prices:
+        strategy: lww
+        scope_columns:
+          organization: organization
+      billing-products:
+        strategy: lww
+        scope_columns:
+          organization: organization
+      billing-promos:
+        strategy: lww
+        scope_columns:
+          organization: organization
+      billing-return-transactions:
+        strategy: lww
+        scope_columns:
+          organization: organization
+      billing-soas:
+        strategy: lww
+        scope_columns:
+          organization: facility
+      billing-tax-rates:
+        strategy: lww
+        scope_columns:
+          organization: organization
+      billing-void-transactions:
+        strategy: lww
+        scope_columns:
+          organization: organization
+      bir-accreditations:
+        strategy: lww
+        scope_columns:
+          organization: organization
+      bir-logs:
+        strategy: lww
+        scope_columns:
+          organization: organization
+      bir-machines:
+        strategy: lww
+        scope_columns:
+          organization: organization
+      bir-readings:
+        strategy: lww
+        scope_columns:
+          organization: organization
+      booking-events:
+        strategy: lww
+        scope_columns:
+          organization: organization
+      booking-exceptions:
+        strategy: lww
+        scope_columns:
+          user: owner
+      bookings:
+        strategy: lww
+        scope_columns:
+          organization: organization
+      clock-audits:
+        strategy: lww
+        scope_columns:
+          user: by_uid
+      clocks:
+        strategy: lww
+        scope_columns:
+          organization: organization
+      consents:
+        strategy: lww
+        scope_columns:
+          user: user_id
+      conversation-members:
+        strategy: lww
+        scope_columns:
+          organization: organization
+      conversations:
+        strategy: lww
+        scope_columns:
+          organization: organization
+      diagnostic-analyzers:
+        strategy: lww
+        scope_columns:
+          organization: facility
+      diagnostic-measures:
+        strategy: lww
+        scope_columns:
+          organization: facility
+      diagnostic-order-tests:
+        strategy: lww
+        scope_columns:
+          organization: facility
+      diagnostic-order-tests-reports:
+        strategy: lww
+        scope_columns:
+          organization: organization
+      diagnostic-orders:
+        strategy: lww
+        scope_columns:
+          organization: facility
+      diagnostic-packages:
+        strategy: lww
+        scope_columns:
+          organization: facility
+      diagnostic-tests:
+        strategy: lww
+        scope_columns:
+          organization: facility
+      file-links:
+        strategy: lww
+        scope_columns:
+          organization: organization
+      fixtures:
+        strategy: lww
+        scope_columns:
+          organization: organization
+      form-templates:
+        strategy: lww
+        scope_columns:
+          organization: facility
+      hr-schedules:
+        strategy: lww
+        scope_columns:
+          organization: organization
+      insurance-contracts:
+        strategy: lww
+        scope_columns:
+          organization:
+          - insured
+          - insurer
+          - insured_organization
+      insurance-coverages:
+        strategy: lww
+        scope_columns:
+          organization:
+          - insured
+          - insurer
+      insurance-loas:
+        strategy: lww
+        scope_columns:
+          organization: organization
+      inventory-configurations:
+        strategy: lww
+        scope_columns:
+          organization: organization
+      inventory-cycle-count-reports:
+        strategy: lww
+        scope_columns:
+          organization: organization
+      inventory-item-classifications:
+        strategy: lww
+        scope_columns:
+          organization: organization
+      inventory-products:
+        strategy: lww
+        scope_columns:
+          organization: warehouse
+      inventory-stock-configurations:
+        strategy: lww
+        scope_columns:
+          organization: organization
+      inventory-suppliers:
+        strategy: lww
+        scope_columns:
+          organization: warehouse
+      inventory-transactions:
+        strategy: lww
+        scope_columns:
+          organization: warehouse
+      inventory-variants:
+        strategy: lww
+        scope_columns:
+          organization: warehouse
+      legal-acceptances:
+        strategy: lww
+        scope_columns:
+          user: account
+      license-licenses:
+        strategy: lww
+        scope_columns:
+          organization: organization
+      license-packages:
+        strategy: lww
+      medical-encounters:
+        strategy: lww
+        scope_columns:
+          organization: facility
+      medical-patients:
+        strategy: lww
+        scope_columns:
+          organization: facility
+      medical-records:
+        strategy: lww
+        scope_columns:
+          organization: facility
+      medicine-configurations:
+        strategy: lww
+        scope_columns:
+          organization: organization
+      medicine-formulations:
+        strategy: lww
+      medicines:
+        strategy: lww
+      message-references:
+        strategy: lww
+        scope_columns:
+          organization: organization
+      messages:
+        strategy: lww
+        scope_columns:
+          organization: organization
+      organization-members:
+        strategy: lww
+        scope_columns:
+          organization: organization
+      organization-partners:
+        strategy: lww
+        scope_columns:
+          organization: organization
+      organizations:
+        strategy: lww
+        scope_columns:
+          organization: id
+      patient-consents:
+        strategy: lww
+        scope_columns:
+          organization: organization
+      patient-timeline-events:
+        strategy: lww
+        scope_columns:
+          organization: organization
       personal-details:
         strategy: lww
         scope_columns:
           user: id
           organization: facility
+      pharmacy-medication-orders:
+        strategy: lww
+        scope_columns:
+          organization: organization
+      prm-conversations:
+        strategy: lww
+        scope_columns:
+          organization: organization
+      prm-flows:
+        strategy: lww
+        scope_columns:
+          organization: organization
+      prm-message-batches:
+        strategy: lww
+        scope_columns:
+          organization: organization
+      prm-messages:
+        strategy: lww
+        scope_columns:
+          organization: organization
+      prm-recipients:
+        strategy: lww
+        scope_columns:
+          organization: organization
+      prm-reminder-configs:
+        strategy: lww
+        scope_columns:
+          organization: organization
+      prm-templates:
+        strategy: lww
+        scope_columns:
+          organization: organization
+      public-profiles:
+        strategy: lww
+        scope_columns:
+          organization: organization
+      queue-items:
+        strategy: lww
+        scope_columns:
+          organization: organization
+      queues:
+        strategy: lww
+        scope_columns:
+          organization: organization
+      service-providers:
+        strategy: lww
+        scope_columns:
+          organization: facility
+      services:
+        strategy: lww
+        scope_columns:
+          organization: facility
+      services-performeds:
+        strategy: lww
+        scope_columns:
+          organization: facility
+      storage-files:
+        strategy: lww
+        scope_columns:
+          user: owner
+      storage-links:
+        strategy: lww
+        scope_columns:
+          user: owner
+      subscription-packages:
+        strategy: lww
+      support-ticket-messages:
+        strategy: lww
+        scope_columns:
+          user: author
+      support-tickets:
+        strategy: lww
+        scope_columns:
+          organization: organization
+      tasks:
+        strategy: lww
+        scope_columns:
+          organization: organization
+      user:
+        strategy: lww
+        scope_columns:
+          user: id
     collectionsBlacklist:
-      - "--drizzle-migrations"
-      - "-migration-checkpoints"
-      - "activity-logs"
-      - "*-history"             # personal-details-history, medical-records-history, ...
-      - "*-history-archive-*"   # *_history_archive_YYYYMMDD rotated snapshots
+    - --drizzle-migrations
+    - -migration-checkpoints
+    - activity-logs
+    - '*-history'
+    - '*-history-archive-*'
+    - -pg-changelog
+    - analytics-daily-counts
+    - api-key
+    - billing-legacy-invoices
+    - billing-merchants
+    - billing-providers
+    - booking-slots
+    - counters
+    - device-telemetry-devices
+    - document-embeddings
+    - email-providers
+    - hl7-messages
+    - hr-daily-staff-summary
+    - one-time-token
+    - organization-members-archived
+    - passkey
+    - platform-daily-snapshot
+    - prm-mailing-list-subscribers
+    - prm-mailing-lists
+    - prm-providers
+    - services-archived
+    - session
+    - system-syncbases
+    - two-factor
+    - verification
+    - webhook-deliveries
     priorities:
-      "*": 50
+      account: 200
+      account-configurations: 180
+      account-invitations: 180
+      account-onboarding: 180
       accounts: 200
-      personal-details: 180
+      action-codes: 80
+      announcements: 80
+      billing-accounting-transactions: 120
+      billing-coupons: 120
+      billing-credit-transactions: 120
+      billing-expenses: 120
+      billing-invoice-agts: 120
+      billing-invoices: 120
+      billing-items: 120
+      billing-payment-methods: 120
+      billing-payments: 120
+      billing-prices: 120
+      billing-products: 120
+      billing-promos: 120
+      billing-return-transactions: 120
+      billing-soas: 120
+      billing-tax-rates: 120
+      billing-void-transactions: 120
+      bir-accreditations: 120
+      bir-logs: 120
+      bir-machines: 120
+      bir-readings: 120
+      booking-events: 100
+      booking-exceptions: 100
+      bookings: 100
+      clock-audits: 100
+      clocks: 100
+      diagnostic-analyzers: 150
+      diagnostic-measures: 150
+      diagnostic-order-tests: 150
+      diagnostic-order-tests-reports: 150
+      diagnostic-orders: 150
+      diagnostic-packages: 150
+      diagnostic-tests: 150
+      hr-schedules: 100
+      insurance-contracts: 150
+      insurance-coverages: 150
+      insurance-loas: 150
+      inventory-configurations: 100
+      inventory-cycle-count-reports: 100
+      inventory-item-classifications: 100
+      inventory-products: 100
+      inventory-stock-configurations: 100
+      inventory-suppliers: 100
+      inventory-transactions: 100
+      inventory-variants: 100
+      license-packages: 80
+      medical-encounters: 150
+      medical-patients: 170
+      medical-records: 150
+      medicine-formulations: 80
+      medicines: 80
+      organization-members: 180
+      organization-partners: 180
+      organizations: 180
+      patient-consents: 150
+      patient-timeline-events: 150
+      personal-details: 200
+      pharmacy-medication-orders: 150
+      queue-items: 100
+      queues: 100
+      subscription-packages: 80
+      user: 200
+      '*': 50
 
-
-  # Phase 1 fix: spawn one watcher task per collection so a slow
-  # baseline scan of any single table (e.g. analytics-daily-counts
-  # at 763k rows + 60s deadline) doesn't trigger the 10-consecutive-
-  # failures process-exit. Without this, prod has been restart-looping
-  # every ~10min (verified 2026-06-24: 19 restarts in 3h18m, exit
-  # reason "Watcher: 10 consecutive failures, exiting process").
-  # Throttled by the 0.5.25 Semaphore cap (min(num_cpus*2, 16)) so
-  # the boot connection storm that crashlooped preprod on 2026-06-23
-  # can't recur. Same env is live on preprod since 2026-06-23 with
-  # zero issues.
   env:
     - name: CADENCE_PER_COLLECTION_WORKERS
       value: "true"
@@ -1449,7 +1911,7 @@ cadence:
     # 2026-06-26: dropped 7→2 after the 158 GB d25 reseed event.
     # Cost: peers offline >2 days fall below the lamport trim floor
     # and must do a snapshot-based resume (existing code path).
-    retentionDays: 2
+    retentionDays: 7
 
   config:
     RUST_LOG: "info"
