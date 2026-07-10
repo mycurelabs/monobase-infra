@@ -882,6 +882,15 @@ postgresql:
       adminPasswordKey: postgres-password
 
   primary:
+    # M2 full-config rehearsal (2026-07-10): the default max_connections=100
+    # was exhausted by cadence 0.7.0's boot — 99 per-collection ensure tasks
+    # connect simultaneously (advisory lock serializes DDL, not connection
+    # acquisition) → 40 collections' DDL setup starved with "connect failed".
+    # 300 gives headroom for hapihub + 99 watcher workers + DDL/index tasks.
+    # cadence-side fix (gate ensure connections behind the poll semaphore +
+    # per-collection retry) ships as 0.7.1 during the soak.
+    extendedConfiguration: |
+      max_connections = 300
     persistence:
       enabled: true
       storageClass: ""
