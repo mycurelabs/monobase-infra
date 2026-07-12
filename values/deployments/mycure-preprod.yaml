@@ -1097,7 +1097,7 @@ cadence:
       billing-legacy-invoices:
         strategy: lww
         scope_columns:
-          organization: organization
+          organization: facility
       billing-payment-methods:
         strategy: lww
         scope_columns:
