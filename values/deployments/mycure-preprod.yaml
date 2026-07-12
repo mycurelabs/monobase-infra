@@ -188,7 +188,7 @@ hapihub:
 
   image:
     repository: ghcr.io/mycurelabs/hapihub
-    tag: "11.20.49" # #2304: phase-3 x-cache annotations (5 catalog services)
+    tag: "11.20.50" # #2246 _spreadData null-fallback + #2279 warehouse grants
     pullPolicy: IfNotPresent
 
   # Valkey response cache (mono#2231) — preprod is the pilot environment.
