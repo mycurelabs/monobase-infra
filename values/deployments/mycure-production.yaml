@@ -1336,7 +1336,7 @@ cadence:
     # 0.6.2: ensure_sync_infra runs in a background task (poll-deadline-
     # immune), index-before-backfill, advisory lock rescoped to fast DDL —
     # fixes the mono#2172 livelock hit during the 0.6.1 prod deploy.
-    tag: "0.8.0"  # mono#2420 split-store: durable state → primary PG; one-boot import from valkey (preprod-verified 2026-07-13)
+    tag: "0.9.0"  # mono#2356 RC α–η fix program + follow-ups (protocol_rev 3, all fixes gated — see env). Preprod-verified healthy 2026-07-13; peer-binding/scope-fail-closed/stable-keyspace held.
     pullPolicy: Always
 
   # ── cadenceConfig: OWNED HERE (per-env), not in the chart ─────────────
@@ -1847,6 +1847,40 @@ cadence:
   env:
     - name: CADENCE_PER_COLLECTION_WORKERS
       value: "true"
+    # ── 0.9.0 RC α–η fix-program gates (mono#2356) ──────────────────────
+    # Preprod-verified 2026-07-13 (0.9.0 booted clean). All fixes are
+    # default-off in the binary; enabled here. HELD fleet-wide until
+    # validated: ENFORCE_PEER_BINDING (can wedge a box whose peer_id/token
+    # mismatch — validate on a box first), SCOPE_FAIL_CLOSED (announcements
+    # needs an array org-scope), STABLE_KEYSPACE (keyspace-move maint op).
+    - name: CADENCE_WATERMARK_INVARIANT      # #2370 silent-write-loss clamp
+      value: "true"
+    - name: CADENCE_APPLIER_FK_RETRY         # #2358 FK-casualty requeue
+      value: "true"
+    - name: CADENCE_LAG_RECOVERY_INCREMENTAL # #2391 no full-snapshot re-flood
+      value: "true"
+    - name: CADENCE_BASELINE_EMIT            # #2389 baseline-absorbed rows
+      value: "true"
+    - name: CADENCE_MEMBER_SCOPE_EXPANSION   # #2372 anonymous members (own-org; fails open)
+      value: "true"
+    - name: CADENCE_ENFORCE_READ_ONLY        # #2397 v1
+      value: "true"
+    - name: CADENCE_ENFORCE_REVOCATION       # #2397 v4 (revoked_subs empty = no-op)
+      value: "true"
+    - name: CADENCE_JWKS_TTL_SECS            # #2397 v2 (rotation revocation)
+      value: "3600"
+    - name: CADENCE_JSONB_SUBKEY_MERGE       # validate_m partial (delta-safe)
+      value: "true"
+    - name: CADENCE_BULK_OP_DETECT           # WATCH-3 divergence detection
+      value: "true"
+    - name: CADENCE_P2P_ENABLED              # #2359 hub is WS-only
+      value: "false"
+    # HELD off on PROD: retention-peer-floor defaults ON in the binary, but
+    # prod has a disk-emergency history (d25/d27) and the
+    # `cadence_retention_floor_seq==0` alert isn't wired yet — a wedged peer
+    # could pin partitions. Keep the age-cutoff until the alert exists.
+    - name: CADENCE_RETENTION_PEER_FLOOR
+      value: "false"
 
   replicaCount: 1
 
