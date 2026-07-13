@@ -1336,7 +1336,7 @@ cadence:
     # 0.6.2: ensure_sync_infra runs in a background task (poll-deadline-
     # immune), index-before-backfill, advisory lock rescoped to fast DDL —
     # fixes the mono#2172 livelock hit during the 0.6.1 prod deploy.
-    tag: "0.9.0"  # mono#2356 RC α–η fix program + follow-ups (protocol_rev 3, all fixes gated — see env). Preprod-verified healthy 2026-07-13; peer-binding/scope-fail-closed/stable-keyspace held.
+    tag: "0.9.1"  # mono#2356: adds PROTO-5 — bound the pre-HelloAck catch-up count walk. A box returning from downtime (observed 3.24M rows behind: alfheim watermark 47,198,518 vs hub max 50,436,106) was wedged in a 20s "no HelloAck" reconnect loop because the hub walked the whole delta before acking; #2374's deadline + the unbounded walk = far-behind boxes can never handshake. catch_up_total is advisory → capped (strictly-safer, no wire change). 0.9.0 = RC α–η fix program (protocol_rev 3, all fixes gated — see env; peer-binding/scope-fail-closed/stable-keyspace held).
     pullPolicy: Always
 
   # ── cadenceConfig: OWNED HERE (per-env), not in the chart ─────────────
