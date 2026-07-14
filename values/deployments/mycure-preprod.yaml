@@ -1008,6 +1008,10 @@ cadence:
   # until 24h soak + the mono#2103 NULL-growth gate clear.
   enabled: true
 
+  # TEMPORARY (mono#2456 lamport-reset rehearsal): hub scaled to 0 for a
+  # clean-slate cadence metadata wipe. REVERT to bring the hub back up fresh.
+  replicaCount: 0
+
   image:
     repository: ghcr.io/mycurelabs/cadence
     tag: "0.9.5"  # mono#2356: per-page scoped lamport lookup in catch-up — full-collection max-lamport GROUP BY over the 147M-row changelog timed out + (per #2417) killed catch-up mid-walk, so collections after the slow one (subscriptions/user/members) never synced. Now bounded doc_id=ANY() per page. On top of 0.9.4.
