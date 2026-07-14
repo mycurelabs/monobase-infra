@@ -1010,7 +1010,7 @@ cadence:
 
   image:
     repository: ghcr.io/mycurelabs/cadence
-    tag: "0.9.3"  # mono#2356 burn-down PR #2451: lamport integrity (fail-at-collection + persisted clock), live-tail watermark + advance markers, tombstone two-phase ack, applier-failure metric, issuer gate + scope-column validation (gates default-off)
+    tag: "0.9.4"  # mono#2454 box watcher wedge fix (quote table idents + baseline skip-after-N) on top of 0.9.3 (V4 persisted clock)
     pullPolicy: Always
 
   # ── cadenceConfig: OWNED HERE (per-env), not in the chart ─────────────

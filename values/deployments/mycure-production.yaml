@@ -1336,7 +1336,7 @@ cadence:
     # 0.6.2: ensure_sync_infra runs in a background task (poll-deadline-
     # immune), index-before-backfill, advisory lock rescoped to fast DDL —
     # fixes the mono#2172 livelock hit during the 0.6.1 prod deploy.
-    tag: "0.9.3"  # mono#2356 burn-down PR #2451 (preprod-verified): lamport fail-at-collection + persisted clock (V4), live-tail watermark + advance markers, tombstone two-phase ack, applier-failure metric, issuer gate + scope-column validation (gates default-off). 0.9.2 = PROTO-5 walk bound; 0.9.0 = RC α–η program.
+    tag: "0.9.4"  # mono#2454 box watcher wedge fix (quote table idents + baseline skip-after-N) on top of 0.9.3 (V4 persisted clock)
     pullPolicy: Always
 
   # ── cadenceConfig: OWNED HERE (per-env), not in the chart ─────────────
