@@ -1572,10 +1572,7 @@ cadence:
     - name: CADENCE_P2P_ENABLED              # #2359 hub is WS-only
       value: "false"
 
-  # TEMPORARY (mono#2456 lamport-reset rehearsal): hub scaled to 0 for a
-  # clean-slate cadence metadata wipe. REVERT to 1 to bring the hub back up
-  # fresh (regenerates identity + lamport 0).
-  replicaCount: 0
+  replicaCount: 1
 
   # 0.5.26 (#1923) divides per-task LRU capacity by num_collections in
   # parallel mode, capping per-task LRU at ~watcher_lru_capacity/N.
