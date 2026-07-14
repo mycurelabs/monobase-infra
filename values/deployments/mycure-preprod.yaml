@@ -1572,7 +1572,8 @@ cadence:
     - name: CADENCE_P2P_ENABLED              # #2359 hub is WS-only
       value: "false"
 
-  replicaCount: 1
+  # TEMP mono#2456 lamport-reset rehearsal: hub down for wipe. Revert to 1.
+  replicaCount: 0
 
   # 0.5.26 (#1923) divides per-task LRU capacity by num_collections in
   # parallel mode, capping per-task LRU at ~watcher_lru_capacity/N.
