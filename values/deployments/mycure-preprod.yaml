@@ -1010,7 +1010,7 @@ cadence:
 
   image:
     repository: ghcr.io/mycurelabs/cadence
-    tag: "0.9.2"  # parity with prod: PROTO-5 wall-clock bound + mono#2420 split-store  # mono#2356 RC α–η fix program + follow-ups (protocol_rev 3, all fixes gated — see env). Preprod alfheim-first soak before prod.
+    tag: "0.9.3"  # mono#2356 burn-down PR #2451: lamport integrity (fail-at-collection + persisted clock), live-tail watermark + advance markers, tombstone two-phase ack, applier-failure metric, issuer gate + scope-column validation (gates default-off)
     pullPolicy: Always
 
   # ── cadenceConfig: OWNED HERE (per-env), not in the chart ─────────────
