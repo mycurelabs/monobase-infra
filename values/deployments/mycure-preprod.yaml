@@ -1566,16 +1566,20 @@ cadence:
   replicaCount: 1
 
   # 0.5.26 (#1923) divides per-task LRU capacity by num_collections in
-  # parallel mode, capping per-task LRU at ~watcher_lru_capacity/N. The
-  # earlier 4Gi bump (monobase-infra#30) is no longer needed; step back
-  # down to 2Gi to match staging sizing.
+  # parallel mode, capping per-task LRU at ~watcher_lru_capacity/N.
+  # 2026-07-14 (mono#2356): 2Gi OOM-crashlooped — restart clears in-memory
+  # baseline_emit_done, re-emits baselines for all 98 collections over a
+  # bloated changelog (d13=41GB flood, since dropped) → mem spike >2Gi →
+  # OOMKill → repeat, so live-capture never stabilizes (cloud→box sync
+  # stalls). Bumped limit 2Gi→4Gi to let one baseline-emit cycle complete;
+  # prod runs 12Gi but the preprod node (6.4Gi alloc) can't back that.
   resources:
     requests:
       cpu: 200m
       memory: 512Mi
     limits:
       cpu: "2"
-      memory: 2Gi
+      memory: 4Gi
 
   gateway:
     hostname: ""
