@@ -1331,6 +1331,12 @@ cadence:
   # only, unconfigured table → zero changelog rows.
   enabled: true
 
+  # TEMPORARY (2026-07-14 incident): paused to shed PG load — hub resync
+  # catch-up walks were ~half the active queries on the pegged 2-vCPU PG
+  # node during clinic peak hours. Restore to 1 off-peak (or after the PG
+  # node capacity bump); boxes queue offline and catch up on resume.
+  replicaCount: 0
+
   image:
     repository: ghcr.io/mycurelabs/cadence
     # 0.6.2: ensure_sync_infra runs in a background task (poll-deadline-
