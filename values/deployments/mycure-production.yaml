@@ -1725,6 +1725,13 @@ cadence:
           user: owner
       subscription-packages:
         strategy: lww
+      subscriptions:
+        # #2373: per-org module feature-flag row; FE gates sidebar nav on it.
+        # Was added to services/hapihub/cadence.yml (Increment 6) but never
+        # mirrored into the hub allowlist here → boxes got 0 rows → nav diverged.
+        strategy: lww
+        scope_columns:
+          organization: organization
       support-ticket-messages:
         strategy: lww
         scope_columns:
