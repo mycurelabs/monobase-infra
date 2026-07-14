@@ -1961,10 +1961,13 @@ cadence:
     enabled: true
     readFrom: "pg"
     # 2026-06-26: dropped 7→2 after the 158 GB d25 reseed event.
-    # 2026-07-10 (#103 M4 cutover): raised back 2→7 — offline peers need
-    # the 7-day lamport floor; disk cost is ~7× daily changelog volume
-    # (58 GB single-day partitions observed post-M4, budget accordingly).
-    retentionDays: 7
+    # 2026-07-10 (#103 M4 cutover): raised back 2→7 for fleet offline
+    # tolerance.
+    # 2026-07-14: back to 2 — post-M4 daily partitions run 9-58 GB, so 7d
+    # retention risks another disk-full. Cost (unchanged from 06-26): peers
+    # offline >2 days fall below the lamport trim floor and must do a
+    # snapshot-based resume (existing code path).
+    retentionDays: 2
 
   config:
     RUST_LOG: "info"
