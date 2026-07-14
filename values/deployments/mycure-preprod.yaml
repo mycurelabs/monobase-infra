@@ -1010,7 +1010,7 @@ cadence:
 
   image:
     repository: ghcr.io/mycurelabs/cadence
-    tag: "0.9.4"  # mono#2454 box watcher wedge fix (quote table idents + baseline skip-after-N) on top of 0.9.3 (V4 persisted clock)
+    tag: "0.9.5"  # mono#2356: per-page scoped lamport lookup in catch-up — full-collection max-lamport GROUP BY over the 147M-row changelog timed out + (per #2417) killed catch-up mid-walk, so collections after the slow one (subscriptions/user/members) never synced. Now bounded doc_id=ANY() per page. On top of 0.9.4.
     pullPolicy: Always
 
   # ── cadenceConfig: OWNED HERE (per-env), not in the chart ─────────────
