@@ -337,7 +337,7 @@ mycure:
 
   image:
     repository: ghcr.io/mycurelabs/mycureapp
-    tag: "10.25.82"
+    tag: "10.25.83"
     pullPolicy: IfNotPresent
 
   replicaCount: 1
