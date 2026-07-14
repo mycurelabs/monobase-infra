@@ -348,7 +348,7 @@ hapihubNext:
 
   image:
     repository: ghcr.io/mycurelabs/hapihub
-    tag: "11.20.50" # #2246 _spreadData null-fallback + #2279 warehouse grants; NEVER deploy 11.20.44 (stale binary)
+    tag: "11.20.51" # #2246 _spreadData null-fallback + #2279 warehouse grants; NEVER deploy 11.20.44 (stale binary)
     pullPolicy: IfNotPresent
 
   # Valkey response cache (mono#2231). Soaked on preprod 2026-07-07: 2h driven
@@ -606,7 +606,7 @@ mycure:
 
   image:
     repository: ghcr.io/mycurelabs/mycureapp
-    tag: "10.25.85"
+    tag: "10.25.86"
     pullPolicy: IfNotPresent
 
   replicaCount: 1
