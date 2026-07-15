@@ -188,7 +188,7 @@ hapihub:
 
   image:
     repository: ghcr.io/mycurelabs/hapihub
-    tag: "11.20.53" # #2246 _spreadData null-fallback + #2279 warehouse grants
+    tag: "11.20.54" # #2462 finalize set-once: idempotency guards on encounter/record/invoice finish+finalize
     pullPolicy: IfNotPresent
 
   # Valkey response cache (mono#2231) — preprod is the pilot environment.
