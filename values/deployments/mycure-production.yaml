@@ -1019,6 +1019,11 @@ postgresql:
       # M4 cutover (2026-07-10): 96 cadence workers connect at boot; default 100
       # was exhausted on the preprod rehearsal. Restart PG to apply.
       max_connections = 300
+      # Slow-query logging (2026-07-15 perf review): every finding had to be dug
+      # out of pg_stat_statements because durations weren't logged. Already live
+      # via ALTER SYSTEM (postgresql.auto.conf) — this line just reconciles the
+      # repo; the restart it implies is behaviorally a no-op for this setting.
+      log_min_duration_statement = 1000
     # Cross-DB spread: never co-locate the PG primary with MongoDB. Both are
     # heavy (PG ~1.5core/8.6Gi, Mongo ~6Gi) and had piled onto one prod node,
     # saturating it (CPU 105%) and causing 15-16s queries. `required` is safe:
@@ -1063,6 +1068,7 @@ postgresql:
       # M4 cutover (2026-07-10): 96 cadence workers connect at boot; default 100
       # was exhausted on the preprod rehearsal. Restart PG to apply.
       max_connections = 300
+      log_min_duration_statement = 1000
       primary_slot_name = 'pg_read_replica'
     # Prefer to keep the read replica off the primary and Mongo nodes too, so
     # all three DBs spread. Soft (preferred) — the replica is idle/less critical,
