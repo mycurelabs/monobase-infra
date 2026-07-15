@@ -1010,7 +1010,7 @@ cadence:
 
   image:
     repository: ghcr.io/mycurelabs/cadence
-    tag: "0.9.5"  # mono#2356: per-page scoped lamport lookup in catch-up — full-collection max-lamport GROUP BY over the 147M-row changelog timed out + (per #2417) killed catch-up mid-walk, so collections after the slow one (subscriptions/user/members) never synced. Now bounded doc_id=ANY() per page. On top of 0.9.4.
+    tag: "0.9.6"  # mono#2456: bulk token-cutoff revocation (CADENCE_MIN_TOKEN_IAT) for reset straggler containment. On top of 0.9.5 (per-page scoped catch-up lamport, mono#2356).
     pullPolicy: Always
 
   # ── cadenceConfig: OWNED HERE (per-env), not in the chart ─────────────
@@ -1563,6 +1563,11 @@ cadence:
       value: "true"
     - name: CADENCE_ENFORCE_REVOCATION       # #2397 v4
       value: "true"
+    - name: CADENCE_MIN_TOKEN_IAT            # mono#2456 bulk-cutoff revocation (0.9.6)
+      # Reject any sync token issued before this unix-epoch cutoff (reset
+      # straggler containment). Set to the 2026-07-15 lamport-reset-revocation
+      # test epoch; re-onboarded boxes get tokens minted AFTER this and pass.
+      value: "1784083106"
     - name: CADENCE_JWKS_TTL_SECS            # #2397 v2 (rotation revocation)
       value: "3600"
     - name: CADENCE_JSONB_SUBKEY_MERGE       # validate_m partial (delta-safe)
