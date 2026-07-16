@@ -1010,7 +1010,7 @@ cadence:
 
   image:
     repository: ghcr.io/mycurelabs/cadence
-    tag: "0.9.7"  # audit safety-hardening (Tier0 gate promotions, F3 retention ceiling, F2 applier dead-letter, F12 fail-closed) ON TOP of 0.9.6 (min_token_iat) + 0.9.5 (per-page catch-up lamport)
+    tag: "0.9.8"  # audit Batch A: F16 schema-enforce, F9 loro-gate off (sheds RAM floor), F14/F15 below-floor divergence gauge
     pullPolicy: Always
 
   # ── cadenceConfig: OWNED HERE (per-env), not in the chart ─────────────
