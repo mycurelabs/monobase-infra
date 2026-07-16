@@ -30,7 +30,7 @@ hapihub:
   enabled: true
   image:
     repository: ghcr.io/mycurelabs/hapihub
-    tag: "11.20.53"
+    tag: "11.20.55"
     pullPolicy: IfNotPresent
   replicaCount: 1
   resources:
@@ -118,7 +118,7 @@ mycure-dashboard:
   enabled: true
   image:
     repository: ghcr.io/mycurelabs/dashboard
-    tag: "0.14.11"
+    tag: "0.14.12"
     pullPolicy: IfNotPresent
   replicaCount: 1
   resources:
@@ -180,7 +180,7 @@ mycure:
   enabled: true
   image:
     repository: ghcr.io/mycurelabs/mycureapp
-    tag: "10.25.91"
+    tag: "10.25.92"
     pullPolicy: IfNotPresent
   replicaCount: 1
   resources:
