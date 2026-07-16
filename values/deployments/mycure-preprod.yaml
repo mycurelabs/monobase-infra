@@ -188,7 +188,7 @@ hapihub:
 
   image:
     repository: ghcr.io/mycurelabs/hapihub
-    tag: "11.20.55" # #2462 finalize set-once: idempotency guards on encounter/record/invoice finish+finalize
+    tag: "11.20.56" # #2462 finalize set-once: idempotency guards on encounter/record/invoice finish+finalize
     pullPolicy: IfNotPresent
 
   # Valkey response cache (mono#2231) — preprod is the pilot environment.
@@ -337,7 +337,7 @@ mycure:
 
   image:
     repository: ghcr.io/mycurelabs/mycureapp
-    tag: "10.25.94"
+    tag: "10.25.95"
     pullPolicy: IfNotPresent
 
   replicaCount: 1
