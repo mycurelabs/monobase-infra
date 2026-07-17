@@ -1010,7 +1010,7 @@ cadence:
 
   image:
     repository: ghcr.io/mycurelabs/cadence
-    tag: "0.9.9"  # F17 applier drops unknown columns (additive schema-skew robustness) — fixes cloud->box break on version-lagged boxes
+    tag: "0.9.11"  # TEMP DEBUG (mono#2356): recv-leg PROTO instrumentation to pin box->hub upload fault (hub receive half). Revert to 0.9.9 after diagnosis.
     pullPolicy: Always
 
   # ── cadenceConfig: OWNED HERE (per-env), not in the chart ─────────────
