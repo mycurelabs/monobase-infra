@@ -1,0 +1,25 @@
+{{- if .Values.enabled }}
+# The namespace has default-deny ingress+egress; open just what the PoC needs.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: poc-iroh
+  namespace: {{ .Values.global.namespace }}
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: poc-iroh
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Allow the LoadBalancer/world to reach the QUIC + health ports (any source).
+    - ports:
+        - protocol: UDP
+          port: {{ .Values.udpPort }}
+        - protocol: TCP
+          port: {{ .Values.udpPort }}
+  egress:
+    # Throwaway PoC: allow all egress (DNS + relay fallback + QUIC return paths).
+    - {}
+{{- end }}

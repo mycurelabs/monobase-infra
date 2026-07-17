@@ -13,7 +13,9 @@ metadata:
     service.beta.kubernetes.io/do-loadbalancer-healthcheck-port: {{ .Values.udpPort | quote }}
 spec:
   type: LoadBalancer
-  externalTrafficPolicy: Local
+  # Cluster (not Local): a DO UDP LB proxies, so the pod must reply via the LB
+  # (SNAT) or the client sees a source-IP mismatch and the QUIC handshake fails.
+  externalTrafficPolicy: Cluster
   ports:
   - name: quic
     port: {{ .Values.udpPort }}
