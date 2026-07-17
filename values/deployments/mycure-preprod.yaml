@@ -1010,7 +1010,7 @@ cadence:
 
   image:
     repository: ghcr.io/mycurelabs/cadence
-    tag: "0.9.12"  # TEMP DEBUG (mono#2356): append_change field-dedup FIX for box->hub upload (changelog_pkey dup) + full-chain error logging. Revert to a clean release after E2E verify.
+    tag: "0.9.14"  # mono#2356: box->cloud upload chain — append_change field-dedup (changelog_pkey dup) + full-chain error logging + A3 recv-apply teardown + watcher future-ts watermark cap. L3 echo loop (F11) still open.
     pullPolicy: Always
 
   # ── cadenceConfig: OWNED HERE (per-env), not in the chart ─────────────
