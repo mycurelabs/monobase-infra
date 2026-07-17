@@ -1010,7 +1010,7 @@ cadence:
 
   image:
     repository: ghcr.io/mycurelabs/cadence
-    tag: "0.9.11"  # TEMP DEBUG (mono#2356): recv-leg PROTO instrumentation to pin box->hub upload fault (hub receive half). Revert to 0.9.9 after diagnosis.
+    tag: "0.9.12"  # TEMP DEBUG (mono#2356): append_change field-dedup FIX for box->hub upload (changelog_pkey dup) + full-chain error logging. Revert to a clean release after E2E verify.
     pullPolicy: Always
 
   # ── cadenceConfig: OWNED HERE (per-env), not in the chart ─────────────
