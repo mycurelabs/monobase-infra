@@ -16,10 +16,20 @@ spec:
       labels:
         app.kubernetes.io/name: poc-iroh
     spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        seccompProfile:
+          type: RuntimeDefault
       containers:
       - name: poc-iroh
         image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
         imagePullPolicy: {{ .Values.image.pullPolicy }}
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop: ["ALL"]
         args: ["hub"]
         env:
         - name: CADENCE_POC_UDP_PORT
