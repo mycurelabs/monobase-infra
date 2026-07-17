@@ -1736,3 +1736,17 @@ podSecurityStandards:
 # ===== RESOURCE QUOTAS =====
 resourceQuotas:
   enabled: false
+
+# ===== PoC: iroh 1.0 direct-QUIC connectivity test (THROWAWAY) =====
+# Deploys a tiny iroh 1.0 hub behind a DOKS UDP LoadBalancer to test whether
+# on-prem boxes can hole-punch a DIRECT QUIC path to a k8s-hosted peer. Not
+# wired to cadence or any data. Tear down (set enabled:false / delete block +
+# charts/poc-iroh + argocd/applications/templates/poc-iroh.yaml) after the run.
+pocIroh:
+  enabled: true
+  image:
+    repository: ghcr.io/mycurelabs/poc-iroh
+    tag: "0.1.0"
+    pullPolicy: IfNotPresent
+  udpPort: 6472
+  nodePool: "staging"

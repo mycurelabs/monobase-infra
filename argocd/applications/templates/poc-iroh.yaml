@@ -1,0 +1,38 @@
+{{- if and .Values.pocIroh .Values.pocIroh.enabled }}
+# Throwaway PoC: iroh 1.0 hub behind a DOKS UDP LoadBalancer.
+# Delete this file + the charts/poc-iroh dir + the pocIroh values block when done.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ .Values.global.namespace }}-poc-iroh
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    path: charts/poc-iroh
+    repoURL: {{ .Values.argocd.repoURL }}
+    targetRevision: {{ .Values.argocd.targetRevision | default "main" }}
+    helm:
+      releaseName: poc-iroh
+      valuesObject:
+        {{- toYaml .Values.pocIroh | nindent 8 }}
+        global: {{ .Values.global | toYaml | nindent 10 }}
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: {{ .Values.global.namespace }}
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false
+    retry:
+      limit: 5
+      backoff:
+        duration: 10s
+        maxDuration: 5m
+{{- end }}

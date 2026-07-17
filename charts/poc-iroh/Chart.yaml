@@ -1,0 +1,6 @@
+apiVersion: v2
+name: poc-iroh
+description: Throwaway PoC — iroh 1.0 hub reachable via a DOKS UDP LoadBalancer, to test direct QUIC hole-punch from on-prem boxes. Delete after the experiment.
+type: application
+version: 0.1.0
+appVersion: "0.1.0"

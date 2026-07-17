@@ -1,0 +1,50 @@
+{{- if .Values.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: poc-iroh
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    app.kubernetes.io/name: poc-iroh
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: poc-iroh
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: poc-iroh
+    spec:
+      containers:
+      - name: poc-iroh
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        args: ["hub"]
+        env:
+        - name: CADENCE_POC_UDP_PORT
+          value: {{ .Values.udpPort | quote }}
+        ports:
+        - name: quic
+          containerPort: {{ .Values.udpPort }}
+          protocol: UDP
+        - name: health
+          containerPort: {{ .Values.udpPort }}
+          protocol: TCP
+        livenessProbe:
+          tcpSocket:
+            port: health
+          initialDelaySeconds: 5
+          periodSeconds: 15
+        resources:
+          {{- toYaml .Values.resources | nindent 10 }}
+      {{- if .Values.nodePool }}
+      nodeSelector:
+        node-pool: {{ .Values.nodePool }}
+      tolerations:
+      - key: "node-pool"
+        operator: "Equal"
+        value: {{ .Values.nodePool | quote }}
+        effect: "NoSchedule"
+      {{- end }}
+{{- end }}
