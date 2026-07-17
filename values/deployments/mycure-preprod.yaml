@@ -1756,7 +1756,9 @@ pocIroh:
   enabled: true
   image:
     repository: ghcr.io/mycurelabs/poc-iroh
-    tag: "0.1.0"
+    tag: "0.2.0"
     pullPolicy: IfNotPresent
   udpPort: 6472
+  # udp-gateway LB IP — hub advertises this so boxes connect by EndpointId alone.
+  publicAddr: "165.245.145.61:6472"
   nodePool: "staging"

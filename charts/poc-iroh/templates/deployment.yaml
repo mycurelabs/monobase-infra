@@ -8,6 +8,9 @@ metadata:
     app.kubernetes.io/name: poc-iroh
 spec:
   replicas: 1
+  # RWO volume for the sqlite identity db → Recreate avoids attach deadlock on update.
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app.kubernetes.io/name: poc-iroh
@@ -34,6 +37,17 @@ spec:
         env:
         - name: CADENCE_POC_UDP_PORT
           value: {{ .Values.udpPort | quote }}
+        - name: CADENCE_POC_DB
+          value: /data/poc.db
+        {{- if .Values.publicAddr }}
+        # Hub advertises its own public LB address so peers reach it DIRECTLY by
+        # EndpointId alone (no peer-side IP). A pod can't self-discover its LB IP.
+        - name: CADENCE_POC_PUBLIC_ADDR
+          value: {{ .Values.publicAddr | quote }}
+        {{- end }}
+        volumeMounts:
+        - name: data
+          mountPath: /data
         ports:
         - name: quic
           containerPort: {{ .Values.udpPort }}
@@ -48,6 +62,10 @@ spec:
           periodSeconds: 15
         resources:
           {{- toYaml .Values.resources | nindent 10 }}
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: poc-iroh-data
       {{- if .Values.nodePool }}
       nodeSelector:
         node-pool: {{ .Values.nodePool }}

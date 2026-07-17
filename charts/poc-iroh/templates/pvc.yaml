@@ -1,0 +1,14 @@
+{{- if .Values.enabled }}
+# Persists the sqlite identity db so the hub's EndpointId is stable across restarts.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: poc-iroh-data
+  namespace: {{ .Values.global.namespace }}
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+{{- end }}

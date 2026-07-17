@@ -2,12 +2,16 @@ enabled: true
 
 image:
   repository: ghcr.io/mycurelabs/poc-iroh
-  tag: "0.1.0"
+  tag: "0.2.0"
   pullPolicy: IfNotPresent
 
 # UDP port the iroh QUIC endpoint binds, and the LB forwards. A TCP listener on
 # the same port serves the DO LoadBalancer health check.
 udpPort: 6472
+
+# Public address the hub advertises (the udp-gateway LB IP:port) so peers reach
+# it directly by EndpointId alone. Empty = advertise only discovered addrs.
+publicAddr: ""
 
 resources:
   requests:
