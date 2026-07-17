@@ -1010,7 +1010,7 @@ cadence:
 
   image:
     repository: ghcr.io/mycurelabs/cadence
-    tag: "0.9.14"  # mono#2356: box->cloud upload chain — append_change field-dedup (changelog_pkey dup) + full-chain error logging + A3 recv-apply teardown + watcher future-ts watermark cap. L3 echo loop (F11) still open.
+    tag: "0.9.15"  # mono#2356: box<->cloud sync chain (L1 append_change dedup + L1b A1/A3 + L2 watermark cap + L3 watcher UTC tz). Clean release.
     pullPolicy: Always
 
   # ── cadenceConfig: OWNED HERE (per-env), not in the chart ─────────────
