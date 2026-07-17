@@ -1,0 +1,6 @@
+apiVersion: v2
+name: udp-gateway
+description: Infra-owned L4 UDP LoadBalancer for QUIC (iroh). App-agnostic — apps are just pods selected by targetSelector; the LB + its public IP are independent of app deploys. Analogous to the shared HTTP gateways, but for raw UDP which they can't carry.
+type: application
+version: 0.1.0
+appVersion: "0.1.0"

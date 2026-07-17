@@ -1737,10 +1737,20 @@ podSecurityStandards:
 resourceQuotas:
   enabled: false
 
+# ===== Infra: L4 UDP LoadBalancer for QUIC (iroh) =====
+# Owns the UDP LoadBalancer separately from any app chart, like the HTTP gateways
+# (which can't carry UDP). Apps are just pods it selects; re-point targetSelector
+# to cadence when QUIC lands there and the LB + public IP stay put.
+udpGateway:
+  enabled: true
+  targetSelector:
+    app.kubernetes.io/name: poc-iroh
+  port: 6472
+  healthPort: 6472
+
 # ===== PoC: iroh 1.0 direct-QUIC connectivity test (THROWAWAY) =====
-# Deploys a tiny iroh 1.0 hub behind a DOKS UDP LoadBalancer to test whether
-# on-prem boxes can hole-punch a DIRECT QUIC path to a k8s-hosted peer. Not
-# wired to cadence or any data. Tear down (set enabled:false / delete block +
+# Tiny iroh 1.0 hub pod; reachability is provided by the infra udpGateway LB
+# above (not an app-owned Service). Tear down (set enabled:false / delete block +
 # charts/poc-iroh + argocd/applications/templates/poc-iroh.yaml) after the run.
 pocIroh:
   enabled: true

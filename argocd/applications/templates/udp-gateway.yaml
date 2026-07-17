@@ -1,0 +1,39 @@
+{{- if and .Values.udpGateway .Values.udpGateway.enabled }}
+# Infra-owned L4 UDP LoadBalancer for QUIC (iroh). Separate from any app chart so
+# the LB + public IP outlive individual app deploys and can be re-pointed (e.g.
+# poc-iroh -> cadence) by changing targetSelector, not the app.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ .Values.global.namespace }}-udp-gateway
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    path: charts/udp-gateway
+    repoURL: {{ .Values.argocd.repoURL }}
+    targetRevision: {{ .Values.argocd.targetRevision | default "main" }}
+    helm:
+      releaseName: udp-gateway
+      valuesObject:
+        {{- toYaml .Values.udpGateway | nindent 8 }}
+        global: {{ .Values.global | toYaml | nindent 10 }}
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: {{ .Values.global.namespace }}
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false
+    retry:
+      limit: 5
+      backoff:
+        duration: 10s
+        maxDuration: 5m
+{{- end }}

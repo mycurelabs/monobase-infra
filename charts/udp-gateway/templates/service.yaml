@@ -1,0 +1,32 @@
+{{- if .Values.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: udp-gateway
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    app.kubernetes.io/name: udp-gateway
+  annotations:
+    # Stable LB name → DO reuses the same LoadBalancer (and its IP) across
+    # Service recreation, so the hub's direct address doesn't churn.
+    service.beta.kubernetes.io/do-loadbalancer-name: {{ printf "%s-udp-gateway" .Values.global.namespace | quote }}
+    # DO network LBs require a TCP/HTTP health check.
+    service.beta.kubernetes.io/do-loadbalancer-healthcheck-protocol: "tcp"
+    service.beta.kubernetes.io/do-loadbalancer-healthcheck-port: {{ .Values.healthPort | quote }}
+spec:
+  type: LoadBalancer
+  # Cluster (not Local): a DO UDP LB proxies, so the pod must reply via the LB
+  # (SNAT) or the client sees a source-IP mismatch and the QUIC handshake fails.
+  externalTrafficPolicy: Cluster
+  selector:
+    {{- toYaml .Values.targetSelector | nindent 4 }}
+  ports:
+  - name: quic
+    port: {{ .Values.port }}
+    targetPort: {{ .Values.port }}
+    protocol: UDP
+  - name: health
+    port: {{ .Values.healthPort }}
+    targetPort: {{ .Values.healthPort }}
+    protocol: TCP
+{{- end }}
