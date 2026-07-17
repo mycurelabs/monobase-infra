@@ -2,7 +2,7 @@ enabled: true
 
 image:
   repository: ghcr.io/mycurelabs/poc-iroh
-  tag: "0.2.0"
+  tag: "0.3.0"
   pullPolicy: IfNotPresent
 
 # UDP port the iroh QUIC endpoint binds, and the LB forwards. A TCP listener on
