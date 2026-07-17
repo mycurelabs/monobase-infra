@@ -1,0 +1,6 @@
+apiVersion: v2
+name: cade
+description: cade — iroh 1.0 P2P transport + peer registry (cadence v2 replacement, transport foundation). Reachable via the infra udp-gateway UDP LoadBalancer.
+type: application
+version: 2.0.0
+appVersion: "2.0.0"

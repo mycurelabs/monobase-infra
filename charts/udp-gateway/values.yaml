@@ -3,12 +3,12 @@ enabled: true
 # The app pods this UDP LB forwards to. Swap to cadence when QUIC lands there;
 # the LB and its public IP stay put — the app never owns the LB.
 targetSelector:
-  app.kubernetes.io/name: poc-iroh
+  app.kubernetes.io/name: cade
 
 # UDP port carrying QUIC traffic (forwarded 1:1 to the target pods).
 port: 6472
 
 # DO network LoadBalancers require a TCP/HTTP health check; the target pods must
-# serve TCP on this port. poc-iroh opens a TCP listener on its UDP port; cadence
+# serve TCP on this port. cade opens a TCP listener on its UDP port; cadence
 # would use its HTTP port (7890).
 healthPort: 6472

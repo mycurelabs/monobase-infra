@@ -2,10 +2,10 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: poc-iroh
+  name: cade
   namespace: {{ .Values.global.namespace }}
   labels:
-    app.kubernetes.io/name: poc-iroh
+    app.kubernetes.io/name: cade
 spec:
   replicas: 1
   # RWO volume for the sqlite identity db → Recreate avoids attach deadlock on update.
@@ -13,11 +13,11 @@ spec:
     type: Recreate
   selector:
     matchLabels:
-      app.kubernetes.io/name: poc-iroh
+      app.kubernetes.io/name: cade
   template:
     metadata:
       labels:
-        app.kubernetes.io/name: poc-iroh
+        app.kubernetes.io/name: cade
     spec:
       securityContext:
         runAsNonRoot: true
@@ -27,7 +27,7 @@ spec:
         seccompProfile:
           type: RuntimeDefault
       containers:
-      - name: poc-iroh
+      - name: cade
         image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
         imagePullPolicy: {{ .Values.image.pullPolicy }}
         securityContext:
@@ -37,14 +37,14 @@ spec:
             drop: ["ALL"]
         args: ["peer", "--accept"]
         env:
-        - name: CADENCE_POC_UDP_PORT
+        - name: CADE_UDP_PORT
           value: {{ .Values.udpPort | quote }}
-        - name: CADENCE_POC_DB
-          value: /data/poc.db
+        - name: CADE_DB
+          value: /data/cade.db
         {{- if .Values.publicAddr }}
-        # Hub advertises its own public LB address so peers reach it DIRECTLY by
+        # Anchor advertises its own public LB address so peers reach it DIRECTLY by
         # EndpointId alone (no peer-side IP). A pod can't self-discover its LB IP.
-        - name: CADENCE_POC_PUBLIC_ADDR
+        - name: CADE_PUBLIC_ADDR
           value: {{ .Values.publicAddr | quote }}
         {{- end }}
         volumeMounts:
@@ -67,7 +67,7 @@ spec:
       volumes:
       - name: data
         persistentVolumeClaim:
-          claimName: poc-iroh-data
+          claimName: cade-data
       {{- if .Values.nodePool }}
       nodeSelector:
         node-pool: {{ .Values.nodePool }}

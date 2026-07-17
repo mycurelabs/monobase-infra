@@ -1,10 +1,9 @@
-{{- if and .Values.pocIroh .Values.pocIroh.enabled }}
-# Throwaway PoC: iroh 1.0 hub behind a DOKS UDP LoadBalancer.
-# Delete this file + the charts/poc-iroh dir + the pocIroh values block when done.
+{{- if and .Values.cade .Values.cade.enabled }}
+# cade — iroh 1.0 P2P transport + registry (cadence v2 foundation), behind the udp-gateway LB.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: {{ .Values.global.namespace }}-poc-iroh
+  name: {{ .Values.global.namespace }}-cade
   namespace: argocd
   annotations:
     argocd.argoproj.io/sync-wave: "3"
@@ -13,13 +12,13 @@ metadata:
 spec:
   project: default
   source:
-    path: charts/poc-iroh
+    path: charts/cade
     repoURL: {{ .Values.argocd.repoURL }}
     targetRevision: {{ .Values.argocd.targetRevision | default "main" }}
     helm:
-      releaseName: poc-iroh
+      releaseName: cade
       valuesObject:
-        {{- toYaml .Values.pocIroh | nindent 8 }}
+        {{- toYaml .Values.cade | nindent 8 }}
         global: {{ .Values.global | toYaml | nindent 10 }}
   destination:
     server: https://kubernetes.default.svc

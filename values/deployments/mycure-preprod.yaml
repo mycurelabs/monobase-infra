@@ -1739,26 +1739,25 @@ resourceQuotas:
 
 # ===== Infra: L4 UDP LoadBalancer for QUIC (iroh) =====
 # Owns the UDP LoadBalancer separately from any app chart, like the HTTP gateways
-# (which can't carry UDP). Apps are just pods it selects; re-point targetSelector
-# to cadence when QUIC lands there and the LB + public IP stay put.
+# (which can't carry UDP). Apps are just pods it selects; the LB + public IP stay
+# put regardless of which app targetSelector points at.
 udpGateway:
   enabled: true
   targetSelector:
-    app.kubernetes.io/name: poc-iroh
+    app.kubernetes.io/name: cade
   port: 6472
   healthPort: 6472
 
-# ===== PoC: iroh 1.0 direct-QUIC connectivity test (THROWAWAY) =====
-# Tiny iroh 1.0 hub pod; reachability is provided by the infra udpGateway LB
-# above (not an app-owned Service). Tear down (set enabled:false / delete block +
-# charts/poc-iroh + argocd/applications/templates/poc-iroh.yaml) after the run.
-pocIroh:
+# ===== cade — iroh 1.0 P2P transport + registry (cadence v2 foundation) =====
+# The anchor node; reachability is provided by the infra udpGateway LB above (not an
+# app-owned Service). Image is on the cadence 2.x line (cade = cadence v2).
+cade:
   enabled: true
   image:
-    repository: ghcr.io/mycurelabs/poc-iroh
-    tag: "0.5.0"
+    repository: ghcr.io/mycurelabs/cadence
+    tag: "2.0.0"
     pullPolicy: IfNotPresent
   udpPort: 6472
-  # udp-gateway LB IP — hub advertises this so boxes connect by EndpointId alone.
+  # udp-gateway LB IP — the anchor advertises this so peers connect by EndpointId alone.
   publicAddr: "165.245.145.61:6472"
   nodePool: "staging"

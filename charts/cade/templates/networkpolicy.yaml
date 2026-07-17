@@ -1,14 +1,14 @@
 {{- if .Values.enabled }}
-# The namespace has default-deny ingress+egress; open just what the PoC needs.
+# The namespace has default-deny ingress+egress; open just what cade needs.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: poc-iroh
+  name: cade
   namespace: {{ .Values.global.namespace }}
 spec:
   podSelector:
     matchLabels:
-      app.kubernetes.io/name: poc-iroh
+      app.kubernetes.io/name: cade
   policyTypes:
     - Ingress
     - Egress
@@ -20,6 +20,6 @@ spec:
         - protocol: TCP
           port: {{ .Values.udpPort }}
   egress:
-    # Throwaway PoC: allow all egress (DNS + relay fallback + QUIC return paths).
+    # Allow all egress (DNS + relay fallback + QUIC return paths).
     - {}
 {{- end }}
