@@ -1,7 +1,7 @@
 {{- if and .Values.udpGateway .Values.udpGateway.enabled }}
 # Infra-owned L4 UDP LoadBalancer for QUIC (iroh). Separate from any app chart so
 # the LB + public IP outlive individual app deploys and can be re-pointed (e.g.
-# poc-iroh -> cadence) by changing targetSelector, not the app.
+# cade -> a future cadence sync engine) by changing targetSelector, not the app.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
