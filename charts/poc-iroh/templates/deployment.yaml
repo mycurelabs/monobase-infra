@@ -35,7 +35,7 @@ spec:
           readOnlyRootFilesystem: true
           capabilities:
             drop: ["ALL"]
-        args: ["hub"]
+        args: ["peer", "--accept"]
         env:
         - name: CADENCE_POC_UDP_PORT
           value: {{ .Values.udpPort | quote }}
