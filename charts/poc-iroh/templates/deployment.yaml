@@ -22,6 +22,8 @@ spec:
       securityContext:
         runAsNonRoot: true
         runAsUser: 65532
+        # chown the PVC to this group so the non-root user can write the sqlite db.
+        fsGroup: 65532
         seccompProfile:
           type: RuntimeDefault
       containers:
