@@ -635,6 +635,10 @@ mycure:
     # there. Host blank → defaults to https://us.i.posthog.com (free plan, US).
     POSTHOG_KEY: "phc_yHbJY82kkxQ5YGUc6Z6J438SYxQfCrSJCptG2LkhM9yE"
     POSTHOG_HOST: ""
+    # GA4 measurement id — public, ships to the browser. Read at runtime via
+    # /config.json (mono#2522 pattern, same as PostHog); inert until mycureapp
+    # ships that PR. Prod-only: leaving it unset on demo/preprod keeps GA4 off.
+    GA4_MEASUREMENT_ID: "G-WFLMM2PV7W"
 
   podDisruptionBudget:
     enabled: false
