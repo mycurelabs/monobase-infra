@@ -348,7 +348,7 @@ hapihubNext:
 
   image:
     repository: ghcr.io/mycurelabs/hapihub
-    tag: "11.20.59" # #2462 finalize set-once: idempotency guards on encounter/record/invoice finish+finalize (stops fresh finalized_at/finished_at clobbers); NEVER deploy 11.20.44 (stale binary)
+    tag: "11.20.60" # #2462 finalize set-once: idempotency guards on encounter/record/invoice finish+finalize (stops fresh finalized_at/finished_at clobbers); NEVER deploy 11.20.44 (stale binary)
     pullPolicy: IfNotPresent
 
   # Valkey response cache (mono#2231). Soaked on preprod 2026-07-07: 2h driven
@@ -606,7 +606,7 @@ mycure:
 
   image:
     repository: ghcr.io/mycurelabs/mycureapp
-    tag: "10.25.98"
+    tag: "10.25.99"
     pullPolicy: IfNotPresent
 
   replicaCount: 1
