@@ -348,7 +348,7 @@ hapihubNext:
 
   image:
     repository: ghcr.io/mycurelabs/hapihub
-    tag: "11.20.61" # ROLLBACK from 11.20.62: nginx-edge 502 storm (upstream prematurely closed -> no live upstreams) started with the 00:44Z .62 deploy; .61->.62 diff is only the relax-datetime response-validation change — suspected to abort responses mid-serialization. Login/auth user-visible failures + 429 retry cascade.
+    tag: "11.20.63" # .63 fixes the .62 mid-response abort (nginx-edge 502 storm); NEVER deploy 11.20.62 or 11.20.44 (stale binary)
     pullPolicy: IfNotPresent
 
   # Valkey response cache (mono#2231). Soaked on preprod 2026-07-07: 2h driven
@@ -606,7 +606,7 @@ mycure:
 
   image:
     repository: ghcr.io/mycurelabs/mycureapp
-    tag: "10.25.101" # 10.25.101: fixes the DataTable/ResizeObserver regression that forced the 10.25.100 -> 10.25.99 rollback
+    tag: "10.25.102"
     pullPolicy: IfNotPresent
 
   replicaCount: 1
