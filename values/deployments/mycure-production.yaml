@@ -606,7 +606,7 @@ mycure:
 
   image:
     repository: ghcr.io/mycurelabs/mycureapp
-    tag: "10.25.100"
+    tag: "10.25.99" # ROLLBACK from 10.25.100: DataTable refactor (refactor/table-filter) causes runaway horizontal table growth + ResizeObserver loop on list pages (e.g. /inventory/products). Re-bump only with the fixed release.
     pullPolicy: IfNotPresent
 
   replicaCount: 1
