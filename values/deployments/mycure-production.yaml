@@ -348,7 +348,7 @@ hapihubNext:
 
   image:
     repository: ghcr.io/mycurelabs/hapihub
-    tag: "11.20.62" # #2462 finalize set-once: idempotency guards on encounter/record/invoice finish+finalize (stops fresh finalized_at/finished_at clobbers); NEVER deploy 11.20.44 (stale binary)
+    tag: "11.20.61" # ROLLBACK from 11.20.62: nginx-edge 502 storm (upstream prematurely closed -> no live upstreams) started with the 00:44Z .62 deploy; .61->.62 diff is only the relax-datetime response-validation change — suspected to abort responses mid-serialization. Login/auth user-visible failures + 429 retry cascade.
     pullPolicy: IfNotPresent
 
   # Valkey response cache (mono#2231). Soaked on preprod 2026-07-07: 2h driven
