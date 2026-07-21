@@ -17,15 +17,16 @@ data:
         strategy: {{ $col.strategy }}
         {{- if $col.scope_rules }}
         scope_rules:
-          {{- range $k, $v := $col.scope_rules }}
-          {{ $k }}: {{ $v }}
-          {{- end }}
+          {{- $col.scope_rules | toYaml | nindent 10 }}
         {{- end }}
         {{- if $col.scope_columns }}
+        {{- /* toYaml (not `{{ $v }}`) so a multi-column list renders as a real
+               YAML sequence. Go's default slice stringification prints
+               `[insured insurer insured_organization]` (space-joined, no commas)
+               → parsed as ONE bogus column → PrimaryReader drops the whole
+               collection (PG 42703) → HMO/partner data never reaches boxes. */}}
         scope_columns:
-          {{- range $k, $v := $col.scope_columns }}
-          {{ $k }}: {{ $v }}
-          {{- end }}
+          {{- $col.scope_columns | toYaml | nindent 10 }}
         {{- end }}
       {{- end }}
     {{- if .Values.cadenceConfig.collectionsBlacklist }}

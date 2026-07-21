@@ -1263,6 +1263,10 @@ cadence:
         strategy: lww
         scope_columns:
           organization: organization
+      inventory-stocks:
+        strategy: lww
+        scope_columns:
+          organization: warehouse
       inventory-suppliers:
         strategy: lww
         scope_columns:
@@ -1509,6 +1513,7 @@ cadence:
       inventory-item-classifications: 100
       inventory-products: 100
       inventory-stock-configurations: 100
+      inventory-stocks: 100
       inventory-suppliers: 100
       inventory-transactions: 100
       inventory-variants: 100
