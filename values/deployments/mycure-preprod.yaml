@@ -188,7 +188,7 @@ hapihub:
 
   image:
     repository: ghcr.io/mycurelabs/hapihub
-    tag: "11.20.63" # #2462 finalize set-once: idempotency guards on encounter/record/invoice finish+finalize
+    tag: "11.20.64" # mono#2508 transfer status markers on request row + #2510 diagnostic-order facility default (preprod E2E)
     pullPolicy: IfNotPresent
 
   # Valkey response cache (mono#2231) — preprod is the pilot environment.
@@ -1010,7 +1010,7 @@ cadence:
 
   image:
     repository: ghcr.io/mycurelabs/cadence
-    tag: "0.9.15"  # mono#2356: box<->cloud sync chain (L1 append_change dedup + L1b A1/A3 + L2 watermark cap + L3 watcher UTC tz). Clean release.
+    tag: "0.9.16"  # mono#2509 periodic member-scope refresh + offline-buffer live reconcile (preprod E2E)
     pullPolicy: Always
 
   # ── cadenceConfig: OWNED HERE (per-env), not in the chart ─────────────
