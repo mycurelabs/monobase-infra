@@ -188,7 +188,7 @@ hapihub:
 
   image:
     repository: ghcr.io/mycurelabs/hapihub
-    tag: "11.20.65" # mono#2592 credit-balance recompute trigger + billing-credit-accounts sync scope (preprod E2E)
+    tag: "11.20.66" # mono#2570 global-reference seed (ICD-10/medicines/diagnostic catalog/HMO) baked into every DB via data-migration (preprod E2E)
     pullPolicy: IfNotPresent
 
   # Valkey response cache (mono#2231) — preprod is the pilot environment.
