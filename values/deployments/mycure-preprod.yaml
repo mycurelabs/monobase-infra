@@ -1010,7 +1010,7 @@ cadence:
 
   image:
     repository: ghcr.io/mycurelabs/cadence
-    tag: "0.9.18"  # mono#2605 bounded #2389 baseline-emit (soak) — re-emit only the un-synced window (updated_at > W), not whole tables
+    tag: "0.9.19"  # mono#2605 bounded #2389 baseline-emit + per-boot recovery fix (soak) — re-emit only updated_at > W each boot
     pullPolicy: Always
 
   # ── cadenceConfig: OWNED HERE (per-env), not in the chart ─────────────
