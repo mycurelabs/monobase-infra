@@ -1010,7 +1010,7 @@ cadence:
 
   image:
     repository: ghcr.io/mycurelabs/cadence
-    tag: "0.9.16"  # mono#2509 periodic member-scope refresh + offline-buffer live reconcile (preprod E2E)
+    tag: "0.9.17"  # mono#2569 repro test tag-align cut (no runtime change vs 0.9.16); embedded cadence 0.9.17 on 1.5.51 boxes
     pullPolicy: Always
 
   # ── cadenceConfig: OWNED HERE (per-env), not in the chart ─────────────
