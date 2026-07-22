@@ -1010,7 +1010,7 @@ cadence:
 
   image:
     repository: ghcr.io/mycurelabs/cadence
-    tag: "0.9.17"  # mono#2569 repro test tag-align cut (no runtime change vs 0.9.16); embedded cadence 0.9.17 on 1.5.51 boxes
+    tag: "0.9.18"  # mono#2605 bounded #2389 baseline-emit (soak) — re-emit only the un-synced window (updated_at > W), not whole tables
     pullPolicy: Always
 
   # ── cadenceConfig: OWNED HERE (per-env), not in the chart ─────────────
@@ -1555,16 +1555,16 @@ cadence:
     - name: CADENCE_LAG_RECOVERY_INCREMENTAL # #2391 no full-snapshot re-flood
       value: "true"
     - name: CADENCE_BASELINE_EMIT            # #2389 baseline-absorbed rows
-      # 2026-07-14 (mono#2356): OFF on preprod. The reconcile is a one-shot
-      # per-restart pass that re-emits baselines for all 98 collections
-      # (~30-60min on this prod-clone dataset, re-inflates the changelog by
-      # tens of GB) and starves LIVE capture until it drains — so a new
-      # cloud write isn't captured for 30-60min after any hub restart,
-      # blocking cloud→box sync. Baseline is still served via the
-      # primary-reader on every catch-up (correctness-safe), so turning
-      # this off just trades cheaper catch-up for prompt live capture.
-      # Prod keeps it true (12Gi, rarely restarts).
-      value: "false"
+      # 2026-07-22 (mono#2605): SOAK — re-enabled now that the pass is BOUNDED
+      # (cadence 0.9.18). It was disabled 2026-07-14 because the old pass
+      # re-emitted the WHOLE table for all 98 collections (~30-60min, tens of GB
+      # changelog re-inflation, starved live capture). The bounded pass re-emits
+      # ONLY the un-synced window (updated_at > durable capture watermark W),
+      # so a cleanly-synced hub restart is a near no-op. WATCH during soak:
+      # `cadence_baseline_emit_rows_total` must stay bounded (a spike = W far
+      # behind), changelog partitions must not balloon, and live capture must be
+      # prompt post-restart. Revert to "false" if the metric climbs unbounded.
+      value: "true"
     - name: CADENCE_MEMBER_SCOPE_EXPANSION   # #2372 anonymous members (own-org)
       value: "true"
     - name: CADENCE_ENFORCE_READ_ONLY        # #2397 v1
