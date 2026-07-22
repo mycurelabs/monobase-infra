@@ -188,7 +188,7 @@ hapihub:
 
   image:
     repository: ghcr.io/mycurelabs/hapihub
-    tag: "11.20.64" # mono#2508 transfer status markers on request row + #2510 diagnostic-order facility default (preprod E2E)
+    tag: "11.20.65" # mono#2592 credit-balance recompute trigger + billing-credit-accounts sync scope (preprod E2E)
     pullPolicy: IfNotPresent
 
   # Valkey response cache (mono#2231) — preprod is the pilot environment.
@@ -1074,6 +1074,10 @@ cadence:
         strategy: lww
         scope_columns:
           organization: organization
+      billing-credit-accounts:
+        strategy: lww
+        scope_columns:
+          organization: organization
       billing-credit-transactions:
         strategy: lww
         scope_columns:
@@ -1473,6 +1477,7 @@ cadence:
       announcements: 80
       billing-accounting-transactions: 120
       billing-coupons: 120
+      billing-credit-accounts: 120
       billing-credit-transactions: 120
       billing-expenses: 120
       billing-invoice-agts: 120
