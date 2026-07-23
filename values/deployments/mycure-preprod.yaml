@@ -1566,7 +1566,7 @@ cadence:
       # 1.88M / hub 861k / 39k catch-up / box→cloud apply-lag. Re-enable only
       # after the emit is scoped to genuinely box-origin, un-uploaded rows
       # (exclude seeded reference + cloud-applied rows), not the updated_at proxy.
-      value: "false"
+      value: "true"  # mono#2624 soak: content-diff reconciliation is flood-safe (only uncaptured rows re-emit)
     - name: CADENCE_MEMBER_SCOPE_EXPANSION   # #2372 anonymous members (own-org)
       value: "true"
     - name: CADENCE_ENFORCE_READ_ONLY        # #2397 v1
@@ -1587,7 +1587,7 @@ cadence:
     - name: CADENCE_BULK_OP_DETECT           # WATCH-3 divergence detection
       value: "true"
     - name: CADENCE_P2P_ENABLED              # #2359 hub is WS-only
-      value: "true"  # mono#2624 soak: content-diff reconciliation is flood-safe (re-emits only uncaptured rows)
+      value: "true"
 
   replicaCount: 1
 
