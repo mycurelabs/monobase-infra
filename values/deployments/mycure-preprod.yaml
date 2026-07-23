@@ -51,6 +51,9 @@ api:
 
   gateway:
     hostname: ""
+    # Anti-coalescing exact listener (own exact-name cert) — stops HTTP/2
+    # connection reuse across preprod hosts that NGF 421s. Pair with hapihub's.
+    sectionName: https-preprod-mycure
 
   livenessProbe:
     enabled: true
@@ -101,6 +104,7 @@ account:
 
   gateway:
     hostname: ""
+    sectionName: https-preprod-hapihub  # anti-coalescing exact listener, see mycure block
 
   config:
     API_URL: "https://hapihub.preprod.localfirsthealth.com"
