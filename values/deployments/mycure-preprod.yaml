@@ -1013,7 +1013,7 @@ cadence:
 
   image:
     repository: ghcr.io/mycurelabs/cadence
-    tag: "0.9.21"  # mono#2624 content-diff reconciliation (emits only rows the changelog does not reflect) — soak
+    tag: "0.9.22"  # mono#2624 content-diff reconciliation (emits only rows the changelog does not reflect) — soak
     pullPolicy: Always
 
   # ── cadenceConfig: OWNED HERE (per-env), not in the chart ─────────────
@@ -1334,8 +1334,14 @@ cadence:
           organization: organization
       organizations:
         strategy: lww
+        # #2630: scope by own id OR overlords (jsonb array of parent org ids) so
+        # box-created child orgs / dx-centers (id != box org, overlords contains
+        # box org) sync via array-membership matching. Keep in lockstep with
+        # monobase-mycure services/hapihub/cadence.yml.
         scope_columns:
-          organization: id
+          organization:
+            - id
+            - overlords
       patient-consents:
         strategy: lww
         scope_columns:
