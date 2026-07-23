@@ -66,6 +66,23 @@ nginxGatewayResources:
     namespace: nginx-gateway-system
     gatewayClassName: nginx
     listeners:
+      # Exact-hostname listeners for the preprod app<->api pair. Purpose: serve
+      # EXACT-name certs on these SNIs so browsers can't HTTP/2-coalesce the
+      # frontend connection onto the API host (wildcard cert + shared LB IP
+      # made connections reusable across hosts; NGF's strict
+      # `$ssl_server_name != $host -> 421` check then failed sign-in POSTs,
+      # which browsers don't auto-retry). Preprod is the guinea pig; roll the
+      # same pattern to prod hosts once soaked. See mono#2540 thread / 421s.
+      - name: https-preprod-mycure
+        port: 443
+        protocol: HTTPS
+        hostname: "mycure.preprod.localfirsthealth.com"
+        tlsSecretName: nginx-gateway-tls-preprod-mycure
+      - name: https-preprod-hapihub
+        port: 443
+        protocol: HTTPS
+        hostname: "hapihub.preprod.localfirsthealth.com"
+        tlsSecretName: nginx-gateway-tls-preprod-hapihub
       # Preprod localfirsthealth.com (ephemeral prod-mirror env)
       - name: https-preprod-lfh
         port: 443
@@ -109,6 +126,16 @@ nginxGatewayResources:
 
   tls:
     certificates:
+      # Exact-name certs for the anti-coalescing listeners above — MUST stay
+      # single-hostname; adding extra dnsNames would re-enable coalescing.
+      - secretName: nginx-gateway-tls-preprod-mycure
+        clusterIssuer: letsencrypt-mycure-cloudflare-prod  # DNS-01
+        dnsNames:
+          - mycure.preprod.localfirsthealth.com
+      - secretName: nginx-gateway-tls-preprod-hapihub
+        clusterIssuer: letsencrypt-mycure-cloudflare-prod  # DNS-01
+        dnsNames:
+          - hapihub.preprod.localfirsthealth.com
       - secretName: nginx-gateway-tls-preprod
         clusterIssuer: letsencrypt-mycure-cloudflare-prod  # DNS-01, wildcard
         dnsNames:
