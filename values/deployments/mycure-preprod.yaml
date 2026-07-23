@@ -188,21 +188,18 @@ hapihub:
 
   image:
     repository: ghcr.io/mycurelabs/hapihub
-    tag: "11.20.66" # mono#2570 global-reference seed (ICD-10/medicines/diagnostic catalog/HMO) baked into every DB via data-migration (preprod E2E)
+    tag: "11.20.67" # mono#2617 bounded response-cache getOrSet lock (lockTimeout/hardTimeout) — cache re-enabled below
     pullPolicy: IfNotPresent
 
   # Valkey response cache (mono#2231) — preprod is the pilot environment.
   # Cached endpoints are declared via x-cache in hapihub's OpenAPI specs
   # (phase 1: fixtures 12h, services 5m, personal-details 5m). Kill switch:
   # set false here, or `kubectl exec deploy/hapihub -- hapihub cache flush`.
-  #
-  # INTERIM (mono#2617): disabled. bentocache's per-key getOrSet mutex has no
-  # timeout, so a stalled lock-holder (Valkey/disk stall on the co-located
-  # node) wedged every same-key request → GET /accounts/{id} hung ~118s → 502
-  # → "login works, everything after fails". Re-enable once the bounded-lock
-  # fix (lockTimeout/hardTimeout in core/cache.ts) ships in a hapihub image.
+  # (mono#2617 RESOLVED in 11.20.67: bentocache getOrSet lock is now bounded
+  # by lockTimeout/hardTimeout in core/cache.ts, so a stalled holder fails open
+  # to the DB instead of wedging GET /accounts/{id}. Interim disable removed.)
   cache:
-    enabled: false
+    enabled: true
 
   # Daily cleanup of expired Better Auth sessions (they never self-delete).
   pruneExpiredSessions:
