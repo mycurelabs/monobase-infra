@@ -1558,16 +1558,15 @@ cadence:
     - name: CADENCE_LAG_RECOVERY_INCREMENTAL # #2391 no full-snapshot re-flood
       value: "true"
     - name: CADENCE_BASELINE_EMIT            # #2389 baseline-absorbed rows
-      # 2026-07-22 (mono#2605): SOAK — re-enabled now that the pass is BOUNDED
-      # (cadence 0.9.18). It was disabled 2026-07-14 because the old pass
-      # re-emitted the WHOLE table for all 98 collections (~30-60min, tens of GB
-      # changelog re-inflation, starved live capture). The bounded pass re-emits
-      # ONLY the un-synced window (updated_at > durable capture watermark W),
-      # so a cleanly-synced hub restart is a near no-op. WATCH during soak:
-      # `cadence_baseline_emit_rows_total` must stay bounded (a spike = W far
-      # behind), changelog partitions must not balloon, and live capture must be
-      # prompt post-restart. Revert to "false" if the metric climbs unbounded.
-      value: "true"
+      # 2026-07-23 (mono#2605): DISABLED again. The bounded pass still floods —
+      # `updated_at > W−Δ` conflates "recently changed" with "un-synced
+      # box-origin", so it re-emits large recently-SEEDED reference collections
+      # (#2570: 23k medicines/boot + action-codes/diagnostic-* on the test box)
+      # and hub-applied rows that already exist on both sides → box changelog
+      # 1.88M / hub 861k / 39k catch-up / box→cloud apply-lag. Re-enable only
+      # after the emit is scoped to genuinely box-origin, un-uploaded rows
+      # (exclude seeded reference + cloud-applied rows), not the updated_at proxy.
+      value: "false"
     - name: CADENCE_MEMBER_SCOPE_EXPANSION   # #2372 anonymous members (own-org)
       value: "true"
     - name: CADENCE_ENFORCE_READ_ONLY        # #2397 v1
