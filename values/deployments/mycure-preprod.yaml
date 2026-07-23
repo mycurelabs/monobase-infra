@@ -195,8 +195,14 @@ hapihub:
   # Cached endpoints are declared via x-cache in hapihub's OpenAPI specs
   # (phase 1: fixtures 12h, services 5m, personal-details 5m). Kill switch:
   # set false here, or `kubectl exec deploy/hapihub -- hapihub cache flush`.
+  #
+  # INTERIM (mono#2617): disabled. bentocache's per-key getOrSet mutex has no
+  # timeout, so a stalled lock-holder (Valkey/disk stall on the co-located
+  # node) wedged every same-key request → GET /accounts/{id} hung ~118s → 502
+  # → "login works, everything after fails". Re-enable once the bounded-lock
+  # fix (lockTimeout/hardTimeout in core/cache.ts) ships in a hapihub image.
   cache:
-    enabled: true
+    enabled: false
 
   # Daily cleanup of expired Better Auth sessions (they never self-delete).
   pruneExpiredSessions:
