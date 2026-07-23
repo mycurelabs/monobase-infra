@@ -1013,7 +1013,7 @@ cadence:
 
   image:
     repository: ghcr.io/mycurelabs/cadence
-    tag: "0.9.19"  # mono#2605 bounded #2389 baseline-emit + per-boot recovery fix (soak) — re-emit only updated_at > W each boot
+    tag: "0.9.21"  # mono#2624 content-diff reconciliation (emits only rows the changelog does not reflect) — soak
     pullPolicy: Always
 
   # ── cadenceConfig: OWNED HERE (per-env), not in the chart ─────────────
@@ -1587,7 +1587,7 @@ cadence:
     - name: CADENCE_BULK_OP_DETECT           # WATCH-3 divergence detection
       value: "true"
     - name: CADENCE_P2P_ENABLED              # #2359 hub is WS-only
-      value: "false"
+      value: "true"  # mono#2624 soak: content-diff reconciliation is flood-safe (re-emits only uncaptured rows)
 
   replicaCount: 1
 
