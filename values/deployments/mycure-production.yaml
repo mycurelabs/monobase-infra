@@ -1867,9 +1867,15 @@ cadence:
       user: 200
 
   env:
-    # 2026-07-24 canary: serial watcher (~1 poll conn) — Tier-1 PG guardrail.
+    # 2026-07-24 canary: MUST be true (mirror preprod). Serial mode (false)
+    # EXITS the process at 10 consecutive watcher-deadline failures; on a
+    # fresh-reset hub the baseline scan of 99 large prod collections exceeds
+    # the 60s poll deadline → process restart loop (observed). Parallel mode
+    # QUARANTINES a slow collection's worker instead (survives). Connection
+    # cost is bounded by the semaphore (~min(cpus*2,16)) — well under the
+    # cadence role's CONNECTION LIMIT 50.
     - name: CADENCE_PER_COLLECTION_WORKERS
-      value: "false"
+      value: "true"
     # ── FENCE (2026-07-24 hub reset): reject every pre-existing on-prem box
     # token so no stale peer reconnects and re-inflates the fresh hub. Every
     # existing token's iat < this cutoff. Re-onboarded boxes (laser360 first)
