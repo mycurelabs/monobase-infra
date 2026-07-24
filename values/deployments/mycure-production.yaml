@@ -1346,7 +1346,7 @@ cadence:
     # 0.6.2: ensure_sync_infra runs in a background task (poll-deadline-
     # immune), index-before-backfill, advisory lock rescoped to fast DDL —
     # fixes the mono#2172 livelock hit during the 0.6.1 prod deploy.
-    tag: "0.9.5"  # mono#2356: per-page scoped lamport lookup in catch-up. 0.9.4's full-collection MAX(lamport) GROUP BY doc_id ran 10-16min/collection; retry stampede (32 concurrent) pegged the PG primary node 2026-07-14 → hapihub-next starved, client-visible slowness. On top of 0.9.4 (mono#2454 box watcher wedge fix).
+    tag: "0.9.23"  # 2026-07-24 first-wave canary: hub metadata reset (lamport 885M→0) + fenced fleet (MIN_TOKEN_IAT). #2624 reconcile merged to main (PR #2655), reproducible; digest sha256:23dd551e. Preprod-soaked. Prev 0.9.5 note: mono#2356 per-page scoped lamport lookup.
     pullPolicy: Always
 
   # ── cadenceConfig: OWNED HERE (per-env), not in the chart ─────────────
@@ -1867,8 +1867,22 @@ cadence:
       user: 200
 
   env:
+    # 2026-07-24 canary: serial watcher (~1 poll conn) — Tier-1 PG guardrail.
     - name: CADENCE_PER_COLLECTION_WORKERS
+      value: "false"
+    # ── FENCE (2026-07-24 hub reset): reject every pre-existing on-prem box
+    # token so no stale peer reconnects and re-inflates the fresh hub. Every
+    # existing token's iat < this cutoff. Re-onboarded boxes (laser360 first)
+    # get tokens minted AFTER it. Gated on CADENCE_ENFORCE_REVOCATION=true.
+    - name: CADENCE_MIN_TOKEN_IAT
+      value: "1784883822"
+    - name: CADENCE_ENFORCE_PEER_BINDING     # #2397 v3 — validated on preprod+boxes
       value: "true"
+    # ── Tier-1 PG guardrails (protect the shared primary from the #2605 path) ──
+    - name: CADENCE_BASELINE_EMIT_MAX_ROWS   # cap re-emit (default 50000)
+      value: "2000"
+    - name: CADENCE_QUERY_BATCH_SIZE         # smaller catch-up read batches (default 5000)
+      value: "2000"
     # ── 0.9.0 RC α–η fix-program gates (mono#2356) ──────────────────────
     # Preprod-verified 2026-07-13 (0.9.0 booted clean). All fixes are
     # default-off in the binary; enabled here. HELD fleet-wide until
@@ -1893,10 +1907,10 @@ cadence:
       value: "3600"
     - name: CADENCE_JSONB_SUBKEY_MERGE       # validate_m partial (delta-safe)
       value: "true"
-    - name: CADENCE_BULK_OP_DETECT           # WATCH-3 divergence detection
-      value: "true"
-    - name: CADENCE_P2P_ENABLED              # #2359 hub is WS-only
+    - name: CADENCE_BULK_OP_DETECT           # WATCH-3; Tier-1: OFF for canary (avoids per-collection full-table COUNT PG load — cleaner soak signal)
       value: "false"
+    - name: CADENCE_P2P_ENABLED              # #2359 hub is WS-only
+      value: "true"
     # HELD off on PROD: retention-peer-floor defaults ON in the binary, but
     # prod has a disk-emergency history (d25/d27) and the
     # `cadence_retention_floor_seq==0` alert isn't wired yet — a wedged peer
@@ -1904,11 +1918,11 @@ cadence:
     - name: CADENCE_RETENTION_PEER_FLOOR
       value: "false"
 
-  # TEMPORARY (2026-07-14 incident): paused to shed PG load — hub resync
-  # catch-up walks were ~half the active queries on the pegged 2-vCPU PG
-  # node during clinic peak hours. Restore to 1 off-peak (or after the PG
-  # node capacity bump); boxes queue offline and catch up on resume.
-  replicaCount: 0
+  # 2026-07-24: re-enabled at 1 for the first-wave canary — fresh-reset hub,
+  # fleet fenced (MIN_TOKEN_IAT) so only re-onboarded boxes connect. The
+  # 2026-07-14 pause was to shed PG load from 885M-lamport catch-up walks;
+  # post-reset the changelog is empty and only laser360 syncs, so load is minimal.
+  replicaCount: 1
 
   # Resources sized to the empirically-observed memory floor (2026-06-10
   # incident, monobase-infra#10). After §A.2/§B/§D/§E shipped in 0.5.14-0.5.17
@@ -1924,13 +1938,16 @@ cadence:
   # every-catch-up (baseline not persisted to changelog) blew past the 4Gi
   # limit → OOMKilled (exit 137). Bumped 4Gi→12Gi / req 1→3Gi to stop the
   # crash loop while the catch-up memory profile is retuned for 96 collections.
+  # 2026-07-24 canary: 2Gi req (≥ ~1.7Gi RSS floor, honest scheduling) / 4Gi limit
+  # (~2.3x over the floor). Post-reset with 0-1 peers there is no 96-collection
+  # catch-up storm, so the M4 12Gi is unnecessary; revisit before full-fleet re-onboard.
   resources:
     requests:
       cpu: 200m
-      memory: 3Gi
+      memory: 2Gi
     limits:
       cpu: "2"
-      memory: 12Gi
+      memory: 4Gi
 
   gateway:
     hostname: ""
@@ -1945,6 +1962,25 @@ cadence:
     serviceName: postgresql-primary
     auth:
       database: hapihub
+      # 2026-07-24: dedicated least-privilege role (Tier-2 PG guardrail).
+      # CONNECTION LIMIT 50 (of 300) + role statement_timeout=30s so cadence
+      # can never starve hapihub of connections or hold long queries. Password
+      # from GCP SM via the externalSecrets block → secret `cadence-secrets`.
+      username: cadence
+      existingSecret: cadence-secrets
+
+  # Tier-2: sync the `cadence` DB-role password from GCP Secret Manager.
+  # Produces secret `cadence-secrets` (key `postgres-password`) that the
+  # postgresql.auth.existingSecret above consumes for BOTH the primary and
+  # pg-changelog DSNs (identical → single 32-conn pool).
+  externalSecrets:
+    enabled: true
+    secretStore: "gcp-secretstore"
+    secretStoreKind: "ClusterSecretStore"
+    refreshInterval: 1h
+    secrets:
+      - secretKey: postgres-password
+        remoteKey: mycure-production-cadence-db-password
 
   valkey:
     enabled: true
