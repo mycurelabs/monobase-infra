@@ -1077,14 +1077,6 @@ cadence:
         strategy: lww
         scope_columns:
           organization: organization
-      billing-credit-accounts:
-        strategy: lww
-        scope_columns:
-          organization: organization
-      billing-credit-transactions:
-        strategy: lww
-        scope_columns:
-          organization: organization
       billing-expenses:
         strategy: lww
         scope_columns:
@@ -1453,6 +1445,8 @@ cadence:
     - -pg-changelog
     - analytics-daily-counts
     - api-key
+    - billing-credit-accounts
+    - billing-credit-transactions
     - billing-merchants
     - billing-providers
     - booking-slots
@@ -1486,8 +1480,6 @@ cadence:
       announcements: 80
       billing-accounting-transactions: 120
       billing-coupons: 120
-      billing-credit-accounts: 120
-      billing-credit-transactions: 120
       billing-expenses: 120
       billing-invoice-agts: 120
       billing-invoices: 120
@@ -1547,6 +1539,7 @@ cadence:
       queue-items: 100
       queues: 100
       subscription-packages: 80
+      subscriptions: 80
       user: 200
 
   env:
