@@ -1272,8 +1272,14 @@ cadence:
           organization: organization
       inventory-stocks:
         strategy: lww
+        # #2598: warehouse OR organization — a stock's warehouse is a CHILD
+        # facility (parent=clinic org) in multi-facility clinics while
+        # organization = the clinic org = the box's org. Keep in lockstep with
+        # monobase-mycure services/hapihub/cadence.yml.
         scope_columns:
-          organization: warehouse
+          organization:
+            - warehouse
+            - organization
       inventory-suppliers:
         strategy: lww
         scope_columns:
