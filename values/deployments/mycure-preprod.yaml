@@ -1013,7 +1013,7 @@ cadence:
 
   image:
     repository: ghcr.io/mycurelabs/cadence
-    tag: "0.9.22"  # mono#2624 content-diff reconciliation (emits only rows the changelog does not reflect) — soak
+    tag: "0.9.23"  # mono#2624 content-diff reconciliation, rebased onto main (PR #2655) — reproducible from main; digest sha256:23dd551e
     pullPolicy: Always
 
   # ── cadenceConfig: OWNED HERE (per-env), not in the chart ─────────────
