@@ -1774,6 +1774,9 @@ cade:
   # udp-gateway LB IP — the anchor advertises this so peers connect by EndpointId alone.
   publicAddr: "165.245.145.61:6472"
   nodePool: "staging"
+  gateway:
+    # The preprod wildcard listener (*.preprod.localfirsthealth.com) on the shared gateway.
+    sectionName: https-preprod-lfh
 
 # cadence-v2 issuer — mints grants + serves JWKS (in-cluster for the hub, HTTPS for external boxes).
 cadenceIssuer:
@@ -1785,3 +1788,5 @@ cadenceIssuer:
   iss: cadence-preprod-issuer
   fleetId: mycure-preprod
   nodePool: "staging"
+  gateway:
+    sectionName: https-preprod-lfh
