@@ -1,0 +1,32 @@
+{{- if and .Values.enabled .Values.gateway.enabled }}
+# Public HTTPS for the issuer so external boxes can `cadence auth login` (POST /enroll) and fetch JWKS.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: cadence-issuer
+  namespace: {{ include "cadence-issuer.namespace" . }}
+  labels:
+    {{- include "cadence-issuer.labels" . | nindent 4 }}
+spec:
+  parentRefs:
+    - name: {{ include "cadence-issuer.gateway.name" . }}
+      namespace: {{ include "cadence-issuer.gateway.namespace" . }}
+      sectionName: {{ .Values.gateway.sectionName | default "https" }}
+  hostnames:
+    {{- if .Values.gateway.hostnames }}
+    {{- range .Values.gateway.hostnames }}
+    - {{ . }}
+    {{- end }}
+    {{- else }}
+    - {{ include "cadence-issuer.gateway.hostname" . }}
+    {{- end }}
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      backendRefs:
+        - name: cadence-issuer
+          port: {{ .Values.service.port }}
+          weight: 1
+{{- end }}

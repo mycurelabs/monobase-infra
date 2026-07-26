@@ -2,24 +2,70 @@ enabled: true
 
 image:
   repository: ghcr.io/mycurelabs/cadence
-  tag: "2.0.0"
+  tag: "2.0.1"
   pullPolicy: IfNotPresent
 
-# UDP port the iroh QUIC endpoint binds, and the udp-gateway LB forwards. A TCP listener on
-# the same port serves the DO LoadBalancer health check.
+# UDP port the iroh QUIC endpoint binds; the udp-gateway LB forwards it. A TCP listener on the same port
+# serves the DO LoadBalancer health check.
 udpPort: 6472
+# TCP port for the observability + bootstrap API (/healthz, /readyz, /metrics, /.well-known/…).
+apiPort: 9464
 
-# Public address the anchor advertises (the udp-gateway LB IP:port) so peers reach it
-# directly by EndpointId alone. Empty = advertise only discovered addrs.
-publicAddr: ""
+# Public address the anchor advertises (the udp-gateway LB IP:port) so peers reach it directly by
+# EndpointId alone. Must match `public_addr` in the mounted cadence.yaml.
+publicAddr: "165.245.145.61:6472"
 
+# Isolated cadence_v2 database (the v2 hub anchors here — legacy cadence is untouched). The PG password
+# comes from the existing Bitnami `postgresql` k8s secret (postgres-password); the URL is assembled from
+# CADENCE_DB in the deployment.
+postgresql:
+  serviceName: postgresql
+  port: 5432
+  auth:
+    database: cadence_v2
+    username: postgres
+    existingSecret: postgresql
+
+# In-cluster cadence-v2 issuer (charts/cadence-issuer). The initContainer enrols the hub against it, and
+# the hub verifies grants against its JWKS. Keep iss/fleet in lockstep with cadence.yaml + the issuer.
+issuer:
+  serviceName: cadence-issuer
+  port: 9500
+  iss: cadence-preprod-issuer
+  fleetId: mycure-preprod
+
+service:
+  type: ClusterIP
+  port: 9464
+  targetPort: 9464
+  annotations: {}
+
+# NGINX Gateway HTTPRoute — exposes the API over HTTPS so external boxes can fetch the bootstrap doc
+# (/.well-known/cadence-configuration.json) via --seed-url.
+gateway:
+  enabled: true
+  hostname: ""          # defaults to cade.{global.domain}
+  hostnames: []
+  sectionName: https
+  snippetsPolicy:
+    enabled: false
+    proxyReadTimeout: "3600s"
+    clientMaxBodySize: "64m"
+
+serviceAccount:
+  create: true
+  name: ""
+  annotations: {}
+
+# A cadence-v2 data-plane hub carries the ~1.2 GiB iroh/tokio/loro floor — do NOT undersize (the old
+# transport-only 64Mi/128Mi was for `peer --accept`). The isolated small DB keeps baseline cheap.
 resources:
   requests:
-    cpu: 50m
-    memory: 64Mi
+    cpu: 250m
+    memory: 1Gi
   limits:
-    cpu: 200m
-    memory: 128Mi
+    cpu: "2"
+    memory: 3Gi
 
-# Schedule onto the same pool cadence uses (tainted node-pool=staging on preprod).
+# Schedule onto the pool cadence uses (tainted node-pool=staging on preprod).
 nodePool: "staging"
