@@ -1762,13 +1762,26 @@ udpGateway:
 # ===== cade — iroh 1.0 P2P transport + registry (cadence v2 foundation) =====
 # The anchor node; reachability is provided by the infra udpGateway LB above (not an
 # app-owned Service). Image is on the cadence 2.x line (cade = cadence v2).
+# cade — cadence v2 data-plane HUB (isolated cadence_v2 DB rehearsal). Full chart: run --config, enroll
+# initContainer, API service + HTTPRoute (cade.preprod…), reachable for direct QUIC via udp-gateway.
 cade:
   enabled: true
   image:
     repository: ghcr.io/mycurelabs/cadence
-    tag: "2.0.0"
+    tag: "2.0.1"
     pullPolicy: IfNotPresent
   udpPort: 6472
   # udp-gateway LB IP — the anchor advertises this so peers connect by EndpointId alone.
   publicAddr: "165.245.145.61:6472"
+  nodePool: "staging"
+
+# cadence-v2 issuer — mints grants + serves JWKS (in-cluster for the hub, HTTPS for external boxes).
+cadenceIssuer:
+  enabled: true
+  image:
+    repository: ghcr.io/mycurelabs/cadence
+    tag: "2.0.1"
+    pullPolicy: IfNotPresent
+  iss: cadence-preprod-issuer
+  fleetId: mycure-preprod
   nodePool: "staging"

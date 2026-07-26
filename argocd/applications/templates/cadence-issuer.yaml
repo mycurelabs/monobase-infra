@@ -1,0 +1,37 @@
+{{- if and .Values.cadenceIssuer .Values.cadenceIssuer.enabled }}
+# cadence-v2 issuer — mints grants + serves JWKS. Wave 2 so it is up before the cade hub (wave 3) enrols.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ .Values.global.namespace }}-cadence-issuer
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    path: charts/cadence-issuer
+    repoURL: {{ .Values.argocd.repoURL }}
+    targetRevision: {{ .Values.argocd.targetRevision | default "main" }}
+    helm:
+      releaseName: cadence-issuer
+      valuesObject:
+        {{- toYaml .Values.cadenceIssuer | nindent 8 }}
+        global: {{ .Values.global | toYaml | nindent 10 }}
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: {{ .Values.global.namespace }}
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false
+    retry:
+      limit: 5
+      backoff:
+        duration: 10s
+        maxDuration: 5m
+{{- end }}

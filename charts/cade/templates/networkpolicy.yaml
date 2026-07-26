@@ -13,12 +13,15 @@ spec:
     - Ingress
     - Egress
   ingress:
-    # Allow the LoadBalancer/world to reach the QUIC + health ports (any source).
+    # Allow the LoadBalancer/world to reach the QUIC + health ports (any source), plus the API port
+    # (the NGINX gateway HTTPRoute backend + kubelet probes).
     - ports:
         - protocol: UDP
           port: {{ .Values.udpPort }}
         - protocol: TCP
           port: {{ .Values.udpPort }}
+        - protocol: TCP
+          port: {{ .Values.apiPort }}
   egress:
     # Allow all egress (DNS + relay fallback + QUIC return paths).
     - {}

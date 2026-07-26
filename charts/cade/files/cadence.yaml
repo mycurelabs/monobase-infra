@@ -1,0 +1,347 @@
+# cadence-v2 HUB (anchor) config for mycure-preprod — the isolated-DB rehearsal.
+# Rendered into a ConfigMap by charts/cade and read via `cadence run --config`. Transport + auth + tuning
+# here; the sync manifest is inline as `sync:` (kept in lockstep with the mono
+# services/cadence-v2-example-hapihub/cadence.yaml). The DB URL is injected at runtime via CADENCE_DB
+# (holds the PG password from the ExternalSecret) — never templated into this file.
+
+# db: injected via CADENCE_DB env (postgres://…/cadence_v2) — do NOT set here (keeps the secret out of git).
+seed_url: []                        # a hub has no upstream seed (it is the anchor)
+seed: []
+accept: true                        # anchor: accept inbound + bind the fixed port
+listen_port: 6472
+public_addr: 165.245.145.61:6472    # the udp-gateway LB — peers reach this hub directly by EndpointId
+mdns: false
+api_addr: 0.0.0.0:9464              # observability API + bootstrap discovery doc (/.well-known/…)
+alpn: hapihub/2                     # app boundary: gates catch-up + namespaces gossip topics
+
+auth:
+  jwks_url: http://cadence-issuer:9500/.well-known/jwks.json   # in-cluster issuer
+  grant_jwks_uri: https://cade.preprod.localfirsthealth.com/grant-jwks
+  issuer: [cadence-preprod-issuer]   # trusted `iss` allowlist (first = JWKS persistence key)
+  fleet_id: mycure-preprod            # required `aud`
+  jwks_refresh_secs: 300
+  min_iat: 0                        # revocation wall (unix secs; 0 = off)
+
+# Engine timing + reconcile tuning. Every key defaults to its production value (shown) — omit the whole
+# `tuning:` block to take all defaults, or list just the keys you want to change.
+tuning:
+  capture_every_secs: 1
+  reconcile_every_secs: 30
+  retention_secs: 604800            # 7d — load-bearing: MUST exceed max peer offline duration
+  gc_every_secs: 3600
+  reroute_every_secs: 300
+  schema_check_every_secs: 60
+  reconcile_peers_max: 1
+  seed_reconcile_every: 1
+  log_format: text                  # or "json" for the k8s aggregator
+
+# The sync manifest, inline — the ONLY place collections are supplied (there is no separate manifest
+# file). Auto-enumerated from the prod `hapihub` DB schema (every real application table), scope inferred
+# per-table:
+#   - cadence.yml scope_columns where the table is listed there (authoritative),
+#   - else inferred from the row's columns (org: facility>organization>warehouse, insurance OR-lists;
+#     user: uid/user_id/owner/created_by/by_uid/account/author),
+#   - else the entry is COMMENTED OUT (no scope column found — confirm/cherry-pick).
+# Trailing `# blacklist` marks tables cadence.yml does NOT sync (kept here for review). Excluded entirely
+# (not collections): _bak_* snapshots, *_history/_archive, migration/changelog/cadence-internal tables.
+# routable `org`; a non-routable `user` tag resolves to org topics via organization_members.
+sync:
+  routable:
+    - org
+  resolve_via:
+    - [user, organization_members, org]
+  collections:
+    - name: account_configurations
+      tags:
+        - { ty: user, field: uid }
+    - name: account_invitations
+      tags:
+        - { ty: user, field: created_by }
+    - name: account_onboarding
+      tags:
+        - { ty: user, field: id }
+    - name: accounts
+      tags:
+        - { ty: user, field: id }
+    - name: action_codes
+      tags:
+        - { ty: org, field: organization }
+    - name: billing_coupons
+      tags:
+        - { ty: org, field: organization }
+    - name: billing_customers
+      tags:
+        - { ty: user, field: owner }
+    - name: billing_expenses
+      tags:
+        - { ty: org, field: facility }
+    - name: billing_invoice_agts
+      tags:
+        - { ty: org, field: facility }
+    - name: billing_invoices
+      tags:
+        - { ty: org, field: organization }
+    - name: billing_items
+      tags:
+        - { ty: org, field: facility }
+    - name: billing_legacy_invoices
+      tags:
+        - { ty: org, field: facility }
+    - name: billing_merchants
+      tags:
+        - { ty: user, field: owner }
+    - name: billing_payment_methods
+      tags:
+        - { ty: org, field: organization }
+    - name: billing_payments
+      tags:
+        - { ty: org, field: facility }
+    - name: billing_prices
+      tags:
+        - { ty: org, field: organization }
+    - name: billing_products
+      tags:
+        - { ty: org, field: organization }
+    - name: billing_promos
+      tags:
+        - { ty: org, field: organization }
+    - name: billing_return_transactions
+      tags:
+        - { ty: org, field: organization }
+    - name: billing_soas
+      tags:
+        - { ty: org, field: facility }
+    - name: billing_tax_rates
+      tags:
+        - { ty: org, field: organization }
+    - name: billing_void_transactions
+      tags:
+        - { ty: org, field: organization }
+    - name: booking_events
+      tags:
+        - { ty: org, field: organization }
+    - name: booking_exceptions
+      tags:
+        - { ty: user, field: owner }
+    - name: bookings
+      tags:
+        - { ty: org, field: organization }
+    - name: clocks
+      tags:
+        - { ty: org, field: organization }
+    - name: diagnostic_analyzers
+      tags:
+        - { ty: org, field: facility }
+    - name: diagnostic_measures
+      tags:
+        - { ty: org, field: facility }
+    - name: diagnostic_order_tests
+      tags:
+        - { ty: org, field: facility }
+    - name: diagnostic_order_tests_history
+      tags:
+        - { ty: org, field: facility }
+    - name: diagnostic_order_tests_reports
+      tags:
+        - { ty: org, field: organization }
+    - name: diagnostic_orders
+      tags:
+        - { ty: org, field: facility }
+    - name: diagnostic_packages
+      tags:
+        - { ty: org, field: facility }
+    - name: diagnostic_tests
+      tags:
+        - { ty: org, field: facility }
+    - name: file_links
+      tags:
+        - { ty: org, field: organization }
+    - name: fixtures
+      tags:
+        - { ty: org, field: organization }
+    - name: form_templates
+      tags:
+        - { ty: org, field: facility }
+    - name: insurance_contracts
+      tags:
+        - { ty: org, field: insured }
+        - { ty: org, field: insurer }
+        - { ty: org, field: insured_organization }
+    - name: insurance_coverages
+      tags:
+        - { ty: org, field: insured }
+        - { ty: org, field: insurer }
+    - name: insurance_loas
+      tags:
+        - { ty: org, field: organization }
+    - name: inventory_configurations
+      tags:
+        - { ty: org, field: organization }
+    - name: inventory_products
+      tags:
+        - { ty: org, field: warehouse }
+    - name: inventory_stock_configurations
+      tags:
+        - { ty: org, field: organization }
+    - name: inventory_stocks
+      tags:
+        - { ty: org, field: warehouse }
+    - name: inventory_stocks_history
+      tags:
+        - { ty: org, field: warehouse }
+    - name: inventory_suppliers
+      tags:
+        - { ty: org, field: warehouse }
+    - name: inventory_trackers
+      tags:
+        - { ty: org, field: organization }
+    - name: inventory_transactions
+      tags:
+        - { ty: org, field: warehouse }
+    - name: inventory_variant_reports
+      tags:
+        - { ty: org, field: warehouse }
+    - name: inventory_variants
+      tags:
+        - { ty: org, field: warehouse }
+    - name: license_licenses
+      tags:
+        - { ty: org, field: organization }
+    - name: medical_encounters
+      tags:
+        - { ty: org, field: facility }
+    - name: medical_patients
+      tags:
+        - { ty: org, field: facility }
+    - name: medical_records
+      tags:
+        - { ty: org, field: facility }
+    - name: medical_records_history
+      tags:
+        - { ty: org, field: facility }
+    - name: medicine_configurations
+      tags:
+        - { ty: org, field: organization }
+    - name: medicine_formulations
+      tags:
+        - { ty: org, field: organization }
+    - name: medicines
+      tags:
+        - { ty: org, field: facility }
+    - name: organization_members
+      tags:
+        - { ty: org, field: organization }
+      edge: { from: uid, to: organization }   # uid -> organization resolves user scope
+    - name: organization_members_archived
+      tags:
+        - { ty: org, field: organization }
+    - name: organization_partners
+      tags:
+        - { ty: org, field: organization }
+    - name: organizations
+      tags:
+        - { ty: org, field: id }
+    - name: personal_details
+      tags:
+        - { ty: org, field: facility }
+        - { ty: user, field: id }
+    - name: personal_details_history
+      tags:
+        - { ty: org, field: facility }
+        - { ty: user, field: id }
+    - name: pharmacy_medication_orders
+      tags:
+        - { ty: org, field: organization }
+    - name: queue_items
+      tags:
+        - { ty: org, field: organization }
+    - name: queues
+      tags:
+        - { ty: org, field: organization }
+    - name: service_providers
+      tags:
+        - { ty: org, field: facility }
+    - name: services
+      tags:
+        - { ty: org, field: facility }
+    - name: services_archived
+      tags:
+        - { ty: org, field: facility }
+    - name: services_performeds
+      tags:
+        - { ty: org, field: facility }
+    - name: storage_files
+      tags:
+        - { ty: user, field: owner }
+    - name: storage_links
+      tags:
+        - { ty: user, field: owner }
+    - name: subscriptions
+      tags:
+        - { ty: org, field: organization }
+
+    ## Better-auth
+    - name: account
+      tags:
+        - { ty: user, field: user_id }
+    - name: passkey
+      tags:
+        - { ty: user, field: user_id }
+    - name: two_factor
+      tags:
+        - { ty: user, field: user_id }
+    - name: user
+      tags:
+        - { ty: user, field: id }
+
+    ## Blacklist
+    # - name: webhook_deliveries  # per device
+    # - name: webhook_subscriptions  # per device
+    # - name: subscription_packages  # online-only
+    # - name: public_profiles  # online-only
+    # - name: prm_*  # online-only
+    # - name: notifications  # per-device
+    # - name: license_packages # online-only
+    # - name: hl7_messages  # per-device
+    # - name: activity_logs # per-device
+    # - name: api_key # per-device
+    # - name: billing_credit_* # online-only
+    # - name: billing_providers  # per-device
+    # - name: bir_*  # per-device
+    # - name: conversation_*  # per-device
+    # - name: counters # per-device
+    # - name: email_*  # online-only
+    # - name: export_requests  # per-device
+    # - name: invitation                       # better-auth, online-only
+    # - name: one_time_token                   # better-auth, per-device
+    # - name: organization                     # better-auth (org plugin; != organizations), online-only
+    # - name: member                           # better-auth (org plugin; != organization_members), online-only
+    # - name: verification                     # better-auth, online-only
+    # - name: session                          # better-auth, per-device
+
+    ## Unsorted — prod scan 2026-07-24 (not yet in collections or blacklist; review + sort)
+    # - name: account_activity
+    # - name: analytics_daily_counts
+    # - name: announcement_acknowledgments
+    # - name: announcements
+    # - name: billing_accounting_transactions
+    # - name: clock_audits
+    # - name: consents
+    # - name: device_telemetry_devices
+    # - name: hr_daily_staff_summary
+    # - name: hr_schedules
+    # - name: inventory_cycle_count_reports
+    # - name: inventory_item_classifications
+    # - name: legal_acceptances
+    # - name: message_references
+    # - name: message_references_history
+    # - name: messages
+    # - name: messages_history
+    # - name: patient_consents
+    # - name: patient_timeline_events
+    # - name: platform_daily_snapshot
+    # - name: support_ticket_messages
+    # - name: support_ticket_messages_history
+    # - name: support_tickets
+    # - name: support_tickets_history
+    # - name: tasks

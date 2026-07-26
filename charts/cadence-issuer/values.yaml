@@ -1,0 +1,59 @@
+enabled: true
+
+image:
+  repository: ghcr.io/mycurelabs/cadence
+  tag: "2.0.1"
+  pullPolicy: IfNotPresent
+
+# HTTP port serving JWKS (/.well-known/jwks.json) + POST /enroll.
+port: 9500
+
+# Minted-grant identity — keep in lockstep with the cade hub + boxes (auth.issuer / auth.fleet_id).
+iss: cadence-preprod-issuer
+fleetId: mycure-preprod
+kid: k1
+
+# Issuer state lives in the same isolated cadence_v2 database (enrollment codes + issued-jti audit). The
+# PG password comes from the existing Bitnami `postgresql` k8s secret.
+postgresql:
+  serviceName: postgresql
+  port: 5432
+  auth:
+    database: cadence_v2
+    username: postgres
+    existingSecret: postgresql
+
+# Only the signing key is a NEW secret (base64 PKCS8 EdDSA from `cadence issuer keygen`).
+externalSecrets:
+  enabled: true
+  secretStore: gcp-secretstore
+  secretStoreKind: ClusterSecretStore
+  refreshInterval: 1h
+  secrets:
+    - secretKey: issuer-key
+      remoteKey: mycure-preprod-cadence-issuer-key
+
+service:
+  type: ClusterIP
+  port: 9500
+
+# HTTPRoute so external boxes can enrol (POST /enroll) and fetch JWKS over HTTPS.
+gateway:
+  enabled: true
+  hostname: ""          # defaults to cadence-issuer.{global.domain}
+  hostnames: []
+  sectionName: https
+
+serviceAccount:
+  create: true
+  name: ""
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 256Mi
+
+nodePool: "staging"

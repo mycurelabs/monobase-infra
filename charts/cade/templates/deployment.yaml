@@ -1,31 +1,65 @@
 {{- if .Values.enabled }}
+{{- $pgHost := printf "%s.%s.svc.cluster.local" (.Values.postgresql.serviceName | default "postgresql") (include "cade.namespace" .) -}}
+{{- $db := printf "postgres://%s:$(PGPASS)@%s:%v/%s" (include "cade.postgresql.username" .) $pgHost (.Values.postgresql.port | default 5432) (include "cade.postgresql.database" .) -}}
+{{- $issuerUrl := printf "http://%s:%v" (.Values.issuer.serviceName | default "cadence-issuer") (.Values.issuer.port | default 9500) -}}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: cade
-  namespace: {{ .Values.global.namespace }}
+  namespace: {{ include "cade.namespace" . }}
   labels:
-    app.kubernetes.io/name: cade
+    {{- include "cade.labels" . | nindent 4 }}
 spec:
   replicas: 1
-  # RWO volume for the sqlite identity db → Recreate avoids attach deadlock on update.
+  # A single addressable anchor identity; roll one-at-a-time.
   strategy:
     type: Recreate
   selector:
     matchLabels:
-      app.kubernetes.io/name: cade
+      {{- include "cade.selectorLabels" . | nindent 6 }}
   template:
     metadata:
       labels:
-        app.kubernetes.io/name: cade
+        {{- include "cade.labels" . | nindent 8 }}
+      annotations:
+        checksum/config: {{ .Files.Get "files/cadence.yaml" | sha256sum }}
     spec:
+      serviceAccountName: {{ include "cade.serviceAccountName" . }}
       securityContext:
         runAsNonRoot: true
         runAsUser: 65532
-        # chown the PVC to this group so the non-root user can write the sqlite db.
-        fsGroup: 65532
         seccompProfile:
           type: RuntimeDefault
+      # Enrol the hub against the issuer and persist its "*" grant into cadence_v2 BEFORE the engine starts
+      # (`cadence run` fail-closes without a grant). Retries until the issuer + DB are reachable.
+      initContainers:
+      - name: enroll
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop: ["ALL"]
+        command: ["/bin/sh", "-c"]
+        args:
+          - |
+            set -u
+            until CODE=$(cadence issuer enroll --db "$CADENCE_DB" --scope '*' 2>/dev/null) \
+              && cadence auth login --db "$CADENCE_DB" --issuer-url "$ISSUER_URL" --code "$CODE"; do
+              echo "waiting for issuer ($ISSUER_URL) + cadence_v2 DB…"; sleep 3
+            done
+            echo "hub enrolled — '*' grant persisted"
+        env:
+        - name: PGPASS
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.postgresql.auth.existingSecret | default "postgresql" }}
+              key: postgres-password
+        - name: CADENCE_DB
+          value: {{ $db | quote }}
+        - name: ISSUER_URL
+          value: {{ $issuerUrl | quote }}
       containers:
       - name: cade
         image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
@@ -35,21 +69,21 @@ spec:
           readOnlyRootFilesystem: true
           capabilities:
             drop: ["ALL"]
-        args: ["peer", "--accept"]
+        # Image ENTRYPOINT is `cadence`; run the data-plane engine from the mounted config. Transport +
+        # auth + the inline sync live in cadence.yaml; the DB URL (with the secret) comes via CADENCE_DB.
+        args: ["run", "--config", "/etc/cadence/cadence.yaml"]
         env:
-        - name: CADE_UDP_PORT
-          value: {{ .Values.udpPort | quote }}
-        - name: CADE_DB
-          value: /data/cade.db
-        {{- if .Values.publicAddr }}
-        # Anchor advertises its own public LB address so peers reach it DIRECTLY by
-        # EndpointId alone (no peer-side IP). A pod can't self-discover its LB IP.
-        - name: CADE_PUBLIC_ADDR
-          value: {{ .Values.publicAddr | quote }}
-        {{- end }}
-        volumeMounts:
-        - name: data
-          mountPath: /data
+        - name: PGPASS
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.postgresql.auth.existingSecret | default "postgresql" }}
+              key: postgres-password
+        - name: CADENCE_DB
+          value: {{ $db | quote }}
+        - name: RUST_LOG
+          value: "cadence=info,warn"
+        - name: CADENCE_LOG_FORMAT
+          value: "json"
         ports:
         - name: quic
           containerPort: {{ .Values.udpPort }}
@@ -57,17 +91,31 @@ spec:
         - name: health
           containerPort: {{ .Values.udpPort }}
           protocol: TCP
+        - name: api
+          containerPort: {{ .Values.apiPort }}
+          protocol: TCP
         livenessProbe:
-          tcpSocket:
-            port: health
-          initialDelaySeconds: 5
+          httpGet:
+            path: /healthz
+            port: api
+          initialDelaySeconds: 10
           periodSeconds: 15
+        readinessProbe:
+          httpGet:
+            path: /readyz
+            port: api
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        volumeMounts:
+        - name: config
+          mountPath: /etc/cadence
+          readOnly: true
         resources:
           {{- toYaml .Values.resources | nindent 10 }}
       volumes:
-      - name: data
-        persistentVolumeClaim:
-          claimName: cade-data
+      - name: config
+        configMap:
+          name: cade-config
       {{- if .Values.nodePool }}
       nodeSelector:
         node-pool: {{ .Values.nodePool }}

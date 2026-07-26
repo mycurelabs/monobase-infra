@@ -1,0 +1,22 @@
+{{- if .Values.enabled }}
+# Default-deny namespace; the issuer only needs in-cluster ingress on its HTTP port (cade hub + box
+# enrollment go through the gateway, but in-cluster enroll/login reach it directly) and egress (DNS + PG).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: cadence-issuer
+  namespace: {{ include "cadence-issuer.namespace" . }}
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: cadence-issuer
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - ports:
+        - protocol: TCP
+          port: {{ .Values.port }}
+  egress:
+    - {}
+{{- end }}
