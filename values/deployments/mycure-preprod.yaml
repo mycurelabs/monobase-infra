@@ -188,7 +188,7 @@ hapihub:
 
   image:
     repository: ghcr.io/mycurelabs/hapihub
-    tag: "11.20.68" # mono#2617 bounded response-cache getOrSet lock (lockTimeout/hardTimeout) — cache re-enabled below
+    tag: "11.20.69" # mono#2617 bounded response-cache getOrSet lock (lockTimeout/hardTimeout) — cache re-enabled below
     pullPolicy: IfNotPresent
 
   # Valkey response cache (mono#2231) — preprod is the pilot environment.
@@ -340,7 +340,7 @@ mycure:
 
   image:
     repository: ghcr.io/mycurelabs/mycureapp
-    tag: "10.25.103"
+    tag: "10.25.104"
     pullPolicy: IfNotPresent
 
   replicaCount: 1
