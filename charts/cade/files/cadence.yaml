@@ -15,9 +15,11 @@ api_addr: 0.0.0.0:9464              # observability API + bootstrap discovery do
 alpn: hapihub/2                     # app boundary: gates catch-up + namespaces gossip topics
 
 auth:
-  jwks_url: http://cadence-issuer:9500/.well-known/jwks.json   # in-cluster issuer
+  # 2.x is OAuth: discover the AS via RFC 8414 from issuer_url (→ iss + jwks_uri), not the old jwks_url +
+  # issuer-allowlist. The hub uses the in-cluster standalone issuer as its AS (same key/iss/kid as hapihub,
+  # so grants minted by EITHER — box grants via hapihub, the hub's own '*' via this issuer — verify here).
+  issuer_url: http://cadence-issuer:9500
   grant_jwks_uri: https://cade.preprod.localfirsthealth.com/grant-jwks
-  issuer: [cadence-preprod-issuer]   # trusted `iss` allowlist (first = JWKS persistence key)
   fleet_id: mycure-preprod            # required `aud`
   jwks_refresh_secs: 300
   min_iat: 0                        # revocation wall (unix secs; 0 = off)
