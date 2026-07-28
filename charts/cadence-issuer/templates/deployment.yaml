@@ -34,8 +34,11 @@ spec:
           capabilities:
             drop: ["ALL"]
         # `issuer serve` reads --db via CADENCE_ISSUER_DB and --issuer-key via CADENCE_ISSUER_KEY (env);
-        # iss/fleet/kid/addr are args. Serves JWKS + /enroll.
-        args: ["issuer", "serve", "--iss", {{ .Values.iss | quote }}, "--fleet-id", {{ .Values.fleetId | quote }}, "--kid", {{ .Values.kid | quote }}, "--addr", "0.0.0.0:{{ .Values.port }}"]
+        # iss/fleet/kid/addr are args. Serves the OAuth AS (metadata + JWKS + authorize + token + status).
+        # --public-url is the in-cluster address the RFC 8414 metadata advertises: the hub (the only party
+        # that authorizes against this standalone issuer — boxes use hapihub-as-AS) discovers + reaches its
+        # endpoints here. Without it the metadata would advertise the unreachable default http://0.0.0.0.
+        args: ["issuer", "serve", "--iss", {{ .Values.iss | quote }}, "--fleet-id", {{ .Values.fleetId | quote }}, "--kid", {{ .Values.kid | quote }}, "--addr", "0.0.0.0:{{ .Values.port }}", "--public-url", {{ printf "http://%s:%v" (.Values.serviceName | default "cadence-issuer") (.Values.port | default 9500) | quote }}]
         env:
         - name: PGPASS
           valueFrom:

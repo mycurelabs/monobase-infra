@@ -188,7 +188,7 @@ hapihub:
 
   image:
     repository: ghcr.io/mycurelabs/hapihub
-    tag: "11.20.69" # mono#2617 bounded response-cache getOrSet lock (lockTimeout/hardTimeout) — cache re-enabled below
+    tag: "11.20.70" # feat/cadence-v2: cadence OAuth AS + grant device-telemetry (#2727 E2E). Prior: 11.20.69 (mono#2617 cache lock)
     pullPolicy: IfNotPresent
 
   # Valkey response cache (mono#2231) — preprod is the pilot environment.
@@ -252,6 +252,17 @@ hapihub:
       value: "300"
     - name: BETTER_AUTH_SESSION_COOKIE_CACHE_ENABLED
       value: "false"
+    # cadence-v2 OAuth Authorization Server (#2727 E2E). hapihub mints box grants with the SAME EdDSA key +
+    # iss + kid as the standalone cadence-issuer, so the hub (which trusts the issuer's JWKS) verifies them
+    # unchanged. CADENCE_ISSUER_KEY (the PEM of that key) comes from the externalSecret below.
+    - name: CADENCE_ISSUER_ISS
+      value: "cadence-preprod-issuer"
+    - name: CADENCE_ISSUER_KID
+      value: "k1"
+    - name: CADENCE_ISSUER_FLEET_ID
+      value: "mycure-preprod"
+    - name: CADENCE_ISSUER_AUTHORIZE_URL
+      value: "https://mycure.preprod.localfirsthealth.com/oauth/authorize"
 
   livenessProbe:
     enabled: true
@@ -300,6 +311,11 @@ hapihub:
         remoteKey: mycure-production-private-key
       - secretKey: PUBLIC_KEY
         remoteKey: mycure-production-public-key
+      # cadence-v2 OAuth AS signing key (#2727) — the standalone cadence-issuer's EdDSA key, PEM-encoded
+      # (single-line, \n-escaped; hapihub un-escapes). Same key/iss(cadence-preprod-issuer)/kid(k1) as the
+      # issuer, so grants hapihub mints verify against the issuer JWKS the hub already trusts.
+      - secretKey: CADENCE_ISSUER_KEY
+        remoteKey: mycure-preprod-cadence-issuer-key-pem
       # Storage configuration (GCP)
       - secretKey: STORAGE_BUCKET
         remoteKey: mycure-production-storage-bucket
@@ -340,7 +356,7 @@ mycure:
 
   image:
     repository: ghcr.io/mycurelabs/mycureapp
-    tag: "10.25.104"
+    tag: "10.25.107" # feat/cadence-v2: /oauth/authorize consent page for cadence box onboarding (#2727)
     pullPolicy: IfNotPresent
 
   replicaCount: 1
@@ -1768,7 +1784,7 @@ cade:
   enabled: true
   image:
     repository: ghcr.io/mycurelabs/cadence
-    tag: "2.0.8"
+    tag: "2.0.9" # feat/cadence-v2 OAuth auth redesign + mDNS (#2727)
     pullPolicy: IfNotPresent
   udpPort: 6472
   # udp-gateway LB IP — the anchor advertises this so peers connect by EndpointId alone.
@@ -1783,7 +1799,7 @@ cadenceIssuer:
   enabled: true
   image:
     repository: ghcr.io/mycurelabs/cadence
-    tag: "2.0.7"
+    tag: "2.0.9" # feat/cadence-v2 OAuth AS endpoints (#2727)
     pullPolicy: IfNotPresent
   iss: cadence-preprod-issuer
   fleetId: mycure-preprod
