@@ -1784,7 +1784,7 @@ cade:
   enabled: true
   image:
     repository: ghcr.io/mycurelabs/cadence
-    tag: "2.0.9" # feat/cadence-v2 OAuth auth redesign + mDNS (#2727)
+    tag: "2.0.10" # feat/cadence-v2 OAuth + mDNS + glibc-fix (#2727)
     pullPolicy: IfNotPresent
   udpPort: 6472
   # udp-gateway LB IP — the anchor advertises this so peers connect by EndpointId alone.
@@ -1799,7 +1799,7 @@ cadenceIssuer:
   enabled: true
   image:
     repository: ghcr.io/mycurelabs/cadence
-    tag: "2.0.9" # feat/cadence-v2 OAuth AS endpoints (#2727)
+    tag: "2.0.10" # feat/cadence-v2 OAuth AS + glibc-fix (#2727)
     pullPolicy: IfNotPresent
   iss: cadence-preprod-issuer
   fleetId: mycure-preprod

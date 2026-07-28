@@ -442,6 +442,14 @@ so a scheduled `hapihub backfill` boots with the identical environment.
       name: {{ include "hapihub.fullname" . }}-secrets
       key: STRIPE_SECRET_KEY
       optional: true
+# cadence-v2 OAuth AS signing key (PEM). optional:true → envs without the secret key (demo/prod) just skip
+# the EdDSA JWK in hapihub's JWKS. Set on preprod via externalSecrets → mycure-preprod-cadence-issuer-key-pem.
+- name: CADENCE_ISSUER_KEY
+  valueFrom:
+    secretKeyRef:
+      name: {{ include "hapihub.fullname" . }}-secrets
+      key: CADENCE_ISSUER_KEY
+      optional: true
 # v11 auth secrets
 - name: AUTH_SECRET
   valueFrom:
