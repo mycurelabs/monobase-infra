@@ -188,7 +188,7 @@ hapihub:
 
   image:
     repository: ghcr.io/mycurelabs/hapihub
-    tag: "11.20.70" # feat/cadence-v2: cadence OAuth AS + grant device-telemetry (#2727 E2E). Prior: 11.20.69 (mono#2617 cache lock)
+    tag: "11.20.71" # feat/cadence-v2: cadence OAuth AS + grant device-telemetry (#2727 E2E). Prior: 11.20.69 (mono#2617 cache lock)
     pullPolicy: IfNotPresent
 
   # Valkey response cache (mono#2231) — preprod is the pilot environment.
