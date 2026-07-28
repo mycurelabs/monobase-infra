@@ -45,11 +45,12 @@ spec:
         args:
           - |
             set -u
-            until CODE=$(cadence issuer enroll --db "$CADENCE_DB" --scope '*' 2>/dev/null) \
-              && cadence auth login --db "$CADENCE_DB" --issuer-url "$ISSUER_URL" --code "$CODE"; do
+            # cadence 2.x is OAuth-only (the legacy `issuer enroll` + `auth login --code` path was removed):
+            # authorize directly against the issuer's dev-approve AS for the "*" scope (PKCE + DPoP → grant).
+            until cadence auth login --db "$CADENCE_DB" --issuer-url "$ISSUER_URL" --scope '*'; do
               echo "waiting for issuer ($ISSUER_URL) + cadence_v2 DB…"; sleep 3
             done
-            echo "hub enrolled — '*' grant persisted"
+            echo "hub authorized — '*' grant persisted"
         env:
         - name: PGPASS
           valueFrom:
