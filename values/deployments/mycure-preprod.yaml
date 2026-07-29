@@ -188,7 +188,7 @@ hapihub:
 
   image:
     repository: ghcr.io/mycurelabs/hapihub
-    tag: "11.20.72" # feat/cadence-v2: cadence OAuth AS + grant device-telemetry (#2727 E2E). Prior: 11.20.69 (mono#2617 cache lock)
+    tag: "11.20.73" # feat/cadence-v2: publish cadence_seed_url + cadence_fleet_id in AS metadata (single-URL box onboarding, #2727)
     pullPolicy: IfNotPresent
 
   # Valkey response cache (mono#2231) — preprod is the pilot environment.
@@ -263,6 +263,10 @@ hapihub:
       value: "mycure-preprod"
     - name: CADENCE_ISSUER_AUTHORIZE_URL
       value: "https://mycure.preprod.localfirsthealth.com/oauth/authorize"
+    # Advertised as `cadence_seed_url` in the AS metadata so a box derives its sync hub from the single
+    # configured api URL (no separate hub/fleet onboarding field). Re-domained hub (#2727).
+    - name: CADENCE_ISSUER_SEED_URL
+      value: "https://cadence.preprod.localfirsthealth.com"
 
   livenessProbe:
     enabled: true
