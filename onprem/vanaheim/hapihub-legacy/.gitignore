@@ -1,0 +1,4 @@
+# On-box only — never commit secrets or the cold-copied data.
+.env
+keyfile
+mongo-data/

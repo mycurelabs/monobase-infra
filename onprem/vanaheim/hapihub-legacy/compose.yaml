@@ -1,0 +1,47 @@
+# Legacy hapihub v8 + MongoDB — on-prem archive on vanaheim (mono#2295).
+# Moved out of the DO k8s cluster; kept reachable (tailnet-only) as a cold archive
+# before hapihub.localfirsthealth.com is reclaimed for v11 and the cluster copy is torn down.
+#
+# Data dir ./mongo-data is the physical WiredTiger cold-copy of the cluster's mongodb-0
+# (both ends are mongo 7.0.15 x86-64 → engine-level portable). See README steps 2-3.
+# Real secrets live in ./.env on the box only (chmod 600) — never committed.
+name: hapihub-legacy
+
+services:
+  mongodb:
+    image: mongo:7.0.15
+    container_name: hapihub-legacy-mongodb
+    restart: unless-stopped
+    # Official mongo image: data at /data/db, plain mongod flags (avoids the Bitnami init wrapper).
+    command: ["mongod", "--replSet", "rs0", "--keyFile", "/keyfile", "--bind_ip_all", "--auth"]
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGODB_USER}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGODB_PASSWORD}
+    volumes:
+      - ./mongo-data:/data/db          # the cold-copied WiredTiger data directory
+      - ./keyfile:/keyfile:ro          # fresh internal-auth keyfile (single member, key can differ)
+    ports:
+      - "127.0.0.1:27017:27017"        # localhost-only; reach over tailnet via ssh tunnel / tailscale serve
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
+
+  hapihub:
+    image: ghcr.io/mycurelabs/hapihub:10.11.15
+    container_name: hapihub-legacy-app
+    restart: unless-stopped
+    env_file: .env                     # full v8 env — see .env.example
+    ports:
+      - "127.0.0.1:7500:7500"          # localhost-only; app defaults to 7500 (do NOT set PORT — port:NaN bug)
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:7500/ >/dev/null 2>&1 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
