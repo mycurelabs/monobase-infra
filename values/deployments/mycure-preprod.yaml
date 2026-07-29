@@ -188,7 +188,7 @@ hapihub:
 
   image:
     repository: ghcr.io/mycurelabs/hapihub
-    tag: "11.20.74" # feat/cadence-v2: publish cadence_seed_url + cadence_fleet_id in AS metadata (single-URL box onboarding, #2727)
+    tag: "11.20.75" # feat/cadence-v2: publish cadence_seed_url + cadence_fleet_id in AS metadata (single-URL box onboarding, #2727)
     pullPolicy: IfNotPresent
 
   # Valkey response cache (mono#2231) — preprod is the pilot environment.
