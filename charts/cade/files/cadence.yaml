@@ -19,7 +19,7 @@ auth:
   # issuer-allowlist. The hub uses the in-cluster standalone issuer as its AS (same key/iss/kid as hapihub,
   # so grants minted by EITHER — box grants via hapihub, the hub's own '*' via this issuer — verify here).
   issuer_url: http://cadence-issuer:9500
-  grant_jwks_uri: https://cade.preprod.localfirsthealth.com/grant-jwks
+  grant_jwks_uri: https://cadence.preprod.localfirsthealth.com/grant-jwks
   fleet_id: mycure-preprod            # required `aud`
   jwks_refresh_secs: 300
   min_iat: 0                        # revocation wall (unix secs; 0 = off)
