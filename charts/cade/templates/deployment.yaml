@@ -95,16 +95,8 @@ spec:
         - name: api
           containerPort: {{ .Values.apiPort }}
           protocol: TCP
-        # The one-time baseline capture of a LARGE primary DB (e.g. the full hapihub: 520k+
-        # personal_details + ~97 collections) runs before the API server binds; it can take minutes.
-        # A startupProbe holds liveness off until /healthz answers, so the pod isn't SIGKILLed (exit 137)
-        # mid-baseline and forced to restart from scratch. Normal liveness takes over once it succeeds.
-        startupProbe:
-          httpGet:
-            path: /healthz
-            port: api
-          periodSeconds: 10
-          failureThreshold: 90   # ~15 min for the initial baseline
+        # No startupProbe needed: cade 2.0.12+ installs triggers (fast DDL) + binds the API BEFORE running
+        # the baseline in the background, so /healthz answers immediately even against a large primary DB.
         livenessProbe:
           httpGet:
             path: /healthz

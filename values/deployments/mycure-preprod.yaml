@@ -1784,7 +1784,7 @@ cade:
   enabled: true
   image:
     repository: ghcr.io/mycurelabs/cadence
-    tag: "2.0.11" # feat/cadence-v2 dense-divergence bulk-stream — fixes box catch-up stall on a re-versioned scope (#2727)
+    tag: "2.0.12" # feat/cadence-v2 background baseline (no startup crash-loop on a big DB) + dense-divergence fix (#2727)
     pullPolicy: IfNotPresent
   udpPort: 6472
   # udp-gateway LB IP — the anchor advertises this so peers connect by EndpointId alone.
