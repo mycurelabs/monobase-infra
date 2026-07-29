@@ -1025,7 +1025,10 @@ cadence:
   # watcher_ensure_pg_ddl=true; override via CADENCE_WATCHER_GRACE_MS /
   # CADENCE_WATCHER_ENSURE_PG_DDL env if needed. Prod stays on 0.5.41
   # until 24h soak + the mono#2103 NULL-growth gate clear.
-  enabled: true
+  # RETIRED in preprod 2026-07-29 (#2727): superseded by cadence-v2 (cade),
+  # which now serves the preprod test box. Disabled to prune the v1 hub and
+  # free the cadence.preprod.localfirsthealth.com domain for cade to reclaim.
+  enabled: false
 
   image:
     repository: ghcr.io/mycurelabs/cadence
