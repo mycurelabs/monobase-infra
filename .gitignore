@@ -81,3 +81,25 @@ node_modules/
 
 **/charts/*.tgz
 .playwright-mcp/
+
+# ---------------------------------
+# CLAUDE
+# ---------------------------------
+
+# Regression fix loop
+.cycle-*.log
+.cycle-*.log.raw
+.cycle-*.fifo
+
+# Issue resolver cron state
+.issue-resolver-state.json
+
+.claude/worktrees
+.claude/workflows
+**/.claude/settings.local.json
+**/.claude/*.local.md
+**/.claude/scheduled_tasks.lock
+**/CLAUDE.local.md
+**/.mcp.json
+!.claude/
+!.claude/agents/.gitkeep
