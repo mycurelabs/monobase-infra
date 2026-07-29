@@ -36,6 +36,10 @@ tuning:
   reconcile_peers_max: 1
   seed_reconcile_every: 1
   log_format: text                  # or "json" for the k8s aggregator
+  # Anchor on the full hapihub DB: materialize a scope's rows only when a box declares it (on admit),
+  # instead of eager-baselining all ~15M rows of all orgs at startup. Manifest-derived per-scope filter
+  # (cadence 2.0.14, #2727). The hub serves a handful of test orgs, not the whole tenant set.
+  lazy_baseline: true
 
 # The sync manifest, inline — the ONLY place collections are supplied (there is no separate manifest
 # file). Auto-enumerated from the prod `hapihub` DB schema (every real application table), scope inferred
