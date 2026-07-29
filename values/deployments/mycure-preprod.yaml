@@ -1790,16 +1790,6 @@ cade:
   # udp-gateway LB IP — the anchor advertises this so peers connect by EndpointId alone.
   publicAddr: "165.245.145.61:6472"
   nodePool: "staging"
-  # Guarantee CPU for the reconcile loop. Default request (250m) gets throttled under node
-  # contention → the scope-scan that runs 6ms unloaded takes ~1.35s, so a box's cold catch-up
-  # can't get a baseline frame within the 30s deadline → "catch-up read stalled" loop (#2727 E2E).
-  resources:
-    requests:
-      cpu: "1000m"
-      memory: 1Gi
-    limits:
-      cpu: "2"
-      memory: 3Gi
   gateway:
     # The preprod wildcard listener (*.preprod.localfirsthealth.com) on the shared gateway.
     sectionName: https-preprod-lfh
