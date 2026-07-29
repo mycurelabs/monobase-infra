@@ -1795,7 +1795,7 @@ cade:
   # can't get a baseline frame within the 30s deadline → "catch-up read stalled" loop (#2727 E2E).
   resources:
     requests:
-      cpu: "1500m"
+      cpu: "1000m"
       memory: 1Gi
     limits:
       cpu: "2"
