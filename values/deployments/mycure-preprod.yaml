@@ -1784,7 +1784,7 @@ cade:
   enabled: true
   image:
     repository: ghcr.io/mycurelabs/cadence
-    tag: "2.0.14" # feat/cadence-v2 lazy per-scope baseline + cadence_dirty index + bg baseline (#2727)
+    tag: "2.0.15" # feat/cadence-v2 lazy per-scope baseline + cadence_dirty index + bounded capture tick (#2727)
     pullPolicy: IfNotPresent
   udpPort: 6472
   # udp-gateway LB IP — the anchor advertises this so peers connect by EndpointId alone.
