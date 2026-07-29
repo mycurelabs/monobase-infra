@@ -1790,6 +1790,13 @@ cade:
   # udp-gateway LB IP — the anchor advertises this so peers connect by EndpointId alone.
   publicAddr: "165.245.145.61:6472"
   nodePool: "staging"
+  # Integrated model (promote cade-v2 to be preprod's cadence, #2727): watch the LIVE hapihub app DB
+  # instead of the isolated cadence_v2 seed, so live cloud writes capture + sync to boxes (matches prod's
+  # legacy cadence, which watches hapihub). cade installs cadence_* side-tables + capture triggers on the
+  # live tables at startup and baselines existing rows. The cadence-issuer keeps its own cadence_v2 state.
+  postgresql:
+    auth:
+      database: hapihub
   gateway:
     # The preprod wildcard listener (*.preprod.localfirsthealth.com) on the shared gateway.
     sectionName: https-preprod-lfh
