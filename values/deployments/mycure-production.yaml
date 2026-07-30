@@ -89,7 +89,7 @@ account:
     hostname: ""
 
   config:
-    API_URL: "https://hapihub.localfirsthealth.com"
+    API_URL: "https://hapihub-next.localfirsthealth.com"
 
   podDisruptionBudget:
     enabled: false
@@ -696,8 +696,8 @@ mycure-myaccount:
     sectionName: https-lfh # Use localfirsthealth.com HTTPS listener
 
   config:
-    API_URL: "https://hapihub.localfirsthealth.com"
-    HAPIHUB_URL: "https://hapihub.localfirsthealth.com"
+    API_URL: "https://hapihub-next.localfirsthealth.com"
+    HAPIHUB_URL: "https://hapihub-next.localfirsthealth.com"
 
   podDisruptionBudget:
     enabled: false
@@ -726,8 +726,8 @@ dentalemon-myaccount:
     sectionName: https-lfh # Use localfirsthealth.com HTTPS listener
 
   config:
-    API_URL: "https://hapihub.localfirsthealth.com"
-    HAPIHUB_URL: "https://hapihub.localfirsthealth.com"
+    API_URL: "https://hapihub-next.localfirsthealth.com"
+    HAPIHUB_URL: "https://hapihub-next.localfirsthealth.com"
 
   podDisruptionBudget:
     enabled: false
@@ -820,7 +820,7 @@ dentalemon-website:
     enabled: true
 
   config:
-    API_URL: "https://hapihub.localfirsthealth.com"
+    API_URL: "https://hapihub-next.localfirsthealth.com"
     ACCOUNT_URL: "https://dentalemon-myaccount.localfirsthealth.com"
 
   podDisruptionBudget:
@@ -850,8 +850,8 @@ dentalemon:
     sectionName: https-lfh # Use localfirsthealth.com HTTPS listener
 
   config:
-    API_URL: "https://hapihub.localfirsthealth.com"
-    HAPIHUB_URL: "https://hapihub.localfirsthealth.com"
+    API_URL: "https://hapihub-next.localfirsthealth.com"
+    HAPIHUB_URL: "https://hapihub-next.localfirsthealth.com"
 
   podDisruptionBudget:
     enabled: false
