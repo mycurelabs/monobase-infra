@@ -1,10 +1,10 @@
 {{/* Chart name */}}
-{{- define "cade.name" -}}
+{{- define "cadence.name" -}}
 {{- default .Chart.Name .Values.nameOverride | trunc 63 | trimSuffix "-" }}
 {{- end }}
 
 {{/* Fully qualified app name */}}
-{{- define "cade.fullname" -}}
+{{- define "cadence.fullname" -}}
 {{- if .Values.fullnameOverride }}
 {{- .Values.fullnameOverride | trunc 63 | trimSuffix "-" }}
 {{- else }}
@@ -18,14 +18,14 @@
 {{- end }}
 
 {{/* Chart label */}}
-{{- define "cade.chart" -}}
+{{- define "cadence.chart" -}}
 {{- printf "%s-%s" .Chart.Name .Chart.Version | replace "+" "_" | trunc 63 | trimSuffix "-" }}
 {{- end }}
 
 {{/* Common labels */}}
-{{- define "cade.labels" -}}
-helm.sh/chart: {{ include "cade.chart" . }}
-{{ include "cade.selectorLabels" . }}
+{{- define "cadence.labels" -}}
+helm.sh/chart: {{ include "cadence.chart" . }}
+{{ include "cadence.selectorLabels" . }}
 {{- if .Chart.AppVersion }}
 app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
 {{- end }}
@@ -33,18 +33,26 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 app.kubernetes.io/part-of: monobase
 {{- end }}
 
-{{/* Selector labels — app label is stable "cade" (the udp-gateway targets it). */}}
-{{- define "cade.selectorLabels" -}}
+{{/*
+Selector labels — the app label stays literal "cade" even though the chart is now "cadence".
+Two reasons it must NOT track the chart name: (1) the udp-gateway UDP LoadBalancer targets pods by
+`app.kubernetes.io/name: cade`, and (2) a Deployment's spec.selector is immutable. The runtime
+resource names (Deployment/Service `cade`, ConfigMap `cade-config`, Secret `cade-secrets`) are
+likewise kept stable — only the chart/app/values-key naming layer moved to `cadence`. Flip the runtime
+label → cadence (and the udp-gateway selector with it) once the legacy `cadence-legacy` pods are fully
+deleted, so the two never share the `cadence` label while both exist.
+*/}}
+{{- define "cadence.selectorLabels" -}}
 app.kubernetes.io/name: cade
 {{- end }}
 
 {{/* Namespace */}}
-{{- define "cade.namespace" -}}
+{{- define "cadence.namespace" -}}
 {{- default .Release.Namespace .Values.global.namespace }}
 {{- end }}
 
 {{/* Service account name */}}
-{{- define "cade.serviceAccountName" -}}
+{{- define "cadence.serviceAccountName" -}}
 {{- if .Values.serviceAccount.create }}
 {{- default "cade" .Values.serviceAccount.name }}
 {{- else }}
@@ -53,23 +61,23 @@ app.kubernetes.io/name: cade
 {{- end }}
 
 {{/* Gateway parent ref */}}
-{{- define "cade.gateway.name" -}}
+{{- define "cadence.gateway.name" -}}
 {{- default "shared-gateway" .Values.global.gateway.name }}
 {{- end }}
-{{- define "cade.gateway.namespace" -}}
+{{- define "cadence.gateway.namespace" -}}
 {{- default "gateway-system" .Values.global.gateway.namespace }}
 {{- end }}
-{{- define "cade.gateway.hostname" -}}
-{{- if .Values.gateway.hostname }}{{ .Values.gateway.hostname }}{{ else }}{{ printf "cade.%s" .Values.global.domain }}{{ end }}
+{{- define "cadence.gateway.hostname" -}}
+{{- if .Values.gateway.hostname }}{{ .Values.gateway.hostname }}{{ else }}{{ printf "cadence.%s" .Values.global.domain }}{{ end }}
 {{- end }}
 
 {{/* PostgreSQL coordinates for the isolated cadence_v2 database */}}
-{{- define "cade.postgresql.host" -}}
-{{- printf "%s.%s.svc.cluster.local" (.Values.postgresql.serviceName | default "postgresql") (include "cade.namespace" .) -}}
+{{- define "cadence.postgresql.host" -}}
+{{- printf "%s.%s.svc.cluster.local" (.Values.postgresql.serviceName | default "postgresql") (include "cadence.namespace" .) -}}
 {{- end }}
-{{- define "cade.postgresql.database" -}}
+{{- define "cadence.postgresql.database" -}}
 {{- .Values.postgresql.auth.database | default "cadence_v2" -}}
 {{- end }}
-{{- define "cade.postgresql.username" -}}
+{{- define "cadence.postgresql.username" -}}
 {{- .Values.postgresql.auth.username | default "postgres" -}}
 {{- end }}

@@ -1,17 +1,17 @@
 {{- if and .Values.enabled .Values.gateway.enabled }}
 # Exposes the hub API (+ /.well-known/cadence-configuration.json bootstrap doc) over HTTPS so external
-# boxes can discover this anchor's EndpointId + public_addr via `--seed-url https://cade.<domain>`.
+# boxes can discover this anchor's EndpointId + public_addr via `--seed-url https://cadence.<domain>`.
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
   name: cade
-  namespace: {{ include "cade.namespace" . }}
+  namespace: {{ include "cadence.namespace" . }}
   labels:
-    {{- include "cade.labels" . | nindent 4 }}
+    {{- include "cadence.labels" . | nindent 4 }}
 spec:
   parentRefs:
-    - name: {{ include "cade.gateway.name" . }}
-      namespace: {{ include "cade.gateway.namespace" . }}
+    - name: {{ include "cadence.gateway.name" . }}
+      namespace: {{ include "cadence.gateway.namespace" . }}
       sectionName: {{ .Values.gateway.sectionName | default "https" }}
   hostnames:
     {{- if .Values.gateway.hostnames }}
@@ -19,7 +19,7 @@ spec:
     - {{ . }}
     {{- end }}
     {{- else }}
-    - {{ include "cade.gateway.hostname" . }}
+    - {{ include "cadence.gateway.hostname" . }}
     {{- end }}
   rules:
     - matches:
