@@ -488,7 +488,10 @@ monitoring:
 
     # Wrapper chart gateway configuration (not nested)
     gateway:
-      enabled: true
+      # Disabled: Grafana is admin-only, reached via `kubectl port-forward`
+      # (svc/grafana 3000). Dropping the HTTPRoute removes the last consumer of
+      # the envoy shared-gateway — no public grafana.mycureapp.com ingress.
+      enabled: false
       hostname: ""  # Uses grafana.{domain}
   
   # Alertmanager (wired into kube-prometheus via templates/monitoring.yaml).
