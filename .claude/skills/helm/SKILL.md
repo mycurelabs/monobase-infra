@@ -119,7 +119,6 @@ helm history hapihub -n mycure-production
 - `mycurelocal` — MyCure Local (local-first variant)
 - `mycurev8` — MyCure v8 (legacy frontend)
 - `mycure-myaccount` — MyCure MyAccount portal
-- `mycure-deploydash` — Deployment dashboard
 - `dentalemon` — DentaLemon dental app
 - `dentalemon-myaccount` — DentaLemon account portal
 - `dentalemon-website` — DentaLemon marketing site

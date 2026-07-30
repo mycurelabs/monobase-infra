@@ -49,7 +49,7 @@ Each tenant namespace contains:
 A typical tenant namespace (`mycure-production`) contains:
 
 **Applications:**
-- Deployments: hapihub, mycure, mycurelocal, mycurev8, mycure-myaccount, mycure-deploydash, dentalemon, dentalemon-myaccount, dentalemon-website, syncd, api, account
+- Deployments: hapihub, mycure, mycurelocal, mycurev8, mycure-myaccount, dentalemon, dentalemon-myaccount, dentalemon-website, syncd, api, account
 - Each with: Service, HTTPRoute, ConfigMap
 
 **Data stores:**

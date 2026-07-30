@@ -368,8 +368,6 @@ mycure-myaccount:
   enabled: false
 dentalemon-myaccount:
   enabled: false
-mycure-deploydash:
-  enabled: false
 hapihub-docs:
   enabled: false
 dentalemon-website:

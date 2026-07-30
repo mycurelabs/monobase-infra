@@ -273,7 +273,6 @@ gateway:
         - dentalemon-website.localfirsthealth.com
         - grafana.localfirsthealth.com
         - hapihub.localfirsthealth.com
-        - mycure-deploydash.localfirsthealth.com
         - mycure-myaccount.localfirsthealth.com
         - mycure.localfirsthealth.com
         - mycurelocal.localfirsthealth.com

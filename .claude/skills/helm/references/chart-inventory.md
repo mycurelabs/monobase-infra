@@ -42,12 +42,6 @@
 - **Key values**: `image.tag`, `gateway.hostname`, `gateway.sectionName`, `config.API_URL`
 - **Templates**: deployment, service, httproute, configmap
 
-### mycure-deploydash
-- **Purpose**: MyCure DeployDash — Deployment dashboard
-- **Runtime**: Vue.js (static serving)
-- **Key values**: `image.tag`, `gateway.hostname`, `gateway.sectionName`, `config.API_URL`
-- **Templates**: deployment, service, httproute, configmap
-
 ### dentalemon
 - **Purpose**: DentaLemon — Dental healthcare application
 - **Runtime**: Vue.js (static serving)
