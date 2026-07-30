@@ -1,0 +1,83 @@
+# Legacy hapihub v8 archive on niflheim (mono#2295) — DUMP+RESTORE, sync-logs excluded.
+# Live mongo data on a docker named volume (fast / disk); durable dump.gz stays on /mnt/storage.
+name: hapihub-legacy
+services:
+  mongodb:
+    image: mongo:7.0.15
+    container_name: hapihub-legacy-mongodb
+    restart: unless-stopped
+    command: ["mongod","--replSet","rs0","--keyFile","/keyfile","--bind_ip_all"]
+    volumes:
+      - hapihub-legacy-data:/data/db
+      - ./keyfile:/keyfile:ro
+    ports:
+      - "127.0.0.1:27017:27017"
+    healthcheck:
+      test: ["CMD","mongosh","--quiet","--eval","db.adminCommand('ping')"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+  hapihub:
+    image: ghcr.io/mycurelabs/hapihub:10.11.15
+    container_name: hapihub-legacy-app
+    restart: unless-stopped
+    environment:
+      - ACCOUNTS_SERVICE_ACCOUNT_EMAILS=${ACCOUNTS_SERVICE_ACCOUNT_EMAILS}
+      - AUTH_SECRET=${AUTH_SECRET}
+      - BETTER_AUTH_PASSKEY_RP_ID=${BETTER_AUTH_PASSKEY_RP_ID}
+      - BETTER_AUTH_PASSKEY_RP_NAME=${BETTER_AUTH_PASSKEY_RP_NAME}
+      - BETTER_AUTH_RATE_LIMIT_ENABLED=${BETTER_AUTH_RATE_LIMIT_ENABLED}
+      - BETTER_AUTH_RATE_LIMIT_MAX=${BETTER_AUTH_RATE_LIMIT_MAX}
+      - BETTER_AUTH_RATE_LIMIT_WINDOW=${BETTER_AUTH_RATE_LIMIT_WINDOW}
+      - BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET}
+      - BETTER_AUTH_SESSION_COOKIE_CACHE_ENABLED=${BETTER_AUTH_SESSION_COOKIE_CACHE_ENABLED}
+      - CLUSTER_INSTANCES=${CLUSTER_INSTANCES}
+      - CORS_ALLOW_LOCAL_NETWORK=${CORS_ALLOW_LOCAL_NETWORK}
+      - CORS_ALLOW_MOBILE_APPS=${CORS_ALLOW_MOBILE_APPS}
+      - CORS_ALLOW_TUNNELING=${CORS_ALLOW_TUNNELING}
+      - CORS_CREDENTIALS=${CORS_CREDENTIALS}
+      - CORS_ORIGINS=${CORS_ORIGINS}
+      - CORS_STRICT=${CORS_STRICT}
+      - DATABASE_STARTUP_RETRIES=${DATABASE_STARTUP_RETRIES}
+      - DATABASE_STARTUP_RETRY_DELAY_MS=${DATABASE_STARTUP_RETRY_DELAY_MS}
+      - DATABASE_WAIT_FOR_READY=${DATABASE_WAIT_FOR_READY}
+      - DB_RECREATE_INDEX_ON_CONFLICT=${DB_RECREATE_INDEX_ON_CONFLICT}
+      - DB_SKIP_CREATE_INDEXES=${DB_SKIP_CREATE_INDEXES}
+      - ENC_BILLING_INVOICES=${ENC_BILLING_INVOICES}
+      - ENC_BILLING_ITEMS=${ENC_BILLING_ITEMS}
+      - ENC_BILLING_PAYMENTS=${ENC_BILLING_PAYMENTS}
+      - ENC_MEDICAL_RECORDS=${ENC_MEDICAL_RECORDS}
+      - ENC_PERSONAL_DETAILS=${ENC_PERSONAL_DETAILS}
+      - EXTERNAL_ADDRESS=${EXTERNAL_ADDRESS}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
+      - HAPIHUB_PORT=${HAPIHUB_PORT}
+      - HOME=${HOME}
+      - MONGODB_DATABASE=${MONGODB_DATABASE}
+      - MONGODB_HOST=${MONGODB_HOST}
+      - MONGODB_PASSWORD=${MONGODB_PASSWORD}
+      - MONGODB_PORT=${MONGODB_PORT}
+      - MONGODB_USER=${MONGODB_USER}
+      - MONGO_URI=${MONGO_URI}
+      - PORT=${PORT}
+      - PRIVATE_KEY=${PRIVATE_KEY}
+      - PUBLIC_KEY=${PUBLIC_KEY}
+      - RUN_WORKERS=${RUN_WORKERS}
+      - STORAGE_BUCKET=${STORAGE_BUCKET}
+      - STORAGE_CLIENT_EMAIL=${STORAGE_CLIENT_EMAIL}
+      - STORAGE_DIRECTORY=${STORAGE_DIRECTORY}
+      - STORAGE_PRIVATE_KEY=${STORAGE_PRIVATE_KEY}
+      - STORAGE_PROJECT_ID=${STORAGE_PROJECT_ID}
+      - STORAGE_TYPE=${STORAGE_TYPE}
+      - STRIPE_CHECKOUT_CANCEL_URL=${STRIPE_CHECKOUT_CANCEL_URL}
+      - STRIPE_CHECKOUT_SUCCESS_URL=${STRIPE_CHECKOUT_SUCCESS_URL}
+      - STRIPE_KEY=${STRIPE_KEY}
+      - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
+    ports:
+      - "127.0.0.1:7500:7500"
+    depends_on:
+      mongodb:
+        condition: service_healthy
+volumes:
+  hapihub-legacy-data:
