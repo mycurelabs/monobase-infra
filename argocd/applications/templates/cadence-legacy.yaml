@@ -1,11 +1,15 @@
 {{- if and .Values.cadence .Values.cadence.enabled }}
-# ArgoCD Application: Cadence P2P Sync Engine
+# ArgoCD Application: Cadence P2P Sync Engine (LEGACY — retired-in-place)
+# Serves the 3 canaries on cadence-legacy.localfirsthealth.com while cadence-v2
+# is readied. Frees `charts/cadence`, the `-cadence` app name, and
+# `cadence.localfirsthealth.com` for v2. Still reads the `.Values.cadence` config
+# key (unchanged); rename that key when v2 lands and needs it.
 # Sync Wave 3 - Deploy application after database
 
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: {{ .Values.global.namespace }}-cadence
+  name: {{ .Values.global.namespace }}-cadence-legacy
   namespace: argocd
   annotations:
     argocd.argoproj.io/sync-wave: "3"
@@ -15,11 +19,11 @@ spec:
   project: default
 
   source:
-    path: charts/cadence
+    path: charts/cadence-legacy
     repoURL: {{ .Values.argocd.repoURL }}
     targetRevision: {{ .Values.argocd.targetRevision | default "main" }}
     helm:
-      releaseName: cadence
+      releaseName: cadence-legacy
       valuesObject:
         {{- $cadenceValues := omit .Values.cadence "postgresql" "valkey" }}
         {{- toYaml $cadenceValues | nindent 8 }}

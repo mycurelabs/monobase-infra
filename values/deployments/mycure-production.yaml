@@ -1934,11 +1934,8 @@ cadence:
       memory: 4Gi
 
   gateway:
-    # Transition to cadence-legacy (retire-in-place; frees `cadence` host for v2).
-    # Dual-hostname so the 3 canaries can re-point to cadence-legacy with zero downtime;
-    # cadence.localfirsthealth.com is dropped once they're re-enrolled.
+    # Retired-in-place as cadence-legacy; `cadence.localfirsthealth.com` freed for cadence-v2.
     hostnames:
-      - cadence.localfirsthealth.com
       - cadence-legacy.localfirsthealth.com
     sectionName: https-lfh # Use localfirsthealth.com HTTPS listener
     snippetsPolicy:
