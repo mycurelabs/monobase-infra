@@ -1305,8 +1305,10 @@ mailpit:
     enabled: true
     hostname: ""
 
-# ===== P2P SYNC: Cadence — Tier 4.4 =====
-cadence:
+# ===== P2P SYNC: Cadence (LEGACY — retired-in-place) — Tier 4.4 =====
+# Config key renamed cadence → cadence-legacy so `cadence:` is free for cadence-v2.
+# Consumed by argocd/applications/templates/cadence-legacy.yaml via index (hyphenated key).
+cadence-legacy:
   # 0.6.1 (mono#2103 Fix 1 + infra#77 Fix 3): DB-owned updated_at triggers
   # + (updated_at, id) keyset index installed by ensure_sync_infra at
   # watcher boot behind a PG advisory lock (mono#2126 + #2132), and
