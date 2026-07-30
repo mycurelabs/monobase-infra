@@ -33,6 +33,7 @@ Day-to-day operations, monitoring, and incident response.
 - **[SECRETS-MANAGEMENT.md](operations/SECRETS-MANAGEMENT.md)** - External Secrets Operator, KMS integration
 - **[EXTERNAL-DNS.md](operations/EXTERNAL-DNS.md)** - Automatic DNS record management from HTTPRoutes
 - **[TROUBLESHOOTING.md](operations/TROUBLESHOOTING.md)** - Common issues and solutions
+- **[GATEWAY-STALE-ENDPOINT-RUNBOOK.md](operations/GATEWAY-STALE-ENDPOINT-RUNBOOK.md)** - Intermittent ~50% gateway 504s/timeouts after a backend restart (wedged nginx data-plane pod)
 
 ## 🔐 Security
 
