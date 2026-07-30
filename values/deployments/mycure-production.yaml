@@ -1043,6 +1043,14 @@ postgresql:
 
   readReplicas:
     replicaCount: 1
+    # NOTE: the read replica PVC (data-postgresql-read-0) is excluded from Velero
+    # backups — it is a byte-copy of the primary, redundant for DR. The exclusion
+    # is applied as a label directly on the PVC (cannot be set via this chart: a
+    # StatefulSet's volumeClaimTemplate is immutable on update, so a persistence
+    # label change would be rejected by the API server):
+    #   kubectl -n mycure-production label pvc data-postgresql-read-0 \
+    #     velero.io/exclude-from-backup=true --overwrite
+    # Re-apply this label if the replica PVC is ever re-created (e.g. re-clone).
     persistence:
       enabled: true
       storageClass: ""

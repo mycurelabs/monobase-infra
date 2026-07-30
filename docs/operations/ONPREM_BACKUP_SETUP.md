@@ -104,7 +104,9 @@ sudo SPACES_ACCESS_KEY=… SPACES_SECRET_KEY=… KOPIA_PASSWORD=… \
 | `--backup-dir=PATH` | `/var/backups/mycure` | Mirror target. With LUKS modes, this becomes a mountpoint. |
 | `--bucket=NAME` | `mycure-doks-velero-backups` | DO Spaces bucket. |
 | `--region=REGION` | `sgp1` | DO Spaces region. |
-| `--max-age=DURATION` | `30d` | rclone `--max-age`; older objects skipped/deleted locally. |
+| `--max-age=DURATION` | off | rclone `--max-age`. **Leave off for Kopia repos** — it filters objects by age from *both* the copy and the delete pass, so it neither reliably reclaims space nor keeps a restorable mirror (fresh snapshots dedup against older packs it would skip). Bound size with `--namespaces` + source TTL instead. |
+| `--namespaces=LIST` | all | Mirror only these namespaces' Kopia repos (comma/space separated) plus all backup metadata; everything else is excluded. A Kopia repo is atomic per namespace, so this keeps each mirrored repo fully restore-consistent. This is how the on-prem disk is bounded. |
+| `--bsl-prefix=PREFIX` | `infrastructure` | BackupStorageLocation prefix inside the bucket; used to build the `--namespaces` path filters. |
 | `--service-user=USER` | `mycure-backup` | System user that runs the mirror. |
 | `--timer-on-calendar=S` | `*-*-* 02:30:00 UTC` | systemd OnCalendar for the mirror. |
 | `--kopia-version=VER` | pinned in script | Kopia static binary release. |
@@ -232,13 +234,24 @@ Both commands should succeed.
 
 ### Re-run after changing flags
 
-The script is idempotent. Re-running with different flags reconfigures cleanly:
+The script is idempotent. Re-running with different flags reconfigures cleanly.
 
-```sh
-# Bump retention from 30d to 60d:
-sudo SPACES_ACCESS_KEY=… SPACES_SECRET_KEY=… KOPIA_PASSWORD=… \
-  scripts/onprem-backup-setup.sh --max-age=60d
-```
+> **Bounded subset (current prod config):** the `hel.niflheim` box has a 1.8T
+> disk and cannot hold the full 30-day repo. It mirrors **only the
+> `mycure-production` namespace** (plus all backup metadata) — always pass
+> `--namespaces` on re-run or the mirror re-downloads the `monitoring` + `velero`
+> Kopia repos (~316G) and re-fills the disk:
+>
+> ```sh
+> sudo SPACES_ACCESS_KEY=… SPACES_SECRET_KEY=… KOPIA_PASSWORD=… \
+>   scripts/onprem-backup-setup.sh --namespaces=mycure-production
+> ```
+>
+> Retention (how many days) is a **source-side** setting — it's the Velero
+> schedule TTL (`values/infrastructure/main.yaml` → `velero.schedules.*.retention`),
+> not an on-prem flag. The on-prem mirror faithfully holds whatever Spaces holds
+> for the namespaces it mirrors; it cannot keep fewer *days* than the cloud
+> without an independent Kopia repo.
 
 ### Rotate the Spaces access key
 
@@ -282,7 +295,7 @@ sudo userdel mycure-backup 2>/dev/null || true
 | Script fails at "rclone failed to list spaces:…" | Wrong access key or bucket name | Recheck `SPACES_ACCESS_KEY`/`SECRET`; confirm bucket name and region. |
 | Timer `inactive (dead)` after first run | Service failed | `journalctl -u mycure-backup-mirror.service` for stderr. |
 | `cryptsetup: Device … is still in use` | Previous mount didn't release | `umount /var/backups/mycure; cryptsetup close mycure-backup` then re-run. |
-| Disk fills before 30 days | Production data growth exceeded estimate | Increase disk, shorten `--max-age`, or revisit on-prem retention vs. cloud retention. |
+| Disk fills up | Production data growth, or mirroring too many namespaces | Narrow `--namespaces` (drop low-value repos like `monitoring`/`velero`), shorten the source Velero TTL (`velero.schedules.*.retention`), or grow the disk (see NIFLHEIM_RAID_PROPOSAL.md). Do **not** reach for `--max-age` — it can corrupt restorability. |
 | `kopia snapshot list` returns empty | No Velero data-mover backup has run since the on-prem mirror was started | Wait for tonight's `production-daily` schedule, or trigger a manual `velero backup create`. |
 
 ---

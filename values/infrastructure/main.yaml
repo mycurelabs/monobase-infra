@@ -414,7 +414,11 @@ velero:
       daily:
         enabled: true
         schedule: "0 2 * * *"  # 2 AM daily
-        retention: 720h  # 30 days
+        # 14d, not 30d: the mycure-production Kopia repo is ~4x the single-snapshot
+        # floor at 30d of daily history. 14d ~halves it on both DO Spaces and the
+        # on-prem mirror (which can't hold 30d on its 1.8T disk). See
+        # docs/operations/ONPREM_BACKUP_SETUP.md.
+        retention: 336h  # 14 days
         namespaces:
           - mycure-production
 

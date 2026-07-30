@@ -25,7 +25,9 @@ BACKUP_DIR=/var/backups/mycure
 BUCKET=mycure-doks-velero-backups
 REGION=sgp1
 RETENTION_DAYS=30
-MAX_AGE=30d
+MAX_AGE=""                                       # rclone --max-age; empty = OFF (see note below)
+NAMESPACES=""                                    # comma/space list of namespaces to mirror; empty = whole bucket
+BSL_PREFIX=infrastructure                        # BackupStorageLocation prefix inside the bucket
 SERVICE_USER=mycure-backup
 TIMER_ON_CALENDAR="*-*-* 02:30:00 UTC"
 YES_WIPE_DEVICE=0
@@ -70,7 +72,10 @@ Flags:
   --bucket=NAME           DO Spaces bucket name                (default: $BUCKET)
   --region=REGION         DO Spaces region                     (default: $REGION)
   --retention-days=N      reference value, recorded in summary (default: $RETENTION_DAYS)
-  --max-age=DURATION      rclone --max-age                     (default: $MAX_AGE)
+  --max-age=DURATION      rclone --max-age; empty = OFF        (default: off)
+  --namespaces=LIST       mirror only these namespaces' Kopia repos (comma/space
+                          separated) + all backup metadata; empty = whole bucket
+  --bsl-prefix=PREFIX     BackupStorageLocation prefix in bucket (default: $BSL_PREFIX)
   --service-user=USER     system user that runs the mirror     (default: $SERVICE_USER)
   --timer-on-calendar=S   systemd OnCalendar=                  (default: "$TIMER_ON_CALENDAR")
   --yes-wipe-device       required confirm for luks-partition mode
@@ -105,6 +110,8 @@ while [[ $# -gt 0 ]]; do
     --region=*)             REGION="${1#*=}";              shift;;
     --retention-days=*)     RETENTION_DAYS="${1#*=}";      shift;;
     --max-age=*)            MAX_AGE="${1#*=}";             shift;;
+    --namespaces=*)         NAMESPACES="${1#*=}";          shift;;
+    --bsl-prefix=*)         BSL_PREFIX="${1#*=}";          shift;;
     --service-user=*)       SERVICE_USER="${1#*=}";        shift;;
     --timer-on-calendar=*)  TIMER_ON_CALENDAR="${1#*=}";   shift;;
     --kopia-version=*)      KOPIA_VERSION="${1#*=}";       shift;;
@@ -425,6 +432,28 @@ fi
 curl -sS -m 15 -X POST -H 'Content-Type: application/json' -d "$payload" "$url" >/dev/null || true
 NOTIFY
 
+# ---------- rclone path filter + max-age (shared by mirror + verify) ----------
+# NAMESPACES set → mirror only the Velero backup metadata + the named namespaces'
+# Kopia repos, dropping every other repo. A Kopia repo is atomic per namespace
+# (snapshots share deduplicated blobs), so subsetting by namespace keeps each
+# mirrored repo fully restore-consistent while bounding on-prem disk. Empty
+# NAMESPACES → mirror the whole bucket (original behavior).
+filter_lines=""
+if [[ -n "$NAMESPACES" ]]; then
+  filter_lines="  --include \"$BSL_PREFIX/backups/**\" \\"$'\n'
+  for ns in ${NAMESPACES//,/ }; do
+    filter_lines+="  --include \"$BSL_PREFIX/kopia/$ns/**\" \\"$'\n'
+  done
+  filter_lines+="  --exclude \"**\" \\"$'\n'
+fi
+
+# --max-age is OFF by default. On a content-addressed Kopia repo it is a footgun:
+# fresh snapshots dedup against pack blobs older than the cutoff, so --max-age can
+# skip blobs the latest snapshot still needs, producing an incomplete, silently
+# unrestorable mirror. Bound size via --namespaces + source-side TTL instead.
+maxage_line=""
+[[ -n "$MAX_AGE" ]] && maxage_line="  --max-age $MAX_AGE \\"$'\n'
+
 # ---------- systemd service + timer ----------
 log "writing systemd unit $SERVICE_NAME.service"
 # ExecStartPre  fires before ExecStart → start notification (always on when
@@ -457,8 +486,7 @@ LogNamespace=$LOG_NAMESPACE
 SyslogIdentifier=$SERVICE_NAME
 $notify_start
 ExecStart=$RCLONE_BIN sync spaces:$BUCKET/ $BACKUP_DIR/spaces/ \\
-  --max-age $MAX_AGE \\
-  --transfers $RCLONE_TRANSFERS \\
+${maxage_line}${filter_lines}  --transfers $RCLONE_TRANSFERS \\
   --checkers $RCLONE_CHECKERS \\
   --log-level INFO \\
   --stats 5m \\
@@ -532,7 +560,7 @@ RCLONE_BIN=$RCLONE_BIN
 echo "==> pre-verify sync"
 "\$RCLONE_BIN" sync "spaces:\$BUCKET" "\$MIRROR_ROOT" \\
   --config "\$RCLONE_CONFIG" \\
-  --transfers 4 \\
+${filter_lines}  --transfers 4 \\
   --checkers 8 \\
   --stats 1m --stats-one-line
 
@@ -550,7 +578,7 @@ trap 'rm -f "\$report"' EXIT
 "\$RCLONE_BIN" check "spaces:\$BUCKET" "\$MIRROR_ROOT" \\
   --config "\$RCLONE_CONFIG" \\
   --checksum \\
-  --combined "\$report" \\
+${filter_lines}  --combined "\$report" \\
   --transfers 4 \\
   --checkers 8 \\
   --stats 1m --stats-one-line || true   # exit code reflects ANY diff; we reinterpret
@@ -689,7 +717,9 @@ echo "  encryption    : $ENCRYPTION"
 echo "  backup dir    : $BACKUP_DIR"
 echo "  bucket        : spaces:$BUCKET ($REGION)"
 echo "  service user  : $SERVICE_USER"
-echo "  retention ref : ${RETENTION_DAYS}d (rclone --max-age=$MAX_AGE)"
+echo "  retention ref : ${RETENTION_DAYS}d (source Velero TTL; on-prem mirrors whatever Spaces holds)"
+echo "  max-age       : ${MAX_AGE:-off}"
+echo "  namespaces    : ${NAMESPACES:-all (whole bucket)}${NAMESPACES:+ (+ backup metadata, prefix=$BSL_PREFIX)}"
 echo "  mirror timer  : $TIMER_ON_CALENDAR"
 mirror_next=$(systemctl list-timers --no-legend --no-pager "$SERVICE_NAME.timer" 2>/dev/null | awk '{print $1, $2, $3}' | head -1)
 echo "  next mirror   : ${mirror_next:-see: systemctl list-timers}"
