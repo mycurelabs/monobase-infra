@@ -1,0 +1,6 @@
+# On-box only — never commit secrets, keys, or data.
+.env
+env.sh
+keyfile
+mongo-data/
+*.archive.gz
