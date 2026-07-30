@@ -188,7 +188,7 @@ hapihub:
 
   image:
     repository: ghcr.io/mycurelabs/hapihub
-    tag: "11.20.77" # feat/cadence-v2: backfill organizations.cluster for existing orgs (#2727)
+    tag: "11.20.78" # feat/cadence-v2: AS grants own org + fam:<cluster> (#2727)
     pullPolicy: IfNotPresent
 
   # Valkey response cache (mono#2231) — preprod is the pilot environment.
