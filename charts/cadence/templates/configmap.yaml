@@ -3,9 +3,9 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: cade-config
-  namespace: {{ include "cade.namespace" . }}
+  namespace: {{ include "cadence.namespace" . }}
   labels:
-    {{- include "cade.labels" . | nindent 4 }}
+    {{- include "cadence.labels" . | nindent 4 }}
 data:
   # The hub's cadence.yaml — transport + auth + tuning + the inline `sync:` manifest. Kept in lockstep
   # with the mono services/cadence-v2-example-hapihub/cadence.yaml (the sync section is the single source).

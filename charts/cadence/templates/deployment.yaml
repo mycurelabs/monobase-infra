@@ -1,13 +1,13 @@
 {{- if .Values.enabled }}
-{{- $pgHost := printf "%s.%s.svc.cluster.local" (.Values.postgresql.serviceName | default "postgresql") (include "cade.namespace" .) -}}
-{{- $db := printf "postgres://%s:$(PGPASS)@%s:%v/%s" (include "cade.postgresql.username" .) $pgHost (.Values.postgresql.port | default 5432) (include "cade.postgresql.database" .) -}}
+{{- $pgHost := printf "%s.%s.svc.cluster.local" (.Values.postgresql.serviceName | default "postgresql") (include "cadence.namespace" .) -}}
+{{- $db := printf "postgres://%s:$(PGPASS)@%s:%v/%s" (include "cadence.postgresql.username" .) $pgHost (.Values.postgresql.port | default 5432) (include "cadence.postgresql.database" .) -}}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: cade
-  namespace: {{ include "cade.namespace" . }}
+  namespace: {{ include "cadence.namespace" . }}
   labels:
-    {{- include "cade.labels" . | nindent 4 }}
+    {{- include "cadence.labels" . | nindent 4 }}
 spec:
   replicas: 1
   # A single addressable anchor identity; roll one-at-a-time.
@@ -15,15 +15,15 @@ spec:
     type: Recreate
   selector:
     matchLabels:
-      {{- include "cade.selectorLabels" . | nindent 6 }}
+      {{- include "cadence.selectorLabels" . | nindent 6 }}
   template:
     metadata:
       labels:
-        {{- include "cade.labels" . | nindent 8 }}
+        {{- include "cadence.labels" . | nindent 8 }}
       annotations:
         checksum/config: {{ .Files.Get "files/cadence.yaml" | sha256sum }}
     spec:
-      serviceAccountName: {{ include "cade.serviceAccountName" . }}
+      serviceAccountName: {{ include "cadence.serviceAccountName" . }}
       securityContext:
         runAsNonRoot: true
         runAsUser: 65532

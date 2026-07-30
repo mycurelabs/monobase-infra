@@ -1,9 +1,9 @@
-{{- if and .Values.cade .Values.cade.enabled }}
-# cade — iroh 1.0 P2P transport + registry (cadence v2 foundation), behind the udp-gateway LB.
+{{- if and .Values.cadence .Values.cadence.enabled }}
+# cadence — iroh 1.0 P2P transport + registry (cadence v2 foundation), behind the udp-gateway LB.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: {{ .Values.global.namespace }}-cade
+  name: {{ .Values.global.namespace }}-cadence
   namespace: argocd
   annotations:
     argocd.argoproj.io/sync-wave: "3"
@@ -12,13 +12,13 @@ metadata:
 spec:
   project: default
   source:
-    path: charts/cade
+    path: charts/cadence
     repoURL: {{ .Values.argocd.repoURL }}
     targetRevision: {{ .Values.argocd.targetRevision | default "main" }}
     helm:
-      releaseName: cade
+      releaseName: cadence
       valuesObject:
-        {{- toYaml .Values.cade | nindent 8 }}
+        {{- toYaml .Values.cadence | nindent 8 }}
         global: {{ .Values.global | toYaml | nindent 10 }}
   destination:
     server: https://kubernetes.default.svc
