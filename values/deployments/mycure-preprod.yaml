@@ -779,13 +779,14 @@ mycurev8:
   enabled: false
 
 # ===== DATABASE: MongoDB =====
-# Synthetic single-node replica set used solely as the source for the
-# hapihub-migrator nightly CronJob smoke test. Preprod is a CronJob
-# staging ground — no CDC, no data of consequence here. The argo template
-# always enforces architecture=replicaset, so a single-replica rs0 is
-# what we actually deploy.
+# Removed 2026-07-30. Was a synthetic single-node replica set existing only
+# to feed the hapihub-migrator CronJob smoke test — but the migrator has been
+# stopped since 2026-07-02 (hapihubMigrator.enabled: false), so nothing
+# consumed it. Setting enabled:false prunes the StatefulSet + PVC via ArgoCD.
+# The remaining config below is retained (disabled) so the migrator smoke
+# test can be revived without re-deriving the mongo shape.
 mongodb:
-  enabled: true
+  enabled: false
 
   image:
     repository: bitnamilegacy/mongodb
