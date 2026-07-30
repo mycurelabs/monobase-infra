@@ -1762,7 +1762,7 @@ cade:
   enabled: true
   image:
     repository: ghcr.io/mycurelabs/cadence
-    tag: "2.0.17" # feat/cadence-v2 lazy-baseline scope-index validity (no-timeout DDL + drop invalid) + jsonb scope cols + responder apply metric (#2727)
+    tag: "2.0.18" # feat/cadence-v2 auth-login authorize-url override — hub enrolls its '*' grant against hapihub (sole AS, coherent status_list) (#2727)
     pullPolicy: IfNotPresent
   udpPort: 6472
   # udp-gateway LB IP — the anchor advertises this so peers connect by EndpointId alone.
@@ -1783,26 +1783,26 @@ cade:
     # metadata's cadence_seed_url); the legacy cade.preprod hostname is dropped.
     hostnames:
       - cadence.preprod.localfirsthealth.com
-  # Runtime grant verification: hapihub is the AS (#2727). Env-driven (not baked into cadence.yaml). The
-  # hub verifies box grants AND its own '*' grant against hapihub's JWKS (all share the cadence-issuer key).
+  # hapihub is the SOLE AS (#2727) — it mints both box grants AND the hub's own '*' grant. Env-driven (not
+  # baked into the verbatim cadence.yaml). The enroll initContainer authorizes '*' against hapihub with a
+  # non-expiring service-account API key (--bearer); runtime verification is against hapihub's JWKS.
   auth:
     issuerUrl: https://hapihub.preprod.localfirsthealth.com
     grantJwksUri: https://hapihub.preprod.localfirsthealth.com/.well-known/jwks.json
     fleetId: mycure-preprod
-  # Boot-time '*' self-mint (replaces the standalone cadence-issuer): a co-located one-shot issuer signs
-  # the hub grant with the shared key. iss/kid MUST match hapihub's so it verifies against hapihub's JWKS.
-  mint:
-    iss: cadence-preprod-issuer
-    kid: k1
-  # The shared EdDSA signing key (same GCP secret the standalone issuer used) → secret cade-secrets.
+    # hapihub advertises a browser authorization_endpoint (RFC 8252 SPA) for boxes; the headless hub
+    # authorizes against the programmatic route instead (CADENCE_AUTH_AUTHORIZE_URL).
+    authorizeUrl: https://hapihub.preprod.localfirsthealth.com/sync/authorize
+  # Service-account API key (better-auth, service@mycure.md, non-expiring) → secret cade-secrets. The hub
+  # presents it as --bearer to authorize its '*' grant. hapihub then mints with a coherent status_list.
   externalSecrets:
     enabled: true
     secretStore: gcp-secretstore
     secretStoreKind: ClusterSecretStore
     refreshInterval: 1h
     secrets:
-      - secretKey: issuer-key
-        remoteKey: mycure-preprod-cadence-issuer-key
+      - secretKey: sa-api-key
+        remoteKey: mycure-preprod-cade-sa-api-key
 
-# cadence-v2 issuer RETIRED (#2727): folded into the cade pod as a boot-time one-shot mint (see cade.mint
-# + the enroll initContainer). hapihub is the sole runtime AS. The standalone Deployment/Service/app is gone.
+# cadence-v2 issuer RETIRED (#2727): hapihub is the sole AS + minter. The hub enrolls its own '*' grant
+# against hapihub with a service-account API key (see the enroll initContainer). No standalone issuer.

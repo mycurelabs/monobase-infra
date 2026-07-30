@@ -29,10 +29,11 @@ spec:
         runAsUser: 65532
         seccompProfile:
           type: RuntimeDefault
-      # Mint the hub's "*" grant into the DB BEFORE the engine starts (`cadence run` fail-closes without a
-      # grant). No standalone issuer service: a co-located, one-shot `cadence issuer serve` on loopback signs
-      # the grant with the SHARED key (CADENCE_ISSUER_KEY), then dies with this init container. Runtime grant
-      # VERIFICATION is against the real AS (hapihub) via CADENCE_ISSUER_URL on the main container.
+      # Enroll the hub's "*" grant into the DB BEFORE the engine starts (`cadence run` fail-closes without a
+      # grant). hapihub is the sole AS: authorize '*' against its PROGRAMMATIC endpoint (CADENCE_AUTH_AUTHORIZE_URL,
+      # since its advertised authorization_endpoint is the browser SPA) with a non-expiring service-account API
+      # key (CADENCE_AUTH_BEARER → x-api-key-equivalent via Bearer). hapihub mints with a coherent status_list;
+      # the hub verifies box + own grants against hapihub's JWKS. Retries until hapihub + the DB are reachable.
       initContainers:
       - name: enroll
         image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
@@ -46,17 +47,10 @@ spec:
         args:
           - |
             set -u
-            # Start an ephemeral dev-approve AS on loopback (jti audit → throwaway SQLite in /work; codes are
-            # in-memory) signing with the shared key, then authorize '*' against it (PKCE + DPoP → grant).
-            CADENCE_ISSUER_DB="sqlite:///work/issuer.db" \
-              cadence issuer serve --iss "$ISS" --fleet-id "$FLEET_ID" --kid "$KID" \
-                --addr 127.0.0.1:9500 --public-url http://127.0.0.1:9500 &
-            ISS_PID=$!
-            until cadence auth login --db "$CADENCE_DB" --issuer-url http://127.0.0.1:9500 --scope '*'; do
-              echo "waiting for local issuer + cadence_v2 DB…"; sleep 3
+            until cadence auth login --db "$CADENCE_DB" --issuer-url "$CADENCE_ISSUER_URL" --scope '*'; do
+              echo "waiting for hapihub AS ($CADENCE_ISSUER_URL) + cadence_v2 DB…"; sleep 3
             done
-            kill "$ISS_PID" 2>/dev/null || true
-            echo "hub authorized — '*' grant persisted"
+            echo "hub authorized — '*' grant persisted (minted by hapihub)"
         env:
         - name: PGPASS
           valueFrom:
@@ -65,24 +59,16 @@ spec:
               key: postgres-password
         - name: CADENCE_DB
           value: {{ $db | quote }}
-        - name: HOME
-          value: /work
-        - name: TMPDIR
-          value: /work
-        - name: CADENCE_ISSUER_KEY
+        - name: CADENCE_ISSUER_URL
+          value: {{ .Values.auth.issuerUrl | quote }}
+        - name: CADENCE_AUTH_AUTHORIZE_URL
+          value: {{ .Values.auth.authorizeUrl | quote }}
+        # Non-expiring service-account API key, presented as the Bearer credential on the authorize call.
+        - name: CADENCE_AUTH_BEARER
           valueFrom:
             secretKeyRef:
               name: cade-secrets
-              key: issuer-key
-        - name: ISS
-          value: {{ .Values.mint.iss | quote }}
-        - name: FLEET_ID
-          value: {{ .Values.auth.fleetId | quote }}
-        - name: KID
-          value: {{ .Values.mint.kid | quote }}
-        volumeMounts:
-        - name: work
-          mountPath: /work
+              key: sa-api-key
       containers:
       - name: cade
         image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
@@ -149,9 +135,6 @@ spec:
       - name: config
         configMap:
           name: cade-config
-      # Writable scratch for the enroll initContainer's ephemeral issuer SQLite (readOnlyRootFilesystem).
-      - name: work
-        emptyDir: {}
       {{- if .Values.nodePool }}
       nodeSelector:
         node-pool: {{ .Values.nodePool }}
