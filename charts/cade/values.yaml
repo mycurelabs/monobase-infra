@@ -26,24 +26,17 @@ postgresql:
     username: postgres
     existingSecret: postgresql
 
-# Runtime grant verification — env-driven per env (the deployment sets CADENCE_ISSUER_URL /
-# CADENCE_GRANT_JWKS_URI / CADENCE_FLEET_ID from these; env wins over the mounted cadence.yaml, so these
-# env-specific URLs are NOT baked into files/cadence.yaml). The AS (hapihub) whose JWKS verifies BOTH box
-# grants and the hub's own '*' grant — all signed with one shared key.
+# hapihub is the sole AS + grant minter — env-driven per env (the deployment sets CADENCE_ISSUER_URL /
+# CADENCE_GRANT_JWKS_URI / CADENCE_FLEET_ID / CADENCE_AUTH_AUTHORIZE_URL from these; env wins over the
+# mounted cadence.yaml, so these env-specific URLs are NOT baked into files/cadence.yaml).
 auth:
   issuerUrl: ""       # e.g. https://hapihub.<env>.localfirsthealth.com (RFC 8414 → iss + jwks_uri)
   grantJwksUri: ""    # e.g. https://hapihub.<env>.localfirsthealth.com/.well-known/jwks.json (advertised in bootstrap doc)
   fleetId: ""         # required `aud`, e.g. mycure-preprod
+  authorizeUrl: ""    # programmatic authorize for the headless hub enroll, e.g. https://hapihub.<env>…/sync/authorize
 
-# Boot-time self-mint of the hub's '*' grant: the enroll initContainer runs a co-located, one-shot
-# `cadence issuer serve` on loopback and authorizes '*' against it — no standalone issuer service. iss/kid
-# MUST match the AS (auth) so the minted grant verifies against its JWKS; fleetId reuses auth.fleetId.
-mint:
-  iss: cadence-preprod-issuer
-  kid: k1
-
-# Shared EdDSA signing key for the boot-time mint (the same GCP secret the standalone issuer used) →
-# k8s secret `cade-secrets` key `issuer-key`, exposed as CADENCE_ISSUER_KEY to the enroll initContainer.
+# Service-account API key (non-expiring better-auth key) the enroll initContainer presents to hapihub as
+# --bearer to authorize the hub's '*' grant → k8s secret `cade-secrets` key `sa-api-key` → CADENCE_AUTH_BEARER.
 externalSecrets:
   enabled: false
   secretStore: gcp-secretstore
