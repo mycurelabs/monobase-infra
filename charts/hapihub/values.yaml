@@ -73,13 +73,6 @@ gateway:
   # to apply proxy_read_timeout via NGF SnippetsPolicy instead.
   # If you re-enable, set timeouts.request and/or timeouts.backendRequest.
   timeouts: null
-  
-  # BackendTrafficPolicy configuration for connection settings
-  backendTrafficPolicy:
-    enabled: false  # Disabled - using HTTPRoute timeouts instead
-    timeout:
-      # Connection idle timeout - how long to keep idle connections open
-      # connectionIdleTimeout: "300s"
 
   # NGINX Gateway SnippetsPolicy for proxy timeout tuning
   snippetsPolicy:

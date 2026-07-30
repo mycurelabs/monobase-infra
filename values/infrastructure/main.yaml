@@ -46,12 +46,8 @@ certManagerIssuers:
           - localfirsthealth.com
           - mycure.md
 
-# Envoy Gateway - Gateway API implementation
-envoyGateway:
-  enabled: true
-  version: v1.2.0
-
-# NGINX Gateway Fabric - Staging test (alongside Envoy Gateway)
+# NGINX Gateway Fabric - primary Gateway API implementation
+# (Envoy Gateway was torn down — see git history)
 nginxGateway:
   enabled: true
   version: "2.4.1"
@@ -180,124 +176,16 @@ nginxGatewayResources:
           value: |
             js_header_filter securityHeaders.clearServer;
 
-# EnvoyProxy Configuration - Cloud-specific LoadBalancer settings
-envoyProxyConfig:
-  enabled: false  # Override per deployment
-  name: custom-proxy-config
-  namespace: envoy-gateway-system
-  serviceAnnotations: true
-  cloudProvider: none
-
-  azure:
-    publicIpName: ""
-    resourceGroup: ""
-    ipv4Address: ""
-
-  aws:
-    eipAllocations: ""
-
-  gcp:
-    staticIpAddress: ""
-
-  digitalocean:
-    loadBalancerId: ""
-    loadBalancerName: ""
-
-  customAnnotations: {}
-
-# Gateway Resources - Shared Gateway configuration
+# Gateway metadata consumed by the grafana/signoz Application templates
+# (route hostname + parentRef derivation only). Both routes are disabled today
+# — grafana is admin port-forward, signoz is off — so these values are inert;
+# if either route is re-enabled it attaches to the nginx shared-gateway.
+# Envoy Gateway (the old shared-gateway / gateway-system) was torn down.
 gateway:
-  # Base domain for gateway (override per deployment)
   domain: mycureapp.com
-
-  # Gateway configuration
   gateway:
-    name: shared-gateway
-    namespace: gateway-system
-    gatewayClassName: envoy-gateway
-    listeners:
-      https:
-        enabled: true
-        port: 443
-        protocol: HTTPS
-        # hostname automatically derived from gateway.domain as *.mycureapp.com
-      http:
-        enabled: true
-        port: 80
-        protocol: HTTP
-        # hostname automatically derived from gateway.domain as *.mycureapp.com
-    # Additional listeners for localfirsthealth.com domains
-    additionalListeners:
-      # Production localfirsthealth.com
-      - name: https-lfh
-        port: 443
-        protocol: HTTPS
-        hostname: "*.localfirsthealth.com"
-      - name: http-lfh
-        port: 80
-        protocol: HTTP
-        hostname: "*.localfirsthealth.com"
-      # Removed: *.mycure.md and *.stg.mycure.md envoy listeners.
-      # These were unused — every mycure.md HTTPRoute attaches to
-      # nginx-shared-gateway (different gateway, different cert), and
-      # the gateway-tls certificate doesn't include the *.mycure.md
-      # wildcards, so envoy reported InvalidCertificateRef and the
-      # listeners stayed Programmed=False, dragging gateway-resources
-      # to Degraded health in ArgoCD. (See `kubectl get httproutes -A` —
-      # only monitoring/grafana attaches to envoy shared-gateway.)
-
-  # TLS/Certificate configuration
-  tls:
-    enabled: true
-    secretName: gateway-tls
-    certManager:
-      enabled: true  # Enabled: DNS records exist, ready for certificate provisioning
-      clusterIssuer: letsencrypt-mycure-cloudflare-prod  # DNS-01 challenge (HTTP-01 broken in Envoy Gateway v1.2.0)
-      includeApex: false  # Wildcard listeners don't match apex domain
-      # Specific subdomains for HTTP-01 challenge
-      subdomains:
-        # Production subdomains
-        - grafana
-        - api
-        - web
-        - sync
-        - storage
-        - dentalemon
-        - hapihub
-        - mycure
-        - mycurev8
-      # Additional domains for localfirsthealth.com
-      additionalDomains:
-        # Production localfirsthealth.com
-        - dentalemon-myaccount.localfirsthealth.com
-        - dentalemon-website.localfirsthealth.com
-        - grafana.localfirsthealth.com
-        - hapihub.localfirsthealth.com
-        - mycure-myaccount.localfirsthealth.com
-        - mycure.localfirsthealth.com
-        - mycurelocal.localfirsthealth.com
-        - mycurev8.localfirsthealth.com
-        - sync.localfirsthealth.com
-        # *.mycure.md removed: the envoy shared-gateway no longer has
-        # mycure.md listeners (see additionalListeners above), and the
-        # cert-manager Cloudflare DNS-01 issuer cannot resolve the mycure.md
-        # zone in this account. The real *.mycure.md routes terminate TLS on
-        # nginx-shared-gateway using a separate nginx-gateway-tls-prod-mycure cert.
-
-  # HTTP to HTTPS redirect
-  httpRedirect:
-    enabled: false  # Disabled: wildcard redirect incompatible with HTTP-01
-    statusCode: 301
-
-  # EnvoyPatchPolicy - Increase max request headers size
-  # Fixes HTTP 431 "Request Header Fields Too Large" errors
-  envoyPatchPolicy:
-    enabled: true
-    maxRequestHeadersKb: 96  # Default 60, max 96
-    listeners:
-      - https
-      - https-lfh
-      - https-mycure
+    name: nginx-shared-gateway
+    namespace: nginx-gateway-system
 
 # External Secrets - Secret management
 externalSecrets:

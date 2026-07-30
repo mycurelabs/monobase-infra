@@ -1,5 +1,5 @@
 # Allow Traffic from Gateway to Applications
-# Permits Envoy Gateway and NGINX Gateway to route traffic to Monobase API, API Worker, Monobase Account
+# Permits NGINX Gateway to route traffic to Monobase API, API Worker, Monobase Account
 
 ---
 # Allow Gateway → Monobase API
@@ -19,11 +19,8 @@ spec:
     - Ingress
 
   ingress:
-    # Allow from Gateway namespaces (Envoy Gateway + NGINX Gateway)
+    # Allow from Gateway namespace (NGINX Gateway Fabric)
     - from:
-        - namespaceSelector:
-            matchLabels:
-              kubernetes.io/metadata.name: envoy-gateway-system
         - namespaceSelector:
             matchLabels:
               kubernetes.io/metadata.name: nginx-gateway-system
@@ -52,9 +49,6 @@ spec:
     - from:
         - namespaceSelector:
             matchLabels:
-              kubernetes.io/metadata.name: envoy-gateway-system
-        - namespaceSelector:
-            matchLabels:
               kubernetes.io/metadata.name: nginx-gateway-system
       ports:
         - protocol: TCP
@@ -79,9 +73,6 @@ spec:
 
   ingress:
     - from:
-        - namespaceSelector:
-            matchLabels:
-              kubernetes.io/metadata.name: envoy-gateway-system
         - namespaceSelector:
             matchLabels:
               kubernetes.io/metadata.name: nginx-gateway-system
@@ -110,9 +101,6 @@ spec:
     - from:
         - namespaceSelector:
             matchLabels:
-              kubernetes.io/metadata.name: envoy-gateway-system
-        - namespaceSelector:
-            matchLabels:
               kubernetes.io/metadata.name: nginx-gateway-system
       ports:
         - protocol: TCP
@@ -137,9 +125,6 @@ spec:
 
   ingress:
     - from:
-        - namespaceSelector:
-            matchLabels:
-              kubernetes.io/metadata.name: envoy-gateway-system
         - namespaceSelector:
             matchLabels:
               kubernetes.io/metadata.name: nginx-gateway-system
@@ -168,9 +153,6 @@ spec:
     - from:
         - namespaceSelector:
             matchLabels:
-              kubernetes.io/metadata.name: envoy-gateway-system
-        - namespaceSelector:
-            matchLabels:
               kubernetes.io/metadata.name: nginx-gateway-system
       ports:
         - protocol: TCP
@@ -178,8 +160,7 @@ spec:
 
 ---
 # Notes:
-# 1. Envoy Gateway pods run in envoy-gateway-system namespace
-# 2. NGINX Gateway Fabric pods run in nginx-gateway-system namespace
-# 3. This allows ONLY gateway proxies to reach applications
-# 4. Direct pod-to-pod traffic is still blocked
-# 5. Applications can't reach each other (use allow-apps-to-apps.yaml if needed)
+# 1. NGINX Gateway Fabric pods run in nginx-gateway-system namespace
+# 2. This allows ONLY gateway proxies to reach applications
+# 3. Direct pod-to-pod traffic is still blocked
+# 4. Applications can't reach each other (use allow-apps-to-apps.yaml if needed)
