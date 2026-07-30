@@ -1807,12 +1807,11 @@ cade:
   gateway:
     # The preprod wildcard listener (*.preprod.localfirsthealth.com) on the shared gateway.
     sectionName: https-preprod-lfh
-    # Re-domain to cadence.preprod (#2727), reclaiming the domain freed by retiring cadence v1.
-    # Dual-served during the box cutover: existing boxes keep discovering via cade.preprod while
-    # rebuilt boxes use cadence.preprod (SEED_URL). Drop cade.preprod once the fleet is re-onboarded.
+    # Re-domained to cadence.preprod (#2727), reclaiming the domain freed by retiring cadence v1.
+    # Cutover complete — boxes discover the hub via cadence.preprod (single-URL onboarding, from the AS
+    # metadata's cadence_seed_url); the legacy cade.preprod hostname is dropped.
     hostnames:
       - cadence.preprod.localfirsthealth.com
-      - cade.preprod.localfirsthealth.com
 
 # cadence-v2 issuer — mints grants + serves JWKS (in-cluster for the hub, HTTPS for external boxes).
 cadenceIssuer:
