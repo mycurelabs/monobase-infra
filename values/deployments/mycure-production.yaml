@@ -179,7 +179,7 @@ mycure-pxp:
 
 # ===== HEALTHCARE: HapiHub API =====
 hapihub:
-  enabled: true
+  enabled: false  # v8 retired 2026-07-30 (#2295) — data archived on niflheim (infra#139)
 
   image:
     repository: ghcr.io/mycurelabs/hapihub
@@ -1091,7 +1091,7 @@ postgresql:
 
 # ===== DATABASE: MongoDB =====
 mongodb:
-  enabled: true # Self-hosted MongoDB in Kubernetes
+  enabled: false # v8 Mongo retired 2026-07-30 (#2295); PVCs kept as fallback, delete after grace period
 
   fullnameOverride: "mongodb"
 
