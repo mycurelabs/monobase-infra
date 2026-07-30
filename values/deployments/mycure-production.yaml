@@ -734,7 +734,7 @@ dentalemon-myaccount:
 
 # ===== HEALTHCARE: MyCure DeployDash Application =====
 mycure-deploydash:
-  enabled: true
+  enabled: false   # retired 2026-07-30, replaced by mycure-dashboard
 
   image:
     repository: ghcr.io/mycurelabs/deploydash
