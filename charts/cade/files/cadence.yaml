@@ -53,8 +53,10 @@ tuning:
 sync:
   routable:
     - org
+    - fam
   resolve_via:
     - [user, organization_members, org]
+    - [famsrc, organizations, fam]
   collections:
     - name: account_configurations
       tags:
@@ -218,6 +220,7 @@ sync:
     - name: medical_patients
       tags:
         - { ty: org, field: facility }
+        - { ty: famsrc, field: facility }
     - name: medical_records
       tags:
         - { ty: org, field: facility }
@@ -246,10 +249,13 @@ sync:
     - name: organizations
       tags:
         - { ty: org, field: id }
+        - { ty: fam, field: cluster }
+      edge: { from: id, to: cluster }
     - name: personal_details
       tags:
         - { ty: org, field: facility }
         - { ty: user, field: id }
+        - { ty: famsrc, field: facility }
     - name: personal_details_history
       tags:
         - { ty: org, field: facility }
