@@ -734,7 +734,7 @@ dentalemon-myaccount:
 
 # ===== HEALTHCARE: Frontend Application (v8 Legacy) =====
 mycurev8:
-  enabled: true  # 2026-06-29: internal-only via private host (below)
+  enabled: false  # 2026-06-29: internal-only via private host (below)  # retired 2026-07-30 (#2295): legacy v8 UI, cut over to v11
 
   image:
     repository: ghcr.io/mycurelabs/mycureapp
