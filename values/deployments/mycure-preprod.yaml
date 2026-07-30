@@ -1771,7 +1771,7 @@ cade:
   # Integrated model (promote cade-v2 to be preprod's cadence, #2727): watch the LIVE hapihub app DB
   # instead of the isolated cadence_v2 seed, so live cloud writes capture + sync to boxes (matches prod's
   # legacy cadence, which watches hapihub). cade installs cadence_* side-tables + capture triggers on the
-  # live tables at startup and baselines existing rows. The cadence-issuer keeps its own cadence_v2 state.
+  # live tables at startup and baselines existing rows.
   postgresql:
     auth:
       database: hapihub
@@ -1783,16 +1783,26 @@ cade:
     # metadata's cadence_seed_url); the legacy cade.preprod hostname is dropped.
     hostnames:
       - cadence.preprod.localfirsthealth.com
+  # Runtime grant verification: hapihub is the AS (#2727). Env-driven (not baked into cadence.yaml). The
+  # hub verifies box grants AND its own '*' grant against hapihub's JWKS (all share the cadence-issuer key).
+  auth:
+    issuerUrl: https://hapihub.preprod.localfirsthealth.com
+    grantJwksUri: https://hapihub.preprod.localfirsthealth.com/.well-known/jwks.json
+    fleetId: mycure-preprod
+  # Boot-time '*' self-mint (replaces the standalone cadence-issuer): a co-located one-shot issuer signs
+  # the hub grant with the shared key. iss/kid MUST match hapihub's so it verifies against hapihub's JWKS.
+  mint:
+    iss: cadence-preprod-issuer
+    kid: k1
+  # The shared EdDSA signing key (same GCP secret the standalone issuer used) → secret cade-secrets.
+  externalSecrets:
+    enabled: true
+    secretStore: gcp-secretstore
+    secretStoreKind: ClusterSecretStore
+    refreshInterval: 1h
+    secrets:
+      - secretKey: issuer-key
+        remoteKey: mycure-preprod-cadence-issuer-key
 
-# cadence-v2 issuer — mints grants + serves JWKS (in-cluster for the hub, HTTPS for external boxes).
-cadenceIssuer:
-  enabled: true
-  image:
-    repository: ghcr.io/mycurelabs/cadence
-    tag: "2.0.10" # feat/cadence-v2 OAuth AS + glibc-fix (#2727)
-    pullPolicy: IfNotPresent
-  iss: cadence-preprod-issuer
-  fleetId: mycure-preprod
-  nodePool: "staging"
-  gateway:
-    sectionName: https-preprod-lfh
+# cadence-v2 issuer RETIRED (#2727): folded into the cade pod as a boot-time one-shot mint (see cade.mint
+# + the enroll initContainer). hapihub is the sole runtime AS. The standalone Deployment/Service/app is gone.
