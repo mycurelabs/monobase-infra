@@ -26,13 +26,30 @@ postgresql:
     username: postgres
     existingSecret: postgresql
 
-# In-cluster cadence-v2 issuer (charts/cadence-issuer). The initContainer enrols the hub against it, and
-# the hub verifies grants against its JWKS. Keep iss/fleet in lockstep with cadence.yaml + the issuer.
-issuer:
-  serviceName: cadence-issuer
-  port: 9500
+# Runtime grant verification — env-driven per env (the deployment sets CADENCE_ISSUER_URL /
+# CADENCE_GRANT_JWKS_URI / CADENCE_FLEET_ID from these; env wins over the mounted cadence.yaml, so these
+# env-specific URLs are NOT baked into files/cadence.yaml). The AS (hapihub) whose JWKS verifies BOTH box
+# grants and the hub's own '*' grant — all signed with one shared key.
+auth:
+  issuerUrl: ""       # e.g. https://hapihub.<env>.localfirsthealth.com (RFC 8414 → iss + jwks_uri)
+  grantJwksUri: ""    # e.g. https://hapihub.<env>.localfirsthealth.com/.well-known/jwks.json (advertised in bootstrap doc)
+  fleetId: ""         # required `aud`, e.g. mycure-preprod
+
+# Boot-time self-mint of the hub's '*' grant: the enroll initContainer runs a co-located, one-shot
+# `cadence issuer serve` on loopback and authorizes '*' against it — no standalone issuer service. iss/kid
+# MUST match the AS (auth) so the minted grant verifies against its JWKS; fleetId reuses auth.fleetId.
+mint:
   iss: cadence-preprod-issuer
-  fleetId: mycure-preprod
+  kid: k1
+
+# Shared EdDSA signing key for the boot-time mint (the same GCP secret the standalone issuer used) →
+# k8s secret `cade-secrets` key `issuer-key`, exposed as CADENCE_ISSUER_KEY to the enroll initContainer.
+externalSecrets:
+  enabled: false
+  secretStore: gcp-secretstore
+  secretStoreKind: ClusterSecretStore
+  refreshInterval: 1h
+  secrets: []
 
 service:
   type: ClusterIP

@@ -1,6 +1,0 @@
-apiVersion: v2
-name: cadence-issuer
-description: cadence-v2 issuer — mints JWT capability grants (proof-of-possession enrollment) and serves the JWKS the fleet verifies against. The built-in reference issuer (docs/auth.md).
-type: application
-version: 2.0.1
-appVersion: "2.0.1"

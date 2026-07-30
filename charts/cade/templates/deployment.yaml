@@ -1,7 +1,6 @@
 {{- if .Values.enabled }}
 {{- $pgHost := printf "%s.%s.svc.cluster.local" (.Values.postgresql.serviceName | default "postgresql") (include "cade.namespace" .) -}}
 {{- $db := printf "postgres://%s:$(PGPASS)@%s:%v/%s" (include "cade.postgresql.username" .) $pgHost (.Values.postgresql.port | default 5432) (include "cade.postgresql.database" .) -}}
-{{- $issuerUrl := printf "http://%s:%v" (.Values.issuer.serviceName | default "cadence-issuer") (.Values.issuer.port | default 9500) -}}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -30,8 +29,10 @@ spec:
         runAsUser: 65532
         seccompProfile:
           type: RuntimeDefault
-      # Enrol the hub against the issuer and persist its "*" grant into cadence_v2 BEFORE the engine starts
-      # (`cadence run` fail-closes without a grant). Retries until the issuer + DB are reachable.
+      # Mint the hub's "*" grant into the DB BEFORE the engine starts (`cadence run` fail-closes without a
+      # grant). No standalone issuer service: a co-located, one-shot `cadence issuer serve` on loopback signs
+      # the grant with the SHARED key (CADENCE_ISSUER_KEY), then dies with this init container. Runtime grant
+      # VERIFICATION is against the real AS (hapihub) via CADENCE_ISSUER_URL on the main container.
       initContainers:
       - name: enroll
         image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
@@ -45,11 +46,16 @@ spec:
         args:
           - |
             set -u
-            # cadence 2.x is OAuth-only (the legacy `issuer enroll` + `auth login --code` path was removed):
-            # authorize directly against the issuer's dev-approve AS for the "*" scope (PKCE + DPoP → grant).
-            until cadence auth login --db "$CADENCE_DB" --issuer-url "$ISSUER_URL" --scope '*'; do
-              echo "waiting for issuer ($ISSUER_URL) + cadence_v2 DB…"; sleep 3
+            # Start an ephemeral dev-approve AS on loopback (jti audit → throwaway SQLite in /work; codes are
+            # in-memory) signing with the shared key, then authorize '*' against it (PKCE + DPoP → grant).
+            CADENCE_ISSUER_DB="sqlite:///work/issuer.db" \
+              cadence issuer serve --iss "$ISS" --fleet-id "$FLEET_ID" --kid "$KID" \
+                --addr 127.0.0.1:9500 --public-url http://127.0.0.1:9500 &
+            ISS_PID=$!
+            until cadence auth login --db "$CADENCE_DB" --issuer-url http://127.0.0.1:9500 --scope '*'; do
+              echo "waiting for local issuer + cadence_v2 DB…"; sleep 3
             done
+            kill "$ISS_PID" 2>/dev/null || true
             echo "hub authorized — '*' grant persisted"
         env:
         - name: PGPASS
@@ -59,8 +65,24 @@ spec:
               key: postgres-password
         - name: CADENCE_DB
           value: {{ $db | quote }}
-        - name: ISSUER_URL
-          value: {{ $issuerUrl | quote }}
+        - name: HOME
+          value: /work
+        - name: TMPDIR
+          value: /work
+        - name: CADENCE_ISSUER_KEY
+          valueFrom:
+            secretKeyRef:
+              name: cade-secrets
+              key: issuer-key
+        - name: ISS
+          value: {{ .Values.mint.iss | quote }}
+        - name: FLEET_ID
+          value: {{ .Values.auth.fleetId | quote }}
+        - name: KID
+          value: {{ .Values.mint.kid | quote }}
+        volumeMounts:
+        - name: work
+          mountPath: /work
       containers:
       - name: cade
         image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
@@ -81,6 +103,14 @@ spec:
               key: postgres-password
         - name: CADENCE_DB
           value: {{ $db | quote }}
+        # Runtime grant verification — env-driven (env wins over the mounted cadence.yaml). The AS (hapihub)
+        # whose JWKS verifies box grants AND the hub's own '*' grant (all signed with the shared key).
+        - name: CADENCE_ISSUER_URL
+          value: {{ .Values.auth.issuerUrl | quote }}
+        - name: CADENCE_GRANT_JWKS_URI
+          value: {{ .Values.auth.grantJwksUri | quote }}
+        - name: CADENCE_FLEET_ID
+          value: {{ .Values.auth.fleetId | quote }}
         - name: RUST_LOG
           value: "cadence=info,warn"
         - name: CADENCE_LOG_FORMAT
@@ -119,6 +149,9 @@ spec:
       - name: config
         configMap:
           name: cade-config
+      # Writable scratch for the enroll initContainer's ephemeral issuer SQLite (readOnlyRootFilesystem).
+      - name: work
+        emptyDir: {}
       {{- if .Values.nodePool }}
       nodeSelector:
         node-pool: {{ .Values.nodePool }}
