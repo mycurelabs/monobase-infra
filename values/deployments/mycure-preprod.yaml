@@ -188,7 +188,7 @@ hapihub:
 
   image:
     repository: ghcr.io/mycurelabs/hapihub
-    tag: "11.20.79" # feat/cadence-v2: overlorded orgs route to overlord's fam:<cluster> (#2727)
+    tag: "11.20.80" # feat/cadence-v2: overlorded orgs route to overlord's fam:<cluster> (#2727)
     pullPolicy: IfNotPresent
 
   # Valkey response cache (mono#2231) — preprod is the pilot environment.
@@ -360,7 +360,7 @@ mycure:
 
   image:
     repository: ghcr.io/mycurelabs/mycureapp
-    tag: "10.25.107" # feat/cadence-v2: /oauth/authorize consent page for cadence box onboarding (#2727)
+    tag: "10.25.108" # feat/cadence-v2: /oauth/authorize consent page for cadence box onboarding (#2727)
     pullPolicy: IfNotPresent
 
   replicaCount: 1
