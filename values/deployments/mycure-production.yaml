@@ -1951,12 +1951,12 @@ cadence:
       # 2026-07-24: dedicated least-privilege role (Tier-2 PG guardrail).
       # CONNECTION LIMIT 50 (of 300) + role statement_timeout=30s so cadence
       # can never starve hapihub of connections or hold long queries. Password
-      # from GCP SM via the externalSecrets block → secret `cadence-secrets`.
+      # from GCP SM via the externalSecrets block → secret `cadence-legacy-secrets`.
       username: cadence
-      existingSecret: cadence-secrets
+      existingSecret: cadence-legacy-secrets
 
   # Tier-2: sync the `cadence` DB-role password from GCP Secret Manager.
-  # Produces secret `cadence-secrets` (key `postgres-password`) that the
+  # Produces secret `cadence-legacy-secrets` (key `postgres-password`) that the
   # postgresql.auth.existingSecret above consumes for BOTH the primary and
   # pg-changelog DSNs (identical → single 32-conn pool).
   externalSecrets:
