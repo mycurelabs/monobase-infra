@@ -1355,7 +1355,10 @@ cadence:
   serviceMonitor:
     enabled: true
   # Watch the LIVE hapihub app DB (not an isolated cadence DB), matching preprod + the legacy cadence.
+  # Prod's writer service is `postgresql-primary` (preprod's is the default `postgresql`); cadence WRITES
+  # (side-tables + capture) so it must target the primary, not a read replica.
   postgresql:
+    serviceName: postgresql-primary
     auth:
       database: hapihub
   gateway:
