@@ -720,60 +720,6 @@ dentalemon:
   podDisruptionBudget:
     enabled: false
 
-# ===== HEALTHCARE: SyncD Real-time Synchronization =====
-syncd:
-  enabled: false
-
-  image:
-    repository: ghcr.io/mycurelabs/syncd
-    tag: "5.130.36"
-    pullPolicy: IfNotPresent
-
-  replicaCount: 1
-
-  resources:
-    requests:
-      cpu: 250m
-      memory: 384Mi
-    limits:
-      cpu: "2"
-      memory: 4Gi
-
-  gateway:
-    hostname: ""
-    sectionName: https-preprod-lfh
-
-  livenessProbe:
-    enabled: true
-
-  readinessProbe:
-    enabled: true
-
-  podDisruptionBudget:
-    enabled: false
-
-  autoscaling:
-    enabled: true
-    minReplicas: 2
-    maxReplicas: 3
-
-  externalSecrets:
-    enabled: true
-    secretStore: gcp-secretstore
-    secretStoreKind: ClusterSecretStore
-    refreshInterval: 1h
-    secrets:
-      - secretKey: ENC_BILLING_INVOICES
-        remoteKey: mycure-production-enc-billing-invoices
-      - secretKey: ENC_BILLING_ITEMS
-        remoteKey: mycure-production-enc-billing-items
-      - secretKey: ENC_BILLING_PAYMENTS
-        remoteKey: mycure-production-enc-billing-payments
-      - secretKey: ENC_MEDICAL_RECORDS
-        remoteKey: mycure-production-enc-medical-records
-      - secretKey: ENC_PERSONAL_DETAILS
-        remoteKey: mycure-production-enc-personal-details
-
 # ===== LEGACY: MyCure v8 (disabled, stub required by chart template) =====
 mycurev8:
   enabled: false

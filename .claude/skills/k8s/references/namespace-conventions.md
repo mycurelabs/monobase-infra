@@ -10,7 +10,7 @@ Examples:
 - `mycure-staging` — MyCure staging environment
 
 Each tenant namespace contains:
-- Application deployments (hapihub, mycure, syncd, etc.)
+- Application deployments (hapihub, mycure, cadence, etc.)
 - Database StatefulSets (MongoDB, PostgreSQL)
 - Cache (Valkey/Redis)
 - Object storage (MinIO)
@@ -49,7 +49,7 @@ Each tenant namespace contains:
 A typical tenant namespace (`mycure-production`) contains:
 
 **Applications:**
-- Deployments: hapihub, mycure, mycurelocal, mycurev8, mycure-myaccount, dentalemon, dentalemon-myaccount, dentalemon-website, syncd, api, account
+- Deployments: hapihub, mycure, mycurelocal, mycurev8, mycure-myaccount, dentalemon, dentalemon-myaccount, dentalemon-website, api, account
 - Each with: Service, HTTPRoute, ConfigMap
 
 **Data stores:**
@@ -65,7 +65,7 @@ A typical tenant namespace (`mycure-production`) contains:
 - NetworkPolicies (if security-baseline chart enabled)
 
 **Scaling & Reliability:**
-- HorizontalPodAutoscalers (hapihub, syncd)
+- HorizontalPodAutoscalers (hapihub)
 - PodDisruptionBudgets (when enabled)
 
 ## Creating a New Namespace

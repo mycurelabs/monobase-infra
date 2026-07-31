@@ -113,7 +113,7 @@ helm history hapihub -n mycure-production
 
 ## Chart Categories
 
-### Healthcare Applications (10)
+### Healthcare Applications (9)
 - `hapihub` — HapiHub API (Bun/MongoDB, healthcare backend)
 - `mycure` — MyCure frontend (Vue.js patient app)
 - `mycurelocal` — MyCure Local (local-first variant)
@@ -122,7 +122,6 @@ helm history hapihub -n mycure-production
 - `dentalemon` — DentaLemon dental app
 - `dentalemon-myaccount` — DentaLemon account portal
 - `dentalemon-website` — DentaLemon marketing site
-- `syncd` — SyncD real-time synchronization (WebSocket/Bun/MongoDB)
 
 ### Core Services (2)
 - `api` — Monobase API (Hono/Bun backend)

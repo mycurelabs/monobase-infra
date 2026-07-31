@@ -374,8 +374,6 @@ dentalemon-website:
   enabled: false
 dentalemon:
   enabled: false
-syncd:
-  enabled: false
 mycurev8:
   enabled: false
 mongodb:

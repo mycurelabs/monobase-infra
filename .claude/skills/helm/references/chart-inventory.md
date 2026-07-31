@@ -11,13 +11,6 @@
 - **Dependencies**: MongoDB (bitnami subchart), optional Valkey, optional MinIO, optional Mailpit
 - **Reference implementation** — most complete chart with all patterns
 
-### syncd
-- **Purpose**: SyncD — Real-time synchronization service (WebSocket)
-- **Runtime**: Bun
-- **Database**: MongoDB (shared with hapihub)
-- **Key values**: `image.tag`, `replicaCount`, `gateway.hostname`, `gateway.sectionName`, `externalSecrets`, `mongodb`, `autoscaling`
-- **Templates**: deployment, service, httproute, externalsecret, hpa, pdb
-
 ### mycure
 - **Purpose**: MyCure — Patient-facing healthcare frontend
 - **Runtime**: Vue.js (static serving)

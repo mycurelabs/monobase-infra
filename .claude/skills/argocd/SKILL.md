@@ -166,7 +166,6 @@ ApplicationSet (monobase-auto-discover)
         ├── namespace chart
         ├── hapihub chart
         ├── mycure chart
-        ├── syncd chart
         ├── mongodb (bitnami subchart)
         └── ... (all enabled charts)
 

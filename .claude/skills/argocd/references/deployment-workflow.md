@@ -116,7 +116,7 @@ ArgoCD Application (mycure-production-root)
   ↓ (Helm rendering with these values)
 argocd/applications/ templates
   ↓ (creates per-chart ArgoCD Applications)
-Individual chart deployments (hapihub, mycure, syncd, etc.)
+Individual chart deployments (hapihub, mycure, cadence, etc.)
   ↓ (each chart reads global + its section from values)
 Kubernetes resources (Deployments, Services, HTTPRoutes, etc.)
 ```
@@ -126,7 +126,7 @@ Kubernetes resources (Deployments, Services, HTTPRoutes, etc.)
 ### Production
 - `global.environment: production`
 - `global.nodePool: "production"`
-- HPA enabled for hapihub and syncd
+- HPA enabled for hapihub
 - ExternalSecrets enabled (full secret set)
 - Higher resource limits
 - `gateway.sectionName: https-lfh`
