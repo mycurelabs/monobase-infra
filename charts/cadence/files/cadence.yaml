@@ -184,6 +184,7 @@ sync:
     - name: inventory_configurations
       tags:
         - { ty: org, field: organization }
+        - { ty: famsrc, field: organization }
     - name: inventory_products
       tags:
         - { ty: org, field: warehouse }
@@ -199,6 +200,7 @@ sync:
     - name: inventory_suppliers
       tags:
         - { ty: org, field: warehouse }
+        - { ty: famsrc, field: warehouse }
     - name: inventory_trackers
       tags:
         - { ty: org, field: organization }
@@ -211,6 +213,7 @@ sync:
     - name: inventory_variants
       tags:
         - { ty: org, field: warehouse }
+        - { ty: famsrc, field: warehouse }
     - name: license_licenses
       tags:
         - { ty: org, field: organization }
@@ -224,9 +227,11 @@ sync:
     - name: medical_records
       tags:
         - { ty: org, field: facility }
+        - { ty: famsrc, field: facility }
     - name: medical_records_history
       tags:
         - { ty: org, field: facility }
+        - { ty: famsrc, field: facility }
     - name: medicine_configurations
       tags:
         - { ty: org, field: organization }
