@@ -1059,11 +1059,13 @@ cadence:
   enabled: true
   image:
     repository: ghcr.io/mycurelabs/cadence
-    tag: "2.0.23" # capture-broadcast choke fix (#2832)
+    tag: "2.0.24" # custom-relay: advertise relay_url in bootstrap doc (#2844/#2845)
     pullPolicy: IfNotPresent
   udpPort: 6472
   # udp-gateway LB IP — the anchor advertises this so peers connect by EndpointId alone.
   publicAddr: "165.245.145.61:6472"
+  # Home on the self-hosted relay + advertise it to boxes (hard-NAT boxes ride it instead of n0's public relay).
+  relayUrl: "https://cadence-relay.preprod.localfirsthealth.com"
   nodePool: "staging"
   # Scrape the OpenMetrics /metrics endpoint into Prometheus (reconcile timing/throughput, connect
   # failures, schema drift, reconcile_active, RSS, dirty_depth) — #2727 observability.

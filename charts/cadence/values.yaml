@@ -15,6 +15,10 @@ apiPort: 9464
 # EndpointId alone. Must match `public_addr` in the mounted cadence.yaml.
 publicAddr: "165.245.145.61:6472"
 
+# Self-hosted relay URL. Set per-env to point the anchor (and, via the bootstrap doc, hard-NAT boxes) at
+# the cadence-relay LB instead of n0's public relays. Empty ⇒ n0 relays (RelayMode::custom off).
+relayUrl: ""
+
 # Isolated cadence_v2 database (the v2 hub anchors here — legacy cadence is untouched). The PG password
 # comes from the existing Bitnami `postgresql` k8s secret (postgres-password); the URL is assembled from
 # CADENCE_DB in the deployment.
