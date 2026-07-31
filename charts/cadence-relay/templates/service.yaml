@@ -27,4 +27,9 @@ spec:
     port: {{ .Values.externalHttpsPort }}
     targetPort: {{ .Values.httpsBindPort }}
     protocol: TCP
+  # QUIC address-discovery (same LB IP so it resolves to the relay hostname). 7842 > 1024 → bind == expose.
+  - name: quic
+    port: {{ .Values.quicPort }}
+    targetPort: {{ .Values.quicPort }}
+    protocol: UDP
 {{- end }}

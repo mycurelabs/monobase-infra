@@ -15,11 +15,13 @@ spec:
     - Ingress
     - Egress
   ingress:
-    # Allow the LoadBalancer/world to reach the relay's HTTPS listener (any source — boxes connect from
-    # the internet). kubelet probes hit the same port.
+    # Allow the LoadBalancer/world to reach the relay's HTTPS listener + QUIC addr-discovery (any source —
+    # boxes connect from the internet). kubelet probes hit the HTTPS port.
     - ports:
         - protocol: TCP
           port: {{ .Values.httpsBindPort }}
+        - protocol: UDP
+          port: {{ .Values.quicPort }}
   egress:
     # Allow all egress (DNS + forwarding traffic between connected relay clients).
     - {}
