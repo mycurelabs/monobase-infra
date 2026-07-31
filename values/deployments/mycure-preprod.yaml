@@ -1049,7 +1049,7 @@ cadence:
   enabled: true
   image:
     repository: ghcr.io/mycurelabs/cadence
-    tag: "2.0.24" # TEST: anchor relay-fallback verification (fix/anchor-relay-fallback, draft #2840)
+    tag: "2.0.23" # capture-broadcast choke fix (#2832)
     pullPolicy: IfNotPresent
   udpPort: 6472
   # udp-gateway LB IP — the anchor advertises this so peers connect by EndpointId alone.
