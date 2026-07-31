@@ -97,6 +97,12 @@ spec:
           value: {{ .Values.auth.grantJwksUri | quote }}
         - name: CADENCE_FLEET_ID
           value: {{ .Values.auth.fleetId | quote }}
+        {{- if .Values.relayUrl }}
+        # Self-hosted relay: the anchor homes on it AND advertises it in the bootstrap doc so hard-NAT
+        # boxes adopt the same relay (shared-relay rendezvous). Unset ⇒ n0 relays.
+        - name: CADENCE_RELAY_URL
+          value: {{ .Values.relayUrl | quote }}
+        {{- end }}
         - name: RUST_LOG
           value: "cadence=info,warn"
         - name: CADENCE_LOG_FORMAT
