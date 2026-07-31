@@ -1147,7 +1147,7 @@ cadence:
     refreshInterval: 1h
     secrets:
       - secretKey: sa-api-key
-        remoteKey: mycure-preprod-cade-sa-api-key
+        remoteKey: mycure-preprod-cadence-sa-api-key
 
 # cadence-v2 issuer RETIRED (#2727): hapihub is the sole AS + minter. The hub enrolls its own '*' grant
 # against hapihub with a service-account API key (see the enroll initContainer). No standalone issuer.
