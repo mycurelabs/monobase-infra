@@ -53,9 +53,13 @@ tuning:
 sync:
   routable:
     - org
-    - fam
+    - fam                                    # per-cluster family topic (org neighborhood, e.g. clinic branches)
   resolve_via:
     - [user, organization_members, org]
+    # A patient's `facility` resolves to `fam:<clusterKey>` via the org's own `cluster`
+    # (= COALESCE(parent, id)), so a whole 2-level org family shares ONE topic. Only the
+    # collections carrying a `famsrc` tag (medical_patients, personal_details) fan across the
+    # family — everything else stays scoped to its single owning org (per-collection).
     - [famsrc, organizations, fam]
   collections:
     - name: account_configurations
@@ -184,24 +188,30 @@ sync:
     - name: inventory_configurations
       tags:
         - { ty: org, field: organization }
+        - { ty: famsrc, field: organization }   # + family topic: shared product-catalog config across the org family
     - name: inventory_products
       tags:
         - { ty: org, field: warehouse }
     - name: inventory_stock_configurations
       tags:
         - { ty: org, field: organization }
+        - { ty: org, field: warehouse }
     - name: inventory_stocks
       tags:
+        - { ty: org, field: organization }
         - { ty: org, field: warehouse }
     - name: inventory_stocks_history
       tags:
+        - { ty: org, field: organization }
         - { ty: org, field: warehouse }
     - name: inventory_suppliers
       tags:
         - { ty: org, field: warehouse }
+        - { ty: famsrc, field: warehouse }   # + family topic: shared supplier list across the org family
     - name: inventory_trackers
       tags:
         - { ty: org, field: organization }
+        - { ty: org, field: warehouse }
     - name: inventory_transactions
       tags:
         - { ty: org, field: warehouse }
@@ -211,6 +221,7 @@ sync:
     - name: inventory_variants
       tags:
         - { ty: org, field: warehouse }
+        - { ty: famsrc, field: warehouse }   # + family topic: shared product catalog across the org family
     - name: license_licenses
       tags:
         - { ty: org, field: organization }
@@ -220,13 +231,15 @@ sync:
     - name: medical_patients
       tags:
         - { ty: org, field: facility }
-        - { ty: famsrc, field: facility }
+        - { ty: famsrc, field: facility }   # + family topic: fan across the org neighborhood (per-collection)
     - name: medical_records
       tags:
         - { ty: org, field: facility }
+        - { ty: famsrc, field: facility }   # + family topic: a patient's records follow them across branches
     - name: medical_records_history
       tags:
         - { ty: org, field: facility }
+        - { ty: famsrc, field: facility }   # + family topic (alongside medical_records)
     - name: medicine_configurations
       tags:
         - { ty: org, field: organization }
@@ -249,13 +262,13 @@ sync:
     - name: organizations
       tags:
         - { ty: org, field: id }
-        - { ty: fam, field: cluster }
-      edge: { from: id, to: cluster }
+        - { ty: fam, field: cluster }         # org rows also ride the family topic, so every family box
+      edge: { from: id, to: cluster }         # holds the family's org rows to resolve famsrc -> fam:cluster.
     - name: personal_details
       tags:
         - { ty: org, field: facility }
         - { ty: user, field: id }
-        - { ty: famsrc, field: facility }
+        - { ty: famsrc, field: facility }   # + family topic (per-collection, alongside medical_patients)
     - name: personal_details_history
       tags:
         - { ty: org, field: facility }
