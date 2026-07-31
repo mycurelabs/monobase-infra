@@ -387,6 +387,12 @@ hapihubNext:
   gateway:
     hostnames:
       - hapihub-next.localfirsthealth.com
+      # Claim the retired v10 host wholesale — v10 hapihub is enabled:false since 2026-07-30 (#2295), its
+      # HTTPRoute pruned, so hapihub.localfirsthealth.com had no owner but the partial storageRoute forward.
+      # Routing ALL its paths to hapihub-next completes the v10→v11 migration AND fixes the cadence-v2 OAuth
+      # AS: token_endpoint/jwks_uri are minted from EXTERNAL_ADDRESS = this host (immutable = better-auth
+      # baseURL), so they now resolve to v11. Subsumes the storageRoute forward below (redundant; cleanup later).
+      - hapihub.localfirsthealth.com
     sectionName: https-lfh # Use localfirsthealth.com HTTPS listener
     # No additionalSectionNames: v11 is not on api.mycure.md yet. The
     # main hapihub release owns that hostname; Phase B can decide
