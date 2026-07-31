@@ -1,0 +1,6 @@
+apiVersion: v2
+name: cadence-relay
+description: Self-hosted iroh relay for cadence. Gives hard-NAT boxes (that can't holepunch a direct QUIC path to the anchor) a fast, controlled relay data-path instead of n0's far public relay. Stock n0 iroh-relay image; anchor + boxes point at it via cadence's RelayMode::custom (relay_url).
+type: application
+version: 0.1.0
+appVersion: "1.0.2"

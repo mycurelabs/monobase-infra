@@ -1040,6 +1040,16 @@ udpGateway:
   port: 6472
   healthPort: 6472
 
+# ===== cadence-relay — self-hosted iroh relay for hard-NAT boxes =====
+# Own LB + cert (cadence-relay.preprod.localfirsthealth.com). Anchor + boxes point at it via cadence
+# relay_url once it's verified up (option-a cutover window). Stock n0 relay image, pinned to iroh 1.0.2.
+cadenceRelay:
+  enabled: true
+  image:
+    repository: n0computer/iroh-relay
+    tag: "v1.0.2"
+  # hostname defaults to cadence-relay.{global.domain}; tls via letsencrypt-mycure-cloudflare-prod (DNS-01).
+
 # ===== cadence — iroh 1.0 P2P transport + registry (cadence v2 foundation) =====
 # The anchor node; reachability is provided by the infra udpGateway LB above (not an
 # app-owned Service). Image is on the cadence 2.x line (cadence = cadence v2).
