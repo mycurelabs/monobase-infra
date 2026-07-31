@@ -1082,6 +1082,17 @@ udpGateway:
   port: 6472
   healthPort: 6472
 
+# ===== cadence-relay — self-hosted iroh relay for hard-NAT boxes (prod) =====
+# Own LB + cert (cadence-relay.localfirsthealth.com) + QUIC addr-disc (7842/UDP) so the anchor can home on
+# it. Stands up idle; the anchor/box cutover to it (relayUrl + maestroapp our-relay-only) is a coordinated
+# fleet window. Proven on preprod 2026-07-31.
+cadenceRelay:
+  enabled: true
+  image:
+    repository: n0computer/iroh-relay
+    tag: "v1.0.2"
+  # hostname defaults to cadence-relay.{global.domain} = cadence-relay.localfirsthealth.com
+
 # ===== P2P SYNC: Cadence (LEGACY — retired-in-place) — Tier 4.4 =====
 # Config key renamed cadence → cadence-legacy so `cadence:` is free for cadence-v2.
 # Consumed by argocd/applications/templates/cadence-legacy.yaml via index (hyphenated key).
