@@ -1103,7 +1103,7 @@ cadence:
   enabled: true
   image:
     repository: ghcr.io/mycurelabs/cadence
-    tag: "2.0.21" # feat/cadence-v2: fam-scope records + inventory catalog manifest + reconcile_active metric (#2727)
+    tag: "2.0.23" # fix/cadence-v2: decouple capture drain from broadcast (a stalled neighbor can't freeze uploads) (#2832)
     pullPolicy: IfNotPresent
   udpPort: 6472
   # udp-gateway LB IP — the anchor advertises this so peers connect by EndpointId alone.
