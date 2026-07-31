@@ -1104,12 +1104,14 @@ cadence:
   enabled: true
   image:
     repository: ghcr.io/mycurelabs/cadence
-    tag: "2.0.23" # #2823 baseline-timeout + #2817 re-baseline + #2832 capture-broadcast choke (matches preprod)
-    pullPolicy: IfNotPresent
+    tag: "2.0.27" # option-a self-hosted relay: anchor homes on cadence-relay + advertises it (#2849)
+    pullPolicy: Always # relay cutover; also avoids stale node cache from any reused tag
   udpPort: 6472
   # udp-gateway DO LoadBalancer EXTERNAL-IP (provisioned via monobase-infra#172) — the anchor advertises
   # this so peers reach the hub directly by EndpointId.
   publicAddr: "137.184.250.197:6472"
+  # Home on the self-hosted relay + advertise it so boxes (maestroapp 2.0.28, our-relay-only) adopt it.
+  relayUrl: "https://cadence-relay.localfirsthealth.com"
   nodePool: "production"
   serviceMonitor:
     enabled: true
