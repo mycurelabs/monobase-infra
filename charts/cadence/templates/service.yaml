@@ -2,7 +2,7 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: cade
+  name: cadence
   namespace: {{ include "cadence.namespace" . }}
   labels:
     {{- include "cadence.labels" . | nindent 4 }}
