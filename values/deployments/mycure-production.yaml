@@ -408,9 +408,15 @@ hapihubNext:
       # /device-telemetry: maestroapp installs' sync-token iss + VITE_API_SERVER
       # both point at the v10 host, but the device-telemetry service lives only
       # on v11. v10 returns 404 for these paths, so forwarding is non-disruptive.
+      # /sync + /.well-known/jwks.json: the cadence-v2 OAuth AS metadata advertises
+      # its endpoints from EXTERNAL_ADDRESS (the v10 host, immutable = better-auth
+      # baseURL), so the hub enroll + box onboarding POST /sync/token + fetch jwks
+      # there → 404 without this forward. v10 serves neither → non-disruptive.
       paths:
         - /storage
         - /device-telemetry
+        - /sync
+        - /.well-known/jwks.json
 
   betterAuth:
     passkey:
