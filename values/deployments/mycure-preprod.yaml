@@ -1059,14 +1059,14 @@ cadence:
   enabled: true
   image:
     repository: ghcr.io/mycurelabs/cadence
-    tag: "2.0.25" # custom-relay (#2844/#2845); clean tag (2.0.24 mutated by choke-test build)
+    tag: "2.0.26" # option-b: anchor on our relay + n0 (#2848)
     pullPolicy: Always # tag was mutated once; Always avoids stale node cache
   udpPort: 6472
   # udp-gateway LB IP — the anchor advertises this so peers connect by EndpointId alone.
   publicAddr: "165.245.145.61:6472"
-  # relayUrl held empty: option-a (Custom REPLACES n0) breaks boxes still on n0 that can't be updated
-  # (preprod's manual-user alfheim). Needs option-b (anchor on our-relay AND n0) before re-enabling.
-  relayUrl: ""
+  # option-b (2.0.26): anchor homes on our relay AND keeps n0 defaults, so it advertises our relay to
+  # boxes yet stays reachable by boxes still on n0 (e.g. un-updatable alfheim) during the cutover.
+  relayUrl: "https://cadence-relay.preprod.localfirsthealth.com"
   nodePool: "staging"
   # Scrape the OpenMetrics /metrics endpoint into Prometheus (reconcile timing/throughput, connect
   # failures, schema drift, reconcile_active, RSS, dirty_depth) — #2727 observability.
