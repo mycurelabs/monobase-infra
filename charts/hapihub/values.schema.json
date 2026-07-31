@@ -89,20 +89,6 @@
         "secretStore": {"type": "string"},
         "refreshInterval": {"type": "string", "default": "1h"}
       }
-    },
-    "mongodb": {
-      "type": "object",
-      "properties": {
-        "enabled": {"type": "boolean", "default": true},
-        "replicaCount": {"type": "integer", "minimum": 1, "default": 3},
-        "persistence": {
-          "type": "object",
-          "properties": {
-            "enabled": {"type": "boolean", "default": true},
-            "size": {"type": "string", "pattern": "^[0-9]+Gi$"}
-          }
-        }
-      }
     }
   },
   "required": ["global", "enabled"]

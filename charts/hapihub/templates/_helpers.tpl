@@ -113,46 +113,6 @@ local-path
 {{- end }}
 
 {{/*
-MongoDB host - constructs hostname from MongoDB dependency
-Supports both standalone and replicaset architectures
-*/}}
-{{- define "hapihub.mongodb.host" -}}
-{{- $serviceName := .Values.mongodb.serviceName | default "mongodb" -}}
-{{- $namespace := include "hapihub.namespace" . -}}
-{{- $architecture := .Values.mongodb.architecture | default "replicaset" -}}
-{{- if eq $architecture "replicaset" -}}
-{{- printf "%s-headless.%s.svc.cluster.local" $serviceName $namespace -}}
-{{- else -}}
-{{- printf "%s.%s.svc.cluster.local" $serviceName $namespace -}}
-{{- end -}}
-{{- end }}
-
-{{/*
-MongoDB database name
-*/}}
-{{- define "hapihub.mongodb.database" -}}
-{{- .Values.mongodb.database | default "hapihub" -}}
-{{- end }}
-
-{{/*
-MongoDB username
-*/}}
-{{- define "hapihub.mongodb.username" -}}
-{{- .Values.mongodb.username | default "root" -}}
-{{- end }}
-
-{{/*
-MongoDB connection URL template (app must substitute password from MONGODB_PASSWORD env var)
-*/}}
-{{- define "hapihub.mongodb.connectionUrl" -}}
-{{- $host := include "hapihub.mongodb.host" . -}}
-{{- $database := include "hapihub.mongodb.database" . -}}
-{{- $username := include "hapihub.mongodb.username" . -}}
-{{- $replicaSet := .Values.mongodb.replicaSet | default "rs0" -}}
-mongodb://{{ $username }}@{{ $host }}:27017/{{ $database }}?replicaSet={{ $replicaSet }}
-{{- end }}
-
-{{/*
 PostgreSQL host - constructs hostname from PostgreSQL dependency
 Supports both standalone and replication architectures
 */}}
@@ -276,33 +236,6 @@ so a scheduled `hapihub backfill` boots with the identical environment.
   value: {{ .Values.service.targetPort | quote }}
 - name: PORT
   value: {{ .Values.service.targetPort | quote }}
-# MongoDB connection
-{{- if .Values.mongodb.external }}
-# External/managed MongoDB - MONGO_URI from ExternalSecrets
-- name: MONGO_URI
-  valueFrom:
-    secretKeyRef:
-      name: {{ include "hapihub.fullname" . }}-secrets
-      key: MONGO_URI
-{{- else if .Values.mongodb.enabled }}
-# In-cluster MongoDB - individual components
-- name: MONGODB_HOST
-  value: {{ include "hapihub.mongodb.host" . | quote }}
-- name: MONGODB_PORT
-  value: "27017"
-- name: MONGODB_DATABASE
-  value: {{ include "hapihub.mongodb.database" . | quote }}
-- name: MONGODB_USER
-  value: {{ include "hapihub.mongodb.username" . | quote }}
-- name: MONGODB_PASSWORD
-  valueFrom:
-    secretKeyRef:
-      name: mongodb
-      key: mongodb-root-password
-# MONGO_URI constructed from components using K8s variable expansion
-- name: MONGO_URI
-  value: "mongodb://$(MONGODB_USER):$(MONGODB_PASSWORD)@$(MONGODB_HOST):$(MONGODB_PORT)/$(MONGODB_DATABASE)?replicaSet={{ .Values.mongodb.replicaSet }}&directConnection=true&authSource=admin"
-{{- end }}
 # PostgreSQL connection (v11+)
 {{- if .Values.postgresql.enabled }}
 {{- if .Values.postgresql.external }}
@@ -503,15 +436,6 @@ so a scheduled `hapihub backfill` boots with the identical environment.
       name: {{ include "hapihub.fullname" . }}-secrets
       key: ENC_PERSONAL_DETAILS
       optional: true
-# MongoDB URI (fallback) - only if neither external nor in-cluster MongoDB configured
-{{- if and (not .Values.mongodb.external) (not .Values.mongodb.enabled) }}
-- name: MONGO_URI
-  valueFrom:
-    secretKeyRef:
-      name: {{ include "hapihub.fullname" . }}-secrets
-      key: MONGO_URI
-      optional: true
-{{- end }}
 # JWT/Auth keys
 - name: PRIVATE_KEY
   valueFrom:

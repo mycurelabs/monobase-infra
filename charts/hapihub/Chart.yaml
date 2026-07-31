@@ -8,7 +8,7 @@ keywords:
   - hapihub
   - healthcare
   - bun
-  - mongodb
+  - postgresql
 home: https://github.com/monobaselabs/monobase-infra
 sources:
   - https://github.com/monobaselabs/monobase
@@ -17,5 +17,5 @@ maintainers:
     email: devops@example.com
 
 # Dependencies managed via separate ArgoCD Applications
-# See: argocd/applications/ for MongoDB
+# See: argocd/applications/ for PostgreSQL
 # This is a pure application chart with no sub-charts

@@ -346,11 +346,6 @@ hapihub:
         remoteKey: mycure-production-enc-medical-records
       - secretKey: ENC_PERSONAL_DETAILS
         remoteKey: mycure-production-enc-personal-details
-      # MongoDB URI (kept for parity with the main hapihub block; v11 will
-      # not read it because mongodb.enabled: false below makes the chart
-      # skip MONGODB_* env injection. Harmless to leave in the Secret.)
-      - secretKey: MONGO_URI
-        remoteKey: mycure-production-mongo-uri
       # JWT/Auth keys
       - secretKey: PRIVATE_KEY
         remoteKey: mycure-production-private-key
@@ -383,13 +378,6 @@ hapihub:
       # Email (Postmark) — OTP, magic links, verification, password resets
       - secretKey: POSTMARK_API_KEY
         remoteKey: mycure-production-postmark-api-key
-
-  mongodb:
-    # v11 is Postgres-only. Disabling Mongo here makes the chart skip
-    # MONGODB_* env injection for the hapihub Deployment. The
-    # top-level `mongodb:` StatefulSet is unchanged — the main hapihub
-    # v10 release still needs it.
-    enabled: false
 
   postgresql:
     enabled: true
