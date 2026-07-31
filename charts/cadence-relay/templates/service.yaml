@@ -10,9 +10,11 @@ metadata:
     # Stable LB name → DO reuses the same LoadBalancer + IP across Service recreation, so the relay's
     # public address doesn't churn.
     service.beta.kubernetes.io/do-loadbalancer-name: {{ printf "%s-cadence-relay" .Values.global.namespace | quote }}
-    # DO network LBs require a TCP/HTTP health check — TCP-connect to the relay's HTTPS listener.
+    # DO health check must target a Service port (DO maps it to that port's nodePort) — TCP-connect the
+    # relay's HTTPS port. Using the pod bind port (8443) here fails: it has no nodePort, so every backend
+    # is marked unhealthy and the LB drops all traffic.
     service.beta.kubernetes.io/do-loadbalancer-healthcheck-protocol: "tcp"
-    service.beta.kubernetes.io/do-loadbalancer-healthcheck-port: {{ .Values.httpsBindPort | quote }}
+    service.beta.kubernetes.io/do-loadbalancer-healthcheck-port: {{ .Values.externalHttpsPort | quote }}
     # external-dns creates the A record for the relay hostname → this LB's IP.
     external-dns.alpha.kubernetes.io/hostname: {{ include "cadence-relay.hostname" . | quote }}
 spec:
