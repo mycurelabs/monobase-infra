@@ -197,8 +197,16 @@ hapihub:
   # OpenAPI specs (phase 1: fixtures 12h, services 5m, personal-details 5m).
   # Kill switches: set false here, or
   # `kubectl exec deploy/hapihub -- hapihub cache flush`.
+  #
+  # INTERIM (mono#2839, 2026-07-31): DISABLED. Prod recurrence of the #2617
+  # bentocache lock-backend wedge — Valkey lock store stalled, every same-key
+  # getOrSet hit `timeout while waiting for mutex` → `_FactoryHardTimeout` (10s)
+  # across listOrganizationMembers/listPersonalDetails/retrieveMedicalEncounter
+  # → clients unresponsive. Recreating Valkey cleared it; disabling the response
+  # cache removes the stampede/lock surface until the lock-store stall is
+  # root-caused + a shorter-lock-timeout/degrade-to-direct fix ships.
   cache:
-    enabled: true
+    enabled: false
 
   # Daily cleanup of expired Better Auth sessions (they never self-delete).
   pruneExpiredSessions:
