@@ -4,7 +4,7 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: cade
+  name: cadence
   namespace: {{ include "cadence.namespace" . }}
   labels:
     {{- include "cadence.labels" . | nindent 4 }}
@@ -67,10 +67,10 @@ spec:
         - name: CADENCE_AUTH_BEARER
           valueFrom:
             secretKeyRef:
-              name: cade-secrets
+              name: cadence-secrets
               key: sa-api-key
       containers:
-      - name: cade
+      - name: cadence
         image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
         imagePullPolicy: {{ .Values.image.pullPolicy }}
         securityContext:
@@ -111,7 +111,7 @@ spec:
         - name: api
           containerPort: {{ .Values.apiPort }}
           protocol: TCP
-        # No startupProbe needed: cade 2.0.12+ installs triggers (fast DDL) + binds the API BEFORE running
+        # No startupProbe needed: cadence 2.0.12+ installs triggers (fast DDL) + binds the API BEFORE running
         # the baseline in the background, so /healthz answers immediately even against a large primary DB.
         livenessProbe:
           httpGet:
@@ -134,7 +134,7 @@ spec:
       volumes:
       - name: config
         configMap:
-          name: cade-config
+          name: cadence-config
       {{- if .Values.nodePool }}
       nodeSelector:
         node-pool: {{ .Values.nodePool }}

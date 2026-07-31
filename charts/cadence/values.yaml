@@ -36,7 +36,7 @@ auth:
   authorizeUrl: ""    # programmatic authorize for the headless hub enroll, e.g. https://hapihub.<env>…/sync/authorize
 
 # Service-account API key (non-expiring better-auth key) the enroll initContainer presents to hapihub as
-# --bearer to authorize the hub's '*' grant → k8s secret `cade-secrets` key `sa-api-key` → CADENCE_AUTH_BEARER.
+# --bearer to authorize the hub's '*' grant → k8s secret `cadence-secrets` key `sa-api-key` → CADENCE_AUTH_BEARER.
 externalSecrets:
   enabled: false
   secretStore: gcp-secretstore
@@ -54,7 +54,7 @@ service:
 # (/.well-known/cadence-configuration.json) via --seed-url.
 gateway:
   enabled: true
-  hostname: ""          # defaults to cade.{global.domain}
+  hostname: ""          # defaults to cadence.{global.domain}
   hostnames: []
   sectionName: https
   snippetsPolicy:

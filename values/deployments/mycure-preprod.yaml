@@ -1090,15 +1090,15 @@ resourceQuotas:
 udpGateway:
   enabled: true
   targetSelector:
-    app.kubernetes.io/name: cade
+    app.kubernetes.io/name: cadence
   port: 6472
   healthPort: 6472
 
-# ===== cade — iroh 1.0 P2P transport + registry (cadence v2 foundation) =====
+# ===== cadence — iroh 1.0 P2P transport + registry (cadence v2 foundation) =====
 # The anchor node; reachability is provided by the infra udpGateway LB above (not an
-# app-owned Service). Image is on the cadence 2.x line (cade = cadence v2).
-# cade — cadence v2 data-plane HUB (isolated cadence_v2 DB rehearsal). Full chart: run --config, enroll
-# initContainer, API service + HTTPRoute (cade.preprod…), reachable for direct QUIC via udp-gateway.
+# app-owned Service). Image is on the cadence 2.x line (cadence = cadence v2).
+# cadence — cadence v2 data-plane HUB (isolated cadence_v2 DB rehearsal). Full chart: run --config, enroll
+# initContainer, API service + HTTPRoute (cadence.preprod…), reachable for direct QUIC via udp-gateway.
 cadence:
   enabled: true
   image:
@@ -1109,9 +1109,9 @@ cadence:
   # udp-gateway LB IP — the anchor advertises this so peers connect by EndpointId alone.
   publicAddr: "165.245.145.61:6472"
   nodePool: "staging"
-  # Integrated model (promote cade-v2 to be preprod's cadence, #2727): watch the LIVE hapihub app DB
+  # Integrated model (promote cadence-v2 to be preprod's cadence, #2727): watch the LIVE hapihub app DB
   # instead of the isolated cadence_v2 seed, so live cloud writes capture + sync to boxes (matches prod's
-  # legacy cadence, which watches hapihub). cade installs cadence_* side-tables + capture triggers on the
+  # legacy cadence, which watches hapihub). cadence installs cadence_* side-tables + capture triggers on the
   # live tables at startup and baselines existing rows.
   postgresql:
     auth:
@@ -1121,7 +1121,7 @@ cadence:
     sectionName: https-preprod-lfh
     # Re-domained to cadence.preprod (#2727), reclaiming the domain freed by retiring cadence v1.
     # Cutover complete — boxes discover the hub via cadence.preprod (single-URL onboarding, from the AS
-    # metadata's cadence_seed_url); the legacy cade.preprod hostname is dropped.
+    # metadata's cadence_seed_url); the legacy cadence.preprod hostname is dropped.
     hostnames:
       - cadence.preprod.localfirsthealth.com
   # hapihub is the SOLE AS (#2727) — it mints both box grants AND the hub's own '*' grant. Env-driven (not
@@ -1134,7 +1134,7 @@ cadence:
     # hapihub advertises a browser authorization_endpoint (RFC 8252 SPA) for boxes; the headless hub
     # authorizes against the programmatic route instead (CADENCE_AUTH_AUTHORIZE_URL).
     authorizeUrl: https://hapihub.preprod.localfirsthealth.com/sync/authorize
-  # Service-account API key (better-auth, service@mycure.md, non-expiring) → secret cade-secrets. The hub
+  # Service-account API key (better-auth, service@mycure.md, non-expiring) → secret cadence-secrets. The hub
   # presents it as --bearer to authorize its '*' grant. hapihub then mints with a coherent status_list.
   externalSecrets:
     enabled: true

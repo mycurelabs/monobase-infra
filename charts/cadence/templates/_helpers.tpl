@@ -34,16 +34,12 @@ app.kubernetes.io/part-of: monobase
 {{- end }}
 
 {{/*
-Selector labels — the app label stays literal "cade" even though the chart is now "cadence".
-Two reasons it must NOT track the chart name: (1) the udp-gateway UDP LoadBalancer targets pods by
-`app.kubernetes.io/name: cade`, and (2) a Deployment's spec.selector is immutable. The runtime
-resource names (Deployment/Service `cade`, ConfigMap `cade-config`, Secret `cade-secrets`) are
-likewise kept stable — only the chart/app/values-key naming layer moved to `cadence`. Flip the runtime
-label → cadence (and the udp-gateway selector with it) once the legacy `cadence-legacy` pods are fully
-deleted, so the two never share the `cadence` label while both exist.
+Selector labels. The udp-gateway UDP LoadBalancer selects pods by `app.kubernetes.io/name: cadence`
+(kept in lockstep in charts/udp-gateway/values.yaml). Legacy v1 is a separate chart labelled
+`cadence-legacy`, so there is no collision.
 */}}
 {{- define "cadence.selectorLabels" -}}
-app.kubernetes.io/name: cade
+app.kubernetes.io/name: cadence
 {{- end }}
 
 {{/* Namespace */}}
@@ -54,7 +50,7 @@ app.kubernetes.io/name: cade
 {{/* Service account name */}}
 {{- define "cadence.serviceAccountName" -}}
 {{- if .Values.serviceAccount.create }}
-{{- default "cade" .Values.serviceAccount.name }}
+{{- default "cadence" .Values.serviceAccount.name }}
 {{- else }}
 {{- default "default" .Values.serviceAccount.name }}
 {{- end }}

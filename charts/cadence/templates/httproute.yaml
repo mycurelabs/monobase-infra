@@ -4,7 +4,7 @@
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
-  name: cade
+  name: cadence
   namespace: {{ include "cadence.namespace" . }}
   labels:
     {{- include "cadence.labels" . | nindent 4 }}
@@ -27,7 +27,7 @@ spec:
             type: PathPrefix
             value: /
       backendRefs:
-        - name: cade
+        - name: cadence
           port: {{ .Values.service.port }}
           weight: 1
 {{- end }}
