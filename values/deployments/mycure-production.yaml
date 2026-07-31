@@ -1305,6 +1305,16 @@ mailpit:
     enabled: true
     hostname: ""
 
+# infra L4 UDP LoadBalancer (DigitalOcean) for the cadence v2 QUIC path. Provisioned AHEAD of the v1→v2
+# cutover so its EXTERNAL-IP is known for cadence.publicAddr; idle (no healthy backend) until cadence v2
+# deploys. externalTrafficPolicy Cluster (SNAT) is required for the QUIC handshake.
+udpGateway:
+  enabled: true
+  targetSelector:
+    app.kubernetes.io/name: cadence
+  port: 6472
+  healthPort: 6472
+
 # ===== P2P SYNC: Cadence (LEGACY — retired-in-place) — Tier 4.4 =====
 # Config key renamed cadence → cadence-legacy so `cadence:` is free for cadence-v2.
 # Consumed by argocd/applications/templates/cadence-legacy.yaml via index (hyphenated key).
