@@ -50,6 +50,13 @@ service:
   targetPort: 9464
   annotations: {}
 
+# Prometheus scrape of the OpenMetrics /metrics endpoint (needs the prometheus-operator ServiceMonitor CRD).
+# Off by default; enable per-env.
+serviceMonitor:
+  enabled: false
+  interval: 30s
+  path: /metrics
+
 # NGINX Gateway HTTPRoute — exposes the API over HTTPS so external boxes can fetch the bootstrap doc
 # (/.well-known/cadence-configuration.json) via --seed-url.
 gateway:

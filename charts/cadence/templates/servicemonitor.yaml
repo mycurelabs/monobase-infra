@@ -1,0 +1,24 @@
+{{- if and .Values.enabled .Values.serviceMonitor.enabled }}
+# Scrapes the cadence-v2 OpenMetrics endpoint (GET /metrics on the `api` port, 9464) into Prometheus:
+# reconcile timing (reconcile_ms/reconcile_ticks), throughput (applied/captured/reconciled),
+# connectivity (reconcile_connect_failures, bootstrap_retries), schema drift (schema_mismatch),
+# reconcile_active, RSS, db pool, dirty_depth. Off by default; enabled per-env in values.
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: cadence
+  namespace: {{ include "cadence.namespace" . }}
+  labels:
+    {{- include "cadence.labels" . | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "cadence.selectorLabels" . | nindent 6 }}
+  endpoints:
+    - port: api
+      path: {{ .Values.serviceMonitor.path | default "/metrics" }}
+      interval: {{ .Values.serviceMonitor.interval | default "30s" }}
+      {{- if .Values.serviceMonitor.scrapeTimeout }}
+      scrapeTimeout: {{ .Values.serviceMonitor.scrapeTimeout }}
+      {{- end }}
+{{- end }}
