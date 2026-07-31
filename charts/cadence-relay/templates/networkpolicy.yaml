@@ -1,0 +1,26 @@
+{{- if .Values.enabled }}
+# The namespace has default-deny ingress+egress; open just what the relay needs.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: cadence-relay
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "cadence-relay.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: cadence-relay
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Allow the LoadBalancer/world to reach the relay's HTTPS listener (any source — boxes connect from
+    # the internet). kubelet probes hit the same port.
+    - ports:
+        - protocol: TCP
+          port: {{ .Values.httpsBindPort }}
+  egress:
+    # Allow all egress (DNS + forwarding traffic between connected relay clients).
+    - {}
+{{- end }}
