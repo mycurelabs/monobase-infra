@@ -1,0 +1,28 @@
+{{- if .Values.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: cadence-relay
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "cadence-relay.labels" . | nindent 4 }}
+  annotations:
+    # Stable LB name → DO reuses the same LoadBalancer + IP across Service recreation, so the relay's
+    # public address doesn't churn.
+    service.beta.kubernetes.io/do-loadbalancer-name: {{ printf "%s-cadence-relay" .Values.global.namespace | quote }}
+    # DO network LBs require a TCP/HTTP health check — TCP-connect to the relay's HTTPS listener.
+    service.beta.kubernetes.io/do-loadbalancer-healthcheck-protocol: "tcp"
+    service.beta.kubernetes.io/do-loadbalancer-healthcheck-port: {{ .Values.httpsBindPort | quote }}
+    # external-dns creates the A record for the relay hostname → this LB's IP.
+    external-dns.alpha.kubernetes.io/hostname: {{ include "cadence-relay.hostname" . | quote }}
+spec:
+  type: LoadBalancer
+  externalTrafficPolicy: Cluster
+  selector:
+    app.kubernetes.io/name: cadence-relay
+  ports:
+  - name: https
+    port: {{ .Values.externalHttpsPort }}
+    targetPort: {{ .Values.httpsBindPort }}
+    protocol: TCP
+{{- end }}

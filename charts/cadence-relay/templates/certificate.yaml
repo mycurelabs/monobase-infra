@@ -1,0 +1,18 @@
+{{- if .Values.enabled }}
+# TLS cert for the relay hostname via cert-manager DNS-01 (Cloudflare) — works for this L4/LoadBalancer
+# service (no HTTP path for HTTP-01). The Secret is mounted into the relay pod (Manual cert mode).
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: cadence-relay-tls
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "cadence-relay.labels" . | nindent 4 }}
+spec:
+  secretName: {{ .Values.tls.secretName }}
+  issuerRef:
+    name: {{ .Values.tls.clusterIssuer }}
+    kind: ClusterIssuer
+  dnsNames:
+    - {{ include "cadence-relay.hostname" . | quote }}
+{{- end }}

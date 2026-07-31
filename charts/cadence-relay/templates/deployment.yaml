@@ -1,0 +1,67 @@
+{{- if .Values.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cadence-relay
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "cadence-relay.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: cadence-relay
+  template:
+    metadata:
+      labels:
+        {{- include "cadence-relay.labels" . | nindent 8 }}
+      annotations:
+        checksum/config: {{ .Files.Get "templates/configmap.yaml" | sha256sum }}
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+      - name: iroh-relay
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop: ["ALL"]
+        # Image ENTRYPOINT is `iroh-relay`; run from the mounted TOML.
+        args: ["--config-path", "/etc/iroh-relay/config.toml"]
+        ports:
+        - name: https
+          containerPort: {{ .Values.httpsBindPort }}
+          protocol: TCP
+        volumeMounts:
+        - name: config
+          mountPath: /etc/iroh-relay/config.toml
+          subPath: config.toml
+          readOnly: true
+        - name: certs
+          mountPath: /etc/iroh-relay/certs
+          readOnly: true
+        resources:
+          {{- toYaml .Values.resources | nindent 10 }}
+      volumes:
+      - name: config
+        configMap:
+          name: cadence-relay-config
+      - name: certs
+        secret:
+          secretName: {{ .Values.tls.secretName }}
+      {{- if .Values.nodePool }}
+      nodeSelector:
+        node-pool: {{ .Values.nodePool }}
+      tolerations:
+      - key: "node-pool"
+        operator: "Equal"
+        value: {{ .Values.nodePool | quote }}
+        effect: "NoSchedule"
+      {{- end }}
+{{- end }}

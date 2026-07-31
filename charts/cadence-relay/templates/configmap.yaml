@@ -1,0 +1,24 @@
+{{- if .Values.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cadence-relay-config
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "cadence-relay.labels" . | nindent 4 }}
+data:
+  # iroh-relay v1.0.2 config. Serves the relay protocol over TLS on {{ .Values.httpsBindPort }} (LB maps
+  # {{ .Values.externalHttpsPort }} → it). Certs come from cert-manager (mounted Secret) in `Manual` mode.
+  # QUIC addr-discovery is off (relay data path is HTTPS; hard-NAT boxes can't holepunch anyway). Access is
+  # open (Everyone) — the relay only forwards encrypted traffic; add `[access] shared_token` later to lock down.
+  config.toml: |
+    enable_relay = true
+    http_bind_addr = "[::]:{{ .Values.httpBindPort }}"
+    enable_quic_addr_discovery = false
+
+    [tls]
+    https_bind_addr = "[::]:{{ .Values.httpsBindPort }}"
+    cert_mode = "Manual"
+    manual_cert_path = "/etc/iroh-relay/certs/tls.crt"
+    manual_key_path = "/etc/iroh-relay/certs/tls.key"
+{{- end }}

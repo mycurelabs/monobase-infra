@@ -1,0 +1,38 @@
+enabled: true
+
+# Stock n0 relay image (Docker Hub). Pin to the tag matching the cadence client's iroh version (1.0.2)
+# so the relay protocol is compatible.
+image:
+  repository: n0computer/iroh-relay
+  tag: "v1.0.2"
+  pullPolicy: IfNotPresent
+
+# Public hostname the relay serves TLS on. Defaults to `cadence-relay.{global.domain}` (set in the
+# template); boxes + anchor use `https://<hostname>` as cadence `relay_url`. external-dns creates the
+# A record from the LoadBalancer Service annotation.
+hostname: ""
+
+# Ports. externalHttpsPort = what clients hit (the relay protocol, HTTPS/WebSocket over TLS). The pod runs
+# non-root (PodSecurity), so it binds high ports internally and the LB maps 443 → 8443. QUIC
+# address-discovery (a UDP holepunch aid) is disabled — the relay DATA path is 443/TCP, and the hard-NAT
+# boxes this relay serves can't holepunch regardless; keeping it off means one clean TCP LoadBalancer.
+externalHttpsPort: 443
+httpsBindPort: 8443
+httpBindPort: 8080
+
+# TLS via cert-manager (DNS-01, works for an L4 service — no HTTP path needed). The issued Secret is
+# mounted read-only and the relay reads it in `Manual` cert mode.
+tls:
+  clusterIssuer: letsencrypt-mycure-cloudflare-prod
+  secretName: cadence-relay-tls
+
+resources:
+  requests:
+    cpu: 250m
+    memory: 256Mi
+  limits:
+    cpu: "1"
+    memory: 1Gi
+
+# Schedule onto the same pool cadence uses (tainted node-pool=staging on preprod).
+nodePool: "staging"
