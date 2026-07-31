@@ -1103,7 +1103,7 @@ cadence:
   enabled: true
   image:
     repository: ghcr.io/mycurelabs/cadence
-    tag: "2.0.18" # feat/cadence-v2 auth-login authorize-url override — hub enrolls its '*' grant against hapihub (sole AS, coherent status_list) (#2727)
+    tag: "2.0.21" # feat/cadence-v2: fam-scope records + inventory catalog manifest + reconcile_active metric (#2727)
     pullPolicy: IfNotPresent
   udpPort: 6472
   # udp-gateway LB IP — the anchor advertises this so peers connect by EndpointId alone.
