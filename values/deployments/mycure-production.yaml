@@ -1109,10 +1109,10 @@ cadence:
   # authorizes '*' against the programmatic /sync/authorize with the service-account API key (--bearer);
   # runtime grant verification is against hapihub's JWKS.
   auth:
-    issuerUrl: https://hapihub-next.localfirsthealth.com
-    grantJwksUri: https://hapihub-next.localfirsthealth.com/.well-known/jwks.json
+    issuerUrl: https://hapihub.localfirsthealth.com
+    grantJwksUri: https://hapihub.localfirsthealth.com/.well-known/jwks.json
     fleetId: mycure-production
-    authorizeUrl: https://hapihub-next.localfirsthealth.com/sync/authorize
+    authorizeUrl: https://hapihub.localfirsthealth.com/sync/authorize
   # Service-account API key (better-auth, service@mycure.md, non-expiring) → secret cadence-secrets.
   # `mycure-production-cadence-sa-api-key` is provisioned in GCP Secret Manager; the hub presents it as --bearer.
   externalSecrets:
