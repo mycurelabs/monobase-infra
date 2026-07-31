@@ -177,173 +177,13 @@ mycure-pxp:
   podDisruptionBudget:
     enabled: false
 
-# ===== HEALTHCARE: HapiHub API =====
+# ===== HEALTHCARE: HapiHub API (v11) =====
+# The canonical hapihub release (releaseName: hapihub). Was the v11 "hapihub-next"
+# cutover sibling; promoted to canonical 2026-07-31 after the v10 stack was retired
+# (#2295) and hapihub.localfirsthealth.com was routed wholesale to v11 (#176). Serves
+# hapihub.localfirsthealth.com (canonical) + hapihub-next.localfirsthealth.com (retained
+# alias — frontends/cadence still call it). PostgreSQL-only.
 hapihub:
-  enabled: false  # v8 retired 2026-07-30 (#2295) — data archived on niflheim (infra#139)
-
-  image:
-    repository: ghcr.io/mycurelabs/hapihub
-    tag: "10.11.15"
-    pullPolicy: IfNotPresent
-
-  replicaCount: 3
-
-  resources:
-    requests:
-      cpu: 500m
-      memory: 768Mi
-    limits:
-      cpu: "2"
-      memory: 2Gi
-
-  gateway:
-    hostnames:
-      - hapihub.localfirsthealth.com
-      - api.mycure.md
-    sectionName: https-lfh # Use localfirsthealth.com HTTPS listener
-    additionalSectionNames:
-      - https-mycure
-    # timeouts removed: nginx-shared-gateway doesn't support
-    # spec.rules[].timeouts and was logging UnsupportedField warnings.
-    # The proxy_read_timeout/client_max_body_size snippet now lives in
-    # nginxGatewayResources.snippetsPolicies in values/infrastructure/main.yaml
-    # so it's owned once at the cluster level (avoids "directive is duplicate"
-    # errors when both staging and production hapihub releases tried to own
-    # identical snippets on the same shared Gateway).
-    snippetsPolicy:
-      enabled: false
-
-  betterAuth:
-    passkey:
-      rpName: "Mycure"
-      rpId: "localfirsthealth.com"
-
-  config:
-    CORS_ORIGINS: "https://mycure.localfirsthealth.com,https://mycurev8.localfirsthealth.com,https://mycurev8-private.localfirsthealth.com,https://mycurelocal.localfirsthealth.com,https://mycure-myaccount.localfirsthealth.com,https://mycure-dashboard.localfirsthealth.com,https://mycure-pxp.localfirsthealth.com,https://dentalemon.localfirsthealth.com,https://dentalemon-myaccount.localfirsthealth.com,https://dentalemon-website.localfirsthealth.com"
-    CORS_STRICT: "true"
-    CORS_ALLOW_LOCAL_NETWORK: "false"
-    CORS_ALLOW_MOBILE_APPS: "true"
-    ACCOUNTS_SERVICE_ACCOUNT_EMAILS: "service@mycure.md"
-
-  env:
-    - name: BETTER_AUTH_RATE_LIMIT_ENABLED
-      value: "true"
-    - name: BETTER_AUTH_RATE_LIMIT_WINDOW
-      value: "60"
-    - name: BETTER_AUTH_RATE_LIMIT_MAX
-      value: "300"
-    - name: BETTER_AUTH_SESSION_COOKIE_CACHE_ENABLED
-      value: "false"
-
-  livenessProbe:
-    enabled: true
-
-  readinessProbe:
-    enabled: true
-
-  podDisruptionBudget:
-    enabled: false
-
-  autoscaling:
-    enabled: true
-    minReplicas: 1
-    maxReplicas: 3
-
-  externalSecrets:
-    enabled: true
-    secretStore: gcp-secretstore
-    secretStoreKind: ClusterSecretStore
-    refreshInterval: 1h
-    secrets:
-      # Google OAuth
-      - secretKey: GOOGLE_CLIENT_ID
-        remoteKey: mycure-production-google-oauth-client-id
-      - secretKey: GOOGLE_CLIENT_SECRET
-        remoteKey: mycure-production-google-oauth-client-secret
-      - secretKey: STRIPE_SECRET_KEY
-        remoteKey: mycure-production-stripe-secret-key
-      # Encryption keys
-      - secretKey: ENC_BILLING_INVOICES
-        remoteKey: mycure-production-enc-billing-invoices
-      - secretKey: ENC_BILLING_ITEMS
-        remoteKey: mycure-production-enc-billing-items
-      - secretKey: ENC_BILLING_PAYMENTS
-        remoteKey: mycure-production-enc-billing-payments
-      - secretKey: ENC_MEDICAL_RECORDS
-        remoteKey: mycure-production-enc-medical-records
-      - secretKey: ENC_PERSONAL_DETAILS
-        remoteKey: mycure-production-enc-personal-details
-      # MongoDB URI (managed DigitalOcean)
-      - secretKey: MONGO_URI
-        remoteKey: mycure-production-mongo-uri
-      # JWT/Auth keys
-      - secretKey: PRIVATE_KEY
-        remoteKey: mycure-production-private-key
-      - secretKey: PUBLIC_KEY
-        remoteKey: mycure-production-public-key
-      # Storage configuration (GCP)
-      - secretKey: STORAGE_BUCKET
-        remoteKey: mycure-production-storage-bucket
-      - secretKey: STORAGE_CLIENT_EMAIL
-        remoteKey: mycure-production-storage-client-email
-      - secretKey: STORAGE_DIRECTORY
-        remoteKey: mycure-production-storage-directory
-      - secretKey: STORAGE_PRIVATE_KEY
-        remoteKey: mycure-production-storage-private-key
-      - secretKey: STORAGE_PROJECT_ID
-        remoteKey: mycure-production-storage-project-id
-      - secretKey: STORAGE_TYPE
-        remoteKey: mycure-production-storage-type
-      # Stripe configuration
-      - secretKey: STRIPE_KEY
-        remoteKey: mycure-production-stripe-key
-      - secretKey: STRIPE_CHECKOUT_SUCCESS_URL
-        remoteKey: mycure-production-stripe-checkout-success-url
-      - secretKey: STRIPE_CHECKOUT_CANCEL_URL
-        remoteKey: mycure-production-stripe-checkout-cancel-url
-      # ===== 11.x additions (Tier 5 Phase 5) =====
-      # Wired into the deployment template at hapihub/templates/deployment.yaml:248-260
-      # as `optional: true` env vars, so safe to land while still on 10.x.
-      # All 10.x secrets above are kept for rollback safety until Tier 6 cleanup.
-      - secretKey: AUTH_SECRET
-        remoteKey: mycure-production-auth-secret
-      - secretKey: BETTER_AUTH_SECRET
-        remoteKey: mycure-production-better-auth-secret
-
-  mongodb:
-    external: false # Use in-cluster MongoDB
-    enabled: true
-    serviceName: mongodb
-    database: hapihub
-    username: root
-    replicaSet: rs0
-
-  # ===== 11.x PostgreSQL backend (Tier 5 Phase 5 prep) =====
-  # When postgresql.enabled: true and external: false, the hapihub chart
-  # constructs DATABASE_URI directly from the in-cluster `postgresql` K8s
-  # secret (charts/hapihub/templates/deployment.yaml:127-135). 10.x ignores
-  # this env var; 11.x reads it on cutover. Safe to land while still on 10.x.
-  postgresql:
-    enabled: true
-    external: false
-    serviceName: postgresql-primary
-    auth:
-      database: hapihub
-      username: postgres
-      existingSecret: postgresql
-
-# ===== HEALTHCARE: HapiHub API (v11 — temporary cutover sibling) =====
-# Second Helm release of the hapihub chart, deployed via the
-# hapihub-next ArgoCD app template (releaseName: hapihub-next).
-# Resources end up named `hapihub-next` (Deployment, Service, HTTPRoute,
-# ConfigMap), distinct from the main `hapihub` release above.
-#
-# Purpose: expose v11 on a temp hostname so the new mycure frontend can
-# exercise it while mycurev8 continues to call the canonical v10.
-# A later phase will swap HTTPRoute hostnames so v11 takes canonical.
-# See RCA-2026-04-22-HAPIHUB-0014-MIGRATION-BLOCKING-INDEX-BUILD.md
-# for the migration safety context.
-hapihubNext:
   enabled: true
 
   image:
@@ -356,7 +196,7 @@ hapihubNext:
   # 0 client errors. Cached endpoints are declared via x-cache in hapihub's
   # OpenAPI specs (phase 1: fixtures 12h, services 5m, personal-details 5m).
   # Kill switches: set false here, or
-  # `kubectl exec deploy/hapihub-next -- hapihub cache flush`.
+  # `kubectl exec deploy/hapihub -- hapihub cache flush`.
   cache:
     enabled: true
 
@@ -386,43 +226,17 @@ hapihubNext:
 
   gateway:
     hostnames:
-      - hapihub-next.localfirsthealth.com
-      # Claim the retired v10 host wholesale — v10 hapihub is enabled:false since 2026-07-30 (#2295), its
-      # HTTPRoute pruned, so hapihub.localfirsthealth.com had no owner but the partial storageRoute forward.
-      # Routing ALL its paths to hapihub-next completes the v10→v11 migration AND fixes the cadence-v2 OAuth
-      # AS: token_endpoint/jwks_uri are minted from EXTERNAL_ADDRESS = this host (immutable = better-auth
-      # baseURL), so they now resolve to v11. Subsumes the storageRoute forward below (redundant; cleanup later).
+      # Canonical host (took over from the retired v10 stack, #176). Carries the
+      # cadence-v2 OAuth AS metadata (token_endpoint/jwks_uri minted from
+      # EXTERNAL_ADDRESS = this host, immutable = better-auth baseURL).
       - hapihub.localfirsthealth.com
+      # Retained alias — frontends/cadence still call it. Keep until they migrate.
+      - hapihub-next.localfirsthealth.com
     sectionName: https-lfh # Use localfirsthealth.com HTTPS listener
-    # No additionalSectionNames: v11 is not on api.mycure.md yet. The
-    # main hapihub release owns that hostname; Phase B can decide
-    # whether to move it here or keep it on the legacy side.
+    # No additionalSectionNames: not on api.mycure.md (Better Auth rpId is
+    # localfirsthealth.com; api.mycure.md would need cross-domain cookie handling).
     snippetsPolicy:
       enabled: false
-    # Issue #44: storage/file/link URLs are minted from EXTERNAL_ADDRESS, which
-    # for hapihub-next is the v10 host (hapihub.localfirsthealth.com) → 404.
-    # EXTERNAL_ADDRESS is ALSO better-auth's baseURL, so it can't be changed
-    # without breaking auth. Instead, route only /storage on the v10 host to
-    # this v11 service (v10 serves no /storage there). Fixes the URLs with zero
-    # auth impact. (Long-term: wire storage.downloadURLHost in hapihub code.)
-    storageRoute:
-      enabled: true
-      sectionName: https-lfh
-      hostnames:
-        - hapihub.localfirsthealth.com
-      # v11-only paths to forward from the v10 host to hapihub-next.
-      # /device-telemetry: maestroapp installs' sync-token iss + VITE_API_SERVER
-      # both point at the v10 host, but the device-telemetry service lives only
-      # on v11. v10 returns 404 for these paths, so forwarding is non-disruptive.
-      # /sync + /.well-known/jwks.json: the cadence-v2 OAuth AS metadata advertises
-      # its endpoints from EXTERNAL_ADDRESS (the v10 host, immutable = better-auth
-      # baseURL), so the hub enroll + box onboarding POST /sync/token + fetch jwks
-      # there → 404 without this forward. v10 serves neither → non-disruptive.
-      paths:
-        - /storage
-        - /device-telemetry
-        - /sync
-        - /.well-known/jwks.json
 
   betterAuth:
     passkey:
@@ -436,12 +250,12 @@ hapihubNext:
     CORS_ALLOW_MOBILE_APPS: "true"
     ACCOUNTS_SERVICE_ACCOUNT_EMAILS: "service@mycure.md"
     APPLE_APP_BUNDLE_IDENTIFIER: "com.mycure.pxp"
-    # Issue #44: mint storage file/link URLs on hapihub-next's own host instead of
-    # the v10 host (EXTERNAL_ADDRESS, which is also Better Auth's baseURL and can't
-    # change). Requires hapihub >= 11.20.32 (which wires storage.downloadURLHost).
+    # Issue #44: mint storage file/link URLs on the retained hapihub-next alias
+    # rather than defaulting to EXTERNAL_ADDRESS (= hapihub.localfirsthealth.com,
+    # also Better Auth's baseURL). Requires hapihub >= 11.20.32 (wires storage.downloadURLHost).
     STORAGE_DOWNLOAD_URL_HOST: "https://hapihub-next.localfirsthealth.com"
     # mono#2114: background jobs (exports, email, doc-ingestion, PDF/Chromium)
-    # moved to the hapihub-next-worker release below — a single export/PDF
+    # moved to the hapihub-worker release below — a single export/PDF
     # job landing on an API pod ballooned it toward the memory limit.
     RUN_WORKERS: "false"
 
@@ -467,7 +281,7 @@ hapihubNext:
     - name: POSTMARK_API_KEY
       valueFrom:
         secretKeyRef:
-          name: hapihub-next-secrets
+          name: hapihub-secrets
           key: POSTMARK_API_KEY
     - name: EMAIL_FROM_EMAIL
       value: "no-reply@mycure.md"
@@ -572,7 +386,7 @@ hapihubNext:
 
   mongodb:
     # v11 is Postgres-only. Disabling Mongo here makes the chart skip
-    # MONGODB_* env injection for the hapihub-next Deployment. The
+    # MONGODB_* env injection for the hapihub Deployment. The
     # top-level `mongodb:` StatefulSet is unchanged — the main hapihub
     # v10 release still needs it.
     enabled: false
@@ -586,16 +400,16 @@ hapihubNext:
       username: postgres
       existingSecret: postgresql
 
-# hapihub-next-worker: background-job consumer for hapihub-next
-# (mono#2114). Deep-merged onto the hapihubNext block by the
-# hapihub-next-worker ArgoCD app template — image/config/secrets flow from
-# hapihubNext automatically; only the deltas live here.
-hapihubNextWorker:
+# hapihub-worker: background-job consumer for hapihub
+# (mono#2114). Deep-merged onto the hapihub block by the
+# hapihub-worker ArgoCD app template — image/config/secrets flow from
+# hapihub automatically; only the deltas live here.
+hapihubWorker:
   enabled: true
 
   replicaCount: 1
 
-  # Explicit resources — the worker app deep-merges hapihubNext values, so
+  # Explicit resources — the worker app deep-merges hapihub values, so
   # without this it would inherit the API release's 1Gi request. The worker
   # runs exports/PDF-Chromium which legitimately spike; keep a 2Gi request.
   resources:
@@ -653,10 +467,9 @@ mycure:
     sectionName: https-lfh # Use localfirsthealth.com HTTPS listener
 
   config:
-    # Points at the v11 cutover sibling (hapihubNext release). Canonical
-    # hapihub.localfirsthealth.com stays on v10 for mycurev8 during the
-    # transition. Phase B will flip this back to the canonical URL when
-    # v11 takes over hapihub.localfirsthealth.com.
+    # Points at the retained hapihub-next alias (served by the canonical hapihub
+    # release). Can be flipped to https://hapihub.localfirsthealth.com once all
+    # frontends are migrated off the alias.
     API_URL: "https://hapihub-next.localfirsthealth.com"
     HAPIHUB_URL: "https://hapihub-next.localfirsthealth.com"
     # PostHog product analytics. Public project key (phc_...), safe to commit —
@@ -1304,7 +1117,7 @@ cadence:
     sectionName: https-lfh
     hostnames:
       - cadence.localfirsthealth.com
-  # hapihub-next is the SOLE AS (mints box grants + the hub's own '*' grant). The enroll initContainer
+  # hapihub is the SOLE AS (mints box grants + the hub's own '*' grant). The enroll initContainer
   # authorizes '*' against the programmatic /sync/authorize with the service-account API key (--bearer);
   # runtime grant verification is against hapihub's JWKS.
   auth:
