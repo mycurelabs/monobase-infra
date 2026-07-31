@@ -461,6 +461,20 @@ hapihubNext:
       value: "no-reply@mycure.md"
     - name: EMAIL_FROM_NAME
       value: "MyCure"
+    # cadence-v2 OAuth Authorization Server (v1→v2 prod cutover). hapihub is the SOLE AS: it mints box grants
+    # AND the hub's own '*' grant with this EdDSA key. The values are advertised in
+    # /.well-known/cadence-configuration.json so a box derives its sync hub (cadence_seed_url) + fleet (aud)
+    # from the single api URL — single-URL onboarding. CADENCE_ISSUER_KEY (the PEM) is the externalSecret below.
+    - name: CADENCE_ISSUER_ISS
+      value: "cadence-production-issuer"
+    - name: CADENCE_ISSUER_KID
+      value: "k1"
+    - name: CADENCE_ISSUER_FLEET_ID
+      value: "mycure-production"
+    - name: CADENCE_ISSUER_AUTHORIZE_URL
+      value: "https://mycure.localfirsthealth.com/oauth/authorize"
+    - name: CADENCE_ISSUER_SEED_URL
+      value: "https://cadence.localfirsthealth.com"
 
   livenessProbe:
     enabled: true
@@ -485,6 +499,9 @@ hapihubNext:
     secretStoreKind: ClusterSecretStore
     refreshInterval: 1h
     secrets:
+      # cadence-v2 issuer EdDSA signing key (prod cutover) — hapihub mints box + hub grants with it.
+      - secretKey: CADENCE_ISSUER_KEY
+        remoteKey: mycure-production-cadence-issuer-key-pem
       # Google OAuth
       - secretKey: GOOGLE_CLIENT_ID
         remoteKey: mycure-production-google-oauth-client-id
@@ -858,7 +875,9 @@ dentalemon:
 
 # ===== HEALTHCARE: SyncD Real-time Synchronization =====
 syncd:
-  enabled: true
+  # RETIRED with the cadence-v1 cutover (2026-07-31): legacy Mongo→on-prem WebSocket sync; was already
+  # replicas=0. Disabled → ArgoCD prunes it. (MongoDB dep retires separately; PVCs in grace-period, #2295.)
+  enabled: false
 
   image:
     repository: ghcr.io/mycurelabs/syncd
@@ -1318,6 +1337,52 @@ udpGateway:
 # ===== P2P SYNC: Cadence (LEGACY — retired-in-place) — Tier 4.4 =====
 # Config key renamed cadence → cadence-legacy so `cadence:` is free for cadence-v2.
 # Consumed by argocd/applications/templates/cadence-legacy.yaml via index (hyphenated key).
+# ===== P2P sync: cadence v2 (iroh 1.0 QUIC) — PROD cutover, replaces cadence-legacy (v1→v2, 2026-07-31) =====
+# The anchor hub. Reachability via the infra udpGateway LB below (a fresh prod DO UDP LoadBalancer — preprod's
+# IP is not reusable). Watches the LIVE hapihub app DB: installs cadence_* side-tables + capture triggers on
+# the live tables at startup and baselines existing rows (ships the #2823 baseline fix + #2817 re-baseline).
+cadence:
+  enabled: true
+  image:
+    repository: ghcr.io/mycurelabs/cadence
+    tag: "2.0.22" # #2823 baseline-timeout fix + #2817 tag-set re-baseline (PR mono#2827)
+    pullPolicy: IfNotPresent
+  udpPort: 6472
+  # udp-gateway DO LoadBalancer EXTERNAL-IP (provisioned via monobase-infra#172) — the anchor advertises
+  # this so peers reach the hub directly by EndpointId.
+  publicAddr: "137.184.250.197:6472"
+  nodePool: "production"
+  serviceMonitor:
+    enabled: true
+  # Watch the LIVE hapihub app DB (not an isolated cadence DB), matching preprod + the legacy cadence.
+  postgresql:
+    auth:
+      database: hapihub
+  gateway:
+    sectionName: https-lfh
+    hostnames:
+      - cadence.localfirsthealth.com
+  # hapihub-next is the SOLE AS (mints box grants + the hub's own '*' grant). The enroll initContainer
+  # authorizes '*' against the programmatic /sync/authorize with the service-account API key (--bearer);
+  # runtime grant verification is against hapihub's JWKS.
+  auth:
+    issuerUrl: https://hapihub-next.localfirsthealth.com
+    grantJwksUri: https://hapihub-next.localfirsthealth.com/.well-known/jwks.json
+    fleetId: mycure-production
+    authorizeUrl: https://hapihub-next.localfirsthealth.com/sync/authorize
+  # Service-account API key (better-auth, service@mycure.md, non-expiring) → secret cadence-secrets.
+  # `mycure-production-cadence-sa-api-key` is provisioned in GCP Secret Manager; the hub presents it as --bearer.
+  externalSecrets:
+    enabled: true
+    secretStore: gcp-secretstore
+    secretStoreKind: ClusterSecretStore
+    refreshInterval: 1h
+    secrets:
+      - secretKey: sa-api-key
+        remoteKey: mycure-production-cadence-sa-api-key
+
+# (udpGateway — the prod cadence QUIC UDP LoadBalancer — is provisioned separately in monobase-infra#172.)
+
 cadence-legacy:
   # 0.6.1 (mono#2103 Fix 1 + infra#77 Fix 3): DB-owned updated_at triggers
   # + (updated_at, id) keyset index installed by ensure_sync_infra at
@@ -1329,7 +1394,9 @@ cadence-legacy:
   # (zero restarts, changelog ⊆ allowlist, RSS 324Mi). Canary proofs on
   # preprod: raw UPDATE detected in 5s, open-txn detected post-COMMIT
   # only, unconfigured table → zero changelog rows.
-  enabled: true
+  # RETIRED 2026-07-31: superseded by cadence v2 (the `cadence:` block above). Disabled → ArgoCD prunes the
+  # v1 hub. Its `cadence.*` PG schema + Valkey `cadence:*` keys are cleared operationally after v2 is healthy.
+  enabled: false
 
   image:
     repository: ghcr.io/mycurelabs/cadence
