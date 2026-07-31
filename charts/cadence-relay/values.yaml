@@ -13,12 +13,15 @@ image:
 hostname: ""
 
 # Ports. externalHttpsPort = what clients hit (the relay protocol, HTTPS/WebSocket over TLS). The pod runs
-# non-root (PodSecurity), so it binds high ports internally and the LB maps 443 → 8443. QUIC
-# address-discovery (a UDP holepunch aid) is disabled — the relay DATA path is 443/TCP, and the hard-NAT
-# boxes this relay serves can't holepunch regardless; keeping it off means one clean TCP LoadBalancer.
+# non-root (PodSecurity), so it binds high ports internally and the LB maps 443 → 8443.
+# QUIC address-discovery (UDP, iroh's DEFAULT_RELAY_QUIC_PORT 7842) MUST be enabled + exposed: iroh netcheck
+# ranks a relay's latency via this endpoint, and only a ranked relay can be selected as a node's HOME relay.
+# Without it the anchor never homes on this relay (it falls back to n0). 7842 > 1024 so no port mapping is
+# needed (bind == expose). The DO LB carries both TCP 443 and UDP 7842 (same pattern as udp-gateway).
 externalHttpsPort: 443
 httpsBindPort: 8443
 httpBindPort: 8080
+quicPort: 7842
 
 # TLS via cert-manager (DNS-01, works for an L4 service — no HTTP path needed). The issued Secret is
 # mounted read-only and the relay reads it in `Manual` cert mode.

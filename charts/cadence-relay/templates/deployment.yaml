@@ -38,6 +38,9 @@ spec:
         - name: https
           containerPort: {{ .Values.httpsBindPort }}
           protocol: TCP
+        - name: quic
+          containerPort: {{ .Values.quicPort }}
+          protocol: UDP
         volumeMounts:
         - name: config
           mountPath: /etc/iroh-relay/config.toml
