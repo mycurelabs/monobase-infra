@@ -1064,10 +1064,9 @@ cadence:
   udpPort: 6472
   # udp-gateway LB IP — the anchor advertises this so peers connect by EndpointId alone.
   publicAddr: "165.245.145.61:6472"
-  # relayUrl HELD EMPTY until the coordinated cutover window. With QUIC-addr-disc now on the relay, setting
-  # this makes the anchor HOME on our relay (drops n0) — which strands any box still on n0 (alfheim) until
-  # all boxes are updated to maestroapp 2.0.28 (our-relay-only) in the same window. Flip together, not before.
-  relayUrl: ""
+  # CUTOVER: anchor homes on our relay (QUIC-addr-disc lets netcheck rank it) + advertises it in the doc.
+  # All boxes are being moved to maestroapp 2.0.28 (our-relay-only) in the same window.
+  relayUrl: "https://cadence-relay.preprod.localfirsthealth.com"
   nodePool: "staging"
   # Scrape the OpenMetrics /metrics endpoint into Prometheus (reconcile timing/throughput, connect
   # failures, schema drift, reconcile_active, RSS, dirty_depth) — #2727 observability.
