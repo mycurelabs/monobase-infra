@@ -85,6 +85,8 @@ grafana:
       fileName: api-server.json
     - configMapName: grafana-dashboard-prometheus
       fileName: prometheus.json
+    - configMapName: grafana-dashboard-cadence
+      fileName: cadence.json
 
 # ===== Custom Gateway API Configuration =====
 gateway:
