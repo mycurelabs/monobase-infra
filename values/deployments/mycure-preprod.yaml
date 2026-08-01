@@ -1059,7 +1059,7 @@ cadence:
   enabled: true
   image:
     repository: ghcr.io/mycurelabs/cadence
-    tag: "2.0.25" # option-a: anchor our-relay-ONLY so it homes on our relay (option-b/2.0.26 let n0 win netcheck via hairpin)
+    tag: "2.0.28" # reconcile fast-path indexes (#2850)
     pullPolicy: Always # tag was mutated once; Always avoids stale node cache
   udpPort: 6472
   # udp-gateway LB IP — the anchor advertises this so peers connect by EndpointId alone.
