@@ -1104,7 +1104,7 @@ cadence:
   enabled: true
   image:
     repository: ghcr.io/mycurelabs/cadence
-    tag: "2.0.27" # option-a self-hosted relay: anchor homes on cadence-relay + advertises it (#2849)
+    tag: "2.0.28" # reconcile fast-path indexes (#2850)
     pullPolicy: Always # relay cutover; also avoids stale node cache from any reused tag
   udpPort: 6472
   # udp-gateway DO LoadBalancer EXTERNAL-IP (provisioned via monobase-infra#172) — the anchor advertises
