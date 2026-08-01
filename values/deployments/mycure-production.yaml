@@ -1101,7 +1101,7 @@ cadence:
   enabled: true
   image:
     repository: ghcr.io/mycurelabs/cadence
-    tag: "2.0.30" # slow-large-catch-up survival: transport idle 120s + READ_IDLE 90s (mono #2854); preprod-verified
+    tag: "2.1.1" # resume cursor + applier trigger-suppression (stops *_history shell amplification #2856) — preprod-verified incl. purge; WIRE-BREAKING, all prod boxes need ≥2.1.0 (mono #2854/#2856)
     pullPolicy: Always # relay cutover; also avoids stale node cache from any reused tag
   udpPort: 6472
   # udp-gateway DO LoadBalancer EXTERNAL-IP (provisioned via monobase-infra#172) — the anchor advertises
