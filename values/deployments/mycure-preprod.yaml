@@ -1059,7 +1059,7 @@ cadence:
   enabled: true
   image:
     repository: ghcr.io/mycurelabs/cadence
-    tag: "2.0.28" # reconcile fast-path indexes (#2850)
+    tag: "2.0.30" # slow-large-catch-up survival: transport idle 120s + READ_IDLE 90s (mono #2854)
     pullPolicy: Always # tag was mutated once; Always avoids stale node cache
   udpPort: 6472
   # udp-gateway LB IP — the anchor advertises this so peers connect by EndpointId alone.
