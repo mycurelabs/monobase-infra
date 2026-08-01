@@ -1059,7 +1059,7 @@ cadence:
   enabled: true
   image:
     repository: ghcr.io/mycurelabs/cadence
-    tag: "2.1.1" # resume cursor + applier trigger-suppression (stops *_history shell amplification) — both hub+box ≥2.1.0 (mono #2854/#2856)
+    tag: "2.1.2" # + `cadence purge` fp-safe bulk shell-tombstone subcommand (mono #2856/#2860)
     pullPolicy: Always # tag was mutated once; Always avoids stale node cache
   udpPort: 6472
   # udp-gateway LB IP — the anchor advertises this so peers connect by EndpointId alone.
