@@ -35,8 +35,7 @@ app.kubernetes.io/part-of: monobase
 
 {{/*
 Selector labels. The udp-gateway UDP LoadBalancer selects pods by `app.kubernetes.io/name: cadence`
-(kept in lockstep in charts/udp-gateway/values.yaml). Legacy v1 is a separate chart labelled
-`cadence-legacy`, so there is no collision.
+(kept in lockstep in charts/udp-gateway/values.yaml).
 */}}
 {{- define "cadence.selectorLabels" -}}
 app.kubernetes.io/name: cadence
