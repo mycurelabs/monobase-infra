@@ -1,4 +1,5 @@
-# cadence-v2 HUB (anchor) config for mycure-preprod — the isolated-DB rehearsal.
+# cadence-v2 HUB (anchor) config — shared across environments; per-env values are templated in
+# (the configmap renders this via `tpl`, so `{{ .Values.publicAddr }}` resolves per deployment).
 # Rendered into a ConfigMap by charts/cadence and read via `cadence run --config`. Transport + auth + tuning
 # here; the sync manifest is inline as `sync:` (kept in lockstep with the mono
 # services/cadence-v2-example-hapihub/cadence.yaml). The DB URL is injected at runtime via CADENCE_DB
@@ -9,7 +10,7 @@ seed_url: []                        # a hub has no upstream seed (it is the anch
 seed: []
 accept: true                        # anchor: accept inbound + bind the fixed port
 listen_port: 6472
-public_addr: 165.245.145.61:6472    # the udp-gateway LB — peers reach this hub directly by EndpointId
+public_addr: {{ .Values.publicAddr }}    # per-env udp-gateway LB (values.cadence.publicAddr) — peers reach this hub directly by EndpointId
 mdns: false
 api_addr: 0.0.0.0:9464              # observability API + bootstrap discovery doc (/.well-known/…)
 alpn: hapihub/2                     # app boundary: gates catch-up + namespaces gossip topics
