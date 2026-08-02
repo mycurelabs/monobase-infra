@@ -10,5 +10,5 @@ data:
   # The hub's cadence.yaml — transport + auth + tuning + the inline `sync:` manifest. Kept in lockstep
   # with the mono services/cadence-v2-example-hapihub/cadence.yaml (the sync section is the single source).
   cadence.yaml: |
-    {{- .Files.Get "files/cadence.yaml" | nindent 4 }}
+    {{- tpl (.Files.Get "files/cadence.yaml") . | nindent 4 }}
 {{- end }}
