@@ -1059,7 +1059,7 @@ cadence:
   enabled: true
   image:
     repository: ghcr.io/mycurelabs/cadence
-    tag: "2.1.8" # adaptive payload-fetch batch + halve-on-timeout retry so wide-JSONB tables stop stalling capture (mono #2913)
+    tag: "2.1.9" # bound catch-up serve first-frame (PAGE 5000→1000 + flush per page) so the resume cursor advances on fat scopes (mono #2918)
     pullPolicy: Always # tag was mutated once; Always avoids stale node cache
   udpPort: 6472
   # udp-gateway LB IP — the anchor advertises this so peers connect by EndpointId alone.
