@@ -10,11 +10,15 @@ metadata:
     # Stable LB name → DO reuses the same LoadBalancer + IP across Service recreation, so the relay's
     # public address doesn't churn.
     service.beta.kubernetes.io/do-loadbalancer-name: {{ printf "%s-cadence-relay" .Values.global.namespace | quote }}
-    # DO health check must target a Service port (DO maps it to that port's nodePort) — TCP-connect the
-    # relay's HTTPS port. Using the pod bind port (8443) here fails: it has no nodePort, so every backend
-    # is marked unhealthy and the LB drops all traffic.
-    service.beta.kubernetes.io/do-loadbalancer-healthcheck-protocol: "tcp"
+    # DO health check must target a Service port (DO maps it to that port's nodePort). Use an HTTPS GET of
+    # the relay's `/` (iroh-relay answers 200) on the existing https port rather than a bare TCP connect:
+    # a TCP check opens the TLS port then closes without a ClientHello, so the relay logs every probe as
+    # `http_server: failed to handle connection … TLS accept … reset` at ERROR (≈1/3 of all log lines). A
+    # real HTTPS request completes the handshake → 200 → healthy, no reset spam. (Don't use the pod bind
+    # port 8443 here — it has no nodePort, which marks every backend unhealthy and drops all traffic.)
+    service.beta.kubernetes.io/do-loadbalancer-healthcheck-protocol: "https"
     service.beta.kubernetes.io/do-loadbalancer-healthcheck-port: {{ .Values.externalHttpsPort | quote }}
+    service.beta.kubernetes.io/do-loadbalancer-healthcheck-path: "/"
     # external-dns creates the A record for the relay hostname → this LB's IP.
     external-dns.alpha.kubernetes.io/hostname: {{ include "cadence-relay.hostname" . | quote }}
 spec:
