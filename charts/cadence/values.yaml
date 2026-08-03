@@ -78,7 +78,7 @@ serviceAccount:
   name: ""
   annotations: {}
 
-# A cadence-v2 data-plane hub carries the ~1.2 GiB iroh/tokio/loro floor — do NOT undersize (the old
+# A cadence data-plane hub carries the ~1.2 GiB iroh/tokio/loro floor — do NOT undersize (the old
 # transport-only 64Mi/128Mi was for `peer --accept`). The isolated small DB keeps baseline cheap.
 resources:
   requests:
