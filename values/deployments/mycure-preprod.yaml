@@ -1059,7 +1059,7 @@ cadence:
   enabled: true
   image:
     repository: ghcr.io/mycurelabs/cadence
-    tag: "2.1.5" # retry (not quarantine) transient DB errors in reconcile apply — no silent cloud-row drop under load (mono #2909)
+    tag: "2.1.6" # backpressure baseline enqueue so it stops starving the shared box PG (bounds cadence_dirty, mono #2911)
     pullPolicy: Always # tag was mutated once; Always avoids stale node cache
   udpPort: 6472
   # udp-gateway LB IP — the anchor advertises this so peers connect by EndpointId alone.
