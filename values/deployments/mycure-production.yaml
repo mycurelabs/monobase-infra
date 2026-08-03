@@ -235,7 +235,7 @@ hapihub:
   gateway:
     hostnames:
       # Canonical host (took over from the retired v10 stack, #176). Carries the
-      # cadence-v2 OAuth AS metadata (token_endpoint/jwks_uri minted from
+      # cadence OAuth AS metadata (token_endpoint/jwks_uri minted from
       # EXTERNAL_ADDRESS = this host, immutable = better-auth baseURL).
       - hapihub.localfirsthealth.com
       # Retained alias — frontends/cadence still call it. Keep until they migrate.
@@ -295,7 +295,7 @@ hapihub:
       value: "no-reply@mycure.md"
     - name: EMAIL_FROM_NAME
       value: "MyCure"
-    # cadence-v2 OAuth Authorization Server (v1→v2 prod cutover). hapihub is the SOLE AS: it mints box grants
+    # cadence OAuth Authorization Server (v1→v2 prod cutover). hapihub is the SOLE AS: it mints box grants
     # AND the hub's own '*' grant with this EdDSA key. The values are advertised in
     # /.well-known/cadence-configuration.json so a box derives its sync hub (cadence_seed_url) + fleet (aud)
     # from the single api URL — single-URL onboarding. CADENCE_ISSUER_KEY (the PEM) is the externalSecret below.
@@ -333,7 +333,7 @@ hapihub:
     secretStoreKind: ClusterSecretStore
     refreshInterval: 1h
     secrets:
-      # cadence-v2 issuer EdDSA signing key (prod cutover) — hapihub mints box + hub grants with it.
+      # cadence issuer EdDSA signing key (prod cutover) — hapihub mints box + hub grants with it.
       - secretKey: CADENCE_ISSUER_KEY
         remoteKey: mycure-production-cadence-issuer-key-pem
       # Google OAuth

@@ -1,8 +1,8 @@
-# cadence-v2 HUB (anchor) config — shared across environments; per-env values are templated in
+# cadence HUB (anchor) config — shared across environments; per-env values are templated in
 # (the configmap renders this via `tpl`, so `{{ .Values.publicAddr }}` resolves per deployment).
 # Rendered into a ConfigMap by charts/cadence and read via `cadence run --config`. Transport + auth + tuning
 # here; the sync manifest is inline as `sync:` (kept in lockstep with the mono
-# services/cadence-v2-example-hapihub/cadence.yaml). The DB URL is injected at runtime via CADENCE_DB
+# services/cadence-example-hapihub/cadence.yaml). The DB URL is injected at runtime via CADENCE_DB
 # (holds the PG password from the ExternalSecret) — never templated into this file.
 
 # db: injected via CADENCE_DB env (postgres://…/cadence_v2) — do NOT set here (keeps the secret out of git).

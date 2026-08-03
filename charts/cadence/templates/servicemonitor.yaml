@@ -1,5 +1,5 @@
 {{- if and .Values.enabled .Values.serviceMonitor.enabled }}
-# Scrapes the cadence-v2 OpenMetrics endpoint (GET /metrics on the `api` port, 9464) into Prometheus:
+# Scrapes the cadence OpenMetrics endpoint (GET /metrics on the `api` port, 9464) into Prometheus:
 # reconcile timing (reconcile_ms/reconcile_ticks), throughput (applied/captured/reconciled),
 # connectivity (reconcile_connect_failures, bootstrap_retries), schema drift (schema_mismatch),
 # reconcile_active, RSS, db pool, dirty_depth. Off by default; enabled per-env in values.
