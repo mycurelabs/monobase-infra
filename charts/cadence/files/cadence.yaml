@@ -249,7 +249,7 @@ sync:
         - { ty: org, field: organization }
     - name: medicines
       tags:
-        - { ty: org, field: facility }
+        - { ty: org, field: organization }
     - name: organization_members
       tags:
         - { ty: org, field: organization }
