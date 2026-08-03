@@ -188,7 +188,7 @@ hapihub:
 
   image:
     repository: ghcr.io/mycurelabs/hapihub
-    tag: "11.20.81" # feat/cadence: overlorded orgs route to overlord's fam:<cluster> (#2727)
+    tag: "11.20.85" # match the box's bundled hapihub schema (cadence schema_hash guard) for the 2.1.4 box↔hub reconcile test
     pullPolicy: IfNotPresent
 
   # Valkey response cache (mono#2231) — preprod is the pilot environment.
@@ -1059,7 +1059,7 @@ cadence:
   enabled: true
   image:
     repository: ghcr.io/mycurelabs/cadence
-    tag: "2.1.2" # + `cadence purge` fp-safe bulk shell-tombstone subcommand (mono #2856/#2860)
+    tag: "2.1.4" # unified Node::start + background baseline so large boxes actually sync (mono #2904)
     pullPolicy: Always # tag was mutated once; Always avoids stale node cache
   udpPort: 6472
   # udp-gateway LB IP — the anchor advertises this so peers connect by EndpointId alone.
