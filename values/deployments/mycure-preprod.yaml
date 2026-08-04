@@ -1057,9 +1057,8 @@ cadenceRelay:
 # initContainer, API service + HTTPRoute (cadence.preprod…), reachable for direct QUIC via udp-gateway.
 cadence:
   enabled: true
-  # Preprod opts into the observability API (/metrics /status /peers) + targeted routing debug so we can
-  # measure the resolve-cache memo (cadence_resolve_cache_builds flat = memo working) — mono#2966.
-  apiAddr: ":9464"
+  # Preprod: targeted routing debug to measure the resolve-cache memo (cadence_resolve_cache_builds
+  # flat = memo working, mono#2966). The observability API is already on via cadence.yaml (api_addr).
   rustLog: "cadence=info,cadence::routing=debug,warn"
   image:
     repository: ghcr.io/mycurelabs/cadence
