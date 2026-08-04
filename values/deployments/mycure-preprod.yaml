@@ -1059,7 +1059,7 @@ cadence:
   enabled: true
   image:
     repository: ghcr.io/mycurelabs/cadence
-    tag: "2.1.18" # batched key reads JOIN (VALUES …) not (coll,id) IN — index-only scan vs a 500-way BitmapOr, ~830× less work on the shared app PG during baseline (#2947); det content-derived versions (#2938)
+    tag: "2.1.21" # per-value lazy baseline: resolve-derived fam: scopes enqueue col='v' per value (indexed range scan) instead of col IN(…)+global-pk SORT that statement-timed-out at 60s/chunk on a 5.18M-row scope → 0 progress forever (mono#2962); + concurrent broadcast dispatch (#2961), hot/baseline capture split (#2958)
     pullPolicy: Always # tag was mutated once; Always avoids stale node cache
   udpPort: 6472
   # udp-gateway LB IP — the anchor advertises this so peers connect by EndpointId alone.
