@@ -10,6 +10,12 @@ image:
 udpPort: 6472
 # TCP port for the observability + bootstrap API (/healthz, /readyz, /metrics, /.well-known/…).
 apiPort: 9464
+# Address the observability API binds. Empty ⇒ API OFF (the flag-gated default). Set per-env (e.g.
+# ":9464") to opt into /metrics /status /peers — zero cost until set.
+apiAddr: ""
+# RUST_LOG for the cadence container. Override per-env for targeted debug (e.g.
+# "cadence=info,cadence::routing=debug,warn").
+rustLog: "cadence=info,warn"
 
 # Public address the anchor advertises (the udp-gateway LB IP:port) so peers reach it directly by
 # EndpointId alone. Must match `public_addr` in the mounted cadence.yaml.
