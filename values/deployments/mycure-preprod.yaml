@@ -1059,7 +1059,7 @@ cadence:
   enabled: true
   image:
     repository: ghcr.io/mycurelabs/cadence
-    tag: "2.1.14" # deterministic content-derived row versions — re-baseline/clone converge (fp match); replaces HLC state-versioning (#2938)
+    tag: "2.1.18" # batched key reads JOIN (VALUES …) not (coll,id) IN — index-only scan vs a 500-way BitmapOr, ~830× less work on the shared app PG during baseline (#2947); det content-derived versions (#2938)
     pullPolicy: Always # tag was mutated once; Always avoids stale node cache
   udpPort: 6472
   # udp-gateway LB IP — the anchor advertises this so peers connect by EndpointId alone.
