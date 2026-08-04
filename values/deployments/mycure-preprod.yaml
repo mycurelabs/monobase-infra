@@ -1059,7 +1059,7 @@ cadence:
   enabled: true
   image:
     repository: ghcr.io/mycurelabs/cadence
-    tag: "2.1.13" # zombie-box fix: mDNS re-bootstrap throttle (#2922) + per-scope re-bootstrap (#2932) + catch-up first-frame; box+hub lockstep
+    tag: "2.1.14" # deterministic content-derived row versions — re-baseline/clone converge (fp match); replaces HLC state-versioning (#2938)
     pullPolicy: Always # tag was mutated once; Always avoids stale node cache
   udpPort: 6472
   # udp-gateway LB IP — the anchor advertises this so peers connect by EndpointId alone.
