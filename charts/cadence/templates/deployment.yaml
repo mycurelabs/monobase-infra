@@ -104,9 +104,14 @@ spec:
           value: {{ .Values.relayUrl | quote }}
         {{- end }}
         - name: RUST_LOG
-          value: "cadence=info,warn"
+          value: {{ .Values.rustLog | default "cadence=info,warn" | quote }}
         - name: CADENCE_LOG_FORMAT
           value: "json"
+        {{- if .Values.apiAddr }}
+        # Observability API (/metrics /status /peers) — off by default; set per-env to opt in.
+        - name: CADENCE_API_ADDR
+          value: {{ .Values.apiAddr | quote }}
+        {{- end }}
         ports:
         - name: quic
           containerPort: {{ .Values.udpPort }}
