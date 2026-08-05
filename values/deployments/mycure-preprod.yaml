@@ -1062,7 +1062,7 @@ cadence:
   rustLog: "cadence=info,cadence::routing=debug,warn"
   image:
     repository: ghcr.io/mycurelabs/cadence
-    tag: "2.1.22" # resolve-relationship cache memoized behind a change-epoch: re-reads resolve_via tables (organizations) only when they change, not every capture tick — kills the per-tick `to_jsonb FROM organizations` contention on the shared app PG; bounded (1M-edge cap, one snapshot) (mono#2966). + per-value lazy baseline (#2962), concurrent broadcast dispatch (#2961)
+    tag: "2.1.25" # seed reconcile-backoff capped below the anchor subscription TTL: a hard-NAT edge re-dials its anchor within the TTL so a flap can't strand it past the 32-min backoff — orphan recovery ≤32min → ≤2min (mono#2981). + resolve-cache memo (#2966), per-value lazy baseline (#2962), concurrent broadcast dispatch (#2961)
     pullPolicy: Always # tag was mutated once; Always avoids stale node cache
   udpPort: 6472
   # udp-gateway LB IP — the anchor advertises this so peers connect by EndpointId alone.
