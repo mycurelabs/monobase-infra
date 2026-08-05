@@ -1057,13 +1057,33 @@ cadenceRelay:
 # initContainer, API service + HTTPRoute (cadence.preprod…), reachable for direct QUIC via udp-gateway.
 cadence:
   enabled: true
-  # Preprod: targeted routing debug to measure the resolve-cache memo (cadence_resolve_cache_builds
-  # flat = memo working, mono#2966). The observability API is already on via cadence.yaml (api_addr).
-  rustLog: "cadence=info,cadence::routing=debug,warn"
+  # ── TEMPORARY (transport pressure test, mono#3037): the -net harness image REPLACES the sync hub ──
+  # While this block is in effect, the preprod sync hub is DOWN (boxes back off + self-heal on
+  # restore). Restore = revert to tag "2.1.26" + delete `args`/`netSkSecret`. See mono
+  # crates/cadence-net/README.md for the harness + scenario catalogue.
+  rustLog: "cadence_net=debug,iroh=info,iroh_gossip=info,warn"
   image:
     repository: ghcr.io/mycurelabs/cadence
-    tag: "2.1.26" # per-collection priority tiers (mono#2997): baseline + dense catch-up serve current-state before *_history bulk (order only, still converges); manifest priorities in the sync block below
+    tag: "2.1.26-net" # transport-only net-probe harness (serve mode); NOT the sync engine
     pullPolicy: Always # tag was mutated once; Always avoids stale node cache
+  # Serve-mode anchor on the isolated test overlay (own ALPN → can never mesh with the production
+  # overlay, even across the shared relay). Inherits the udp-gateway LB (TCP dump on 6472 keeps the
+  # health check green) + the well-known ingress (doc server on 9464 answers the HTTP probes).
+  args:
+    - "--serve"
+    - "--scope"
+    - "net:pressure"
+    - "--listen-port"
+    - "6472"
+    - "--doc-addr"
+    - "0.0.0.0:9464"
+    - "--public-addr"
+    - "165.245.145.61:6472"
+    - "--relay"
+    - "https://cadence-relay.preprod.localfirsthealth.com"
+    - "--alpn"
+    - "cadence-net-test/1"
+  netSkSecret: "cadence-net-sk" # imperative Secret (key `sk`) — stable anchor id across restarts
   udpPort: 6472
   # udp-gateway LB IP — the anchor advertises this so peers connect by EndpointId alone.
   publicAddr: "165.245.145.61:6472"

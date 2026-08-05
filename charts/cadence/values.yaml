@@ -17,6 +17,17 @@ apiAddr: ""
 # "cadence=info,cadence::routing=debug,warn").
 rustLog: "cadence=info,warn"
 
+# Override the MAIN container's args. Default (empty) = the stock sync engine
+# (`run --config /etc/cadence/cadence.yaml`). Setting this ALSO skips the `enroll` initContainer --
+# custom args mean the pod is not running the stock engine (e.g. the cadence-net `-net` pressure
+# image; crates/cadence-net/README.md in the mono repo), so the engine auth-grant prerequisite
+# does not apply.
+args: []
+# Name of a k8s Secret (key `sk`, 64 hex chars) giving the -net harness a stable identity
+# (CADENCE_NET_SK). Empty = unset (ephemeral identity per pod start). Test-scoped; created
+# imperatively, not managed here.
+netSkSecret: ""
+
 # Public address the anchor advertises (the udp-gateway LB IP:port) so peers reach it directly by
 # EndpointId alone. Must match `public_addr` in the mounted cadence.yaml.
 publicAddr: "165.245.145.61:6472"
