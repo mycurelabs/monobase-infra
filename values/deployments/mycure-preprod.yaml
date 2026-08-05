@@ -1060,7 +1060,7 @@ cadence:
   rustLog: "cadence=info,cadence_routing=debug,warn"
   image:
     repository: ghcr.io/mycurelabs/cadence
-    tag: "2.1.35" # typed range bounds (mono#3072): short-id tree exclusion removed — org: scopes negotiate on the tree (was ~180 s scan rounds). WIRE IS FLEET-LOCKSTEP — boxes must run 2.1.35 too.
+    tag: "2.1.36" # future-clock containment (mono#3074): capture gate + poison sweep + durable DLQ — auto-heals the 12-row future-updated_at wedge within one GC tick. Wire unchanged.
     pullPolicy: Always # tag was mutated once; Always avoids stale node cache
   udpPort: 6472
   # udp-gateway LB IP — the anchor advertises this so peers connect by EndpointId alone.
