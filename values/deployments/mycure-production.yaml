@@ -1102,7 +1102,7 @@ cadence:
   rustLog: "cadence=info,cadence_routing=debug,warn"
   image:
     repository: ghcr.io/mycurelabs/cadence
-    tag: "2.1.37" # parity with preprod: RSOS tree + LeafIds (mono#3062), typed bounds (#3072), observability (#3068), future-clock containment (#3074/#3076). WIRE: boxes must run maestroapp ≥2.1.35 (mdt upgraded in the same window)
+    tag: "2.1.38" # gate-fp drift self-heal (mono#3078): persist the drift scan — ends per-round O(scope) scans, activates the org range tree
     pullPolicy: Always # relay cutover; also avoids stale node cache from any reused tag
   udpPort: 6472
   # udp-gateway DO LoadBalancer EXTERNAL-IP (provisioned via monobase-infra#172) — the anchor advertises
