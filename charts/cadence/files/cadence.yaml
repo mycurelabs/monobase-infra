@@ -1,35 +1,35 @@
-# cadence HUB (anchor) config ÃÂ¢ÃÂÃÂ shared across environments; per-env values are templated in
+# cadence HUB (anchor) config — shared across environments; per-env values are templated in
 # (the configmap renders this via `tpl`, so `{{ .Values.publicAddr }}` resolves per deployment).
 # Rendered into a ConfigMap by charts/cadence and read via `cadence run --config`. Transport + auth + tuning
 # here; the sync manifest is inline as `sync:` (kept in lockstep with the mono
 # services/hapihub/cadence.yaml). The DB URL is injected at runtime via CADENCE_DB
-# (holds the PG password from the ExternalSecret) ÃÂ¢ÃÂÃÂ never templated into this file.
+# (holds the PG password from the ExternalSecret) — never templated into this file.
 
-# db: injected via CADENCE_DB env (postgres://ÃÂ¢ÃÂÃÂ¦/cadence_v2) ÃÂ¢ÃÂÃÂ do NOT set here (keeps the secret out of git).
+# db: injected via CADENCE_DB env (postgres://…/cadence_v2) — do NOT set here (keeps the secret out of git).
 seed_url: []                        # a hub has no upstream seed (it is the anchor)
 seed: []
 accept: true                        # anchor: accept inbound + bind the fixed port
 listen_port: 6472
-public_addr: {{ .Values.publicAddr }}    # per-env udp-gateway LB (values.cadence.publicAddr) ÃÂ¢ÃÂÃÂ peers reach this hub directly by EndpointId
+public_addr: {{ .Values.publicAddr }}    # per-env udp-gateway LB (values.cadence.publicAddr) — peers reach this hub directly by EndpointId
 mdns: false
-api_addr: 0.0.0.0:9464              # observability API + bootstrap discovery doc (/.well-known/ÃÂ¢ÃÂÃÂ¦)
+api_addr: 0.0.0.0:9464              # observability API + bootstrap discovery doc (/.well-known/…)
 alpn: hapihub/2                     # app boundary: gates catch-up + namespaces gossip topics
 
 auth:
-  # 2.x is OAuth: the AS is discovered via RFC 8414 from issuer_url (ÃÂ¢ÃÂÃÂ iss + jwks_uri). issuer_url,
+  # 2.x is OAuth: the AS is discovered via RFC 8414 from issuer_url (→ iss + jwks_uri). issuer_url,
   # grant_jwks_uri and fleet_id are ENV-SPECIFIC, so they are NOT set here (this file is mounted verbatim,
-  # not templated) ÃÂ¢ÃÂÃÂ the deployment injects them via CADENCE_ISSUER_URL / CADENCE_GRANT_JWKS_URI /
+  # not templated) — the deployment injects them via CADENCE_ISSUER_URL / CADENCE_GRANT_JWKS_URI /
   # CADENCE_FLEET_ID (env wins over this file). The hub verifies box grants + its own '*' grant against the
   # AS's JWKS (all share one signing key). Only env-agnostic knobs stay here:
   jwks_refresh_secs: 300
   min_iat: 0                        # revocation wall (unix secs; 0 = off)
 
-# Engine timing + reconcile tuning. Every key defaults to its production value (shown) ÃÂ¢ÃÂÃÂ omit the whole
+# Engine timing + reconcile tuning. Every key defaults to its production value (shown) — omit the whole
 # `tuning:` block to take all defaults, or list just the keys you want to change.
 tuning:
   capture_every_secs: 1
   reconcile_every_secs: 30
-  retention_secs: 604800            # 7d ÃÂ¢ÃÂÃÂ load-bearing: MUST exceed max peer offline duration
+  retention_secs: 604800            # 7d — load-bearing: MUST exceed max peer offline duration
   gc_every_secs: 3600
   reroute_every_secs: 300
   schema_check_every_secs: 60
@@ -41,13 +41,13 @@ tuning:
   # (cadence 2.0.14, #2727). The hub serves a handful of test orgs, not the whole tenant set.
   lazy_baseline: true
 
-# The sync manifest, inline ÃÂ¢ÃÂÃÂ the ONLY place collections are supplied (there is no separate manifest
+# The sync manifest, inline — the ONLY place collections are supplied (there is no separate manifest
 # file). Auto-enumerated from the prod `hapihub` DB schema (every real application table), scope inferred
 # per-table:
 #   - cadence.yml scope_columns where the table is listed there (authoritative),
 #   - else inferred from the row's columns (org: facility>organization>warehouse, insurance OR-lists;
 #     user: uid/user_id/owner/created_by/by_uid/account/author),
-#   - else the entry is COMMENTED OUT (no scope column found ÃÂ¢ÃÂÃÂ confirm/cherry-pick).
+#   - else the entry is COMMENTED OUT (no scope column found — confirm/cherry-pick).
 # Trailing `# blacklist` marks tables cadence.yml does NOT sync (kept here for review). Excluded entirely
 # (not collections): _bak_* snapshots, *_history/_archive, migration/changelog/cadence-internal tables.
 # routable `org`; a non-routable `user` tag resolves to org topics via organization_members.
@@ -60,7 +60,7 @@ sync:
     # A patient's `facility` resolves to `fam:<clusterKey>` via the org's own `cluster`
     # (= COALESCE(parent, id)), so a whole 2-level org family shares ONE topic. Only the
     # collections carrying a `famsrc` tag (medical_patients, personal_details) fan across the
-    # family ÃÂ¢ÃÂÃÂ everything else stays scoped to its single owning org (per-collection).
+    # family — everything else stays scoped to its single owning org (per-collection).
     - [famsrc, organizations, fam]
   collections:
     - name: account_configurations
@@ -151,7 +151,7 @@ sync:
       tags:
         - { ty: org, field: facility }
     - name: diagnostic_order_tests_history
-      priority: 20   # *_history bulk: baseline/catch-up LAST (order only -- still converges)
+      priority: 20   # *_history bulk: baseline/catch-up LAST, after current-state (order only, still converges)
       tags:
         - { ty: org, field: facility }
     - name: diagnostic_order_tests_reports
@@ -240,7 +240,7 @@ sync:
         - { ty: org, field: facility }
         - { ty: famsrc, field: facility }   # + family topic: a patient's records follow them across branches
     - name: medical_records_history
-      priority: 20   # the biggest, fattest collection (~4.3M rows) -- baseline it LAST
+      priority: 20   # the biggest, fattest collection (~4.3M rows), baseline it LAST so a box is usable in minutes
       tags:
         - { ty: org, field: facility }
         - { ty: famsrc, field: facility }   # + family topic (alongside medical_records)
@@ -274,7 +274,7 @@ sync:
         - { ty: user, field: id }
         - { ty: famsrc, field: facility }   # + family topic (per-collection, alongside medical_patients)
     - name: personal_details_history
-      priority: 20   # *_history bulk: baseline/catch-up LAST (order only -- still converges)
+      priority: 20   # *_history bulk: baseline/catch-up LAST, after current-state (order only, still converges)
       tags:
         - { ty: org, field: facility }
         - { ty: user, field: id }
@@ -348,7 +348,7 @@ sync:
     # - name: verification                     # better-auth, online-only
     # - name: session                          # better-auth, per-device
 
-    ## Unsorted ÃÂ¢ÃÂÃÂ prod scan 2026-07-24 (not yet in collections or blacklist; review + sort)
+    ## Unsorted — prod scan 2026-07-24 (not yet in collections or blacklist; review + sort)
     # - name: account_activity
     # - name: analytics_daily_counts
     # - name: announcement_acknowledgments
