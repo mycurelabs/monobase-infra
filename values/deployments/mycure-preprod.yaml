@@ -1057,11 +1057,34 @@ cadenceRelay:
 # initContainer, API service + HTTPRoute (cadence.preprod…), reachable for direct QUIC via udp-gateway.
 cadence:
   enabled: true
-  rustLog: "cadence=info,cadence_routing=debug,warn"
+  # ── TEMPORARY (transport pressure test, mono#3056): the -net harness image REPLACES the sync hub ──
+  # While this block is in effect, the preprod sync hub is DOWN (boxes back off + self-heal on restore).
+  # Restore = revert tag to "2.1.28" + delete `args`/`netSkSecret` + restore rustLog. The 2.1.29-net image
+  # carries the net-layer loudness signals (scopes_held/scopes_orphaned gauges, dead-topic reap, dump-port
+  # bound) from mono#3056 — the point of this run is to prove they fire on a severed topology.
+  rustLog: "cadence_net=debug,iroh=info,iroh_gossip=info,warn"
   image:
     repository: ghcr.io/mycurelabs/cadence
-    tag: "2.1.28" # relay liveness probe path fix (mono#3051: /generate_204 is plain-HTTP-only → falls back to GET /; makes cadence_net_relay_probe_failures truthful) on top of the 2.1.27 oversized-broadcast fix (mono#3043)
+    tag: "2.1.29-net" # transport-only net-probe harness (serve mode); NOT the sync engine
     pullPolicy: Always # tag was mutated once; Always avoids stale node cache
+  # Serve-mode anchor on the isolated test overlay (own ALPN → can never mesh with the production overlay,
+  # even across the shared relay). Inherits the udp-gateway LB (TCP dump on 6472 keeps the health check
+  # green) + the well-known ingress (doc server on 9464 answers the HTTP probes).
+  args:
+    - "--serve"
+    - "--scope"
+    - "net:pressure"
+    - "--listen-port"
+    - "6472"
+    - "--doc-addr"
+    - "0.0.0.0:9464"
+    - "--public-addr"
+    - "165.245.145.61:6472"
+    - "--relay"
+    - "https://cadence-relay.preprod.localfirsthealth.com"
+    - "--alpn"
+    - "cadence-net-test/1"
+  netSkSecret: "cadence-net-sk" # imperative Secret (key `sk`) — stable anchor id across restarts
   udpPort: 6472
   # udp-gateway LB IP — the anchor advertises this so peers connect by EndpointId alone.
   publicAddr: "165.245.145.61:6472"
