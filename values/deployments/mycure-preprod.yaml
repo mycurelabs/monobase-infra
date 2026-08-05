@@ -1060,7 +1060,7 @@ cadence:
   rustLog: "cadence=info,cadence_routing=debug,warn"
   image:
     repository: ghcr.io/mycurelabs/cadence
-    tag: "2.1.37" # future-clock containment hotfix (mono#3076): cadence_meta_phys built CONCURRENTLY — 2.1.36 wedged enroll on the big live cadence_meta
+    tag: "2.1.38" # gate-fp drift self-heal (mono#3078): persist the drift scan — ends per-round O(scope) scans, activates the org range tree
     pullPolicy: Always # tag was mutated once; Always avoids stale node cache
   udpPort: 6472
   # udp-gateway LB IP — the anchor advertises this so peers connect by EndpointId alone.
