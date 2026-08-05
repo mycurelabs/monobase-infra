@@ -1060,7 +1060,7 @@ cadence:
   rustLog: "cadence=info,cadence_routing=debug,warn"
   image:
     repository: ghcr.io/mycurelabs/cadence
-    tag: "2.1.27" # sync hub RESTORED post transport-harness test (mono#224 block removed): oversized-broadcast fix — fat *_history rows no longer kill the gossip connection (64KiB max + engine guard, mono#3043) + relay liveness probe ground truth (cadence_net_relay_probe_failures)
+    tag: "2.1.28" # relay liveness probe path fix (mono#3051: /generate_204 is plain-HTTP-only → falls back to GET /; makes cadence_net_relay_probe_failures truthful) on top of the 2.1.27 oversized-broadcast fix (mono#3043)
     pullPolicy: Always # tag was mutated once; Always avoids stale node cache
   udpPort: 6472
   # udp-gateway LB IP — the anchor advertises this so peers connect by EndpointId alone.
