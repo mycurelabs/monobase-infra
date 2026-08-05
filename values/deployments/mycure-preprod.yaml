@@ -1062,7 +1062,7 @@ cadence:
   rustLog: "cadence=info,cadence::routing=debug,warn"
   image:
     repository: ghcr.io/mycurelabs/cadence
-    tag: "2.1.25" # seed reconcile-backoff capped below the anchor subscription TTL: a hard-NAT edge re-dials its anchor within the TTL so a flap can't strand it past the 32-min backoff — orphan recovery ≤32min → ≤2min (mono#2981). + resolve-cache memo (#2966), per-value lazy baseline (#2962), concurrent broadcast dispatch (#2961)
+    tag: "2.1.26" # per-collection priority tiers (mono#2997): baseline + dense catch-up serve current-state before *_history bulk (order only, still converges); manifest priorities in the sync block below
     pullPolicy: Always # tag was mutated once; Always avoids stale node cache
   udpPort: 6472
   # udp-gateway LB IP — the anchor advertises this so peers connect by EndpointId alone.
