@@ -1060,7 +1060,7 @@ cadence:
   rustLog: "cadence=info,cadence_routing=debug,warn"
   image:
     repository: ghcr.io/mycurelabs/cadence
-    tag: "2.1.28" # relay liveness probe path fix (mono#3051: /generate_204 is plain-HTTP-only → falls back to GET /; makes cadence_net_relay_probe_failures truthful) on top of the 2.1.27 oversized-broadcast fix (mono#3043)
+    tag: "2.1.33" # reconcile fast path: RSOS range tree + LeafIds id-exchange (mono#3062, 50× sparse catch-up) + full fault→signal observability (mono#3068). WIRE IS FLEET-LOCKSTEP — boxes must run 2.1.33 too.
     pullPolicy: Always # tag was mutated once; Always avoids stale node cache
   udpPort: 6472
   # udp-gateway LB IP — the anchor advertises this so peers connect by EndpointId alone.
