@@ -34,6 +34,7 @@ spec:
       # since its advertised authorization_endpoint is the browser SPA) with a non-expiring service-account API
       # key (CADENCE_AUTH_BEARER → x-api-key-equivalent via Bearer). hapihub mints with a coherent status_list;
       # the hub verifies box + own grants against hapihub's JWKS. Retries until hapihub + the DB are reachable.
+      {{- if not .Values.args }}
       initContainers:
       - name: enroll
         image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
@@ -69,6 +70,7 @@ spec:
             secretKeyRef:
               name: cadence-secrets
               key: sa-api-key
+      {{- end }}
       containers:
       - name: cadence
         image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
@@ -80,8 +82,23 @@ spec:
             drop: ["ALL"]
         # Image ENTRYPOINT is `cadence`; run the data-plane engine from the mounted config. Transport +
         # auth + the inline sync live in cadence.yaml; the DB URL (with the secret) comes via CADENCE_DB.
+        # `args` in values overrides the stock engine invocation (e.g. the cadence-net `-net` harness
+        # image) — and also skips the enroll initContainer above (custom args = not the stock engine,
+        # no grant prerequisite).
+        {{- if .Values.args }}
+        args: {{ toYaml .Values.args | nindent 10 }}
+        {{- else }}
         args: ["run", "--config", "/etc/cadence/cadence.yaml"]
+        {{- end }}
         env:
+        {{- if .Values.netSkSecret }}
+        # Stable identity for the -net harness (hex 32B) — see chart value `netSkSecret`.
+        - name: CADENCE_NET_SK
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.netSkSecret }}
+              key: sk
+        {{- end }}
         - name: PGPASS
           valueFrom:
             secretKeyRef:
