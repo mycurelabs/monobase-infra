@@ -1099,9 +1099,10 @@ cadenceRelay:
 # the live tables at startup and baselines existing rows (ships the #2823 baseline fix + #2817 re-baseline).
 cadence:
   enabled: true
+  rustLog: "cadence=info,cadence_routing=debug,warn"
   image:
     repository: ghcr.io/mycurelabs/cadence
-    tag: "2.1.2" # + `cadence purge` fp-safe bulk shell-evict tool (#2860) for the fleet-wide cloud shell cleanup; wire-compat with 2.1.1 (mono #2854/#2856)
+    tag: "2.1.37" # parity with preprod: RSOS tree + LeafIds (mono#3062), typed bounds (#3072), observability (#3068), future-clock containment (#3074/#3076). WIRE: boxes must run maestroapp ≥2.1.35 (mdt upgraded in the same window)
     pullPolicy: Always # relay cutover; also avoids stale node cache from any reused tag
   udpPort: 6472
   # udp-gateway DO LoadBalancer EXTERNAL-IP (provisioned via monobase-infra#172) — the anchor advertises
