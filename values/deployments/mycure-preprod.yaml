@@ -1057,31 +1057,11 @@ cadenceRelay:
 # initContainer, API service + HTTPRoute (cadence.preprod…), reachable for direct QUIC via udp-gateway.
 cadence:
   enabled: true
-  # ── TEMPORARY (transport recovery test, mono#3061): the -net harness image REPLACES the sync hub ──
-  # While this block is in effect the preprod sync hub is DOWN (boxes back off + self-heal on restore).
-  # Restore = revert tag to "2.1.28" + delete `args`/`netSkSecret` + restore rustLog. 2.1.30-net carries
-  # the silent-path-loss recovery fix (network_change() escalation + iroh 1.0.3 abandoned-path handling) —
-  # the point of this run is to prove a severed edge now auto-recovers WITHOUT a process restart.
-  rustLog: "cadence_net=debug,iroh=info,iroh_gossip=info,warn"
+  rustLog: "cadence=info,cadence_routing=debug,warn"
   image:
     repository: ghcr.io/mycurelabs/cadence
-    tag: "2.1.30-net" # transport-only net-probe harness (serve mode); NOT the sync engine
+    tag: "2.1.28" # relay liveness probe path fix (mono#3051: /generate_204 is plain-HTTP-only → falls back to GET /; makes cadence_net_relay_probe_failures truthful) on top of the 2.1.27 oversized-broadcast fix (mono#3043)
     pullPolicy: Always # tag was mutated once; Always avoids stale node cache
-  args:
-    - "--serve"
-    - "--scope"
-    - "net:pressure"
-    - "--listen-port"
-    - "6472"
-    - "--doc-addr"
-    - "0.0.0.0:9464"
-    - "--public-addr"
-    - "165.245.145.61:6472"
-    - "--relay"
-    - "https://cadence-relay.preprod.localfirsthealth.com"
-    - "--alpn"
-    - "cadence-net-test/1"
-  netSkSecret: "cadence-net-sk" # imperative Secret (key `sk`) — stable anchor id across restarts
   udpPort: 6472
   # udp-gateway LB IP — the anchor advertises this so peers connect by EndpointId alone.
   publicAddr: "165.245.145.61:6472"
