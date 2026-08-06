@@ -296,7 +296,6 @@ medleyapp:
 # Phase 2: enabled — vision extraction (prescription/lab images) for document-ingestion.
 # Reaches the on-prem Ollama via the in-cluster egress Service (ollama.tailscale.svc); the
 # chart NetworkPolicy allows 11434 via namespaceSelector (not ipBlock — that path is in-cluster).
-  chart: app
 medgemmaWorker:
   enabled: true
 
