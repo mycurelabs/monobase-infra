@@ -6,7 +6,7 @@
 # (the live DOKS configuration). LoadBalancer customization (DO LB
 # annotations, FLIPOP, etc.) is done through NGF's NginxProxy CRD / the
 # chart's `nginx.service` values — see
-# argocd/infrastructure/templates/nginx-gateway.yaml and
+# charts/argocd-infrastructure/templates/nginx-gateway.yaml and
 # docs/infrastructure/static-ip-digitalocean.md.
 
 # NGINX Gateway Fabric - Gateway API implementation

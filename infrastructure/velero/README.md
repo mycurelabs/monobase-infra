@@ -65,7 +65,7 @@ doctl compute space create my-cluster-velero-backups --region nyc3
 
 ## Configuration
 
-### Update `argocd/infrastructure/values.yaml`
+### Update `charts/argocd-infrastructure/values.yaml`
 
 ```yaml
 velero:
@@ -108,7 +108,7 @@ See `credentials-template.yaml` for detailed examples.
 ### Deploy via GitOps
 
 ```bash
-git add argocd/infrastructure/values.yaml
+git add charts/argocd-infrastructure/values.yaml
 git commit -m "feat: Enable Velero backups"
 git push
 ```

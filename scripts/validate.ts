@@ -97,7 +97,7 @@ class TemplateValidator {
 
     try {
       const patterns = ['mycompany', 'client-a', 'client-b'];
-      const dirs = ['charts/', 'infrastructure/', 'argocd/'];
+      const dirs = ['charts/', 'infrastructure/'];
       const matches: string[] = [];
 
       for (const dir of dirs) {

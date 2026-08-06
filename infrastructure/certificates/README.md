@@ -138,7 +138,7 @@ charts/cert-manager-issuers/         # ClusterIssuer Helm chart
 
 ClusterIssuers are now managed via the `cert-manager-issuers` Helm chart.
 
-**Configuration:** `argocd/infrastructure/values.yaml` → `certManagerIssuers.issuers`  
+**Configuration:** `charts/argocd-infrastructure/values.yaml` → `certManagerIssuers.issuers`  
 **Chart:** `charts/cert-manager-issuers/`
 
 ### letsencrypt-prod (HTTP-01)

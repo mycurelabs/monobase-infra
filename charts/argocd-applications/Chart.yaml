@@ -1,5 +1,5 @@
 apiVersion: v2
-name: monobase-applications
+name: argocd-applications
 description: ArgoCD Applications for Monobase stack (infrastructure + applications)
 type: application
 version: 1.0.0

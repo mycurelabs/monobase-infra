@@ -6,9 +6,9 @@ This directory contains TLS-related infrastructure resources.
 
 ClusterIssuers are now managed via the `cert-manager-issuers` Helm chart deployed through ArgoCD.
 
-**Configuration:** `argocd/infrastructure/values.yaml` → `certManagerIssuers`  
+**Configuration:** `charts/argocd-infrastructure/values.yaml` → `certManagerIssuers`  
 **Chart:** `charts/cert-manager-issuers/`  
-**ArgoCD App:** `argocd/infrastructure/templates/cert-manager-issuers.yaml`
+**ArgoCD App:** `charts/argocd-infrastructure/templates/cert-manager-issuers.yaml`
 
 ### Available ClusterIssuers
 

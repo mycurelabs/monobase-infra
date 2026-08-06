@@ -19,10 +19,10 @@ values/
 
 ### Infrastructure Configuration
 
-Infrastructure values are referenced by ArgoCD applications in `argocd/infrastructure/`:
+Infrastructure values are referenced by ArgoCD applications in `charts/argocd-infrastructure/`:
 
 ```yaml
-# argocd/bootstrap/infrastructure-root.yaml
+# charts/argocd-bootstrap/infrastructure-root.yaml
 helm:
   valueFiles:
     - ../../values/infrastructure/main.yaml
@@ -30,7 +30,7 @@ helm:
 
 ### Deployment Configuration
 
-Deployment values are automatically discovered by the ApplicationSet in `argocd/bootstrap/applicationset-auto-discover.yaml`.
+Deployment values are automatically discovered by the ApplicationSet in `charts/argocd-bootstrap/applicationset-auto-discover.yaml`.
 
 The ApplicationSet uses a **Git Files Generator** to scan `values/deployments/*.yaml` files:
 
@@ -98,7 +98,7 @@ postgresql:
 ## Migration from Old Structure
 
 This directory was created to consolidate configurations previously scattered across:
-- `argocd/infrastructure/values.yaml` → `values/infrastructure/main.yaml`
+- `charts/argocd-infrastructure/values.yaml` → `values/infrastructure/main.yaml`
 - `infrastructure/*/values.yaml` → `values/infrastructure/{component}.yaml`
 - `deployments/{client}-{env}/values.yaml` → `values/deployments/{client}-{env}.yaml`
 

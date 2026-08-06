@@ -2,7 +2,7 @@
 # Use sparingly — only for components that cannot meet the restricted profile.
 
 # CURRENT exceptions (live cluster, set via ArgoCD managedNamespaceMetadata or
-# kubectl labels — see argocd/infrastructure/templates/{velero,monitoring}.yaml):
+# kubectl labels — see charts/argocd-infrastructure/templates/{velero,monitoring}.yaml):
 #
 # - kube-system                 privileged (managed by DOKS)
 # - velero                      audit/warn=baseline only — node-agent is
