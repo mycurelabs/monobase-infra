@@ -41,7 +41,6 @@ mycure-dashboard:
 # Disabled until validated on preprod. Production rollout (separate PR) flips this
 # on and adds an ExternalSecret for a stable NC_AUTH_JWT_SECRET + admin bootstrap,
 # plus a dedicated read-only Postgres role for the data source.
-  chart: app
 nocodb:
   enabled: false
 
@@ -82,7 +81,6 @@ mycure-pxp:
 # The canonical hapihub release (releaseName: hapihub). Serves
 # hapihub.localfirsthealth.com (canonical) + hapihub-next.localfirsthealth.com
 # (alias — frontends/cadence call it; keep until they migrate). PostgreSQL-only.
-  chart: app
 hapihub:
   enabled: true
 
@@ -176,7 +174,6 @@ mycure:
     enabled: false
 
 # ===== HEALTHCARE: MyCure Local Frontend Application =====
-  chart: app
 mycurelocal:
   image:
     repository: ghcr.io/mycurelabs/mycurelocal
@@ -196,7 +193,6 @@ mycurelocal:
     enabled: false
 
 # ===== HEALTHCARE: MyCure MyAccount Application =====
-  chart: app
 mycure-myaccount:
   image:
     repository: ghcr.io/mycurelabs/myaccount
@@ -218,7 +214,6 @@ mycure-myaccount:
     enabled: false
 
 # ===== HEALTHCARE: HapiHub API Documentation =====
-  chart: app
 hapihub-docs:
   image:
     repository: ghcr.io/mycurelabs/hapihub-docs
@@ -241,7 +236,6 @@ hapihub-docs:
 # Replication mode: 1 primary + 1 read replica with streaming replication.
 # The DB is ~190GB and grows quickly — watch volume headroom (disk-full during
 # WAL redo crashloops the primary).
-  chart: app
 postgresql:
   enabled: true
 
