@@ -496,6 +496,11 @@ cadenceRelay:
     sectionName: https-preprod-lfh
 
 cadence:
+  image:
+    # Read-plane split verification build (mono branch worktree-cadence-sync-scheduler):
+    # scan plane -> CADENCE_DB_READ_URL (postgresql-read), P2 budget, futile-round throttle.
+    # PREPROD-ONLY tag; promotes to a numbered release for prod after the soak.
+    tag: "2.1.49-rp1"
   publicAddr: "104.248.98.161:6473"
   # CUTOVER: anchor homes on our relay (QUIC-addr-disc lets netcheck rank it) + advertises it in the doc.
   # All boxes are being moved to maestroapp 2.0.28 (our-relay-only) in the same window.
