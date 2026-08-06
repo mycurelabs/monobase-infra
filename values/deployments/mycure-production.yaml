@@ -754,16 +754,6 @@ mailpit:
     enabled: true
     hostname: ""
 
-# infra L4 UDP LoadBalancer (DigitalOcean) for the cadence v2 QUIC path. Provisioned AHEAD of the v1→v2
-# cutover so its EXTERNAL-IP is known for cadence.publicAddr; idle (no healthy backend) until cadence v2
-# deploys. externalTrafficPolicy Cluster (SNAT) is required for the QUIC handshake.
-udpGateway:
-  enabled: true
-  targetSelector:
-    app.kubernetes.io/name: cadence
-  port: 6472
-  healthPort: 6472
-
 # ===== cadence-relay — self-hosted iroh relay for hard-NAT boxes (prod) =====
 # Own LB + cert (cadence-relay.localfirsthealth.com) + QUIC addr-disc (7842/UDP) so the anchor can home
 # on it; the anchor advertises it and boxes run maestroapp our-relay-only.
@@ -776,7 +766,7 @@ cadenceRelay:
   nodePool: "prod-apps"
 
 # ===== P2P SYNC: Cadence v2 (iroh 1.0 QUIC) — Tier 4.4 =====
-# The anchor hub. Reachability via the infra udpGateway LB below (a fresh prod DO UDP LoadBalancer — preprod's
+# The anchor hub. Reachability via the shared gateway's UDPRoute (preprod's
 # IP is not reusable). Watches the LIVE hapihub app DB: installs cadence_* side-tables + capture triggers on
 # the live tables at startup and baselines existing rows (ships the #2823 baseline fix + #2817 re-baseline).
 cadence:
@@ -789,8 +779,6 @@ cadence:
   udpPort: 6472
   # Shared-gateway LB IP (nginx-shared-gateway, UDPRoute path — prod keeps canonical port
   # 6472). Path proven from a real box network (alfheim net-probe: direct=true, 18 Mbps).
-  # Legacy udp-gateway LB (137.184.250.197:6472) stays up as rollback until phase 3
-  # removes it; roll back by reverting to it.
   publicAddr: "104.248.98.161:6472"
   # Home on the self-hosted relay + advertise it so boxes (maestroapp 2.0.28, our-relay-only) adopt it.
   relayUrl: "https://cadence-relay.localfirsthealth.com"
@@ -808,9 +796,8 @@ cadence:
     sectionName: https-lfh
     hostnames:
       - cadence.localfirsthealth.com
-    # QUIC via the shared gateway (UDPRoute; cadence LB consolidation). Prod keeps
-    # canonical port 6472 on the shared LB IP. Route is live alongside the legacy
-    # udp-gateway LB; cutover = flipping publicAddr after preprod soak.
+    # QUIC via the shared gateway (UDPRoute). Prod keeps canonical port 6472 on the
+    # shared LB IP.
     udpListener: cadence-quic-prod
   # hapihub is the SOLE AS (mints box grants + the hub's own '*' grant). The enroll initContainer
   # authorizes '*' against the programmatic /sync/authorize with the service-account API key (--bearer);

@@ -727,17 +727,6 @@ podSecurityStandards:
 resourceQuotas:
   enabled: false
 
-# ===== Infra: L4 UDP LoadBalancer for QUIC (iroh) =====
-# Owns the UDP LoadBalancer separately from any app chart, like the HTTP gateways
-# (which can't carry UDP). Apps are just pods it selects; the LB + public IP stay
-# put regardless of which app targetSelector points at.
-udpGateway:
-  enabled: true
-  targetSelector:
-    app.kubernetes.io/name: cadence
-  port: 6472
-  healthPort: 6472
-
 # ===== cadence-relay — self-hosted iroh relay for hard-NAT boxes =====
 # Own LB + cert (cadence-relay.preprod.localfirsthealth.com). Anchor + boxes point at it via cadence
 # relay_url once it's verified up (option-a cutover window). Stock n0 relay image, pinned to iroh 1.0.2.
@@ -749,10 +738,10 @@ cadenceRelay:
   # hostname defaults to cadence-relay.{global.domain}; tls via letsencrypt-mycure-cloudflare-prod (DNS-01).
 
 # ===== cadence — iroh 1.0 P2P transport + registry (cadence v2 foundation) =====
-# The anchor node; reachability is provided by the infra udpGateway LB above (not an
+# The anchor node; reachability is provided by the shared gateway's UDPRoute (not an
 # app-owned Service). Image is on the cadence 2.x line (cadence = cadence v2).
 # cadence — cadence v2 data-plane HUB (isolated cadence_v2 DB rehearsal). Full chart: run --config, enroll
-# initContainer, API service + HTTPRoute (cadence.preprod…), reachable for direct QUIC via udp-gateway.
+# initContainer, API service + HTTPRoute (cadence.preprod…), direct QUIC via the shared-gateway UDPRoute.
 cadence:
   enabled: true
   rustLog: "cadence=info,cadence_routing=debug,warn"
@@ -762,8 +751,7 @@ cadence:
     pullPolicy: Always # mutable tag; Always avoids stale node cache
   udpPort: 6472
   # Shared-gateway LB IP (nginx-shared-gateway, UDPRoute path — preprod is port-demuxed
-  # to 6473). Legacy udp-gateway LB (165.245.145.61:6472) stays up until prod cuts over
-  # and phase 3 removes it; roll back by reverting to it.
+  # to 6473).
   publicAddr: "104.248.98.161:6473"
   # CUTOVER: anchor homes on our relay (QUIC-addr-disc lets netcheck rank it) + advertises it in the doc.
   # All boxes are being moved to maestroapp 2.0.28 (our-relay-only) in the same window.

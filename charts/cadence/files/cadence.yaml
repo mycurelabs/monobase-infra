@@ -10,7 +10,7 @@ seed_url: []                        # a hub has no upstream seed (it is the anch
 seed: []
 accept: true                        # anchor: accept inbound + bind the fixed port
 listen_port: 6472
-public_addr: {{ .Values.publicAddr }}    # per-env udp-gateway LB (values.cadence.publicAddr) — peers reach this hub directly by EndpointId
+public_addr: {{ .Values.publicAddr }}    # shared-gateway LB ip:port (values.cadence.publicAddr) — peers reach this hub directly by EndpointId
 mdns: false
 api_addr: 0.0.0.0:9464              # observability API + bootstrap discovery doc (/.well-known/…)
 alpn: hapihub/2                     # app boundary: gates catch-up + namespaces gossip topics

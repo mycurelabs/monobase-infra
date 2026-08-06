@@ -17,7 +17,7 @@ hostname: ""
 # QUIC address-discovery (UDP, iroh's DEFAULT_RELAY_QUIC_PORT 7842) MUST be enabled + exposed: iroh netcheck
 # ranks a relay's latency via this endpoint, and only a ranked relay can be selected as a node's HOME relay.
 # Without it the anchor never homes on this relay (it falls back to n0). 7842 > 1024 so no port mapping is
-# needed (bind == expose). The DO LB carries both TCP 443 and UDP 7842 (same pattern as udp-gateway).
+# needed (bind == expose). The DO LB carries both TCP 443 and UDP 7842.
 externalHttpsPort: 443
 httpsBindPort: 8443
 httpBindPort: 8080

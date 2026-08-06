@@ -5,8 +5,8 @@ image:
   tag: "2.0.1"
   pullPolicy: IfNotPresent
 
-# UDP port the iroh QUIC endpoint binds; the udp-gateway LB forwards it. A TCP listener on the same port
-# serves the DO LoadBalancer health check.
+# UDP port the iroh QUIC endpoint binds; the shared gateway’s UDPRoute forwards it. A TCP listener on the same port
+# serves the health check.
 udpPort: 6472
 # TCP port for the observability + bootstrap API (/healthz, /readyz, /metrics, /.well-known/…).
 apiPort: 9464
@@ -28,7 +28,7 @@ args: []
 # imperatively, not managed here.
 netSkSecret: ""
 
-# Public address the anchor advertises (the udp-gateway LB IP:port) so peers reach it directly by
+# Public address the anchor advertises (the shared-gateway LB IP:port) so peers reach it directly by
 # EndpointId alone. Must match `public_addr` in the mounted cadence.yaml.
 publicAddr: "165.245.145.61:6472"
 
@@ -86,7 +86,7 @@ gateway:
   hostnames: []
   sectionName: https
   # Shared-gateway UDP listener name for QUIC (e.g. "cadence-quic-preprod", see
-  # values/infrastructure/main.yaml). Empty ⇒ no UDPRoute (legacy udp-gateway LB path).
+  # values/infrastructure/main.yaml). Empty ⇒ no UDPRoute.
   udpListener: ""
   snippetsPolicy:
     enabled: false

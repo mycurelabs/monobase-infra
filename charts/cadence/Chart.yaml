@@ -1,6 +1,6 @@
 apiVersion: v2
 name: cadence
-description: cadence — cadence v2 data-plane hub (iroh 1.0 P2P sync engine). Anchors a Postgres store, serves the observability + bootstrap API, and is reachable for direct QUIC via the infra udp-gateway UDP LoadBalancer.
+description: cadence — cadence v2 data-plane hub (iroh 1.0 P2P sync engine). Anchors a Postgres store, serves the observability + bootstrap API, and is reachable for direct QUIC via the shared gateway’s UDPRoute.
 type: application
 version: 2.0.1
 appVersion: "2.0.1"

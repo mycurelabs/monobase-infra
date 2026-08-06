@@ -26,9 +26,8 @@ spec:
       ports:
         - protocol: TCP
           port: 7890
-        # QUIC via the shared gateway's UDPRoute — packets arrive from the NGF
-        # data-plane pods (unlike the legacy udp-gateway LB path, which enters
-        # via node SNAT and bypasses pod-to-pod policy).
+        # QUIC via the shared gateway's UDPRoute — packets arrive from the
+        # NGF data-plane pods.
         - protocol: UDP
           port: 6472
 

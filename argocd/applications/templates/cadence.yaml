@@ -1,5 +1,5 @@
 {{- if and .Values.cadence .Values.cadence.enabled }}
-# cadence — iroh 1.0 P2P transport + registry (cadence v2 foundation), behind the udp-gateway LB.
+# cadence — iroh 1.0 P2P transport + registry (cadence v2 foundation), QUIC via the shared-gateway UDPRoute.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
