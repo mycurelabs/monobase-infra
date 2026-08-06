@@ -53,7 +53,7 @@ Provider-agnostic secrets management with centralized `secrets.yaml` configurati
   - `validate-cluster.ts` - Cluster state validation ✅
 
 **Configuration:**
-- `infrastructure/secrets.yaml` - Infrastructure-level secrets ✅
+- `values/infrastructure/secrets.yaml` - Infrastructure-level secrets ✅
 - `deployments/example-staging/secrets.yaml` - Staging secrets ✅
 - `deployments/example-production/secrets.yaml` - Production secrets ✅
 
