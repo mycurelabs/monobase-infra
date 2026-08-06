@@ -1102,7 +1102,7 @@ cadence:
   rustLog: "cadence=info,cadence_routing=debug,warn"
   image:
     repository: ghcr.io/mycurelabs/cadence
-    tag: "2.1.42" # sparse-at-scale liveness (mono#3099): fixes the range-verdict serve arm — on 2.1.40 vldmc looped "range: no verdict" (reconcile dead for range-tree boxes, mono#3110). Keeps 2.1.39/2.1.40 keyset-priority + dense-verdict fixes. Preprod-soaked (#242); image verified pullable
+    tag: "2.1.46" # lockstep fleet roll (boxes also 2.1.46, mono#2833): carries #3099 sparse-at-scale liveness + latest upload-path work; supersedes 2.1.42
     pullPolicy: Always # relay cutover; also avoids stale node cache from any reused tag
   udpPort: 6472
   # udp-gateway DO LoadBalancer EXTERNAL-IP (provisioned via monobase-infra#172) — the anchor advertises
