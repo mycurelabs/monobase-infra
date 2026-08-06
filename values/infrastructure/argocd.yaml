@@ -1,210 +1,77 @@
-# ArgoCD - Helm Values
-# Chart: https://github.com/argoproj/argo-helm
-# Version: 5.x+
+# ArgoCD — Helm values (CANONICAL, reconciled with the live release 2026-08-06)
+# Chart: argo/argo-cd 9.0.3 (app v3.1.9) — install/upgrade:
+#   helm upgrade --install argocd argo/argo-cd -n argocd --version 9.0.3 \
+#     -f values/infrastructure/argocd.yaml
+# ArgoCD is NOT managed by an Application (it can't manage itself here);
+# scripts/bootstrap.ts runs the helm command above. Any change to this file
+# must be applied with that command — merging alone does nothing.
+# History: pre-2026-08-06 this file was a stale template while the live
+# release used unrecorded values; this content is the live dump with the
+# node-pool restructure placement (all components on the tainted infra pool).
 
-# Global settings
-global:
-  domain: argocd.example.com  # Set in client config
-
-  # 2026-08-06 pool restructure: ArgoCD (holds cluster-admin) moves to the
-  # tainted infra pool, off the untainted default pool preprod shares.
-  # Applies to every component (controller/server/repoServer/appset/
-  # notifications/redis). NOTE: ArgoCD is installed by scripts/bootstrap.ts
-  # (helm), NOT by an Application — apply with:
-  #   helm upgrade argocd argo/argo-cd -n argocd -f values/infrastructure/argocd.yaml --reuse-values
-  nodeSelector:
-    node-pool: infra
-  tolerations:
-    - key: node-pool
-      operator: Equal
-      value: infra
-      effect: NoSchedule
-
-# Simplified configuration (non-HA)
-redis-ha:
-  enabled: false  # Use standard Redis instead
-
-# Controller (reconciliation engine)
-controller:
-  replicas: 1  # Single replica sufficient for simple deployments
-
-  metrics:
-    enabled: true
-    serviceMonitor:
-      enabled: false  # Enable when monitoring stack is deployed
-
-  resources:
-    requests:
-      cpu: 250m
-      memory: 768Mi  # Increased from 512Mi - prevent OOM (actual usage: 607Mi)
-    limits:
-      cpu: 1
-      memory: 896Mi  # Optimized from 1Gi (actual usage: 608Mi = 68%)
-
-  # Schedule on infrastructure node pool
-  # nodeSelector:
-  #   workload-type: general
-
-  # tolerations:
-  #   - key: "workload-type"
-  #     operator: "Equal"
-  #     value: "infrastructure"
-  #     effect: "NoSchedule"
-
-# Server (API and UI)
-server:
-  replicas: 1  # Single replica
-
-  metrics:
-    enabled: true
-    serviceMonitor:
-      enabled: false
-
-  resources:
-    requests:
-      cpu: 100m
-      memory: 192Mi  # Optimized from 256Mi (actual usage: 31Mi = 16%)
-    limits:
-      cpu: 500m
-      memory: 384Mi  # Optimized from 512Mi (actual usage: 31Mi = 8%)
-
-  # Schedule on infrastructure node pool
-  # nodeSelector:
-  #   workload-type: general
-
-  # tolerations:
-  #   - key: "workload-type"
-  #     operator: "Equal"
-  #     value: "infrastructure"
-  #     effect: "NoSchedule"
-
-  # Ingress via Gateway API (see ingress.yaml)
-  ingress:
-    enabled: false
-
-  # Server configuration
-  config:
-    url: https://argocd.example.com  # Set in client config
-
-    # Git repository credentials
-    repositories: |
-      - type: git
-        url: https://github.com/mycurelabs/monobase-infra.git
-
-    # Resource customizations
-    resource.customizations: |
-      argoproj.io/Application:
-        health.lua: |
-          hs = {}
-          hs.status = "Progressing"
-          hs.message = ""
-          if obj.status ~= nil then
-            if obj.status.health ~= nil then
-              hs.status = obj.status.health.status
-              if obj.status.health.message ~= nil then
-                hs.message = obj.status.health.message
-              end
-            end
-          end
-          return hs
-
-  # RBAC configuration
-  rbacConfig:
-    policy.default: role:readonly
-    policy.csv: |
-      # Default policies
-      p, role:readonly, applications, get, */*, allow
-      p, role:readonly, projects, get, *, allow
-
-      # Admin role
-      g, admin, role:admin
-
-  # Admin password (from secret)
-  extraArgs:
-    - --insecure  # TLS termination at Gateway
-
-# Repo Server (Git repository interaction)
-repoServer:
-  replicas: 1  # Single replica
-
-  metrics:
-    enabled: true
-    serviceMonitor:
-      enabled: false
-
-  resources:
-    requests:
-      cpu: 100m
-      memory: 1Gi  # Increased from 512Mi to prevent OOM
-    limits:
-      cpu: 1
-      memory: 1536Mi  # Optimized from 2Gi (actual usage: 578Mi = 38%)
-
-  # Schedule on infrastructure node pool
-  # nodeSelector:
-  #   workload-type: general
-
-  # tolerations:
-  #   - key: "workload-type"
-  #     operator: "Equal"
-  #     value: "infrastructure"
-  #     effect: "NoSchedule"
-
-# ApplicationSet Controller (App-of-Apps)
 applicationSet:
   enabled: true
-  replicas: 1  # Single replica
-
   metrics:
     enabled: true
     serviceMonitor:
       enabled: false
-
+  nodeSelector:
+    node-pool: infra
+  replicas: 1
   resources:
-    requests:
-      cpu: 50m
-      memory: 128Mi
     limits:
       cpu: 250m
       memory: 256Mi
-
-  # Schedule on infrastructure node pool
-  # nodeSelector:
-  #   workload-type: general
-
-  # tolerations:
-  #   - key: "workload-type"
-  #     operator: "Equal"
-  #     value: "infrastructure"
-  #     effect: "NoSchedule"
-
-# Notifications Controller
+    requests:
+      cpu: 50m
+      memory: 128Mi
+  tolerations:
+  - effect: NoSchedule
+    key: node-pool
+    operator: Equal
+    value: infra
+configs:
+  secret:
+    createSecret: true
+  ssh:
+    knownHosts: |
+      github.com ssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAQEAq2A7hRGmdnm9tUDbO9IDSwBK6TbQa+PXYPCPy6rbTrTtw7PHkccKrpp0yVhp5HdEIcKr6pLlVDBfOLX9QUsyCOV0wzfjIJNlGEYsdlLJizHhbn2mUjvSAHQqZETYP81eFzLQNnPHt4EVVUh7VfDESU84KezmD5QlWpXLmvU31/yMf+Se8xhHTvKSCZIFImWwoG6mbUoWf9nzpIoaSjB+weqqUUmpaaasXVal72J+UX2B+2RPW3RcT0eOzQgqlJL3RKrTJvdsjE3JEAvGq3lGHSZXy28G3skua2SmVi/w4yCE6gbODqnTWlg7+wC604ydGXA8VJiS5ap43JXiUFFAaQ==
+controller:
+  metrics:
+    enabled: true
+    serviceMonitor:
+      enabled: false
+  nodeSelector:
+    node-pool: infra
+  replicas: 1
+  resources:
+    limits:
+      cpu: 1
+      memory: 1Gi
+    requests:
+      cpu: 250m
+      memory: 768Mi
+  tolerations:
+  - effect: NoSchedule
+    key: node-pool
+    operator: Equal
+    value: infra
+dex:
+  enabled: false
+global:
+  domain: argocd.example.com
 notifications:
-  enabled: true
-
   argocdUrl: https://argocd.example.com
-
-  # Schedule on infrastructure node pool
-  # nodeSelector:
-  #   workload-type: general
-
-  # tolerations:
-  #   - key: "workload-type"
-  #     operator: "Equal"
-  #     value: "infrastructure"
-  #     effect: "NoSchedule"
-
+  enabled: true
+  nodeSelector:
+    node-pool: infra
   notifiers:
-    # Slack notifications
-    service.slack: |
-      token: $slack-token
-
-    # Email notifications
     service.email: |
       host: smtp.gmail.com
       port: 587
       from: argocd@example.com
-
+    service.slack: |
+      token: $slack-token
   templates:
     template.app-deployed: |
       message: |
@@ -225,7 +92,6 @@ notifications:
               "short": true
             }]
           }]
-
     template.app-sync-failed: |
       message: |
         Application {{.app.metadata.name}} sync failed
@@ -241,53 +107,107 @@ notifications:
               "short": true
             }]
           }]
-
+  tolerations:
+  - effect: NoSchedule
+    key: node-pool
+    operator: Equal
+    value: infra
   triggers:
     trigger.on-deployed: |
       - when: app.status.sync.status == 'Synced'
         send: [app-deployed]
-
     trigger.on-sync-failed: |
       - when: app.status.sync.status == 'Failed'
         send: [app-sync-failed]
-
-# Dex (SSO/OAuth - optional)
-dex:
-  enabled: false  # Enable for SSO integration
-
-# Configs
-configs:
-  secret:
-    createSecret: true
-    # argocdServerAdminPassword: ""  # Set via External Secrets
-
-  # Known hosts for Git SSH
-  ssh:
-    knownHosts: |
-      github.com ssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAQEAq2A7hRGmdnm9tUDbO9IDSwBK6TbQa+PXYPCPy6rbTrTtw7PHkccKrpp0yVhp5HdEIcKr6pLlVDBfOLX9QUsyCOV0wzfjIJNlGEYsdlLJizHhbn2mUjvSAHQqZETYP81eFzLQNnPHt4EVVUh7VfDESU84KezmD5QlWpXLmvU31/yMf+Se8xhHTvKSCZIFImWwoG6mbUoWf9nzpIoaSjB+weqqUUmpaaasXVal72J+UX2B+2RPW3RcT0eOzQgqlJL3RKrTJvdsjE3JEAvGq3lGHSZXy28G3skua2SmVi/w4yCE6gbODqnTWlg7+wC604ydGXA8VJiS5ap43JXiUFFAaQ==
-
-# Redis (cache) - standard single instance
 redis:
   enabled: true
-
+  nodeSelector:
+    node-pool: infra
   resources:
-    requests:
-      cpu: 50m
-      memory: 64Mi
     limits:
       cpu: 250m
       memory: 128Mi
+    requests:
+      cpu: 50m
+      memory: 64Mi
+  tolerations:
+  - effect: NoSchedule
+    key: node-pool
+    operator: Equal
+    value: infra
+redis-ha:
+  enabled: false
+repoServer:
+  metrics:
+    enabled: true
+    serviceMonitor:
+      enabled: false
+  nodeSelector:
+    node-pool: infra
+  replicas: 1
+  resources:
+    limits:
+      cpu: 1
+      memory: 2Gi
+    requests:
+      cpu: 100m
+      memory: 1Gi
+  tolerations:
+  - effect: NoSchedule
+    key: node-pool
+    operator: Equal
+    value: infra
+server:
+  config:
+    repositories: |
+      - type: git
+        url: https://github.com/monobaselabs/monobase-infra.git
+      # Add client repositories here
+    resource.customizations: |
+      argoproj.io/Application:
+        health.lua: |
+          hs = {}
+          hs.status = "Progressing"
+          hs.message = ""
+          if obj.status ~= nil then
+            if obj.status.health ~= nil then
+              hs.status = obj.status.health.status
+              if obj.status.health.message ~= nil then
+                hs.message = obj.status.health.message
+              end
+            end
+          end
+          return hs
+    url: https://argocd.example.com
+  extraArgs:
+  - --insecure
+  ingress:
+    enabled: false
+  metrics:
+    enabled: true
+    serviceMonitor:
+      enabled: false
+  nodeSelector:
+    node-pool: infra
+  rbacConfig:
+    policy.csv: |
+      # Default policies
+      p, role:readonly, applications, get, */*, allow
+      p, role:readonly, projects, get, *, allow
 
-  # Schedule on infrastructure node pool
-  # nodeSelector:
-  #   workload-type: general
-
-  # tolerations:
-  #   - key: "workload-type"
-  #     operator: "Equal"
-  #     value: "infrastructure"
-  #     effect: "NoSchedule"
-
-# Installation instructions:
-# helm repo add argo https://argoproj.github.io/argo-helm
-# helm install argocd argo/argo-cd -n argocd --create-namespace -f helm-values.yaml
+      # Admin role
+      g, admin, role:admin
+    policy.default: role:readonly
+  replicas: 1
+  resources:
+    limits:
+      cpu: 500m
+      memory: 512Mi
+    requests:
+      cpu: 100m
+      memory: 256Mi
+  tolerations:
+  - effect: NoSchedule
+    key: node-pool
+    operator: Equal
+    value: infra

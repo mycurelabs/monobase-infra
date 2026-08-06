@@ -421,10 +421,13 @@ spec:
 
     spinner.start('Installing ArgoCD...');
     try {
+      // 9.0.3 + canonical values file: reconciled with the live release
+      // 2026-08-06 (the old pin 7.7.12 and infrastructure/argocd/helm-values.yaml
+      // path never matched what was actually running).
       await $`helm upgrade --install argocd argo/argo-cd \
         --namespace argocd \
-        --version 7.7.12 \
-        --values infrastructure/argocd/helm-values.yaml \
+        --version 9.0.3 \
+        --values values/infrastructure/argocd.yaml \
         --wait \
         --timeout 10m`.quiet();
       

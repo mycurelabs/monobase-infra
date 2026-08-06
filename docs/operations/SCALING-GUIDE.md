@@ -121,9 +121,9 @@ Notes:
   NetworkPolicy + PodSecurity + RBAC at the namespace layer — never cite
   taints as the security boundary.
 - ArgoCD is installed by `scripts/bootstrap.ts` (helm), not an Application.
-  Its placement lives in the release values (`helm get values argocd -n argocd`);
-  the repo file `values/infrastructure/argocd.yaml` has drifted from the live
-  release (live: chart 9.0.3; bootstrap pins 7.7.12) — reconcile before reuse.
+  `values/infrastructure/argocd.yaml` is CANONICAL (reconciled with the live
+  release 2026-08-06, chart 9.0.3, verified no-op upgrade). Changes to that
+  file require the helm command in its header — merging alone does nothing.
 - `kubectl exec` into the `velero` namespace reaches the privileged node-agent,
   which can read the PG data volume. Kopia repos are client-side encrypted and
   DO Spaces/volumes encrypt at rest; the human-access control is kubeconfig
