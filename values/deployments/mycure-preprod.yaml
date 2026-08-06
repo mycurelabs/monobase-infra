@@ -1060,7 +1060,7 @@ cadence:
   rustLog: "cadence=info,cadence_routing=debug,warn"
   image:
     repository: ghcr.io/mycurelabs/cadence
-    tag: "2.1.46" # pair-aligned with the maestroapp 2.1.46 fleet release (mono#3109); code-identical to 2.1.42 sparse-at-scale liveness (mono#3099). LOCKSTEP WIRE (keepalives): boxes must run ≥2.1.42
+    tag: "2.1.47" # any-origin LeafIds push (mono#3111): carrier boxes heal the hub — un-strands alfheim's ~395k fam rows. No wire change. PREPROD-ONLY
     pullPolicy: Always # tag was mutated once; Always avoids stale node cache
   udpPort: 6472
   # udp-gateway LB IP — the anchor advertises this so peers connect by EndpointId alone.
