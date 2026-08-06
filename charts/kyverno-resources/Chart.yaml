@@ -1,0 +1,6 @@
+apiVersion: v2
+name: kyverno-resources
+description: Kyverno ClusterPolicies (pod-security, require-labels, restrict-registries)
+type: application
+version: 1.0.0
+appVersion: "1.0"
