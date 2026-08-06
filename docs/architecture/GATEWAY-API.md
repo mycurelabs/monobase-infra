@@ -24,7 +24,7 @@ The Gateway is deployed **automatically by ArgoCD** during bootstrap.
 - ✅ HTTP to HTTPS redirect
 - ✅ LoadBalancer service (created by NGINX Gateway Fabric)
 
-**Configuration:** `values/infrastructure/main.yaml` (`nginxGateway` / `nginxGatewayResources` keys), rendered by `argocd/infrastructure/templates/nginx-gateway.yaml` and `nginx-gateway-resources.yaml` (managed via GitOps)
+**Configuration:** `values/infrastructure/main.yaml` (`nginxGateway` / `nginxGatewayResources` keys), rendered by `charts/argocd-infrastructure/templates/nginx-gateway.yaml` and `nginx-gateway-resources.yaml` (managed via GitOps)
 
 **Reference example:**
 
@@ -396,8 +396,8 @@ For detailed information on multi-domain support:
 - ✅ Cost-effective (single LoadBalancer)
 
 **Deployment:** 
-- NGINX Gateway Fabric operator: `argocd/infrastructure/templates/nginx-gateway.yaml` (sync wave 0)
-- Gateway + TLS resources: `argocd/infrastructure/templates/nginx-gateway-resources.yaml` (sync wave 1)
+- NGINX Gateway Fabric operator: `charts/argocd-infrastructure/templates/nginx-gateway.yaml` (sync wave 0)
+- Gateway + TLS resources: `charts/argocd-infrastructure/templates/nginx-gateway-resources.yaml` (sync wave 1)
 - Configuration: `values/infrastructure/main.yaml` (`nginxGateway` / `nginxGatewayResources` keys, GitOps-managed)
 
-**Proxy customization:** Data-plane sizing/behavior is configured via NGF's `NginxProxy` CRD (set through the chart's `nginx:` values in `argocd/infrastructure/templates/nginx-gateway.yaml`), and raw nginx directives are injected via `SnippetsPolicy` resources (`nginxGatewayResources.snippetsPolicies` in `values/infrastructure/main.yaml`).
+**Proxy customization:** Data-plane sizing/behavior is configured via NGF's `NginxProxy` CRD (set through the chart's `nginx:` values in `charts/argocd-infrastructure/templates/nginx-gateway.yaml`), and raw nginx directives are injected via `SnippetsPolicy` resources (`nginxGatewayResources.snippetsPolicies` in `values/infrastructure/main.yaml`).

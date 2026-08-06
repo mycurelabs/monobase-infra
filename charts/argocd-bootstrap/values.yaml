@@ -1,0 +1,13 @@
+# argocd-bootstrap chart values.
+# Renders the two objects that seed GitOps on a cluster:
+#   1. infrastructure root Application  -> charts/argocd-infrastructure
+#   2. auto-discover ApplicationSet     -> charts/argocd-applications per values/deployments/*.yaml
+# Applied by scripts/bootstrap.ts:
+#   helm template argocd-bootstrap charts/argocd-bootstrap | kubectl apply -f -
+# (kubectl, not helm install: the live objects are kubectl-owned.)
+
+argocd:
+  repoURL: https://github.com/mycurelabs/monobase-infra.git
+  targetRevision: HEAD
+  namespace: argocd
+  clusterServer: https://kubernetes.default.svc

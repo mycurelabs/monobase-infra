@@ -13,7 +13,7 @@ This chart is used by ArgoCD to create client/environment namespaces with:
 
 This chart is deployed automatically by ArgoCD via the `namespace` Application.
 
-Values are passed inline from `argocd/applications/templates/namespace.yaml`:
+Values are passed inline from `charts/argocd-applications/templates/namespace.yaml`:
 
 ```yaml
 source:

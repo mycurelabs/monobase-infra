@@ -450,22 +450,15 @@ spec:
       return;
     }
 
-    const spinner = ora('Deploying Infrastructure Root...').start();
-    
-    try {
-      await $`kubectl apply -f argocd/bootstrap/infrastructure-root.yaml`.quiet();
-      spinner.succeed('Infrastructure Root deployed');
-    } catch (error) {
-      spinner.fail('Infrastructure Root deployment failed');
-      throw error;
-    }
+    const spinner = ora('Deploying ArgoCD bootstrap (infrastructure root + ApplicationSet)...').start();
 
-    spinner.start('Deploying ApplicationSet...');
     try {
-      await $`kubectl apply -f argocd/bootstrap/applicationset-auto-discover.yaml`.quiet();
-      spinner.succeed('ApplicationSet deployed');
+      // kubectl, not helm install: the live objects are kubectl-owned.
+      const rendered = await $`helm template argocd-bootstrap charts/argocd-bootstrap`.text();
+      await $`kubectl apply -f - < ${new Response(rendered)}`.quiet();
+      spinner.succeed('ArgoCD bootstrap deployed');
     } catch (error) {
-      spinner.fail('ApplicationSet deployment failed');
+      spinner.fail('ArgoCD bootstrap deployment failed');
       throw error;
     }
 

@@ -154,7 +154,7 @@ kubectl get clusterissuer
 ### Step 4: Verify the Gateway
 
 NGINX Gateway Fabric is deployed by the ArgoCD infrastructure app
-(`argocd/infrastructure/templates/nginx-gateway.yaml`; config in
+(`charts/argocd-infrastructure/templates/nginx-gateway.yaml`; config in
 `values/infrastructure/main.yaml` under `nginxGateway:`). Nothing to install
 manually — verify it:
 
@@ -349,7 +349,7 @@ helm install account charts/account \\
 # 1. Ensure ArgoCD is deployed
 # 2. Create ArgoCD Application (App-of-Apps)
 
-cat argocd/bootstrap/root-app.yaml.template | \\
+cat charts/argocd-bootstrap/root-app.yaml.template | \\
   sed 's/{{ .Values.global.namespace }}/myclient-prod/g' | \\
   sed 's/{{ .Values.argocd.repoURL }}/https:\\/\\/github.com\\/myclient\\/client-infra.git/g' | \\
   kubectl apply -f -

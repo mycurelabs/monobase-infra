@@ -6,7 +6,7 @@
 # LoadBalancer customization (e.g. a reserved regional static IP via service
 # annotations/loadBalancerIP) is done through NGF's NginxProxy CRD / the
 # chart's `nginx.service` values — see
-# argocd/infrastructure/templates/nginx-gateway.yaml and
+# charts/argocd-infrastructure/templates/nginx-gateway.yaml and
 # docs/infrastructure/static-ip-prerequisites.md.
 
 # NGINX Gateway Fabric - Gateway API implementation
