@@ -102,9 +102,9 @@ mc du myminio/api-files
 | Monobase API | 10 pods | PostgreSQL connections | Add PostgreSQL read replicas |
 | PostgreSQL | 5 nodes | Replication lag | Implement sharding |
 | MinIO | 16 nodes | Erasure coding | Use external S3 |
-| Storage | 5TB/node | Longhorn limit | Add nodes or use cloud storage |
+| Storage | 16TB/volume | DO block-storage volume size limit | Split data across volumes or use object storage |
 
-## Node Pools (DOKS, 2026-08-06 restructure)
+## Node Pools (DOKS)
 
 Role-based pools; taint key is `node-pool=<pool>:NoSchedule` and charts plumb it
 via `global.nodePool` (per-component override: `postgresql.primary.nodePool`).
@@ -121,9 +121,9 @@ Notes:
   NetworkPolicy + PodSecurity + RBAC at the namespace layer — never cite
   taints as the security boundary.
 - ArgoCD is installed by `scripts/bootstrap.ts` (helm), not an Application.
-  `values/infrastructure/argocd.yaml` is CANONICAL (reconciled with the live
-  release 2026-08-06, chart 9.0.3, verified no-op upgrade). Changes to that
-  file require the helm command in its header — merging alone does nothing.
+  `values/infrastructure/argocd.yaml` is CANONICAL for the live release
+  (chart 9.0.3). Changes to that file require the helm command in its
+  header — merging alone does nothing.
 - `kubectl exec` into the `velero` namespace reaches the privileged node-agent,
   which can read the PG data volume. Kopia repos are client-side encrypted and
   DO Spaces/volumes encrypt at rest; the human-access control is kubeconfig
@@ -143,11 +143,11 @@ replays). Reads keep serving from `postgresql-read-0` on prod-apps.
    promote the replica —
    `kubectl -n mycure-production exec postgresql-read-0 -- pg_ctl promote`
    then repoint the `postgresql-primary` Service selector to the read pod.
-   The old primary must then be re-cloned as a replica (see the 2026-06-25
-   re-clone notes: startup probe already tolerates the ~90 min basebackup).
+   The old primary must then be re-cloned as a replica (the startup probe
+   tolerates the ~90 min basebackup).
 3. Planned maintenance instead: `kubectl cordon <prod-db-node>` then
    `kubectl drain <prod-db-node> --ignore-daemonsets --delete-emptydir-data`
-   in an off-peak window — write pause ≈ 60–90 s (measured 2026-08-06).
+   in an off-peak window — write pause ≈ 60–90 s.
 
 ## Summary
 

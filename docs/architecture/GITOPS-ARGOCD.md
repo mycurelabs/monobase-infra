@@ -28,7 +28,7 @@ argocd/
 │   ├── values.yaml
 │   └── templates/
 │       ├── cert-manager.yaml             # TLS certificates (Wave 0)
-│       ├── envoy-gateway.yaml            # Gateway API (Wave 0)
+│       ├── nginx-gateway.yaml            # Gateway API (Wave 0)
 │       ├── external-secrets.yaml          # Secret management (Wave 0)
 │       ├── velero.yaml                   # Backups (Wave 0)
 │       ├── longhorn.yaml                 # Storage (Wave 0, optional)
@@ -87,7 +87,7 @@ git push
 | Component | Wave | Enabled By Default | Purpose |
 |-----------|------|-------------------|---------|
 | cert-manager | 0 | ✅ Yes | TLS certificate automation |
-| envoy-gateway | 0 | ✅ Yes | Gateway API implementation |
+| nginx-gateway | 0 | ✅ Yes | Gateway API implementation |
 | external-secrets | 0 | ✅ Yes | Secret management |
 | velero | 0 | ✅ Yes | Backup and disaster recovery |
 | longhorn | 0 | ❌ No | Distributed block storage |

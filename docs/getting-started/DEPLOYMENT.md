@@ -151,57 +151,22 @@ kubectl get clusterissuer
 
 **Time:** ~3-5 minutes
 
-### Step 4: Deploy Envoy Gateway
+### Step 4: Verify the Gateway
+
+NGINX Gateway Fabric is deployed by the ArgoCD infrastructure app
+(`argocd/infrastructure/templates/nginx-gateway.yaml`; config in
+`values/infrastructure/main.yaml` under `nginxGateway:`). Nothing to install
+manually — verify it:
 
 ```bash
-# Add Helm repository
-helm repo add envoy-gateway https://gateway.envoyproxy.io
-helm repo update
+# Control plane + data plane pods
+kubectl get pods -n nginx-gateway-system
 
-# Install Envoy Gateway
-helm install envoy-gateway envoy-gateway/gateway-helm \\
-  --namespace envoy-gateway-system \\
-  --create-namespace \\
-  --values infrastructure/envoy-gateway/helm-values.yaml
-
-# Wait for ready
-kubectl wait --for=condition=ready pod \\
-  -l control-plane=envoy-gateway \\
-  -n envoy-gateway-system \\
-  --timeout=300s
-
-# Create GatewayClass
-kubectl apply -f infrastructure/envoy-gateway/gateway-class.yaml
-
-# Create shared Gateway (replace values)
-cat infrastructure/envoy-gateway/gateway.yaml.template | \\
-  sed 's/{{ .Values.global.domain }}/myclient.com/g' | \\
-  kubectl apply -f -
-
-# Apply security policies
-kubectl apply -f infrastructure/envoy-gateway/rate-limit-policy.yaml
-
-# Wait for LoadBalancer IP
-kubectl wait --for=jsonpath='{.status.addresses[0].value}' \\
-  gateway/shared-gateway \\
-  -n gateway-system \\
-  --timeout=300s
-
-# Get LoadBalancer IP
-GATEWAY_IP=$(kubectl get gateway shared-gateway -n gateway-system \\
-  -o jsonpath='{.status.addresses[0].value}')
-echo "Gateway LoadBalancer IP: $GATEWAY_IP"
+# Shared Gateway and its LoadBalancer IP
+kubectl get gateway -n nginx-gateway-system
+kubectl get svc -n nginx-gateway-system nginx-shared-gateway-nginx
 ```
 
-**Time:** ~5-10 minutes
-
-**Certificate Management:**
-
-For client custom domains, see:
-- [Certificate Management Operations Guide](../operations/CERTIFICATE-MANAGEMENT.md)
-- [Multi-Domain Gateway Architecture](../architecture/MULTI-DOMAIN-GATEWAY.md)
-
-Certificates are provisioned via HTTP-01 challenge or can be client-provided.
 
 ### Step 5: Deploy External Secrets Operator
 
@@ -627,7 +592,7 @@ echo "Password: $GRAFANA_PASSWORD"
 ### Infrastructure
 - [ ] Longhorn deployed and healthy
 - [ ] cert-manager deployed
-- [ ] Envoy Gateway deployed
+- [ ] NGINX Gateway Fabric deployed
 - [ ] LoadBalancer IP assigned
 - [ ] External Secrets Operator deployed
 - [ ] Velero deployed

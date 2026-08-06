@@ -6,9 +6,9 @@ global:
   namespace: mycure-production
   environment: production
 
-  # 2026-08-06 pool restructure: role-based pools (prod-db / prod-apps / infra /
-  # nonprod) replace production/staging/general. Taints (node-pool=<name>:NoSchedule)
-  # make placement enforced, not advisory. PG primary overrides to prod-db below.
+  # Role-based pools: prod-db / prod-apps / infra / nonprod. Taints
+  # (node-pool=<name>:NoSchedule) make placement enforced, not advisory.
+  # The PG primary overrides to prod-db below.
   nodePool: "prod-apps"
 
   gateway:
@@ -18,84 +18,6 @@ global:
   storage:
     provider: ""
     className: ""
-
-# ===== CORE: Monobase API =====
-api:
-  enabled: false
-
-  image:
-    repository: ghcr.io/monobaselabs/api
-    tag: "0.1.4"
-    pullPolicy: IfNotPresent
-
-  replicaCount: 1
-
-  resources:
-    requests:
-      cpu: 100m
-      memory: 256Mi
-    limits:
-      cpu: 500m
-      memory: 512Mi
-
-  gateway:
-    hostname: ""
-
-  livenessProbe:
-    enabled: true
-
-  readinessProbe:
-    enabled: true
-
-  podDisruptionBudget:
-    enabled: false
-
-  autoscaling:
-    enabled: false
-
-  backup:
-    enabled: false
-
-  externalSecrets:
-    enabled: false
-
-  postgresql:
-    serviceName: postgresql
-    architecture: standalone
-    auth:
-      database: postgres
-      username: postgres
-
-  mailpit:
-    enabled: true
-
-# ===== CORE: Monobase Account Frontend =====
-account:
-  enabled: false
-
-  image:
-    repository: ghcr.io/monobaselabs/accountapp
-    tag: "1.0.2"
-    pullPolicy: IfNotPresent
-
-  replicaCount: 1
-
-  resources:
-    requests:
-      cpu: 10m
-      memory: 64Mi
-    limits:
-      cpu: 200m
-      memory: 128Mi
-
-  gateway:
-    hostname: ""
-
-  config:
-    API_URL: "https://hapihub-next.localfirsthealth.com"
-
-  podDisruptionBudget:
-    enabled: false
 
 # ===== HEALTHCARE: MyCure Dashboard (operator/admin web UI) =====
 mycure-dashboard:
@@ -255,7 +177,7 @@ hapihub:
       rpId: "localfirsthealth.com"
 
   config:
-    CORS_ORIGINS: "https://mycure.localfirsthealth.com,https://mycurev8.localfirsthealth.com,https://mycurelocal.localfirsthealth.com,https://mycure-myaccount.localfirsthealth.com,https://mycure-dashboard.localfirsthealth.com,https://mycure-pxp.localfirsthealth.com,https://dentalemon.localfirsthealth.com,https://dentalemon-myaccount.localfirsthealth.com,https://dentalemon-website.localfirsthealth.com"
+    CORS_ORIGINS: "https://mycure.localfirsthealth.com,https://mycurelocal.localfirsthealth.com,https://mycure-myaccount.localfirsthealth.com,https://mycure-dashboard.localfirsthealth.com,https://mycure-pxp.localfirsthealth.com"
     CORS_STRICT: "true"
     CORS_ALLOW_LOCAL_NETWORK: "false"
     CORS_ALLOW_MOBILE_APPS: "true"
@@ -543,69 +465,6 @@ mycure-myaccount:
   podDisruptionBudget:
     enabled: false
 
-# ===== HEALTHCARE: DentaLemon MyAccount Application =====
-dentalemon-myaccount:
-  enabled: false
-
-  image:
-    repository: ghcr.io/mycurelabs/dentalemon-myaccount
-    tag: "1.0.14"
-    pullPolicy: IfNotPresent
-
-  replicaCount: 1
-
-  resources:
-    requests:
-      cpu: 10m
-      memory: 64Mi
-    limits:
-      cpu: 200m
-      memory: 128Mi
-
-  gateway:
-    hostname: ""
-    sectionName: https-lfh # Use localfirsthealth.com HTTPS listener
-
-  config:
-    API_URL: "https://hapihub-next.localfirsthealth.com"
-    HAPIHUB_URL: "https://hapihub-next.localfirsthealth.com"
-
-  podDisruptionBudget:
-    enabled: false
-
-# ===== HEALTHCARE: Frontend Application (v8 Legacy) =====
-mycurev8:
-  enabled: false  # 2026-06-29: internal-only via private host (below)  # retired 2026-07-30 (#2295): legacy v8 UI, cut over to v11
-
-  image:
-    repository: ghcr.io/mycurelabs/mycureapp
-    tag: "8.24.13"
-    pullPolicy: IfNotPresent
-
-  replicaCount: 1
-
-  resources:
-    requests:
-      cpu: 10m
-      memory: 64Mi
-    limits:
-      cpu: 200m
-      memory: 128Mi
-
-  gateway:
-    # Internal-only host. Single-label so the existing *.localfirsthealth.com
-    # cert + https-lfh listener cover it; NOT the public mycurev8.lfh host.
-    hostname: "mycurev8-private.localfirsthealth.com"
-    sectionName: https-lfh # Use localfirsthealth.com HTTPS listener
-
-  config:
-    API_URL: "https://hapihub.localfirsthealth.com"
-    HAPIHUB_URL: "https://hapihub.localfirsthealth.com"
-    MYCURE_X_URL: "https://mycure.localfirsthealth.com"
-
-  podDisruptionBudget:
-    enabled: false
-
 # ===== HEALTHCARE: HapiHub API Documentation =====
 hapihub-docs:
   enabled: true
@@ -628,71 +487,6 @@ hapihub-docs:
   gateway:
     hostname: "docs.localfirsthealth.com"
     sectionName: https-lfh
-
-  podDisruptionBudget:
-    enabled: false
-
-# ===== HEALTHCARE: DentaLemon Website =====
-dentalemon-website:
-  enabled: false
-
-  image:
-    repository: ghcr.io/mycurelabs/dentalemon-website
-    tag: "0.3.1"
-    pullPolicy: IfNotPresent
-
-  replicaCount: 1
-
-  resources:
-    requests:
-      cpu: 10m
-      memory: 64Mi
-    limits:
-      cpu: 200m
-      memory: 128Mi
-
-  gateway:
-    hostname: ""
-    sectionName: https-lfh
-    gatewayName: nginx-shared-gateway
-    gatewayNamespace: nginx-gateway-system
-
-  networkPolicy:
-    enabled: true
-
-  config:
-    API_URL: "https://hapihub-next.localfirsthealth.com"
-    ACCOUNT_URL: "https://dentalemon-myaccount.localfirsthealth.com"
-
-  podDisruptionBudget:
-    enabled: false
-
-# ===== HEALTHCARE: DentaLemon Dental Application =====
-dentalemon:
-  enabled: false
-
-  image:
-    repository: ghcr.io/mycurelabs/dentalemonapp
-    tag: "10.9.0"
-    pullPolicy: IfNotPresent
-
-  replicaCount: 1
-
-  resources:
-    requests:
-      cpu: 10m
-      memory: 64Mi
-    limits:
-      cpu: 200m
-      memory: 128Mi
-
-  gateway:
-    hostname: ""
-    sectionName: https-lfh # Use localfirsthealth.com HTTPS listener
-
-  config:
-    API_URL: "https://hapihub-next.localfirsthealth.com"
-    HAPIHUB_URL: "https://hapihub-next.localfirsthealth.com"
 
   podDisruptionBudget:
     enabled: false
@@ -725,10 +519,9 @@ postgresql:
       replicationPasswordKey: postgres-replication-password
 
   primary:
-    # Dedicated 1-node pool (g-4vcpu-16gb, 4 dedicated vCPU): the primary pegged
-    # its 2-vCPU m-2vcpu-16gb node at 101% during every big-box onboarding sync
-    # (market 2026-08; earlier #2114/#2356). Taint replaces the old "honest
-    # requests de-facto reserve the node" hack.
+    # Dedicated 1-node pool (g-4vcpu-16gb, 4 dedicated vCPU): big-box
+    # onboarding syncs are CPU-bound on the primary, so it gets dedicated
+    # silicon with no co-tenants.
     nodePool: "prod-db"
     persistence:
       enabled: true
@@ -770,19 +563,6 @@ postgresql:
       # via ALTER SYSTEM (postgresql.auto.conf) — this line just reconciles the
       # repo; the restart it implies is behaviorally a no-op for this setting.
       log_min_duration_statement = 1000
-    # Cross-DB spread: never co-locate the PG primary with MongoDB. Both are
-    # heavy (PG ~1.5core/8.6Gi, Mongo ~6Gi) and had piled onto one prod node,
-    # saturating it (CPU 105%) and causing 15-16s queries. `required` is safe:
-    # 4 prod nodes, 3 DB pods. Overrides the chart's default self-only preset.
-    # Applying reschedules the primary (brief write blip) — trigger in a window.
-    affinity:
-      podAntiAffinity:
-        requiredDuringSchedulingIgnoredDuringExecution:
-          - labelSelector:
-              matchLabels:
-                app.kubernetes.io/name: mongodb
-            topologyKey: kubernetes.io/hostname
-
   readReplicas:
     replicaCount: 1
     # NOTE: the read replica PVC (data-postgresql-read-0) is excluded from Velero
@@ -824,23 +604,6 @@ postgresql:
       max_connections = 300
       log_min_duration_statement = 1000
       primary_slot_name = 'pg_read_replica'
-    # Prefer to keep the read replica off the primary and Mongo nodes too, so
-    # all three DBs spread. Soft (preferred) — the replica is idle/less critical,
-    # and a hard rule could wedge scheduling if a node is drained.
-    affinity:
-      podAntiAffinity:
-        preferredDuringSchedulingIgnoredDuringExecution:
-          - weight: 100
-            podAffinityTerm:
-              labelSelector:
-                matchExpressions:
-                  - key: app.kubernetes.io/name
-                    operator: In
-                    values: [postgresql, mongodb]
-                  - key: app.kubernetes.io/component
-                    operator: NotIn
-                    values: [read]
-              topologyKey: kubernetes.io/hostname
     # Startup probe gates liveness during the initial pg_basebackup. The DB is
     # ~140GB, so a re-clone takes ~90min — the default liveness probe would
     # SIGKILL the pod every ~90s and restart the clone forever. 180min ceiling
@@ -860,65 +623,6 @@ postgresql:
   podDisruptionBudget:
     enabled: true
     minAvailable: 1
-
-# ===== DATABASE: MongoDB =====
-mongodb:
-  enabled: false # v8 Mongo retired 2026-07-30 (#2295); PVCs kept as fallback, delete after grace period
-
-  fullnameOverride: "mongodb"
-
-  architecture: replicaset
-  replicaCount: 1
-
-  image:
-    repository: bitnamilegacy/mongodb
-    tag: 7.0.15-debian-12-r0
-
-  auth:
-    rootUser: root
-    existingSecret: mongodb
-
-  arbiter:
-    enabled: false
-
-  livenessProbe:
-    enabled: true
-    timeoutSeconds: 30
-    periodSeconds: 30
-    failureThreshold: 10
-
-  readinessProbe:
-    enabled: true
-    timeoutSeconds: 20
-    periodSeconds: 20
-    failureThreshold: 10
-
-  persistence:
-    enabled: true
-    storageClass: ""
-    size: 200Gi
-
-  resources:
-    requests:
-      cpu: 1000m
-      memory: 4Gi
-    limits:
-      cpu: 3000m
-      memory: 6Gi
-
-  # Cross-DB spread: mirror of the PG primary rule — Mongo never shares a node
-  # with any PostgreSQL pod. Keeps the two heavy DBs apart on 4 prod nodes.
-  # Applying reschedules Mongo (brief blip) — trigger in a maintenance window.
-  affinity:
-    podAntiAffinity:
-      requiredDuringSchedulingIgnoredDuringExecution:
-        - labelSelector:
-            matchLabels:
-              app.kubernetes.io/name: postgresql
-          topologyKey: kubernetes.io/hostname
-
-  podDisruptionBudget:
-    enabled: false
 
 # ===== CACHE: Valkey (Redis) — Tier 4.3 =====
 valkey:
@@ -1097,8 +801,6 @@ cadenceRelay:
     repository: n0computer/iroh-relay
     tag: "v1.0.2"
   # hostname defaults to cadence-relay.{global.domain} = cadence-relay.localfirsthealth.com
-  # Explicit: the chart default was "staging" and prod never overrode it, so the
-  # PROD relay ran on a staging node (found in the 2026-08-06 pool review).
   nodePool: "prod-apps"
 
 # ===== P2P SYNC: Cadence v2 (iroh 1.0 QUIC) — Tier 4.4 =====
@@ -1154,125 +856,6 @@ cadence:
     secrets:
       - secretKey: sa-api-key
         remoteKey: mycure-production-cadence-sa-api-key
-
-# (udpGateway — the prod cadence QUIC UDP LoadBalancer — is provisioned separately in monobase-infra#172.)
-
-# ===== MIGRATION: HapiHub Migrator (Tier 5) =====
-# Long-lived MongoDB → PostgreSQL migration tool. NOT a Job — runs continuously
-# through bulk → cdc → reverse-cdc as MIGRATION.md phases progress.
-#
-# Default disabled. Flip enabled: true at MIGRATION.md Phase 2 (after the
-# image is published and ready to start the bulk run).
-#
-# v3.7.0 ships MODE=reverse-cdc as PG-only capture: PG triggers record every
-# write on the allowlist into `_pg_changelog`. Capture-only — no MongoDB
-# replay; the changelog is the rollback forensic trail.
-hapihubMigrator:
-  enabled: false # migrator stopped 2026-07-02 (was: Phase 2 bulk started 2026-04-07)
-  replicaCount: 1  # re-enabled 2026-06-10 after cadence 0.5.13 keyset fix landed
-
-  image:
-    repository: ghcr.io/mycurelabs/hapihub-migrator
-    tag: "3.9.3"  # #2092: legacy billing-invoices → billing_legacy_invoices (was mis-mapped to billing_invoices); + billing.invoices → billing_invoices. Reverse map follows registry.
-    pullPolicy: IfNotPresent
-
-  # bulk (Phase 3) → cdc (Phase 4) → reverse-cdc (Phase 6, post-cutover)
-  mode: cdc
-
-  # ===== Reverse PG→Mongo (Phase B) — staged gated rollout (infra#11) =====
-  # Stage 4 (FULL): `tables` filter dropped → reverse-apply covers ALL
-  # reverse-scoped collections, INCLUDING the 5 encrypted ones (personal_details,
-  # medical_records, billing_invoices, billing_items, billing_payments). PG
-  # plaintext is re-encrypted with the prod ENC_* keys before writing to Mongo
-  # (AES-CBC, deterministic; keys verified at startup; ciphertext+_eh validated
-  # end-to-end in preprod). Forward (3.8.1) sets suppress_capture (no echo);
-  # latest-wins skips anything Mongo already has. Stages 1→3b preceded this.
-  reverseCdc:
-    enabled: true
-    apply: true
-    # no `tables` → apply ALL reverse-scoped (incl. encrypted) = full reverse sync
-
-  resources:
-    requests:
-      cpu: 50m
-      memory: 256Mi
-    limits:
-      cpu: "2"
-      memory: 4Gi
-
-  # Connection details — both DB connection strings are assembled in-template
-  # from the existing in-cluster K8s secrets (no GCP secret indirection):
-  #   PG_TARGET_URI ← postgresql Secret (postgres-password)
-  #   MONGO_SOURCE_URI ← mongodb Secret (mongodb-root-password)
-  postgresql:
-    enabled: true
-    serviceName: postgresql-primary
-    port: 5432
-    auth:
-      database: hapihub
-      username: postgres
-      existingSecret: postgresql
-      passwordKey: postgres-password
-
-  mongodb:
-    enabled: true
-    serviceName: mongodb-headless # bitnami chart only creates the headless service
-    port: 27017
-    database: hapihub
-    username: root
-    replicaSet: rs0
-    authSource: admin
-    existingSecret: mongodb
-    passwordKey: mongodb-root-password
-
-  # Encryption keys are required so the migrator can decrypt the encrypted
-  # MongoDB collections (medical-records, billing-*, personal-details) before
-  # writing to PG, AND re-encrypt during reverse CDC.
-  externalSecrets:
-    enabled: true
-    secretStore: gcp-secretstore
-    secretStoreKind: ClusterSecretStore
-    refreshInterval: 1h
-    secrets:
-      - secretKey: ENC_BILLING_INVOICES
-        remoteKey: mycure-production-enc-billing-invoices
-      - secretKey: ENC_BILLING_ITEMS
-        remoteKey: mycure-production-enc-billing-items
-      - secretKey: ENC_BILLING_PAYMENTS
-        remoteKey: mycure-production-enc-billing-payments
-      - secretKey: ENC_MEDICAL_RECORDS
-        remoteKey: mycure-production-enc-medical-records
-      - secretKey: ENC_PERSONAL_DETAILS
-        remoteKey: mycure-production-enc-personal-details
-
-  # Nightly bulk safety-net sweep over a trailing 48h window. Re-runs
-  # MODE=bulk to catch documents the CDC replayer may have missed
-  # (collector disconnects, oplog truncation, key skew, etc.). Bulk is
-  # idempotent (ON CONFLICT DO UPDATE) and shares the upsert path with
-  # CDC — safe alongside the running Deployment. Validated end-to-end
-  # in preprod against tags 3.7.4 and 3.7.8.
-  nightlyJob:
-    enabled: true  # re-enabled 2026-06-10 after cadence 0.5.13 keyset fix landed
-    schedule: "0 18 * * *"   # 02:00 Asia/Manila daily, offset from Velero @ 02:00 UTC
-    lookbackHours: 48
-
-  # Reverse-bulk nightly safety net (MODE=reverse-bulk, PG → Mongo). The reverse
-  # analog of nightlyJob above: sweeps PG rows updated in the trailing window and
-  # upserts them to Mongo (latest-wins, re-encrypting encrypted collections),
-  # catching anything the realtime reverse replayer missed (worker downtime,
-  # capture gaps). Full scope (no `tables`) to match the realtime reverse-apply.
-  # Offset from the forward nightly (18:00) and Velero (02:00).
-  reverseNightlyJob:
-    enabled: true
-    schedule: "0 20 * * *"   # 20:00 UTC daily
-    windowHours: 26
-    resources:
-      requests:
-        cpu: 200m
-        memory: 512Mi
-      limits:
-        cpu: "2"
-        memory: 4Gi
 
 # ===== BACKUP =====
 backup:

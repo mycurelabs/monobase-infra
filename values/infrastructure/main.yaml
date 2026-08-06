@@ -233,11 +233,6 @@ externalSecrets:
 externalDNS:
   enabled: true  # Automatic DNS via Cloudflare
 
-# Longhorn - Distributed block storage
-longhorn:
-  enabled: false  # Usually use cloud provider storage
-  version: 1.6.0
-
 # Kyverno - Policy engine
 kyverno:
   enabled: false  # Optional, enable for policy enforcement

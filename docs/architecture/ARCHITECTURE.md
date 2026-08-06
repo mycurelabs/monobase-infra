@@ -33,15 +33,15 @@ graph TB
     end
     
     subgraph "Kubernetes Cluster"
-        subgraph "gateway-system namespace"
-            Gateway[🌐 Envoy Gateway<br/>shared-gateway<br/>2 replicas]
+        subgraph "nginx-gateway-system namespace"
+            Gateway[🌐 NGINX Gateway Fabric<br/>nginx-shared-gateway<br/>2 data-plane replicas]
         end
         
         subgraph "client-a-prod namespace"
             Monobase API1[⚕️ Monobase API<br/>3 replicas]
             Monobase Account1[📱 Monobase Account<br/>2 replicas]
             API Worker1[🔄 API Worker<br/>2 replicas]
-            PostgreSQL1[(🗄️ PostgreSQL<br/>3-node replica)]
+            PostgreSQL1[(🗄️ PostgreSQL<br/>primary + read replica)]
             MinIO1[(📦 MinIO<br/>6-node distributed)]
         end
         
@@ -51,7 +51,7 @@ graph TB
         end
         
         subgraph "Infrastructure"
-            Longhorn[💾 Longhorn Storage]
+            CSI[💾 Cloud Block Storage<br/>do-block-storage CSI]
             ArgoCD[🔄 ArgoCD GitOps]
             ExtSecrets[🔐 External Secrets]
             CertMgr[🔒 cert-manager]
@@ -75,15 +75,15 @@ graph TB
     ExtSecrets -->|fetches| KMS
     ExtSecrets -.->|injects| Monobase API1
     Velero -.->|backups| PostgreSQL1
-    Longhorn -.->|provides storage| PostgreSQL1
+    CSI -.->|provides storage| PostgreSQL1
 ```
 
 ### Technology Stack
 
 **Core (Always Deployed):**
-- Kubernetes 1.27+ (EKS, AKS, GKE, or self-hosted)
-- Envoy Gateway (Gateway API)
-- Longhorn (distributed storage)
+- Kubernetes 1.27+ (EKS, AKS, GKE, DOKS, or self-hosted)
+- NGINX Gateway Fabric (Gateway API)
+- Cloud block storage CSI (`do-block-storage` on DOKS; Longhorn is an optional profile for the on-prem-k3s provider only)
 - ArgoCD (GitOps)
 - External Secrets Operator (KMS integration)
 - cert-manager (TLS automation)
@@ -91,7 +91,7 @@ graph TB
 **Applications:**
 - Monobase API (API backend)
 - Monobase Account (Vue.js frontend)
-- PostgreSQL 7.x (primary database)
+- PostgreSQL (primary database; primary + streaming read replica)
 
 **Optional:**
 - API Worker (real-time sync)
@@ -103,7 +103,7 @@ graph TB
 **NOT Included (Deliberately):**
 - ❌ Service Mesh (Istio/Linkerd) - Overkill for 3 services
 - ❌ Self-hosted Vault - Use cloud KMS instead
-- ❌ Rook-Ceph - Longhorn + MinIO simpler
+- ❌ Rook-Ceph - Cloud block storage + MinIO simpler
 
 ---
 
@@ -116,7 +116,7 @@ sequenceDiagram
     participant U as 👤 User
     participant DNS as 🌐 DNS
     participant LB as ⚖️ LoadBalancer
-    participant GW as 🚪 Envoy Gateway
+    participant GW as 🚪 NGINX Gateway Fabric
     participant API as ⚕️ Monobase API
     participant DB as 🗄️ PostgreSQL
     participant S3 as 📦 MinIO/S3
@@ -143,7 +143,7 @@ sequenceDiagram
 graph TB
     subgraph "Single Kubernetes Cluster"
         subgraph "Shared Gateway"
-            GW[Envoy Gateway<br/>LoadBalancer IP: X.X.X.X]
+            GW[NGINX Gateway Fabric<br/>LoadBalancer IP: X.X.X.X]
         end
         
         subgraph "client-a-prod namespace"
@@ -166,7 +166,7 @@ graph TB
         
         subgraph "Infrastructure (Shared)"
             NP[NetworkPolicies<br/>Namespace Isolation]
-            Storage[Longhorn<br/>Distributed Storage]
+            Storage[Cloud Block Storage<br/>do-block-storage CSI]
         end
     end
     
@@ -195,9 +195,9 @@ graph TB
                    [LoadBalancer IP]
                           |
         ┌─────────────────┴─────────────────┐
-        │    gateway-system namespace       │
+        │  nginx-gateway-system namespace   │
         │  ┌──────────────────────────────┐ │
-        │  │   Shared Envoy Gateway       │ │
+        │  │   Shared NGINX Gateway (NGF) │ │
         │  │   - HTTPS listener (443)     │ │
         │  │   - HA: 2 replicas           │ │
         │  │   - Rate limiting            │ │
@@ -227,15 +227,15 @@ graph TB
         │  │               │             ││
         │ ┌▼────────────┐ ┌▼─────────┐  ││
         │ │  PostgreSQL    │ │  MinIO   │  ││
-        │ │  Replica Set│ │ Distrib. │  ││
-        │ │  3 nodes    │ │ 6 nodes  │  ││
+        │ │  Primary +  │ │ Distrib. │  ││
+        │ │  read repl. │ │ 6 nodes  │  ││
         │ └──────┬──────┘ └────┬─────┘  ││
         │        │             │         ││
         │  ┌─────┴─────────────┴──────┐ ││
-        │  │   Longhorn Storage       │ ││
-        │  │   - 3x replication       │ ││
-        │  │   - Snapshots            │ ││
-        │  │   - Encryption           │ ││
+        │  │   Cloud Block Storage    │ ││
+        │  │   - do-block-storage CSI │ ││
+        │  │   - Provider-replicated  │ ││
+        │  │   - Velero backups       │ ││
         │  └──────────────────────────┘ ││
         └────────────────────────────────┘
 ```
@@ -259,7 +259,7 @@ Browser → DNS → LoadBalancer → Gateway (443)
 **3. File Upload Flow:**
 ```
 Client → Monobase API → MinIO S3 API (9000)
-  → Longhorn PVC → Distributed storage across nodes
+  → Block-storage PVC (do-block-storage)
 ```
 
 **4. File Download Flow:**
@@ -279,13 +279,14 @@ Client → Monobase API (generates presigned URL)
 
 ```
 ┌─────────────────────────────────────┐
-│  gateway-system namespace (shared) │
+│ nginx-gateway-system ns (shared)   │
 │                                     │
 │  ┌───────────────────────────────┐ │
-│  │   Shared Gateway              │ │
-│  │   - Single HTTPS listener     │ │
+│  │   nginx-shared-gateway (NGF)  │ │
+│  │   - HTTPS listeners           │ │
 │  │   - Wildcard: *.myclient.com  │ │
-│  │   - HA: 2 Envoy replicas      │ │
+│  │   - HA: 2 nginx replicas      │ │
+│  │     (infra node pool)         │ │
 │  │   - Single LoadBalancer IP    │ │
 │  └───────────────────────────────┘ │
 └──────────────┬──────────────────────┘
@@ -310,8 +311,8 @@ apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 spec:
   parentRefs:
-    - name: shared-gateway  # References shared Gateway
-      namespace: gateway-system
+    - name: nginx-shared-gateway  # References shared Gateway
+      namespace: nginx-gateway-system
   hostnames:
     - api.client.com       # Client-specific domain
   rules:
@@ -324,42 +325,33 @@ spec:
 
 ## Storage Architecture
 
-### Longhorn Distributed Block Storage
+### Cloud Block Storage
+
+Deployments run on DOKS and use DigitalOcean block storage via the
+`do-block-storage` CSI driver (the cluster default StorageClass):
 
 ```
-┌─────────────────────────────────────────┐
-│         Longhorn Storage Cluster        │
-│                                         │
-│  ┌────────┐  ┌────────┐  ┌────────┐   │
-│  │ Node 1 │  │ Node 2 │  │ Node 3 │   │
-│  │        │  │        │  │        │   │
-│  │ Replica│  │ Replica│  │ Replica│   │
-│  │   A    │  │   A    │  │   A    │   │
-│  │ Replica│  │ Replica│  │ Replica│   │
-│  │   B    │  │   B    │  │   B    │   │
-│  └────────┘  └────────┘  └────────┘   │
-│                                         │
-│  Data replicated 3x across nodes       │
-│  Can lose 2 nodes without data loss    │
-└─────────────────────────────────────────┘
-         ▲
-         │ iSCSI / NVMe
-         │
-┌────────┴─────────┐
+┌──────────────────┐
 │  StatefulSets    │
-│  - PostgreSQL       │
+│  - PostgreSQL    │
 │  - MinIO         │
-│  - Valkey     │
-└──────────────────┘
+│  - Valkey        │
+└────────┬─────────┘
+         │ PVC (do-block-storage)
+         ▼
+┌─────────────────────────────────────────┐
+│  DigitalOcean Block Storage (CSI)       │
+│  - Provider-replicated volumes          │
+│  - Encryption at rest (provider)        │
+│  - Online volume expansion              │
+│  - Off-cluster backups via Velero       │
+└─────────────────────────────────────────┘
 ```
 
-**Features:**
-- **3-way replication** - Data on 3 nodes
-- **Automatic failover** - Rebuilds replicas on node failure
-- **Snapshots** - Hourly local snapshots
-- **Backups** - Daily S3 backups
-- **Encryption** - dm-crypt volume encryption
-- **Expansion** - Online volume resize
+On other clouds the same pattern applies with the provider's default CSI
+(EBS on EKS, Azure Disk on AKS, PD on GKE). Longhorn is an optional profile
+for the `on-prem-k3s` provider only; it is not deployed on the cloud
+clusters (see [STORAGE.md](../operations/STORAGE.md)).
 
 ### MinIO Distributed Storage (Optional)
 
@@ -442,7 +434,7 @@ Explicit ALLOW rules:
 - Namespace-scoped permissions
 
 **Layer 4: Data (Encryption)**
-- At rest: Longhorn + PostgreSQL encryption
+- At rest: provider block-storage encryption + PostgreSQL
 - In transit: TLS everywhere (cert-manager)
 - Backups: S3 + KMS encryption
 
@@ -460,8 +452,8 @@ Explicit ALLOW rules:
 
 ```
 ┌─────────────────────────────────────────┐
-│  Tier 1: Hourly Snapshots (Fast)        │
-│  - Storage: Local (Longhorn nodes)      │
+│  Tier 1: Volume Snapshots (Fast)        │
+│  - Storage: Provider (CSI snapshots)    │
 │  - Retention: 72 hours                  │
 │  - Recovery: ~5 minutes                 │
 │  - Use: Quick rollback, recent issues   │
@@ -486,7 +478,7 @@ Explicit ALLOW rules:
 
 **Backup Methods:**
 
-1. **Longhorn Snapshots** - Volume-level, COW snapshots
+1. **CSI Volume Snapshots** - Volume-level, provider-managed
 2. **Velero Backups** - Kubernetes-native, application-aware
 3. **PostgreSQL dumps** - Application-level (optional)
 
@@ -548,10 +540,9 @@ Explicit ALLOW rules:
 | Monobase API | 2-3 | Rolling update + PDB | 0s (other pods serve) |
 | Monobase Account | 2 | Rolling update + PDB | 0s |
 | API Worker | 2 | Rolling update + PDB | 0s |
-| PostgreSQL | 3 | Replica set | <30s (auto-failover) |
+| PostgreSQL | 2 | Primary + streaming read replica | Reads keep serving; writes pause until primary reschedules |
 | MinIO | 6 | Erasure coding | 0s (2 node tolerance) |
-| Envoy Gateway | 2 | Anti-affinity | <1s (pod swap) |
-| Longhorn | 3 | Volume replication | 0s (auto-rebuild) |
+| NGINX Gateway Fabric (data plane) | 2 | Anti-affinity (infra node pool) | <1s (pod swap) |
 
 ### Update Strategy
 
@@ -579,11 +570,8 @@ After: Pod C (v2), Pod D (v2) ← 100% v2, zero downtime
 
 ```
 Cluster
-├── gateway-system (shared)
-│   └── shared-gateway (1 Gateway, HA: 2 replicas)
-│
-├── longhorn-system (shared)
-│   └── Longhorn components
+├── nginx-gateway-system (shared)
+│   └── nginx-shared-gateway (1 Gateway, HA: 2 nginx replicas)
 │
 ├── external-secrets-system (shared)
 │   └── External Secrets Operator
@@ -600,18 +588,24 @@ Cluster
 ├── client-a-prod
 │   ├── api, api-worker, account
 │   ├── postgresql, minio, valkey
-│   └── HTTPRoutes → shared-gateway
+│   └── HTTPRoutes → nginx-shared-gateway
 │
 ├── client-a-staging
 │   ├── api, account
 │   ├── postgresql
-│   └── HTTPRoutes → shared-gateway
+│   └── HTTPRoutes → nginx-shared-gateway
 │
 └── client-b-prod
     ├── api, api-worker, account
     ├── postgresql, minio
-    └── HTTPRoutes → shared-gateway
+    └── HTTPRoutes → nginx-shared-gateway
 ```
+
+**Node pools (production DOKS):** workloads are placed on role-based node
+pools — `prod-db` (PostgreSQL primary), `prod-apps` (production apps + PG
+read replica), `infra` (gateway, ArgoCD, ESO, cert-manager, external-dns),
+and `nonprod` (preprod, monitoring, velero). See the authoritative table in
+[SCALING-GUIDE.md — Node Pools](../operations/SCALING-GUIDE.md#node-pools-doks).
 
 **Benefits:**
 - **Isolation** - Each client in separate namespace
@@ -661,7 +655,7 @@ Cluster
 |----------|-----|-----|-----------------|
 | Pod failure | 0s | 0 | Auto-restart + HA |
 | Node failure | <30s | 0 | Pod rescheduling |
-| AZ failure | <5min | 1h | Longhorn snapshot restore |
+| AZ failure | <5min | 1h | Volume snapshot / Velero restore |
 | Database corruption | <1h | 24h | Velero daily backup |
 | Cluster failure | <4h | 1w | Velero weekly + new cluster |
 | Region failure | <8h | 1w | Cross-region backup restore |
@@ -679,13 +673,13 @@ Cluster
 - **Action:** Pods rescheduled to healthy nodes
 - **Impact:** Brief degradation if node had replicas
 - **RTO:** 1-5 minutes
-- **Longhorn:** Rebuilds volume replicas automatically
+- **Storage:** Block-storage volumes reattach to the replacement node
 
-**3. PostgreSQL Replica Failure:**
-- **Detection:** Replica set monitoring
-- **Action:** Automatic failover to secondary
-- **Impact:** <30s connection interruption
-- **RTO:** <30s
+**3. PostgreSQL Node Failure:**
+- **Detection:** Pod/node health monitoring
+- **Action:** Primary pod reschedules; reads keep serving from the read replica
+- **Impact:** Writes pause until the primary is back (see the `prod-db` runbook in [SCALING-GUIDE.md](../operations/SCALING-GUIDE.md))
+- **RTO:** Minutes (pod reschedule + volume reattach)
 
 **4. Complete Cluster Failure:**
 - **Detection:** All nodes down
@@ -708,7 +702,7 @@ Traffic increases → CPU >70% → HPA adds pods
 
 **Storage (via Volume Expansion):**
 ```
-Storage fills → Expand PVC → Longhorn expands volume
+Storage fills → Expand PVC → CSI expands volume
   → No downtime → More space available
 ```
 

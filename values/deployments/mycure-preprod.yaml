@@ -14,8 +14,8 @@ global:
   namespace: mycure-preprod
   environment: preprod
 
-  # 2026-08-06 pool restructure: preprod lives on the untainted nonprod pool
-  # (shared with monitoring/velero); prod pools are tainted so preprod can't land there.
+  # Preprod lives on the untainted nonprod pool (shared with monitoring/
+  # velero); prod pools are tainted so preprod can't land there.
   nodePool: "nonprod"
 
   # Point the database-secrets chart at the mycure-production-* GCP keys so
@@ -30,84 +30,6 @@ global:
   storage:
     provider: ""
     className: ""
-
-# ===== CORE: Monobase API =====
-api:
-  enabled: false
-
-  image:
-    repository: ghcr.io/monobaselabs/api
-    tag: "0.1.4"
-    pullPolicy: IfNotPresent
-
-  replicaCount: 1
-
-  resources:
-    requests:
-      cpu: 100m
-      memory: 256Mi
-    limits:
-      cpu: 500m
-      memory: 512Mi
-
-  gateway:
-    hostname: ""
-
-  livenessProbe:
-    enabled: true
-
-  readinessProbe:
-    enabled: true
-
-  podDisruptionBudget:
-    enabled: false
-
-  autoscaling:
-    enabled: false
-
-  backup:
-    enabled: false
-
-  externalSecrets:
-    enabled: false
-
-  postgresql:
-    serviceName: postgresql
-    architecture: standalone
-    auth:
-      database: postgres
-      username: postgres
-
-  mailpit:
-    enabled: true
-
-# ===== CORE: Monobase Account Frontend =====
-account:
-  enabled: false
-
-  image:
-    repository: ghcr.io/monobaselabs/accountapp
-    tag: "1.0.2"
-    pullPolicy: IfNotPresent
-
-  replicaCount: 1
-
-  resources:
-    requests:
-      cpu: 50m
-      memory: 64Mi
-    limits:
-      cpu: 200m
-      memory: 128Mi
-
-  gateway:
-    hostname: ""
-
-  config:
-    API_URL: "https://hapihub.preprod.localfirsthealth.com"
-
-  podDisruptionBudget:
-    enabled: false
 
 # ===== HEALTHCARE: MyCure Dashboard (operator/admin web UI) =====
 mycure-dashboard:
@@ -230,7 +152,7 @@ hapihub:
       rpId: "preprod.localfirsthealth.com"
 
   config:
-    CORS_ORIGINS: "https://hapihub.preprod.localfirsthealth.com,https://mycure.preprod.localfirsthealth.com,https://mycurelocal.preprod.localfirsthealth.com,https://mycure-myaccount.preprod.localfirsthealth.com,https://mycure-dashboard.preprod.localfirsthealth.com,https://mycure-pxp.preprod.localfirsthealth.com,https://dentalemon.preprod.localfirsthealth.com,https://dentalemon-myaccount.preprod.localfirsthealth.com,https://dentalemon-website.preprod.localfirsthealth.com,https://mycure-pr--*.web.app,https://medleyapp.preprod.localfirsthealth.com"
+    CORS_ORIGINS: "https://hapihub.preprod.localfirsthealth.com,https://mycure.preprod.localfirsthealth.com,https://mycurelocal.preprod.localfirsthealth.com,https://mycure-myaccount.preprod.localfirsthealth.com,https://mycure-dashboard.preprod.localfirsthealth.com,https://mycure-pxp.preprod.localfirsthealth.com,https://mycure-pr--*.web.app,https://medleyapp.preprod.localfirsthealth.com"
     # ---- Phase 2: medical-AI integration (medgemma-worker + openmed enabled below) ----
     INGESTION_ENABLED: "true"
     OPENMED_ENABLED: "true"
@@ -442,36 +364,6 @@ mycure-myaccount:
   podDisruptionBudget:
     enabled: false
 
-# ===== HEALTHCARE: DentaLemon MyAccount Application =====
-dentalemon-myaccount:
-  enabled: false
-
-  image:
-    repository: ghcr.io/mycurelabs/dentalemon-myaccount
-    tag: "1.0.14"
-    pullPolicy: IfNotPresent
-
-  replicaCount: 1
-
-  resources:
-    requests:
-      cpu: 50m
-      memory: 64Mi
-    limits:
-      cpu: 200m
-      memory: 128Mi
-
-  gateway:
-    hostname: ""
-    sectionName: https-preprod-lfh
-
-  config:
-    API_URL: "https://hapihub.preprod.localfirsthealth.com"
-    HAPIHUB_URL: "https://hapihub.preprod.localfirsthealth.com"
-
-  podDisruptionBudget:
-    enabled: false
-
 # ===== HEALTHCARE: HapiHub API Documentation =====
 hapihub-docs:
   enabled: false
@@ -656,111 +548,6 @@ openmed:
   podDisruptionBudget:
     enabled: false
 
-# ===== HEALTHCARE: DentaLemon Website =====
-dentalemon-website:
-  enabled: false
-
-  image:
-    repository: ghcr.io/mycurelabs/dentalemon-website
-    tag: "0.3.1"
-    pullPolicy: IfNotPresent
-
-  replicaCount: 1
-
-  resources:
-    requests:
-      cpu: 50m
-      memory: 64Mi
-    limits:
-      cpu: 200m
-      memory: 128Mi
-
-  gateway:
-    hostname: ""
-    sectionName: https-preprod-lfh
-    gatewayName: nginx-shared-gateway
-    gatewayNamespace: nginx-gateway-system
-
-  networkPolicy:
-    enabled: true
-
-  config:
-    API_URL: "https://hapihub.preprod.localfirsthealth.com"
-    ACCOUNT_URL: "https://dentalemon-myaccount.preprod.localfirsthealth.com"
-
-  podDisruptionBudget:
-    enabled: false
-
-# ===== HEALTHCARE: DentaLemon Dental Application =====
-dentalemon:
-  enabled: false
-
-  image:
-    repository: ghcr.io/mycurelabs/dentalemonapp
-    tag: "10.9.1"
-    pullPolicy: IfNotPresent
-
-  replicaCount: 1
-
-  resources:
-    requests:
-      cpu: 50m
-      memory: 64Mi
-    limits:
-      cpu: 200m
-      memory: 128Mi
-
-  gateway:
-    hostname: ""
-    sectionName: https-preprod-lfh
-
-  config:
-    API_URL: "https://hapihub.preprod.localfirsthealth.com"
-    HAPIHUB_URL: "https://hapihub.preprod.localfirsthealth.com"
-
-  podDisruptionBudget:
-    enabled: false
-
-# ===== LEGACY: MyCure v8 (disabled, stub required by chart template) =====
-mycurev8:
-  enabled: false
-
-# ===== DATABASE: MongoDB =====
-# Removed 2026-07-30. Was a synthetic single-node replica set existing only
-# to feed the hapihub-migrator CronJob smoke test — but the migrator has been
-# stopped since 2026-07-02 (hapihubMigrator.enabled: false), so nothing
-# consumed it. Setting enabled:false prunes the StatefulSet + PVC via ArgoCD.
-# The remaining config below is retained (disabled) so the migrator smoke
-# test can be revived without re-deriving the mongo shape.
-mongodb:
-  enabled: false
-
-  image:
-    repository: bitnamilegacy/mongodb
-    tag: 7.0.15-debian-12-r0
-
-  auth:
-    rootUser: root
-    existingSecret: mongodb
-
-  replicaCount: 1
-
-  arbiter:
-    enabled: false
-
-  persistence:
-    enabled: true
-    storageClass: ""
-    size: 5Gi
-
-  resources:
-    requests:
-      cpu: 50m
-      memory: 256Mi
-    limits:
-      cpu: 500m
-      memory: 1Gi
-
 # ===== DATABASE: PostgreSQL =====
 # Standalone (no read replica) in preprod: prod node pool can't fit a
 # second 4Gi PG pod alongside HA Postgres + existing prod workloads.
@@ -932,90 +719,6 @@ mailpit:
     # outlives short-lived testing. Exposure-free alt: kubectl port-forward svc/mailpit-http 8025:80
     enabled: true
     hostname: "mail.preprod.localfirsthealth.com"
-
-# ===== P2P SYNC: Cadence =====
-hapihubMigrator:
-  enabled: false # migrator stopped 2026-07-02
-
-  image:
-    repository: ghcr.io/mycurelabs/hapihub-migrator
-    tag: "3.9.2"  # #2063 + reverse mirror: same-second ties apply incoming (fwd <=, rev next-second bound)
-    pullPolicy: IfNotPresent
-
-  # No CDC in preprod — only the CronJob is exercised here.
-  deployment:
-    enabled: false
-
-  # Reverse-sync canary (PG → MongoDB): apply scope widened past the initial
-  # clocks,counters pair after an end-to-end round-trip proved apply works
-  # (PG update → _pg_changelog → Mongo upsert, errors=0). Added tables are all
-  # NON-encrypted — preprod has no ENC_* keys (externalSecrets disabled), so
-  # encrypted collections (personal_details, billing_invoices/items/payments,
-  # medical_records) stay out of scope here. Widen further / drop `tables`
-  # as later stages pass.
-  reverseCdc:
-    enabled: true
-    apply: true
-    tables: "clocks,counters,services,medicines,organizations"
-
-  # Reverse safety-net sweep (MODE=reverse-bulk, PG → MongoDB). Scoped to a
-  # small NON-encrypted set to keep the recurring cost low (the real-time
-  # reverseCdc canary above already covers the wider set) and to stay clear
-  # of encrypted collections preprod can't key. windowHours is deliberately
-  # wide here because preprod has no live write traffic — a 26h trailing
-  # window (the prod default) would sweep nothing; 90d lets the safety-net
-  # actually re-check the near-static dataset. Latest-wins makes re-runs
-  # no-ops. Offset 30m from the forward nightly (0 */6).
-  reverseNightlyJob:
-    enabled: true
-    schedule: "30 */6 * * *"
-    windowHours: 2160
-    tables: "counters,organizations"
-    resources:
-      requests:
-        cpu: 100m
-        memory: 256Mi
-      limits:
-        cpu: "1"
-        memory: 1Gi
-
-  # Run every 6h in preprod for faster feedback than nightly.
-  nightlyJob:
-    enabled: true
-    schedule: "0 */6 * * *"
-    lookbackHours: 48
-    resources:
-      requests:
-        cpu: 100m
-        memory: 256Mi
-      limits:
-        cpu: "1"
-        memory: 1Gi
-
-  postgresql:
-    enabled: true
-    serviceName: postgresql
-    port: 5432
-    auth:
-      database: hapihub
-      username: postgres
-      existingSecret: postgresql
-      passwordKey: postgres-password
-
-  mongodb:
-    enabled: true
-    serviceName: mongodb-headless
-    port: 27017
-    database: hapihub
-    username: root
-    replicaSet: rs0
-    authSource: admin
-    existingSecret: mongodb
-    passwordKey: mongodb-root-password
-
-  # No encryption keys in preprod — synthetic Mongo holds no encrypted data.
-  externalSecrets:
-    enabled: false
 
 # ===== BACKUP =====
 backup:

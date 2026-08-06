@@ -1,6 +1,6 @@
 # Gateway API Guide
 
-Envoy Gateway configuration, HTTPRoute management, and zero-downtime routing.
+NGINX Gateway Fabric (NGF) configuration, HTTPRoute management, and zero-downtime routing.
 
 ## Shared Gateway Strategy
 
@@ -19,12 +19,12 @@ Envoy Gateway configuration, HTTPRoute management, and zero-downtime routing.
 The Gateway is deployed **automatically by ArgoCD** during bootstrap.
 
 **What gets created:**
-- ✅ `shared-gateway` Gateway resource in `gateway-system` namespace
-- ✅ Wildcard TLS certificate (`wildcard-tls`) via cert-manager
+- ✅ `nginx-shared-gateway` Gateway resource in `nginx-gateway-system` namespace
+- ✅ Wildcard TLS certificates via cert-manager
 - ✅ HTTP to HTTPS redirect
-- ✅ LoadBalancer service (created by Envoy Gateway)
+- ✅ LoadBalancer service (created by NGINX Gateway Fabric)
 
-**Configuration:** `infrastructure/gateway/shared-gateway.yaml` (managed via GitOps)
+**Configuration:** `values/infrastructure/main.yaml` (`nginxGateway` / `nginxGatewayResources` keys), rendered by `argocd/infrastructure/templates/nginx-gateway.yaml` and `nginx-gateway-resources.yaml` (managed via GitOps)
 
 **Reference example:**
 
@@ -33,10 +33,10 @@ The Gateway is deployed **automatically by ArgoCD** during bootstrap.
 apiVersion: gateway.networking.k8s.io/v1
 kind: Gateway
 metadata:
-  name: shared-gateway
-  namespace: gateway-system
+  name: nginx-shared-gateway
+  namespace: nginx-gateway-system
 spec:
-  gatewayClassName: envoy-gateway
+  gatewayClassName: nginx
   listeners:
     - name: https
       port: 443
@@ -59,7 +59,7 @@ spec:
 ### Get LoadBalancer IP
 
 ```bash
-kubectl get gateway shared-gateway -n gateway-system \\
+kubectl get gateway nginx-shared-gateway -n nginx-gateway-system \\
   -o jsonpath='{.status.addresses[0].value}'
 ```
 
@@ -76,8 +76,8 @@ metadata:
   namespace: myclient-prod
 spec:
   parentRefs:
-    - name: shared-gateway
-      namespace: gateway-system
+    - name: nginx-shared-gateway
+      namespace: nginx-gateway-system
   hostnames:
     - api.myclient.com
   rules:
@@ -131,8 +131,8 @@ metadata:
   namespace: client-c-prod  # New client
 spec:
   parentRefs:
-    - name: shared-gateway
-      namespace: gateway-system
+    - name: nginx-shared-gateway
+      namespace: nginx-gateway-system
   hostnames:
     - api.client-c.com
   rules:
@@ -141,7 +141,7 @@ spec:
           port: 7500
 EOF
 
-# 2. HTTPRoute added dynamically (xDS)
+# 2. HTTPRoute added dynamically (NGF regenerates + reloads nginx config)
 # ✅ NO Gateway restart
 # ✅ NO existing client impact
 # ✅ New route available immediately
@@ -212,7 +212,7 @@ tls:
   mode: Terminate
   certificateRefs:
     - name: wildcard-tls-myclient-com
-      namespace: gateway-system
+      namespace: nginx-gateway-system
 
 # cert-manager creates automatically via Gateway annotation
 ```
@@ -225,8 +225,8 @@ apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 spec:
   parentRefs:
-    - name: shared-gateway
-      namespace: gateway-system
+    - name: nginx-shared-gateway
+      namespace: nginx-gateway-system
       port: 443
   rules:
     - backendRefs:
@@ -250,7 +250,7 @@ kubectl describe httproute api -n myclient-prod
 
 # Common issues:
 # 1. Gateway not ready
-kubectl get gateway shared-gateway -n gateway-system
+kubectl get gateway nginx-shared-gateway -n nginx-gateway-system
 
 # 2. Backend service not found
 kubectl get svc api -n myclient-prod
@@ -265,13 +265,13 @@ kubectl get httproute -A | grep api.myclient.com
 
 ```bash
 # Check Gateway status
-kubectl describe gateway shared-gateway -n gateway-system
+kubectl describe gateway nginx-shared-gateway -n nginx-gateway-system
 
-# Check Envoy deployment
-kubectl get pods -n gateway-system
+# Check NGF control plane + nginx data plane pods
+kubectl get pods -n nginx-gateway-system
 
 # Check LoadBalancer service
-kubectl get svc -n gateway-system
+kubectl get svc -n nginx-gateway-system
 
 # Cloud-specific:
 # AWS: Check security groups, subnets
@@ -321,10 +321,10 @@ certificates:
 
 **Architecture:**
 
-All certificates stored in `gateway-system` namespace (centralized):
+All certificates stored in `nginx-gateway-system` namespace (centralized):
 
 ```
-gateway-system/
+nginx-gateway-system/
   ├── client1-domain-tls (Secret)           # Client domain 1
   ├── client2-domain-tls (Secret)           # Client domain 2
   └── client3-domain-tls (Secret)           # Client domain 3
@@ -341,8 +341,8 @@ gateway-system/
 apiVersion: gateway.networking.k8s.io/v1
 kind: Gateway
 metadata:
-  name: shared-gateway
-  namespace: gateway-system
+  name: nginx-shared-gateway
+  namespace: nginx-gateway-system
 spec:
   listeners:
     - name: https
@@ -396,8 +396,8 @@ For detailed information on multi-domain support:
 - ✅ Cost-effective (single LoadBalancer)
 
 **Deployment:** 
-- Envoy Gateway operator: `argocd/infrastructure/templates/envoy-gateway.yaml` (sync wave 0)
-- Gateway resource: `argocd/infrastructure/templates/gateway-resources.yaml` (sync wave 1)
-- Configuration: `infrastructure/gateway/shared-gateway.yaml` (GitOps-managed)
+- NGINX Gateway Fabric operator: `argocd/infrastructure/templates/nginx-gateway.yaml` (sync wave 0)
+- Gateway + TLS resources: `argocd/infrastructure/templates/nginx-gateway-resources.yaml` (sync wave 1)
+- Configuration: `values/infrastructure/main.yaml` (`nginxGateway` / `nginxGatewayResources` keys, GitOps-managed)
 
-**Reference examples:** See `docs/components/envoy-gateway-*.yaml` and `infrastructure/gateway/` for configuration
+**Proxy customization:** Data-plane sizing/behavior is configured via NGF's `NginxProxy` CRD (set through the chart's `nginx:` values in `argocd/infrastructure/templates/nginx-gateway.yaml`), and raw nginx directives are injected via `SnippetsPolicy` resources (`nginxGatewayResources.snippetsPolicies` in `values/infrastructure/main.yaml`).

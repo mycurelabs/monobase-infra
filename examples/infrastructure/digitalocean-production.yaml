@@ -1,67 +1,43 @@
 # Example: DigitalOcean DOKS Production Infrastructure Configuration
 # DigitalOcean Kubernetes Service - Production Environment
 # Domain: example.com
+#
+# Mirrors the NGINX Gateway Fabric pattern in values/infrastructure/main.yaml
+# (the live DOKS configuration). LoadBalancer customization (DO LB
+# annotations, FLIPOP, etc.) is done through NGF's NginxProxy CRD / the
+# chart's `nginx.service` values — see
+# argocd/infrastructure/templates/nginx-gateway.yaml and
+# docs/infrastructure/static-ip-digitalocean.md.
 
-# EnvoyProxy Configuration - Static IP for DigitalOcean DOKS
-envoyProxyConfig:
+# NGINX Gateway Fabric - Gateway API implementation
+nginxGateway:
   enabled: true
-  cloudProvider: digitalocean
+  version: "2.4.1"
 
-  digitalocean:
-    # Option 1: Load Balancer ID (created LoadBalancer, less stable)
-    # TODO: Replace with actual LoadBalancer ID after initial deployment
-    # See: docs/infrastructure/static-ip-digitalocean.md
-    loadBalancerId: "12345678-1234-1234-1234-123456789abc"
-
-    # Option 2: Load Balancer Name (alternative to ID)
-    loadBalancerName: "production-gateway-lb"
-
-    # Note: For true static IP with DigitalOcean, use FLIPOP operator
-    # See docs/infrastructure/static-ip-digitalocean.md for FLIPOP setup
-
-# Gateway configuration
-gateway:
-  domain: example.com
+# NGINX Gateway Resources
+nginxGatewayResources:
+  gatewayClass:
+    enabled: false  # GatewayClass created by operator chart
 
   gateway:
-    name: shared-gateway
-    namespace: gateway-system
-    gatewayClassName: envoy-gateway
+    name: nginx-shared-gateway
+    namespace: nginx-gateway-system
+    gatewayClassName: nginx
     listeners:
-      https:
-        enabled: true
+      - name: https
         port: 443
         protocol: HTTPS
-      http:
-        enabled: true
+        hostname: "*.example.com"
+        tlsSecretName: nginx-gateway-tls
+      - name: http
         port: 80
         protocol: HTTP
+        hostname: "*.example.com"
 
-  # TLS/Certificate configuration
+  # TLS certificates provisioned by cert-manager
   tls:
-    enabled: true
-    secretName: gateway-tls
-    certManager:
-      enabled: true
-      clusterIssuer: letsencrypt-prod
-      includeApex: true
-      subdomains:
-        - ""  # example.com (apex domain)
-        - app  # app.example.com
-        - api  # api.example.com
-
-  # HTTP to HTTPS redirect
-  httpRedirect:
-    enabled: true
-    statusCode: 301
-
-# Prerequisites:
-# Option 1 (Basic): Use LoadBalancer ID after initial deployment
-# 1. Deploy gateway without static IP configuration
-# 2. Get LoadBalancer ID: doctl compute load-balancer list
-# 3. Update loadBalancerId above
-#
-# Option 2 (Recommended): Use FLIPOP operator for true static IP
-# 1. Create Floating IP: doctl compute floating-ip create --region <region>
-# 2. Install FLIPOP operator in cluster
-# 3. See docs/infrastructure/static-ip-digitalocean.md for detailed instructions
+    certificates:
+      - secretName: nginx-gateway-tls
+        clusterIssuer: letsencrypt-prod
+        dnsNames:
+          - "*.example.com"

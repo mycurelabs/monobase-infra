@@ -1,10 +1,15 @@
 # Storage Operations Guide
 
-Longhorn and MinIO storage management, expansion, and troubleshooting.
+Cloud block storage and MinIO storage management, expansion, and troubleshooting.
+
+> Deployments run on DOKS and use DigitalOcean block storage
+> (`do-block-storage`, the cluster default StorageClass). Longhorn is an
+> optional profile for the `on-prem-k3s` provider; it is not deployed on the
+> cloud clusters. The Longhorn sections below apply to that profile only.
 
 ## Quick Start: Choosing a Storage Provider
 
-**Use `cloud-default`** for most deployments - it's simpler and uses your cluster's native storage.
+**Use `cloud-default`** for most deployments - it's simpler and uses your cluster's native storage. This is what all deployments use.
 
 ### Configuration
 
@@ -21,6 +26,7 @@ global:
 **1. cloud-default (Recommended for Cloud)**
 
 Uses cluster's default StorageClass:
+- DigitalOcean DOKS → `do-block-storage` CSI (production/preprod)
 - AWS EKS → EBS CSI (gp2/gp3)
 - Azure AKS → Azure Disk CSI  
 - GCP GKE → GCP Persistent Disk
@@ -29,14 +35,16 @@ Uses cluster's default StorageClass:
 **Pros:** Simple, managed, native integration  
 **Cons:** Cloud-specific, not portable
 
-**2. longhorn (Recommended for On-Prem)**
+**2. longhorn (Optional Profile for On-Prem k3s)**
 
-Deploys Longhorn distributed storage.
+Deploys Longhorn distributed storage via the upstream Longhorn Helm chart.
+Applies to the `on-prem-k3s` provider only; not deployed on the cloud
+clusters.
 
 **Pros:** Cloud-agnostic, advanced features, on-prem support  
 **Cons:** Requires management, resource overhead
 
-**Use when:** On-premises, multi-cloud, need full control
+**Use when:** On-premises k3s without a cloud CSI
 
 **3. local-path (For k3d/kind Testing)**
 
@@ -49,47 +57,51 @@ Uses local-path-provisioner.
 
 ### Provider Comparison
 
-| Provider | Best For | Complexity | Cost |
-|----------|----------|------------|------|
-| cloud-default | Cloud (EKS/AKS/GKE) | Low | Low |
-| longhorn | On-prem, multi-cloud | Medium | Medium |
-| local-path | k3d/kind testing | Low | Free |
+| Provider | Best For | Complexity | Cost | Status |
+|----------|----------|------------|------|--------|
+| cloud-default | Cloud (DOKS/EKS/AKS/GKE) | Low | Low | **In use** |
+| longhorn | On-prem k3s | Medium | Medium | On-prem profile only |
+| local-path | k3d/kind testing | Low | Free | Testing only |
 
 ---
 
 ## Table of Contents
 
-1. [Longhorn Operations](#longhorn-operations)
+1. [Cloud Block Storage Operations](#cloud-block-storage-operations)
 2. [MinIO Operations](#minio-operations)
 3. [Volume Expansion](#volume-expansion)
 4. [Storage Monitoring](#storage-monitoring)
 5. [Troubleshooting](#troubleshooting)
+6. [Longhorn Operations (Optional On-Prem Profile)](#longhorn-operations-optional-on-prem-profile)
 
 ---
 
-## Longhorn Deployment
+## Cloud Block Storage Operations
 
-### Automatic GitOps Deployment
+Deployments use the `do-block-storage` StorageClass on DOKS. There is
+no storage operator to manage — DigitalOcean provisions, replicates, and
+encrypts the volumes.
 
-When `longhorn.enabled: true` in `argocd/infrastructure/values.yaml`, the bootstrap process automatically deploys:
+```bash
+# List StorageClasses (do-block-storage is default)
+kubectl get storageclass
 
-1. **Longhorn Operator** (sync wave 0) - Distributed storage system
-2. **StorageClass Resources** (sync wave 1) - Default storage classes
+# List volumes in use
+kubectl get pvc -A
 
-**StorageClasses created:**
-- `longhorn` (default) - 3 replicas, encrypted, for production data
-- `longhorn-fast` - 2 replicas, no encryption, for cache/temp data  
-- `longhorn-archive` - 1 replica, encrypted, for backups/archives
+# Check a volume's backing DO volume
+kubectl get pv <pv-name> -o jsonpath='{.spec.csi.volumeHandle}'
+```
 
-**Configuration files:**
-- Longhorn operator: `argocd/infrastructure/templates/longhorn.yaml`
-- StorageClasses: `infrastructure/storage/storageclass.yaml` (GitOps-managed)
+**Key operations:**
+- **Expansion:** edit the PVC size — the CSI driver expands online (see [Volume Expansion](#volume-expansion))
+- **Snapshots/Backups:** handled by Velero (see [BACKUP_DR.md](BACKUP_DR.md))
+- **Encryption at rest:** provided by DigitalOcean block storage
 
-### Manual Deployment (if not using GitOps)
+## Longhorn Operations (Optional On-Prem Profile)
 
-If deploying Longhorn manually outside of ArgoCD, see the Longhorn documentation.
-
-## Longhorn Operations
+> Optional profile for the `on-prem-k3s` provider; not deployed on the cloud
+> clusters. Installation uses the upstream Longhorn Helm chart.
 
 ### Access Longhorn UI
 
@@ -306,7 +318,7 @@ df -h  # Inside pod
 kubectl edit pvc my-pvc -n myclient-prod
 # Change storage size
 
-# 2. Longhorn expands automatically
+# 2. The CSI driver (do-block-storage) expands automatically
 # No pod restart needed!
 
 # 3. Verify
@@ -317,7 +329,7 @@ kubectl get pvc my-pvc -n myclient-prod
 
 ## Storage Monitoring
 
-### Longhorn Metrics
+### Longhorn Metrics (on-prem profile only)
 
 ```bash
 # Via Prometheus (if monitoring enabled)
@@ -342,7 +354,7 @@ kubectl get pvc my-pvc -n myclient-prod
 
 # Alerts:
 - PersistentVolumeFillingUp (>80% full)
-- LonghornVolumeUnhealthy (degraded)
+- LonghornVolumeUnhealthy (degraded — Longhorn on-prem profile only)
 - MinIODiskOffline
 - MinIOHighStorage (>80% used)
 ```
@@ -353,10 +365,6 @@ kubectl get pvc my-pvc -n myclient-prod
 # Check PVC usage
 kubectl exec -it postgresql-0 -n myclient-prod -- df -h
 
-# Check Longhorn node storage
-kubectl get nodes.longhorn.io -n longhorn-system \\
-  -o custom-columns=NAME:.metadata.name,CAPACITY:.status.diskStatus.*.storageMaximum,USED:.status.diskStatus.*.storageAvailable
-
 # Check MinIO usage
 mc du --depth 1 myminio
 ```
@@ -365,7 +373,7 @@ mc du --depth 1 myminio
 
 ## Troubleshooting
 
-### Longhorn Issues
+### Longhorn Issues (on-prem profile only)
 
 **Volume Degraded:**
 
@@ -489,7 +497,7 @@ kubectl exec -it minio-0 -n myclient-prod -- \\
 
 ### 3. Performance Optimization
 
-**Longhorn:**
+**Longhorn (on-prem profile only):**
 - Use `dataLocality: best-effort` for performance
 - Use SSD disks for production
 - Increase `storageOverProvisioningPercentage` for burst
@@ -504,13 +512,12 @@ kubectl exec -it minio-0 -n myclient-prod -- \\
 
 ## Storage Cost Optimization
 
-### Longhorn
+### Cloud Block Storage
 
 **Reduce Costs:**
-- Use 2 replicas for non-critical data (instead of 3)
-- Clean up old snapshots automatically
-- Use compression (if supported)
-- Archive old data to S3
+- Right-size PVCs — expansion is online, so start small and grow
+- Delete PVCs of retired workloads (they keep billing until removed)
+- Archive old data to S3/Spaces instead of growing volumes
 
 ### MinIO
 
@@ -540,12 +547,16 @@ mc ilm add --expiry-days 365 myminio/temporary-files
 
 ## Summary
 
-**Longhorn:**
+**Cloud Block Storage (do-block-storage on DOKS):**
+- Provider-managed CSI volumes
+- Provider replication + encryption at rest
+- Online expansion
+- Off-cluster backups via Velero
+
+**Longhorn (on-prem k3s profile only):**
 - Distributed block storage
 - 3x replication for HA
 - Snapshots + S3 backups
-- Online expansion
-- Encryption support
 
 **MinIO:**
 - S3-compatible object storage
@@ -561,4 +572,4 @@ mc ilm add --expiry-days 365 myminio/temporary-files
 - Performance tuning
 - Security audits
 
-For backup procedures, see [BACKUP-RECOVERY.md](BACKUP-RECOVERY.md).
+For backup procedures, see [BACKUP_DR.md](BACKUP_DR.md).

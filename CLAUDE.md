@@ -34,17 +34,18 @@ Key tasks: `lint`, `validate`, `check`, `fmt`, `bootstrap`, `provision`, `secret
 
 - **Namespaces**: `{client}-{environment}` (e.g., `mycure-production`, `mycure-staging`)
 - **Deployment files**: `values/deployments/{client}-{environment}.yaml`
-- **Chart names**: lowercase, hyphenated (e.g., `mycure-myaccount`, `dentalemon-website`)
-- **Infrastructure namespaces**: `gateway-system`, `envoy-gateway-system`, `argocd`, `monitoring`, `velero`, `cert-manager`, `external-secrets-system`, `external-dns`, `longhorn-system`
+- **Chart names**: lowercase, hyphenated (e.g., `mycure-myaccount`, `mycure-dashboard`)
+- **Infrastructure namespaces**: `nginx-gateway-system`, `argocd`, `monitoring`, `velero`, `cert-manager`, `external-secrets-system`, `external-dns`, `tailscale`
+- **Node pools** (DOKS): `prod-db`, `prod-apps`, `infra`, `nonprod` — tainted `node-pool=<name>:NoSchedule` except nonprod; see docs/operations/SCALING-GUIDE.md
 
 ## Key Patterns
 
-- **Gateway API** (not Ingress) via Envoy Gateway — shared-gateway in `gateway-system` namespace
+- **Gateway API** (not Ingress) via NGINX Gateway Fabric — `nginx-shared-gateway` in `nginx-gateway-system`
 - **External Secrets Operator** syncs from GCP Secret Manager — never commit secrets
 - **ArgoCD auto-sync** — changes to `values/` trigger automatic deployment
 - **Multi-domain gateway** — supports `*.mycureapp.com`, `*.localfirsthealth.com`, `*.stg.localfirsthealth.com`, `*.mycure.md`
 - **Global values** pattern: `global.domain`, `global.namespace`, `global.gateway`, `global.storage`
-- **Bitnami legacy images** for databases/caches (MongoDB, PostgreSQL, Valkey, MinIO)
+- **Bitnami legacy images** for databases/caches (PostgreSQL, Valkey, MinIO)
 
 ## Git Conventions
 

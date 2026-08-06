@@ -38,12 +38,18 @@ Single Kubernetes Cluster
 ├── client-c-prod namespace
 │   └── ... (same pattern)
 │
-├── gateway-system (shared)
-│   └── Envoy Gateway (2-3 pods)
+├── nginx-gateway-system (shared)
+│   └── NGINX Gateway Fabric (control plane + 2 nginx pods)
 │
 └── external-secrets (shared)
     └── External Secrets Operator (1 pod)
 ```
+
+> **Note:** the sizing tables below are generic template guidance for new
+> clusters. For the actual production DOKS cluster, the role-based node pools
+> (`prod-db`, `prod-apps`, `infra`, `nonprod`) documented in
+> [SCALING-GUIDE.md — Node Pools](SCALING-GUIDE.md#node-pools-doks)
+> are authoritative — do not copy sizes from this page.
 
 ### Why Multi-Tenancy?
 
@@ -133,7 +139,7 @@ spec:
           name: client-a-prod
     - namespaceSelector:
         matchLabels:
-          name: gateway-system
+          name: nginx-gateway-system
 ```
 
 ### Shared vs. Per-Client Resources
@@ -143,7 +149,7 @@ spec:
 | **Monobase API** | Per-client | Client-specific data |
 | **API Worker** | Per-client | Client-specific sync logic |
 | **Monobase Account** | Per-client | Client-specific branding |
-| **Envoy Gateway** | Shared | Routing for all clients |
+| **NGINX Gateway Fabric** | Shared | Routing for all clients |
 | **External Secrets** | Shared | Secret management |
 | **Velero** | Shared | Backup all namespaces |
 | **PostgreSQL** | Per-client | Data isolation |
@@ -170,11 +176,11 @@ spec:
 
 | Service | CPU Request | Memory Request | Replicas |
 |---------|-------------|----------------|----------|
-| Envoy Gateway | 500m | 1Gi | 3 |
+| NGINX Gateway Fabric (nginx data plane) | 100m | 384Mi | 2 |
 | External Secrets | 100m | 256Mi | 1 |
 | CoreDNS | 100m | 128Mi | 2 |
 | Metrics Server | 100m | 256Mi | 1 |
-| **Total shared** | **2100m (2.1 vCPU)** | **3.5Gi** | **7 pods** |
+| **Total shared** | **~600m (0.6 vCPU)** | **~1.5Gi** | **6 pods** |
 
 ### Step 3: Add System Overhead
 

@@ -421,9 +421,6 @@ spec:
 
     spinner.start('Installing ArgoCD...');
     try {
-      // 9.0.3 + canonical values file: reconciled with the live release
-      // 2026-08-06 (the old pin 7.7.12 and infrastructure/argocd/helm-values.yaml
-      // path never matched what was actually running).
       await $`helm upgrade --install argocd argo/argo-cd \
         --namespace argocd \
         --version 9.0.3 \
@@ -519,7 +516,7 @@ spec:
     }
 
     try {
-      const lb = await $`kubectl get svc -n gateway-system -l gateway.envoyproxy.io/owning-gateway-name=shared-gateway -o jsonpath='{.items[0].status.loadBalancer.ingress[0].ip}'`.text();
+      const lb = await $`kubectl get svc -n nginx-gateway-system -l gateway.networking.k8s.io/gateway-name=nginx-shared-gateway -o jsonpath='{.items[0].status.loadBalancer.ingress[0].ip}'`.text();
       
       if (lb) {
         console.log(chalk.blue('\n==> LoadBalancer IP'));

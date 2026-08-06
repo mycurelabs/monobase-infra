@@ -1,57 +1,42 @@
 # Example: AWS EKS Production Infrastructure Configuration
 # AWS Elastic Kubernetes Service - Production Environment
 # Domain: example.com
+#
+# Mirrors the NGINX Gateway Fabric pattern in values/infrastructure/main.yaml.
+# LoadBalancer customization (e.g. EIP allocations via service annotations)
+# is done through NGF's NginxProxy CRD / the chart's `nginx.service` values —
+# see argocd/infrastructure/templates/nginx-gateway.yaml and
+# docs/infrastructure/static-ip-prerequisites.md.
 
-# EnvoyProxy Configuration - Static IP for AWS EKS
-envoyProxyConfig:
+# NGINX Gateway Fabric - Gateway API implementation
+nginxGateway:
   enabled: true
-  cloudProvider: aws
+  version: "2.4.1"
 
-  aws:
-    # Elastic IP Allocation IDs (comma-separated, one per subnet/AZ)
-    # TODO: Replace with actual EIP allocation IDs after creating Elastic IPs
-    # See: docs/infrastructure/static-ip-aws.md
-    # Format: "eipalloc-xxxxx,eipalloc-yyyyy,eipalloc-zzzzz"
-    eipAllocations: "eipalloc-0123456789abcdef0,eipalloc-0123456789abcdef1,eipalloc-0123456789abcdef2"
-
-# Gateway configuration
-gateway:
-  domain: example.com
+# NGINX Gateway Resources
+nginxGatewayResources:
+  gatewayClass:
+    enabled: false  # GatewayClass created by operator chart
 
   gateway:
-    name: shared-gateway
-    namespace: gateway-system
-    gatewayClassName: envoy-gateway
+    name: nginx-shared-gateway
+    namespace: nginx-gateway-system
+    gatewayClassName: nginx
     listeners:
-      https:
-        enabled: true
+      - name: https
         port: 443
         protocol: HTTPS
-      http:
-        enabled: true
+        hostname: "*.example.com"
+        tlsSecretName: nginx-gateway-tls
+      - name: http
         port: 80
         protocol: HTTP
+        hostname: "*.example.com"
 
-  # TLS/Certificate configuration
+  # TLS certificates provisioned by cert-manager
   tls:
-    enabled: true
-    secretName: gateway-tls
-    certManager:
-      enabled: true
-      clusterIssuer: letsencrypt-prod
-      includeApex: true
-      subdomains:
-        - ""  # example.com (apex domain)
-        - app  # app.example.com
-        - api  # api.example.com
-
-  # HTTP to HTTPS redirect
-  httpRedirect:
-    enabled: true
-    statusCode: 301
-
-# Prerequisites:
-# 1. Create 3 Elastic IPs (one per subnet/AZ) in your VPC region
-# 2. Get allocation IDs: aws ec2 describe-addresses --region <region>
-# 3. Update eipAllocations above with comma-separated allocation IDs
-# 4. See docs/infrastructure/static-ip-aws.md for detailed instructions
+    certificates:
+      - secretName: nginx-gateway-tls
+        clusterIssuer: letsencrypt-prod
+        dnsNames:
+          - "*.example.com"
