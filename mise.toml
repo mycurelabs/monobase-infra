@@ -12,6 +12,7 @@
 [tools]
 # Infrastructure as Code
 terraform = "1.9.8"
+opentofu = "1.10.6"
 kubectl = "1.31.1"
 helm = "3.16.2"
 k3d = "5.8.3"
@@ -219,3 +220,20 @@ run = 'bun scripts/seed.ts "$@"'
 [tasks.unbootstrap]
 description = "Unbootstrap cluster (destroy ArgoCD/Applications) - REQUIRES CONFIRMATION"
 run = 'bun scripts/bootstrap.ts --destroy "$@"'
+
+[tasks.cluster-init]
+description = "Init OpenTofu for values/cluster (remote state on Spaces)"
+run = "cd values/cluster && tofu init"
+
+[tasks.cluster-plan]
+description = "Plan cluster changes (values/cluster). Exit 2 = changes pending"
+run = "cd values/cluster && tofu plan -detailed-exitcode"
+
+[tasks.cluster-apply]
+description = "Apply cluster changes. Backs up remote state first; interactive approval; STOP on any 'forces replacement' plan line"
+run = """
+mkdir -p backups/terraform-state
+cd values/cluster
+tofu state pull > ../../backups/terraform-state/mycure-doks-main-$(date +%Y%m%dT%H%M%S).tfstate || true
+tofu apply
+"""

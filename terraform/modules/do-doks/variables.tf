@@ -1,37 +1,4 @@
 # DigitalOcean DOKS Module - Variables
-# All configurable parameters for DOKS cluster
-
-# Deployment Profile Presets
-locals {
-  profile_defaults = {
-    small = {
-      node_size  = "s-2vcpu-4gb" # 2 vCPU, 4GB RAM
-      node_count = 3
-      min_nodes  = 3
-      max_nodes  = 10
-    }
-    medium = {
-      node_size  = "s-4vcpu-8gb" # 4 vCPU, 8GB RAM
-      node_count = 5
-      min_nodes  = 5
-      max_nodes  = 15
-    }
-    large = {
-      node_size  = "s-8vcpu-16gb" # 8 vCPU, 16GB RAM
-      node_count = 10
-      min_nodes  = 5
-      max_nodes  = 20
-    }
-  }
-
-  # Use custom node_pool if provided, otherwise use profile defaults
-  effective_node_pool = var.node_size != "" ? {
-    node_size  = var.node_size
-    node_count = var.node_count
-    min_nodes  = var.min_nodes
-    max_nodes  = var.max_nodes
-  } : local.profile_defaults[var.deployment_profile]
-}
 
 variable "cluster_name" {
   description = "Name of the DOKS cluster"
@@ -45,45 +12,36 @@ variable "region" {
 }
 
 variable "kubernetes_version" {
-  description = "Kubernetes version (use 'doctl kubernetes options versions' to list available versions)"
+  description = "Full version slug ('doctl kubernetes options versions'). With auto_upgrade, update this to the live slug after DO upgrades — never apply a downgrade."
   type        = string
-  default     = "1.28.2-do.0"
 }
 
-variable "deployment_profile" {
-  description = "Deployment size profile: small (1-5 clients), medium (5-15 clients), large (15+ clients)"
+variable "node_pools" {
+  description = "Node pools keyed by pool name. Set node_count only on non-autoscaled pools (the autoscaler owns it otherwise)."
+  type = map(object({
+    size       = string
+    node_count = optional(number)
+    auto_scale = optional(bool, false)
+    min_nodes  = optional(number)
+    max_nodes  = optional(number)
+    labels     = optional(map(string), {})
+    taints = optional(list(object({
+      key    = string
+      value  = string
+      effect = string
+    })), [])
+    tags = optional(list(string), [])
+  }))
+}
+
+variable "default_node_pool_key" {
+  description = "node_pools key rendered inline in the cluster resource. Immutable seat: this pool cannot be deleted separately and its size change replaces the CLUSTER — pick the pool least likely to be resized or removed."
   type        = string
-  default     = "small"
 
   validation {
-    condition     = contains(["small", "medium", "large", "custom"], var.deployment_profile)
-    error_message = "Must be 'small', 'medium', 'large', or 'custom'"
+    condition     = contains(keys(var.node_pools), var.default_node_pool_key)
+    error_message = "default_node_pool_key must be a key of node_pools"
   }
-}
-
-# Custom node pool configuration (overrides deployment_profile)
-variable "node_size" {
-  description = "Droplet size for nodes (leave empty to use deployment_profile defaults)"
-  type        = string
-  default     = ""
-}
-
-variable "node_count" {
-  description = "Number of nodes (leave at 0 to use deployment_profile defaults)"
-  type        = number
-  default     = 0
-}
-
-variable "min_nodes" {
-  description = "Minimum nodes for autoscaling (leave at 0 to use deployment_profile defaults)"
-  type        = number
-  default     = 0
-}
-
-variable "max_nodes" {
-  description = "Maximum nodes for autoscaling (leave at 0 to use deployment_profile defaults)"
-  type        = number
-  default     = 0
 }
 
 variable "auto_upgrade" {
@@ -99,19 +57,19 @@ variable "surge_upgrade" {
 }
 
 variable "ha_control_plane" {
-  description = "Enable HA control plane (3 master nodes instead of 1)"
+  description = "Enable HA control plane (3 master nodes instead of 1). Enabling is in-place; disabling replaces the cluster."
   type        = bool
   default     = false
 }
 
 variable "vpc_cidr" {
-  description = "CIDR block for VPC"
+  description = "CIDR block for the VPC (ForceNew on the VPC)"
   type        = string
   default     = "10.244.0.0/16"
 }
 
 variable "tags" {
-  description = "Tags to apply to all resources"
+  description = "Cluster tags, applied verbatim (the provider filters the auto-managed k8s* tags)"
   type        = list(string)
   default     = []
 }

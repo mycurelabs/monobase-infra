@@ -1,24 +1,26 @@
 # Monobase Infrastructure (mono-infra)
 
-Multi-tenant Kubernetes infrastructure for healthcare SaaS (MyCure, DentaLemon, HapiHub).
+Multi-tenant Kubernetes infrastructure for healthcare SaaS (MyCure, HapiHub).
 GitOps-driven with ArgoCD, Helm charts, and Terraform/OpenTofu for 6 cloud providers.
+The live DOKS cluster is OpenTofu-managed from values/cluster (mise run cluster-plan|cluster-apply).
 
 ## Repository Structure
 
 ```
-charts/           # 21 Helm charts (healthcare apps, core services, infrastructure)
-argocd/           # ArgoCD bootstrap + application templates
-  bootstrap/      # ApplicationSet auto-discover + infrastructure root
-  applications/   # Per-deployment app-of-apps templates
-  infrastructure/ # Cluster-wide infrastructure apps
-terraform/        # IaC modules for 6 providers
-  modules/        # aws-eks, azure-aks, gcp-gke, do-doks, on-prem-k3s, local-k3d
-values/           # Configuration values
-  deployments/    # Per-client deployment configs (e.g., mycure-production.yaml)
-  infrastructure/ # Cluster-wide infra config (main.yaml)
-infrastructure/   # Raw K8s manifests (monitoring, security, velero, secrets)
-scripts/          # Operational scripts (bootstrap, provision, secrets, admin)
-docs/             # Architecture, operations, security documentation
+charts/               # Everything deployable is a chart
+  argocd-bootstrap/       # Infrastructure root + auto-discover ApplicationSet
+  argocd-applications/    # Per-deployment Application factory + dedicated templates
+  argocd-infrastructure/  # Cluster-wide infrastructure apps
+  app/                    # Generic frontend/service chart (consolidates clones)
+  <bespoke charts>        # hapihub, cadence, security-baseline, *-resources, ...
+terraform/            # IaC modules for 6 providers
+  modules/                # aws-eks, azure-aks, gcp-gke, do-doks, on-prem-k3s, local-k3d
+values/               # ALL real configuration
+  cluster/                # OpenTofu root for the live DOKS cluster (imported state)
+  deployments/            # <product>-<env>.yaml overlays + _base/<product>.yaml
+  infrastructure/         # Cluster-wide infra config (main.yaml) + secrets registry
+scripts/              # Operational scripts (bootstrap, provision, secrets, admin)
+docs/                 # Architecture, operations, security documentation
 ```
 
 ## Tool Management
