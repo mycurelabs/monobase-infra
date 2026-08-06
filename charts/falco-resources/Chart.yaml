@@ -1,0 +1,13 @@
+apiVersion: v2
+name: falco-resources
+description: Custom Falco runtime security detection rules for Monobase applications
+type: application
+version: 0.1.0
+appVersion: "1.0"
+keywords:
+  - falco
+  - security
+  - runtime-detection
+  - threat-detection
+maintainers:
+  - name: Monobase Labs
