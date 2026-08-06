@@ -761,11 +761,35 @@ cadenceRelay:
 # initContainer, API service + HTTPRoute (cadence.preprod…), reachable for direct QUIC via udp-gateway.
 cadence:
   enabled: true
-  rustLog: "cadence=info,cadence_routing=debug,warn"
+  # ── TEMPORARY (UDPRoute-path transport proof): the -net harness image REPLACES the sync hub ──
+  # Purpose: prove a real box (alfheim net-probe soak) completes QUIC handshake + sustained gossip
+  # through the NEW shared-gateway path (104.248.98.161:6473, UDPRoute → nginx stream) before prod
+  # cuts over. Isolated cadence-net-test/1 ALPN → can never mesh with the production overlay.
+  # While this block is in effect the preprod sync hub is DOWN (boxes back off + self-heal on restore).
+  # RESTORE = tag back to "2.1.47" + delete `args`/`netSkSecret` + restore rustLog.
+  rustLog: "cadence_net=debug,iroh=info,iroh_gossip=info,warn"
   image:
     repository: ghcr.io/mycurelabs/cadence
-    tag: "2.1.47" # any-origin LeafIds push (mono#3111): carrier boxes heal the hub — un-strands alfheim's ~395k fam rows. No wire change. PREPROD-ONLY
+    tag: "2.1.30-net" # transport-only net-probe harness (serve mode); NOT the sync engine. Sync hub = 2.1.47
     pullPolicy: Always # tag was mutated once; Always avoids stale node cache
+  # Serve-mode anchor advertising the shared-gateway UDPRoute path (NOT the legacy udp-gateway LB —
+  # that's the point of this run). TCP dump on 6472 keeps the legacy LB health check green; doc server
+  # on 9464 answers the well-known ingress.
+  args:
+    - "--serve"
+    - "--scope"
+    - "net:pressure"
+    - "--listen-port"
+    - "6472"
+    - "--doc-addr"
+    - "0.0.0.0:9464"
+    - "--public-addr"
+    - "104.248.98.161:6473"
+    - "--relay"
+    - "https://cadence-relay.preprod.localfirsthealth.com"
+    - "--alpn"
+    - "cadence-net-test/1"
+  netSkSecret: "cadence-net-sk" # imperative Secret (key `sk`) — stable anchor id across restarts
   udpPort: 6472
   # Shared-gateway LB IP (nginx-shared-gateway, UDPRoute path — preprod is port-demuxed
   # to 6473). Legacy udp-gateway LB (165.245.145.61:6472) stays up until prod cuts over
