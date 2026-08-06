@@ -1060,7 +1060,7 @@ cadence:
   rustLog: "cadence=info,cadence_routing=debug,warn"
   image:
     repository: ghcr.io/mycurelabs/cadence
-    tag: "2.1.40" # responder-side dense verdict (mono#3093): small diffs go sparse/LeafIds; dense only for genuine catch-ups or tree-less peers. PREPROD-ONLY (image verified pullable); prod after verification
+    tag: "2.1.42" # sparse-at-scale liveness (mono#3099): keepalive frames + single-pass window scans — ends the alfheim/mdt stall class. LOCKSTEP WIRE (keepalives): boxes must run 2.1.42. PREPROD-ONLY; prod after verification
     pullPolicy: Always # tag was mutated once; Always avoids stale node cache
   udpPort: 6472
   # udp-gateway LB IP — the anchor advertises this so peers connect by EndpointId alone.
