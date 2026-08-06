@@ -12,7 +12,7 @@ values/
 │   └── argocd.yaml         # ArgoCD Helm values
 └── deployments/            # Application deployment configurations
     ├── _base/                # Shared product bases (merged first, not deployed)
-    │   └── mycure.yaml
+    │   └── acme.yaml         # Merged into acme-staging.yaml + acme-production.yaml
     ├── acme-staging.yaml     # Acme staging environment
     └── acme-production.yaml  # Acme production environment
 ```
