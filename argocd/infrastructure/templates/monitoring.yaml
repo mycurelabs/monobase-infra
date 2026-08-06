@@ -122,6 +122,13 @@ spec:
         node-exporter:
           image:
             repository: bitnamilegacy/node-exporter
+          # Tolerate the role-pool taints (node-pool=prod-db/prod-apps/infra) —
+          # without this, tainted prod nodes vanish from node-level metrics and
+          # the NodeDisk*/NodeHigh* alerts silently stop covering them.
+          tolerations:
+            - key: node-pool
+              operator: Exists
+              effect: NoSchedule
           resources:
             requests:
               cpu: "10m"       # Optimized from 100m (actual usage: ~2m = 2%)
@@ -150,6 +157,12 @@ spec:
     automated:
       prune: true
       selfHeal: true
+    # PSA EXCEPTION (2026-08 security review): node-exporter is hostNetwork +
+    # hostPath by design (node metrics) — enforce would break it. Audit-only.
+    managedNamespaceMetadata:
+      labels:
+        pod-security.kubernetes.io/audit: baseline
+        pod-security.kubernetes.io/warn: baseline
     syncOptions:
       - CreateNamespace=true
       - ServerSideApply=true

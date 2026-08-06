@@ -14,8 +14,9 @@ global:
   namespace: mycure-preprod
   environment: preprod
 
-  # Reuse prod node pool so scheduling/perf characteristics match prod.
-  nodePool: "staging"
+  # 2026-08-06 pool restructure: preprod lives on the untainted nonprod pool
+  # (shared with monitoring/velero); prod pools are tainted so preprod can't land there.
+  nodePool: "nonprod"
 
   # Point the database-secrets chart at the mycure-production-* GCP keys so
   # Postgres/Mongo/Minio/Valkey K8s secrets carry prod credentials. Required
@@ -1068,7 +1069,7 @@ cadence:
   # CUTOVER: anchor homes on our relay (QUIC-addr-disc lets netcheck rank it) + advertises it in the doc.
   # All boxes are being moved to maestroapp 2.0.28 (our-relay-only) in the same window.
   relayUrl: "https://cadence-relay.preprod.localfirsthealth.com"
-  nodePool: "staging"
+  nodePool: "nonprod"
   # Scrape the OpenMetrics /metrics endpoint into Prometheus (reconcile timing/throughput, connect
   # failures, schema drift, reconcile_active, RSS, dirty_depth) — #2727 observability.
   serviceMonitor:
