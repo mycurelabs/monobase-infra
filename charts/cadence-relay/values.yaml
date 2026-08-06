@@ -37,5 +37,7 @@ resources:
     cpu: "1"
     memory: 1Gi
 
-# Schedule onto the same pool cadence uses (tainted node-pool=staging on preprod).
-nodePool: "staging"
+# Default to the untainted nonprod pool (2026-08-06 restructure). Prod overrides
+# to prod-apps in its deployment values — the old "staging" default silently put
+# the PROD relay on a staging node.
+nodePool: "nonprod"

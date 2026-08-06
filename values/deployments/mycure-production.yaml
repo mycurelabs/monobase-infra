@@ -6,7 +6,10 @@ global:
   namespace: mycure-production
   environment: production
 
-  nodePool: "production"
+  # 2026-08-06 pool restructure: role-based pools (prod-db / prod-apps / infra /
+  # nonprod) replace production/staging/general. Taints (node-pool=<name>:NoSchedule)
+  # make placement enforced, not advisory. PG primary overrides to prod-db below.
+  nodePool: "prod-apps"
 
   gateway:
     name: nginx-shared-gateway
@@ -722,6 +725,11 @@ postgresql:
       replicationPasswordKey: postgres-replication-password
 
   primary:
+    # Dedicated 1-node pool (g-4vcpu-16gb, 4 dedicated vCPU): the primary pegged
+    # its 2-vCPU m-2vcpu-16gb node at 101% during every big-box onboarding sync
+    # (market 2026-08; earlier #2114/#2356). Taint replaces the old "honest
+    # requests de-facto reserve the node" hack.
+    nodePool: "prod-db"
     persistence:
       enabled: true
       storageClass: ""
@@ -731,15 +739,12 @@ postgresql:
       size: 400Gi
     resources:
       requests:
-        # 2026-07-07 node-reservation bump (mono#2129 follow-up): the primary
-        # actually uses ~1.3 cores / 11.5Gi but requested only 250m/4Gi, so the
-        # scheduler saw a "mostly free" node and co-located app pods on it
-        # during the #2114 incident (node hit 105% CPU). Honest requests
-        # de-facto reserve the node (~13.7Gi allocatable) without taints.
-        cpu: 1000m
+        cpu: 2000m
         memory: 12Gi
       limits:
-        cpu: 2000m
+        # 3500m not 4000m: leaves ~400m for the node's daemonsets (cilium,
+        # kube-proxy, velero node-agent, node-exporter) on the 4-vCPU node.
+        cpu: 3500m
         memory: 12Gi  # bumped 8Gi->12Gi 2026-06-29: primary was at ~95% mem (7.6/8Gi), OOM-kill headroom
     # Perf tuning — replaces PG defaults (shared_buffers 128MB / work_mem 4MB)
     # for the 35GB DB; sized to the 8Gi pod limit. See node-separation issue
@@ -1092,6 +1097,9 @@ cadenceRelay:
     repository: n0computer/iroh-relay
     tag: "v1.0.2"
   # hostname defaults to cadence-relay.{global.domain} = cadence-relay.localfirsthealth.com
+  # Explicit: the chart default was "staging" and prod never overrode it, so the
+  # PROD relay ran on a staging node (found in the 2026-08-06 pool review).
+  nodePool: "prod-apps"
 
 # ===== P2P SYNC: Cadence v2 (iroh 1.0 QUIC) — Tier 4.4 =====
 # The anchor hub. Reachability via the infra udpGateway LB below (a fresh prod DO UDP LoadBalancer — preprod's
@@ -1110,7 +1118,7 @@ cadence:
   publicAddr: "137.184.250.197:6472"
   # Home on the self-hosted relay + advertise it so boxes (maestroapp 2.0.28, our-relay-only) adopt it.
   relayUrl: "https://cadence-relay.localfirsthealth.com"
-  nodePool: "production"
+  nodePool: "prod-apps"
   serviceMonitor:
     enabled: true
   # Watch the LIVE hapihub app DB (not an isolated cadence DB), matching preprod + the legacy cadence.

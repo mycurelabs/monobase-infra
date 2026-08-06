@@ -40,8 +40,25 @@ spec:
           limits:
             cpu: 100m
             memory: 128Mi
-        
+
+        # 2026-08-06 pool restructure: ops plane (cert-manager/ESO/external-dns/
+        # ArgoCD/gateway) rides the tainted infra pool, separated from preprod.
+        nodeSelector:
+          node-pool: infra
+        tolerations:
+          - key: node-pool
+            operator: Equal
+            value: infra
+            effect: NoSchedule
+
         cainjector:
+          nodeSelector:
+            node-pool: infra
+          tolerations:
+            - key: node-pool
+              operator: Equal
+              value: infra
+              effect: NoSchedule
           resources:
             requests:
               cpu: 10m
@@ -49,8 +66,15 @@ spec:
             limits:
               cpu: 100m
               memory: 256Mi
-        
+
         webhook:
+          nodeSelector:
+            node-pool: infra
+          tolerations:
+            - key: node-pool
+              operator: Equal
+              value: infra
+              effect: NoSchedule
           resources:
             requests:
               cpu: 10m
@@ -58,6 +82,17 @@ spec:
             limits:
               cpu: 100m
               memory: 64Mi
+
+        # One-shot startupapicheck job: same pool so it isn't blocked if nonprod
+        # is ever full during an install/upgrade.
+        startupapicheck:
+          nodeSelector:
+            node-pool: infra
+          tolerations:
+            - key: node-pool
+              operator: Equal
+              value: infra
+              effect: NoSchedule
   
   destination:
     server: https://kubernetes.default.svc
@@ -67,6 +102,12 @@ spec:
     automated:
       prune: true
       selfHeal: true
+    # PSA floor (2026-08 security review): plain controllers, no privileged pods.
+    managedNamespaceMetadata:
+      labels:
+        pod-security.kubernetes.io/enforce: baseline
+        pod-security.kubernetes.io/audit: restricted
+        pod-security.kubernetes.io/warn: restricted
     syncOptions:
       - CreateNamespace=true
       - ServerSideApply=true

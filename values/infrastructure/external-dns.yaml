@@ -56,6 +56,15 @@ instances:
   #       cpu: 50m
   #       memory: 64Mi
 
+# 2026-08-06 pool restructure: ops plane on the tainted infra pool.
+nodeSelector:
+  node-pool: infra
+tolerations:
+  - key: node-pool
+    operator: Equal
+    value: infra
+    effect: NoSchedule
+
 # Global configuration applied to all instances
 global:
   # Sources to watch (applied to all instances)

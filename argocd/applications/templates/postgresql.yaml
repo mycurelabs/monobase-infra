@@ -75,13 +75,15 @@ spec:
           podDisruptionBudget:
             {{- toYaml .Values.postgresql.podDisruptionBudget | nindent 12 }}
           {{- end }}
-          {{- if .Values.global.nodePool }}
+          {{- $primary := .Values.postgresql.primary | default dict }}
+          {{- $primaryPool := $primary.nodePool | default .Values.global.nodePool }}
+          {{- if $primaryPool }}
           nodeSelector:
-            node-pool: {{ .Values.global.nodePool }}
+            node-pool: {{ $primaryPool }}
           tolerations:
             - key: "node-pool"
               operator: "Equal"
-              value: {{ .Values.global.nodePool | quote }}
+              value: {{ $primaryPool | quote }}
               effect: "NoSchedule"
           {{- end }}
           {{- if and .Values.postgresql.primary .Values.postgresql.primary.affinity }}

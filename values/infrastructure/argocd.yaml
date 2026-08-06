@@ -6,6 +6,20 @@
 global:
   domain: argocd.example.com  # Set in client config
 
+  # 2026-08-06 pool restructure: ArgoCD (holds cluster-admin) moves to the
+  # tainted infra pool, off the untainted default pool preprod shares.
+  # Applies to every component (controller/server/repoServer/appset/
+  # notifications/redis). NOTE: ArgoCD is installed by scripts/bootstrap.ts
+  # (helm), NOT by an Application — apply with:
+  #   helm upgrade argocd argo/argo-cd -n argocd -f values/infrastructure/argocd.yaml --reuse-values
+  nodeSelector:
+    node-pool: infra
+  tolerations:
+    - key: node-pool
+      operator: Equal
+      value: infra
+      effect: NoSchedule
+
 # Simplified configuration (non-HA)
 redis-ha:
   enabled: false  # Use standard Redis instead
