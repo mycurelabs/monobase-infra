@@ -787,9 +787,11 @@ cadence:
     tag: "2.1.47" # lockstep fleet roll (boxes on maestroapp 2.1.47, mono#2833): any-origin LeafIds push (mono#3111); preprod-soaked (#245)
     pullPolicy: Always # relay cutover; also avoids stale node cache from any reused tag
   udpPort: 6472
-  # udp-gateway DO LoadBalancer EXTERNAL-IP (provisioned via monobase-infra#172) — the anchor advertises
-  # this so peers reach the hub directly by EndpointId.
-  publicAddr: "137.184.250.197:6472"
+  # Shared-gateway LB IP (nginx-shared-gateway, UDPRoute path — prod keeps canonical port
+  # 6472). Path proven from a real box network (alfheim net-probe: direct=true, 18 Mbps).
+  # Legacy udp-gateway LB (137.184.250.197:6472) stays up as rollback until phase 3
+  # removes it; roll back by reverting to it.
+  publicAddr: "104.248.98.161:6472"
   # Home on the self-hosted relay + advertise it so boxes (maestroapp 2.0.28, our-relay-only) adopt it.
   relayUrl: "https://cadence-relay.localfirsthealth.com"
   nodePool: "prod-apps"
