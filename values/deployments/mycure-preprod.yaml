@@ -1064,8 +1064,10 @@ cadence:
     tag: "2.1.47" # any-origin LeafIds push (mono#3111): carrier boxes heal the hub — un-strands alfheim's ~395k fam rows. No wire change. PREPROD-ONLY
     pullPolicy: Always # tag was mutated once; Always avoids stale node cache
   udpPort: 6472
-  # udp-gateway LB IP — the anchor advertises this so peers connect by EndpointId alone.
-  publicAddr: "165.245.145.61:6472"
+  # Shared-gateway LB IP (nginx-shared-gateway, UDPRoute path — preprod is port-demuxed
+  # to 6473). Legacy udp-gateway LB (165.245.145.61:6472) stays up until prod cuts over
+  # and phase 3 removes it; roll back by reverting to it.
+  publicAddr: "104.248.98.161:6473"
   # CUTOVER: anchor homes on our relay (QUIC-addr-disc lets netcheck rank it) + advertises it in the doc.
   # All boxes are being moved to maestroapp 2.0.28 (our-relay-only) in the same window.
   relayUrl: "https://cadence-relay.preprod.localfirsthealth.com"
