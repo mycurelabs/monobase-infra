@@ -19,8 +19,8 @@ global:
   nodePool: "nonprod"
 
   # Point the database-secrets chart at the mycure-production-* GCP keys so
-  # Postgres/Mongo/Minio/Valkey K8s secrets carry prod credentials. Required
-  # for Velero-restored PVCs (bitnami init was done with prod passwords).
+  # Postgres/Minio/Valkey K8s secrets carry prod credentials. Required for
+  # Velero-restored PVCs (their bitnami init state is keyed to prod passwords).
   secretPrefix: "mycure-production"
 
   gateway:
@@ -111,7 +111,7 @@ hapihub:
 
   image:
     repository: ghcr.io/mycurelabs/hapihub
-    tag: "11.20.90" # was pinned to 11.20.85 to match the box's bundled hapihub schema (cadence schema_hash guard) for the 2.1.4 box↔hub reconcile test — re-pin if that test needs the exact schema again
+    tag: "11.20.90" # pin to 11.20.85 if the box↔hub reconcile test needs the box's bundled hapihub schema (cadence schema_hash guard)
     pullPolicy: IfNotPresent
 
   # Valkey response cache (mono#2231) — preprod is the pilot environment.
@@ -549,11 +549,9 @@ openmed:
     enabled: false
 
 # ===== DATABASE: PostgreSQL =====
-# Standalone (no read replica) in preprod: prod node pool can't fit a
-# second 4Gi PG pod alongside HA Postgres + existing prod workloads.
-# Replication failover testing is the only thing lost — schema, query,
-# migration, and index rehearsals all still work on a single primary.
-# Re-enable architecture=replication only after the prod pool is bumped.
+# Standalone (no read replica) in preprod: a second PG pod isn't worth the
+# nonprod-pool memory. Replication failover testing is the only thing lost —
+# schema, query, migration, and index rehearsals all work on a single primary.
 postgresql:
   enabled: true
 
@@ -574,11 +572,10 @@ postgresql:
       adminPasswordKey: postgres-password
 
   primary:
-    # M2 full-config rehearsal (2026-07-10): the default max_connections=100
-    # was exhausted by cadence 0.7.0's boot — 99 per-collection ensure tasks
-    # connect simultaneously (advisory lock serializes DDL, not connection
-    # acquisition) → 40 collections' DDL setup starved with "connect failed".
-    # 300 gives headroom for hapihub + 99 watcher workers + DDL/index tasks.
+    # cadence boot opens ~99 per-collection ensure connections simultaneously
+    # (the advisory lock serializes DDL, not connection acquisition), which
+    # exhausts the default max_connections=100. 300 gives headroom for
+    # hapihub + 99 watcher workers + DDL/index tasks.
     # cadence-side fix (gate ensure connections behind the poll semaphore +
     # per-collection retry) ships as 0.7.1 during the soak.
     extendedConfiguration: |
@@ -600,7 +597,7 @@ postgresql:
 
 # ===== CACHE: Valkey (Redis) =====
 valkey:
-  enabled: true  # re-enabled 2026-04-29 alongside cadence (root cause fixed in 0.5.x)
+  enabled: true
 
   global:
     security:
@@ -627,11 +624,8 @@ valkey:
       limits:
         cpu: 500m
         memory: 2Gi
-    # `--maxmemory 1.5GB` + `noeviction` dropped 2026-06-25 alongside
-    # the prod drop — cadence Phase 4a (0.5.36) stopped Valkey changelog
-    # writes when readFrom=Pg, so the cap that paired with the trim
-    # escalation policy is obsolete. Container memory limit (2 GiB)
-    # is the new ceiling.
+    # No --maxmemory cap: with readFrom=Pg cadence writes no Valkey
+    # changelog, so the container memory limit (2 GiB) is the ceiling.
 
 # ===== STORAGE: MinIO Object Storage =====
 minio:
@@ -712,7 +706,7 @@ mailpit:
       memory: 64Mi
 
   gateway:
-    # Public web UI route RE-ENABLED 2026-06-22 per request — intentionally with NO auth.
+    # Public web UI route is intentionally exposed with NO auth.
     # WARNING (#5): preprod runs on cloned-prod data, so this inbox exposes real reset
     # tokens / OTPs / PHI to anyone with the URL. Deliberate testing convenience, not a
     # regression. Put it behind gateway auth (NGF AuthenticationFilter basic-auth) if it
@@ -771,7 +765,7 @@ cadence:
   image:
     repository: ghcr.io/mycurelabs/cadence
     tag: "2.1.30-net" # transport-only net-probe harness (serve mode); NOT the sync engine. Sync hub = 2.1.47
-    pullPolicy: Always # tag was mutated once; Always avoids stale node cache
+    pullPolicy: Always # mutable tag; Always avoids stale node cache
   # Serve-mode anchor advertising the shared-gateway UDPRoute path (NOT the legacy udp-gateway LB —
   # that's the point of this run). TCP dump on 6472 keeps the legacy LB health check green; doc server
   # on 9464 answers the well-known ingress.

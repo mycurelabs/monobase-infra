@@ -47,7 +47,6 @@ certManagerIssuers:
           - mycure.md
 
 # NGINX Gateway Fabric - primary Gateway API implementation
-# (Envoy Gateway was torn down — see git history)
 nginxGateway:
   enabled: true
   # Keep in lockstep with the Gateway API CRD bundle —
@@ -197,7 +196,6 @@ nginxGatewayResources:
 # (route hostname + parentRef derivation only). Both routes are disabled today
 # — grafana is admin port-forward, signoz is off — so these values are inert;
 # if either route is re-enabled it attaches to the nginx shared-gateway.
-# Envoy Gateway (the old shared-gateway / gateway-system) was torn down.
 gateway:
   domain: mycureapp.com
   gateway:
@@ -243,12 +241,10 @@ kyverno:
 # Velero - Backup and disaster recovery
 velero:
   enabled: true
-  # Chart 12.0.1 ships Velero 1.18.0. Bumped from 7.1.4 (Velero 1.14.0)
-  # to pick up the fix from PR #7899 (issues #7898 / #7985): 1.14.0
-  # prematurely cancelled DataUploads when the data-mover's expose pod
-  # was briefly unschedulable while waiting for PVC-PV binding. The DO
-  # CSI provisioner is slow enough to trip this window. Fixed in 1.14.1
-  # and forward; we jump to 1.18.x for ~14 months of additional fixes.
+  # Chart 12.0.1 ships Velero 1.18.0. Requires Velero >= 1.14.1 (PR #7899,
+  # issues #7898/#7985): older versions prematurely cancel DataUploads when
+  # the data-mover's expose pod waits on PVC-PV binding — the DO CSI
+  # provisioner is slow enough to trip that window.
   version: 12.0.1
   provider: digitalocean
   

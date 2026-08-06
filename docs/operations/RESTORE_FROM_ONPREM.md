@@ -105,7 +105,7 @@ mise run provision local-k3d -- -destroy
 
 ## Path B — `kopia` bare-metal extract
 
-Use this only when Path A is not possible (no hardware for a recovery cluster, or the recovery cluster cannot be provisioned in time). Extracting raw PVC bytes and splicing them into a fresh Postgres is brittle but works — drill-tested 2026-05-14 (3.5M `medical_records` rows recovered, total ~8 min from snapshot ID to verified query; 127/140 user tables exactly matched production at the snapshot moment).
+Use this only when Path A is not possible (no hardware for a recovery cluster, or the recovery cluster cannot be provisioned in time). Extracting raw PVC bytes and splicing them into a fresh Postgres is brittle but works — drill-tested (3.5M `medical_records` rows recovered, total ~8 min from snapshot ID to verified query; 127/140 user tables exactly matched production at the snapshot moment).
 
 The fast path is `scripts/onprem-backup-restore.sh`. It wraps the entire flow (rclone S3 shim, kopia connect, snapshot lookup, restore, container boot) into four subcommands. The long-form manual procedure below documents what the script does in case you ever need to deviate or debug.
 
@@ -242,7 +242,7 @@ sudo docker exec pg-restore psql -U postgres -d hapihub -c "
 "
 ```
 
-You'll see a `WARNING: database "hapihub" has a collation version mismatch` — that's benign for a drill (cluster libc was 2.36, the postgres:16 image is 2.41). For a real restore-to-production target it'd warrant a `REINDEX` or matching libc.
+You'll see a `WARNING: database "hapihub" has a collation version mismatch` — that's benign for a drill (the cluster's libc version differs from the one in the postgres:16 image). For a real restore-to-production target it'd warrant a `REINDEX` or matching libc.
 
 Logical export for later re-ingest (optional, if you actually need the data elsewhere):
 

@@ -255,7 +255,7 @@ spec:
             description: "Certificate expires in {{ $value | humanize }} days"
 
 ---
-# Cadence full-config sync program guardrails (plan item 0.5, 2026-07-06).
+# Cadence full-config sync program guardrails.
 # Platform-level signals only — counter-based rules (drop totals, index
 # build failures) ride the cadence 0.7.0 prometheus exposition and land
 # with that rollout.

@@ -108,8 +108,8 @@ spec:
           {{- end }}
           {{- if .Values.postgresql.readReplicas.customStartupProbe }}
           # Gates liveness until the initial pg_basebackup completes. Without
-          # this, a large re-clone (139GB+) is SIGKILLed by liveness every ~90s
-          # and restarts forever. See disk-full incident 2026-06-25.
+          # this, a large re-clone (100GB+) is SIGKILLed by liveness every ~90s
+          # and restarts forever.
           customStartupProbe:
             {{- toYaml .Values.postgresql.readReplicas.customStartupProbe | nindent 12 }}
           {{- end }}

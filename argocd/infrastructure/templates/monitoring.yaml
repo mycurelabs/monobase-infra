@@ -47,10 +47,10 @@ spec:
           resources:
             requests:
               cpu: "100m"
-              memory: "512Mi"  # Bumped from 400Mi — was pegged at the 768Mi limit
+              memory: "512Mi"  # steady working set; smaller requests starve it
             limits:
               cpu: "500m"
-              memory: "1Gi"    # Bumped from 768Mi — Prometheus was at 100% and OOM-risk
+              memory: "1Gi"    # OOM headroom for scrape/query spikes
           
           # Security context
           securityContext:

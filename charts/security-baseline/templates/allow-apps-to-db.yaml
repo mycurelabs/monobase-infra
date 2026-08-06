@@ -163,5 +163,5 @@ spec:
 # 3. Account and MyCure (frontends) have NO database access (security!)
 # 4. DNS access required for service name resolution
 # 5. Kubernetes API access needed for service discovery
-# 6. The hapihub-egress policy also carries hapihub's DNS/443 egress allowances —
-#    do not delete it just because in-cluster MongoDB is retired.
+# 6. The hapihub-egress policy carries hapihub's DNS/443 egress allowances —
+#    load-bearing even with no in-cluster MongoDB.

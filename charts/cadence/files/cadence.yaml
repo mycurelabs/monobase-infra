@@ -348,7 +348,7 @@ sync:
     # - name: verification                     # better-auth, online-only
     # - name: session                          # better-auth, per-device
 
-    ## Unsorted — prod scan 2026-07-24 (not yet in collections or blacklist; review + sort)
+    ## Unsorted — pending review + sort (not yet in collections or blacklist)
     # - name: account_activity
     # - name: analytics_daily_counts
     # - name: announcement_acknowledgments

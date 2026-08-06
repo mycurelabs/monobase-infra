@@ -24,10 +24,10 @@ spec:
         upgradeCRDs: false
         configuration:
           defaultBackupTTL: 720h
-          # CSI snapshots are now the primary path (see schedules + the
-          # do-block-storage-velero VolumeSnapshotClass). FSB stays available
-          # per-backup via `defaultVolumesToFsBackup: true` on the spec, but
-          # is no longer the cluster-wide default.
+          # CSI snapshots are the primary path (see schedules + the
+          # do-block-storage-velero VolumeSnapshotClass). FSB is available
+          # per-backup via `defaultVolumesToFsBackup: true` on the spec, not
+          # as the cluster-wide default.
           defaultVolumesToFsBackup: false
           # EnableCSI is required even in Velero v1.14+ where the CSI plugin
           # is integrated into core. Without it, the csi-pvc-backupper action
@@ -54,8 +54,7 @@ spec:
             privileged: true
           # Tolerate every taint so node-agent runs on production/staging
           # pools too. Without this, FSB-style backups silently fail for any
-          # pod scheduled on a tainted node (production stateful workloads
-          # were affected — see incident 2026-05-12). node-agent is also the
+          # pod scheduled on a tainted node. node-agent is also the
           # data-mover for CSI snapshot uploads to Spaces, so it must reach
           # every node that holds a backed-up volume.
           tolerations:
