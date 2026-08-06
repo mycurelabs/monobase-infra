@@ -37,7 +37,6 @@ resources:
     cpu: "1"
     memory: 1Gi
 
-# Default to the untainted nonprod pool (2026-08-06 restructure). Prod overrides
-# to prod-apps in its deployment values — the old "staging" default silently put
-# the PROD relay on a staging node.
+# Untainted nonprod pool by default; prod overrides to prod-apps in its
+# deployment values.
 nodePool: "nonprod"

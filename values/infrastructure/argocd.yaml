@@ -1,13 +1,11 @@
-# ArgoCD — Helm values (CANONICAL, reconciled with the live release 2026-08-06)
+# ArgoCD — Helm values (CANONICAL — matches the live release)
 # Chart: argo/argo-cd 9.0.3 (app v3.1.9) — install/upgrade:
 #   helm upgrade --install argocd argo/argo-cd -n argocd --version 9.0.3 \
 #     -f values/infrastructure/argocd.yaml
 # ArgoCD is NOT managed by an Application (it can't manage itself here);
 # scripts/bootstrap.ts runs the helm command above. Any change to this file
 # must be applied with that command — merging alone does nothing.
-# History: pre-2026-08-06 this file was a stale template while the live
-# release used unrecorded values; this content is the live dump with the
-# node-pool restructure placement (all components on the tainted infra pool).
+# All components run on the tainted infra pool.
 
 applicationSet:
   enabled: true

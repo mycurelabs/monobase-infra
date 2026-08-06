@@ -115,7 +115,7 @@ spec:
     automated:
       prune: false
       selfHeal: true
-    # PSA EXCEPTION (2026-08 security review): node-agent is privileged +
+    # PSA EXCEPTION: node-agent is privileged +
     # hostPath by design (reads pod volumes for FSB) — enforce would break it.
     # Audit-only; the exception is deliberate and documented here.
     managedNamespaceMetadata:

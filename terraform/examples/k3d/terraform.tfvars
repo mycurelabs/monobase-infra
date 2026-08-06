@@ -6,5 +6,5 @@ servers             = 1  # Control plane nodes
 agents              = 3  # Worker nodes
 http_port           = 80
 https_port          = 443
-disable_traefik     = true  # Use Envoy Gateway instead
+disable_traefik     = true  # Use NGINX Gateway Fabric instead
 install_gateway_api = true

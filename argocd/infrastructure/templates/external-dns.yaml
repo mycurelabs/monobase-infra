@@ -31,7 +31,7 @@ spec:
     automated:
       prune: true
       selfHeal: true
-    # PSA floor (2026-08 security review): plain controller, no privileged pods.
+    # PSA floor: plain controller, no privileged pods.
     managedNamespaceMetadata:
       labels:
         pod-security.kubernetes.io/enforce: baseline

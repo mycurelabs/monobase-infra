@@ -157,7 +157,7 @@ spec:
     automated:
       prune: true
       selfHeal: true
-    # PSA EXCEPTION (2026-08 security review): node-exporter is hostNetwork +
+    # PSA EXCEPTION: node-exporter is hostNetwork +
     # hostPath by design (node metrics) — enforce would break it. Audit-only.
     managedNamespaceMetadata:
       labels:

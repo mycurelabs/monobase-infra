@@ -247,7 +247,7 @@ metadata:
   name: shared-gateway
   namespace: gateway-system
 spec:
-  gatewayClassName: envoy-gateway
+  gatewayClassName: nginx
   listeners:
     - name: https
       port: 443
@@ -632,8 +632,8 @@ kubectl describe httproute client-api -n client-namespace
 # Check Gateway attached routes
 kubectl get gateway shared-gateway -n gateway-system -o yaml
 
-# Check Envoy config
-kubectl exec -n gateway-system deploy/envoy-shared-gateway-xxxxx -- \
+# Check nginx config
+kubectl exec -n nginx-gateway-system deploy/nginx-shared-gateway-nginx -- \
   curl -s localhost:19000/config_dump
 ```
 

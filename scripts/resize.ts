@@ -398,8 +398,8 @@ ${chalk.bold('EXAMPLES:')}
   ${chalk.gray('# Resize MinIO PVCs to 500Gi (auto-approve)')}
   bun scripts/resize.ts --statefulset minio --namespace prod --size 500Gi --auto-approve
 
-  ${chalk.gray('# Resize MongoDB PVCs to 1Ti')}
-  bun scripts/resize.ts --statefulset mongodb --namespace staging --size 1Ti
+  ${chalk.gray('# Resize PostgreSQL primary PVC to 500Gi')}
+  bun scripts/resize.ts --statefulset postgresql-primary --namespace mycure-production --size 500Gi
 
 ${chalk.bold('WARNING:')}
   This script performs the following operations:

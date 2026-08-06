@@ -41,8 +41,8 @@ spec:
             cpu: 100m
             memory: 128Mi
 
-        # 2026-08-06 pool restructure: ops plane (cert-manager/ESO/external-dns/
-        # ArgoCD/gateway) rides the tainted infra pool, separated from preprod.
+        # Ops plane (cert-manager/ESO/external-dns/ArgoCD/gateway) rides the
+        # tainted infra pool, separated from preprod.
         nodeSelector:
           node-pool: infra
         tolerations:
@@ -102,7 +102,7 @@ spec:
     automated:
       prune: true
       selfHeal: true
-    # PSA floor (2026-08 security review): plain controllers, no privileged pods.
+    # PSA floor: plain controllers, no privileged pods.
     managedNamespaceMetadata:
       labels:
         pod-security.kubernetes.io/enforce: baseline

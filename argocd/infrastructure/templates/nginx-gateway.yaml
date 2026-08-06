@@ -34,9 +34,9 @@ spec:
           # it behind this flag.
           gwAPIExperimentalFeatures:
             enable: true
-          # 2026-08-06 pool restructure: the gateway is the prod request path —
-          # it gets the tainted infra pool, away from preprod bursts and the
-          # noisy ops jobs (prometheus, velero kopia) that stay on nonprod.
+          # The gateway is the prod request path — it rides the tainted infra
+          # pool, away from preprod bursts and the noisy ops jobs (prometheus,
+          # velero kopia) on nonprod.
           nodeSelector:
             node-pool: infra
           tolerations:
@@ -59,9 +59,7 @@ spec:
             resources:
               requests:
                 cpu: 100m
-                # 384Mi: restored 2026-08-06 — the TODO below is done; the infra
-                # pool nodes are 8Gi (s-2vcpu-8gb-amd), so the constraint that
-                # forced 192Mi (3Gi general nodes ≥90% requested) is gone.
+                # ~4.5x the steady-state RSS (~85Mi); fits the 8Gi infra nodes.
                 memory: 384Mi
               limits:
                 memory: 1Gi

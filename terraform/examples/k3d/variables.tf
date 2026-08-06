@@ -35,7 +35,7 @@ variable "https_port" {
 }
 
 variable "disable_traefik" {
-  description = "Disable built-in Traefik (use Envoy Gateway instead)"
+  description = "Disable built-in Traefik (use NGINX Gateway Fabric instead)"
   type        = bool
   default     = true
 }
