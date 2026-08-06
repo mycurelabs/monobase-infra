@@ -1,0 +1,17 @@
+apiVersion: v2
+name: app
+description: Generic Monobase app chart (deployment/service/httproute/networkpolicy/hpa/pdb/configmap/externalsecret/pvc), consolidating the per-app clone charts
+type: application
+version: 1.0.0
+appVersion: "10.0.22"
+keywords:
+  - mycure
+  - frontend
+  - vue
+  - healthcare
+home: https://github.com/monobaselabs/monobase-infra
+sources:
+  - https://github.com/monobaselabs/monobase
+maintainers:
+  - name: Your Organization
+    email: devops@example.com
