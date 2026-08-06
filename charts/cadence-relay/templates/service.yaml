@@ -32,4 +32,13 @@ spec:
     port: {{ .Values.quicPort }}
     targetPort: {{ .Values.quicPort }}
     protocol: UDP
+  {{- with .Values.quicAltPort }}
+  # Alternate public QUIC port → same relay QUIC endpoint. Lets clients that adopt
+  # `relay_quic_port` from the bootstrap doc (mono#3166) do address discovery on a
+  # non-default port — the port-demux shape relay consolidation needs.
+  - name: quic-alt
+    port: {{ . }}
+    targetPort: {{ $.Values.quicPort }}
+    protocol: UDP
+  {{- end }}
 {{- end }}
