@@ -46,6 +46,11 @@ certManagerIssuers:
           - localfirsthealth.com
           - mycure.md
 
+# CoreDNS overrides (DOKS coredns-custom hook) — cadence-relay hairpin rewrites.
+# Manifests: infrastructure/coredns/
+corednsCustom:
+  enabled: true
+
 # NGINX Gateway Fabric - primary Gateway API implementation
 nginxGateway:
   enabled: true
