@@ -1,6 +1,14 @@
 {{- if .Values.enabled }}
 {{- $pgHost := printf "%s.%s.svc.cluster.local" (.Values.postgresql.serviceName | default "postgresql") (include "cadence.namespace" .) -}}
 {{- $db := printf "postgres://%s:$(PGPASS)@%s:%v/%s" (include "cadence.postgresql.username" .) $pgHost (.Values.postgresql.port | default 5432) (include "cadence.postgresql.database" .) -}}
+{{- /* Read-plane URL (postgresql.readServiceName, e.g. the streaming replica's service): the hub's
+       reconcile/serve scan queries go there; writes + LWW admission reads stay on $db. Unset ⇒ no env,
+       everything on $db. */ -}}
+{{- $dbRead := "" -}}
+{{- if .Values.postgresql.readServiceName -}}
+{{- $readHost := printf "%s.%s.svc.cluster.local" .Values.postgresql.readServiceName (include "cadence.namespace" .) -}}
+{{- $dbRead = printf "postgres://%s:$(PGPASS)@%s:%v/%s" (include "cadence.postgresql.username" .) $readHost (.Values.postgresql.port | default 5432) (include "cadence.postgresql.database" .) -}}
+{{- end -}}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -106,6 +114,10 @@ spec:
               key: postgres-password
         - name: CADENCE_DB
           value: {{ $db | quote }}
+        {{- if $dbRead }}
+        - name: CADENCE_DB_READ_URL
+          value: {{ $dbRead | quote }}
+        {{- end }}
         # Runtime grant verification — env-driven (env wins over the mounted cadence.yaml). The AS (hapihub)
         # whose JWKS verifies box grants AND the hub's own '*' grant (all signed with the shared key).
         - name: CADENCE_ISSUER_URL

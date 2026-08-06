@@ -169,7 +169,7 @@ hapihub:
       remoteKey: mycure-production-better-auth-secret
 
   postgresql:
-    serviceName: postgresql
+    serviceName: postgresql-primary
 mycure:
   image:
     tag: "10.25.112" # feat/cadence: /oauth/authorize consent page for cadence box onboarding (#2727)
@@ -373,23 +373,35 @@ openmed:
     enabled: false
 
 # ===== DATABASE: PostgreSQL =====
-# Standalone (no read replica) in preprod: a second PG pod isn't worth the
-# nonprod-pool memory. Replication failover testing is the only thing lost —
-# schema, query, migration, and index rehearsals all work on a single primary.
+# Replication (1 primary + 1 read replica), prod-parity: the cadence hub's
+# reconcile/serve scan plane reads from the replica (CADENCE_DB_READ_URL), so
+# the read-plane split is verified here before prod adoption. Both PG pods fit
+# the nonprod pool. The primary's PVC (data-postgresql-primary-0) is a CSI
+# snapshot clone of the pre-replication data-postgresql-0 (215Gi, expanded from
+# the original 200Gi) — see the migration runbook in the PR.
 postgresql:
-  architecture: standalone
+  architecture: replication
+
+  auth:
+    replicationUsername: repl_user
+    secretKeys:
+      replicationPasswordKey: postgres-replication-password
 
   primary:
     # cadence boot opens ~99 per-collection ensure connections simultaneously
     # (the advisory lock serializes DDL, not connection acquisition), which
     # exhausts the default max_connections=100. 300 gives headroom for
     # hapihub + 99 watcher workers + DDL/index tasks.
-    # cadence-side fix (gate ensure connections behind the poll semaphore +
-    # per-collection retry) ships as 0.7.1 during the soak.
+    # pg_stat_statements: query attribution for the read-plane verification
+    # (CREATE EXTENSION pg_stat_statements in the hapihub DB after first boot).
+    # max_slot_wal_keep_size: a dead replica must not fill the primary disk
+    # with slot-retained WAL (prod uses 80GB on a 400Gi volume; 20GB here).
     extendedConfiguration: |
+      shared_preload_libraries = 'pgaudit, pg_stat_statements'
       max_connections = 300
+      max_slot_wal_keep_size = 20GB
     persistence:
-      size: 200Gi
+      size: 215Gi
     resources:
       requests:
         cpu: 500m
@@ -397,6 +409,46 @@ postgresql:
       limits:
         cpu: 2000m
         memory: 8Gi
+
+  readReplicas:
+    replicaCount: 1
+    # NOTE (prod convention): label the replica PVC out of Velero backups once
+    # it exists — it is a byte-copy of the primary, redundant for DR:
+    #   kubectl -n mycure-preprod label pvc data-postgresql-read-0 \
+    #     velero.io/exclude-from-backup=true --overwrite
+    persistence:
+      enabled: true
+      storageClass: ""
+      size: 215Gi
+    resources:
+      requests:
+        cpu: 100m
+        memory: 1Gi
+      limits:
+        cpu: 1000m
+        memory: 4Gi
+    # primary_slot_name pins the replica to a persistent physical slot so the
+    # primary retains WAL until the replica consumes it (capped by
+    # max_slot_wal_keep_size above). pg_stat_statements mirrors the primary —
+    # the read-plane verification reads per-node query stats on BOTH.
+    extendedConfiguration: |
+      shared_preload_libraries = 'pgaudit, pg_stat_statements'
+      max_connections = 300
+      primary_slot_name = 'pg_read_replica'
+    # Gates liveness during the initial pg_basebackup (~42GB clone) — the
+    # default liveness probe would SIGKILL the pod mid-clone and restart it
+    # forever. 180min ceiling (720 * 15s), same as prod.
+    customStartupProbe:
+      exec:
+        command:
+        - /bin/sh
+        - -c
+        - exec pg_isready -U postgres -d dbname=hapihub -h 127.0.0.1 -p 5432
+      initialDelaySeconds: 30
+      periodSeconds: 15
+      timeoutSeconds: 5
+      failureThreshold: 720
+      successThreshold: 1
 
   podDisruptionBudget:
     enabled: false
@@ -449,6 +501,12 @@ cadence:
   # All boxes are being moved to maestroapp 2.0.28 (our-relay-only) in the same window.
   relayUrl: "https://cadence-relay.preprod.localfirsthealth.com"
   nodePool: "nonprod"
+  postgresql:
+    serviceName: postgresql-primary
+    # Read-plane split: the hub's reconcile/serve scan queries go to the
+    # replica (CADENCE_DB_READ_URL); writes + LWW admission reads stay on the
+    # primary. Verification bed for the prod adoption.
+    readServiceName: postgresql-read
   # Scrape the OpenMetrics /metrics endpoint into Prometheus (reconcile timing/throughput, connect
   # failures, schema drift, reconcile_active, RSS, dirty_depth) — #2727 observability.
   gateway:

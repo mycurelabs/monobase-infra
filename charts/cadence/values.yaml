@@ -41,6 +41,10 @@ relayUrl: ""
 # CADENCE_DB in the deployment.
 postgresql:
   serviceName: postgresql
+  # Optional read-plane service (a streaming replica, e.g. postgresql-read): the hub's reconcile/serve
+  # scan queries go there via CADENCE_DB_READ_URL; writes + LWW admission reads stay on serviceName.
+  # Unset ⇒ everything on serviceName.
+  readServiceName: ""
   port: 5432
   auth:
     database: cadence_v2
