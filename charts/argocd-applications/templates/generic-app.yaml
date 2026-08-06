@@ -1,0 +1,64 @@
+# Application factory for pass-through app charts: each registry entry maps a
+# deployment-values key to charts/<name> with wholesale valuesObject
+# passthrough + global injection. Apps with bespoke value wiring keep dedicated
+# templates: postgresql, valkey, minio, minio-artifacts, mailpit, hapihub,
+# hapihub-worker, namespace, security-baseline, database-secrets.
+#
+# The registry is code, not config — template-local so a deployment values
+# file cannot override it.
+{{- $apps := list
+  (dict "name" "cadence"          "key" "cadence")
+  (dict "name" "cadence-relay"    "key" "cadenceRelay")
+  (dict "name" "hapihub-docs"     "key" "hapihub-docs")
+  (dict "name" "medgemma-worker"  "key" "medgemmaWorker")
+  (dict "name" "medley"           "key" "medley")
+  (dict "name" "medleyapp"        "key" "medleyapp")
+  (dict "name" "mycure"           "key" "mycure")
+  (dict "name" "mycure-dashboard" "key" "mycure-dashboard")
+  (dict "name" "mycurelocal"      "key" "mycurelocal")
+  (dict "name" "mycure-myaccount" "key" "mycure-myaccount")
+  (dict "name" "mycure-pxp"       "key" "mycure-pxp")
+  (dict "name" "nocodb"           "key" "nocodb")
+  (dict "name" "openmed"          "key" "openmed")
+}}
+{{- $root := . }}
+{{- range $app := $apps }}
+{{- $vals := index $root.Values $app.key | default dict }}
+{{- if $vals.enabled }}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ $root.Values.global.namespace }}-{{ $app.name }}
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    path: charts/{{ $app.chart | default $app.name }}
+    repoURL: {{ $root.Values.argocd.repoURL }}
+    targetRevision: {{ $root.Values.argocd.targetRevision | default "main" }}
+    helm:
+      releaseName: {{ $app.name }}
+      valuesObject:
+        {{- toYaml $vals | nindent 8 }}
+        global: {{ $root.Values.global | toYaml | nindent 10 }}
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: {{ $root.Values.global.namespace }}
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false
+    retry:
+      limit: 5
+      backoff:
+        duration: 10s
+        maxDuration: 5m
+{{- end }}
+{{- end }}
