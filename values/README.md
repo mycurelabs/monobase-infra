@@ -11,9 +11,20 @@ values/
 │   ├── external-dns.yaml   # External DNS configuration
 │   └── argocd.yaml         # ArgoCD Helm values
 └── deployments/            # Application deployment configurations
+    ├── _base/                # Shared product bases (merged first, not deployed)
+    │   └── mycure.yaml
     ├── acme-staging.yaml     # Acme staging environment
     └── acme-production.yaml  # Acme production environment
 ```
+
+## Naming convention (load-bearing)
+
+Deployment files are `<product>-<env>.yaml`. The ApplicationSet derives each
+file's optional base as `_base/<product>.yaml` (filename minus the trailing
+`-<env>` segment) and merges it first — the env file wins per key; maps
+deep-merge, ARRAYS REPLACE WHOLESALE (keep any array that differs per env
+entirely in the env file). Files without a base render fine
+(`ignoreMissingValueFiles`).
 
 ## Usage
 

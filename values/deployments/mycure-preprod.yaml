@@ -1,3 +1,5 @@
+# Preprod overlay over values/deployments/_base/mycure.yaml (helm merge:
+# base first, this file wins per key; arrays replace wholesale).
 # MyCure Pre-Production Configuration
 # Ephemeral pre-prod rehearsal env on DigitalOcean Kubernetes (DOKS).
 # Mirrors mycure-production in component shape (HA Postgres, replicaset Mongo,
@@ -23,129 +25,46 @@ global:
   # Velero-restored PVCs (their bitnami init state is keyed to prod passwords).
   secretPrefix: "mycure-production"
 
-  gateway:
-    name: nginx-shared-gateway
-    namespace: nginx-gateway-system
-
-  storage:
-    provider: ""
-    className: ""
-
-# ===== HEALTHCARE: MyCure Dashboard (operator/admin web UI) =====
 mycure-dashboard:
-  enabled: true
-
-  image:
-    repository: ghcr.io/mycurelabs/dashboard
-    tag: "0.14.14"
-    pullPolicy: IfNotPresent
-
-  replicaCount: 1
-
   resources:
     requests:
       cpu: 50m
-      memory: 64Mi
-    limits:
-      cpu: 200m
-      memory: 128Mi
-
   gateway:
-    hostname: ""  # defaults to mycure-dashboard.preprod.localfirsthealth.com
     sectionName: https-preprod-lfh
 
   config:
     API_URL: "https://hapihub.preprod.localfirsthealth.com"
 
-  podDisruptionBudget:
-    enabled: false
-
-# ===== INTERNAL TOOL: NocoDB (no-code DB UI for business, issue #2041) =====
-# Moved to the demo namespace (issue #2097) — demo is the persistent sibling; preprod is
-# spun up per-rehearsal. Re-enable here only for preprod-specific rehearsals.
-nocodb:
-  enabled: false
-
-# ===== HEALTHCARE: MyCure PXP (patient-facing web app) =====
 mycure-pxp:
-  enabled: true
-
-  image:
-    repository: ghcr.io/mycurelabs/pxp
-    tag: "2.0.6"
-    pullPolicy: IfNotPresent
-
-  replicaCount: 1
-
   resources:
     requests:
       cpu: 50m
-      memory: 64Mi
-    limits:
-      cpu: 200m
-      memory: 128Mi
-
-  # The pxp image's entrypoint sed-substitutes __PXP_RUNTIME_API_URL__ into
-  # /srv/*.{js,html} at container start, so /srv must be writable. Override
-  # the chart default (readOnlyRootFilesystem: true).
-  securityContext:
-    allowPrivilegeEscalation: false
-    capabilities:
-      drop:
-        - ALL
-    readOnlyRootFilesystem: false
-
   gateway:
-    hostname: ""  # defaults to mycure-pxp.preprod.localfirsthealth.com
     sectionName: https-preprod-lfh
 
   config:
     API_URL: "https://hapihub.preprod.localfirsthealth.com"
 
-  podDisruptionBudget:
-    enabled: false
-
-# ===== HEALTHCARE: HapiHub API =====
 hapihub:
-  enabled: true
-
   image:
-    repository: ghcr.io/mycurelabs/hapihub
     tag: "11.20.90" # pin to 11.20.85 if the box↔hub reconcile test needs the box's bundled hapihub schema (cadence schema_hash guard)
-    pullPolicy: IfNotPresent
-
-  # Valkey response cache (mono#2231) — preprod is the pilot environment.
-  # Cached endpoints are declared via x-cache in hapihub's OpenAPI specs
-  # (phase 1: fixtures 12h, services 5m, personal-details 5m). Kill switch:
-  # set false here, or `kubectl exec deploy/hapihub -- hapihub cache flush`.
-  # (mono#2617 RESOLVED in 11.20.67: bentocache getOrSet lock is now bounded
-  # by lockTimeout/hardTimeout in core/cache.ts, so a stalled holder fails open
-  # to the DB instead of wedging GET /accounts/{id}. Interim disable removed.)
   cache:
     enabled: true
 
   # Daily cleanup of expired Better Auth sessions (they never self-delete).
-  pruneExpiredSessions:
-    enabled: true
-
   replicaCount: 1
 
   resources:
     requests:
-      cpu: 500m
       memory: 768Mi
     limits:
-      cpu: "2"
       memory: 2Gi
 
   gateway:
     hostnames:
-      - hapihub.preprod.localfirsthealth.com
+    - hapihub.preprod.localfirsthealth.com
     sectionName: https-preprod-hapihub  # anti-coalescing exact listener, pairs with mycure block
     # No mycure.md hostnames in preprod — we only route *.preprod.localfirsthealth.com.
-    snippetsPolicy:
-      enabled: false
-
   betterAuth:
     passkey:
       rpName: "Mycure (preprod)"
@@ -160,45 +79,30 @@ hapihub:
     OLLAMA_URL: "http://ollama.tailscale.svc.cluster.local:11434"
     OPENMED_URL: "http://openmed:8920"
     EMBED_MODEL: "bge-m3"  # bge-m3 is what Ollama serves for embeddings (NOT nomic-embed-text)
-    CORS_STRICT: "true"
-    CORS_ALLOW_LOCAL_NETWORK: "false"
-    CORS_ALLOW_MOBILE_APPS: "true"
-    ACCOUNTS_SERVICE_ACCOUNT_EMAILS: "service@mycure.md"
-    APPLE_APP_BUNDLE_IDENTIFIER: "com.mycure.pxp"
-
   env:
-    - name: BETTER_AUTH_RATE_LIMIT_ENABLED
-      value: "true"
-    - name: BETTER_AUTH_RATE_LIMIT_WINDOW
-      value: "60"
-    - name: BETTER_AUTH_RATE_LIMIT_MAX
-      value: "300"
-    - name: BETTER_AUTH_SESSION_COOKIE_CACHE_ENABLED
-      value: "false"
+  - name: BETTER_AUTH_RATE_LIMIT_ENABLED
+    value: "true"
+  - name: BETTER_AUTH_RATE_LIMIT_WINDOW
+    value: "60"
+  - name: BETTER_AUTH_RATE_LIMIT_MAX
+    value: "300"
+  - name: BETTER_AUTH_SESSION_COOKIE_CACHE_ENABLED
+    value: "false"
     # cadence OAuth Authorization Server (#2727 E2E). hapihub mints box grants with the SAME EdDSA key +
     # iss + kid as the standalone cadence-issuer, so the hub (which trusts the issuer's JWKS) verifies them
     # unchanged. CADENCE_ISSUER_KEY (the PEM of that key) comes from the externalSecret below.
-    - name: CADENCE_ISSUER_ISS
-      value: "cadence-preprod-issuer"
-    - name: CADENCE_ISSUER_KID
-      value: "k1"
-    - name: CADENCE_ISSUER_FLEET_ID
-      value: "mycure-preprod"
-    - name: CADENCE_ISSUER_AUTHORIZE_URL
-      value: "https://mycure.preprod.localfirsthealth.com/oauth/authorize"
+  - name: CADENCE_ISSUER_ISS
+    value: "cadence-preprod-issuer"
+  - name: CADENCE_ISSUER_KID
+    value: "k1"
+  - name: CADENCE_ISSUER_FLEET_ID
+    value: "mycure-preprod"
+  - name: CADENCE_ISSUER_AUTHORIZE_URL
+    value: "https://mycure.preprod.localfirsthealth.com/oauth/authorize"
     # Advertised as `cadence_seed_url` in the AS metadata so a box derives its sync hub from the single
     # configured api URL (no separate hub/fleet onboarding field). Re-domained hub (#2727).
-    - name: CADENCE_ISSUER_SEED_URL
-      value: "https://cadence.preprod.localfirsthealth.com"
-
-  livenessProbe:
-    enabled: true
-
-  readinessProbe:
-    enabled: true
-
-  podDisruptionBudget:
-    enabled: false
+  - name: CADENCE_ISSUER_SEED_URL
+    value: "https://cadence.preprod.localfirsthealth.com"
 
   autoscaling:
     enabled: false
@@ -210,189 +114,109 @@ hapihub:
   # Isolation relies on the mailpit/host overrides below + the fact that
   # this env is short-lived and not publicly linked.
   externalSecrets:
-    enabled: true
-    secretStore: gcp-secretstore
-    secretStoreKind: ClusterSecretStore
-    refreshInterval: 1h
     secrets:
       # Google OAuth
-      - secretKey: GOOGLE_CLIENT_ID
-        remoteKey: mycure-preprod-google-oauth-client-id
-      - secretKey: GOOGLE_CLIENT_SECRET
-        remoteKey: mycure-preprod-google-oauth-client-secret
-      - secretKey: STRIPE_SECRET_KEY
-        remoteKey: mycure-preprod-stripe-secret-key
+    - secretKey: GOOGLE_CLIENT_ID
+      remoteKey: mycure-preprod-google-oauth-client-id
+    - secretKey: GOOGLE_CLIENT_SECRET
+      remoteKey: mycure-preprod-google-oauth-client-secret
+    - secretKey: STRIPE_SECRET_KEY
+      remoteKey: mycure-preprod-stripe-secret-key
       # Encryption keys
-      - secretKey: ENC_BILLING_INVOICES
-        remoteKey: mycure-production-enc-billing-invoices
-      - secretKey: ENC_BILLING_ITEMS
-        remoteKey: mycure-production-enc-billing-items
-      - secretKey: ENC_BILLING_PAYMENTS
-        remoteKey: mycure-production-enc-billing-payments
-      - secretKey: ENC_MEDICAL_RECORDS
-        remoteKey: mycure-production-enc-medical-records
-      - secretKey: ENC_PERSONAL_DETAILS
-        remoteKey: mycure-production-enc-personal-details
+    - secretKey: ENC_BILLING_INVOICES
+      remoteKey: mycure-production-enc-billing-invoices
+    - secretKey: ENC_BILLING_ITEMS
+      remoteKey: mycure-production-enc-billing-items
+    - secretKey: ENC_BILLING_PAYMENTS
+      remoteKey: mycure-production-enc-billing-payments
+    - secretKey: ENC_MEDICAL_RECORDS
+      remoteKey: mycure-production-enc-medical-records
+    - secretKey: ENC_PERSONAL_DETAILS
+      remoteKey: mycure-production-enc-personal-details
       # JWT/Auth keys
-      - secretKey: PRIVATE_KEY
-        remoteKey: mycure-production-private-key
-      - secretKey: PUBLIC_KEY
-        remoteKey: mycure-production-public-key
+    - secretKey: PRIVATE_KEY
+      remoteKey: mycure-production-private-key
+    - secretKey: PUBLIC_KEY
+      remoteKey: mycure-production-public-key
       # cadence OAuth AS signing key (#2727) — the standalone cadence-issuer's EdDSA key, PEM-encoded
       # (single-line, \n-escaped; hapihub un-escapes). Same key/iss(cadence-preprod-issuer)/kid(k1) as the
       # issuer, so grants hapihub mints verify against the issuer JWKS the hub already trusts.
-      - secretKey: CADENCE_ISSUER_KEY
-        remoteKey: mycure-preprod-cadence-issuer-key-pem
+    - secretKey: CADENCE_ISSUER_KEY
+      remoteKey: mycure-preprod-cadence-issuer-key-pem
       # Storage configuration (GCP)
-      - secretKey: STORAGE_BUCKET
-        remoteKey: mycure-production-storage-bucket
-      - secretKey: STORAGE_CLIENT_EMAIL
-        remoteKey: mycure-production-storage-client-email
-      - secretKey: STORAGE_DIRECTORY
-        remoteKey: mycure-production-storage-directory
-      - secretKey: STORAGE_PRIVATE_KEY
-        remoteKey: mycure-production-storage-private-key
-      - secretKey: STORAGE_PROJECT_ID
-        remoteKey: mycure-production-storage-project-id
-      - secretKey: STORAGE_TYPE
-        remoteKey: mycure-production-storage-type
+    - secretKey: STORAGE_BUCKET
+      remoteKey: mycure-production-storage-bucket
+    - secretKey: STORAGE_CLIENT_EMAIL
+      remoteKey: mycure-production-storage-client-email
+    - secretKey: STORAGE_DIRECTORY
+      remoteKey: mycure-production-storage-directory
+    - secretKey: STORAGE_PRIVATE_KEY
+      remoteKey: mycure-production-storage-private-key
+    - secretKey: STORAGE_PROJECT_ID
+      remoteKey: mycure-production-storage-project-id
+    - secretKey: STORAGE_TYPE
+      remoteKey: mycure-production-storage-type
       # Stripe configuration
-      - secretKey: STRIPE_KEY
-        remoteKey: mycure-preprod-stripe-key
-      - secretKey: STRIPE_CHECKOUT_SUCCESS_URL
-        remoteKey: mycure-production-stripe-checkout-success-url
-      - secretKey: STRIPE_CHECKOUT_CANCEL_URL
-        remoteKey: mycure-production-stripe-checkout-cancel-url
-      - secretKey: AUTH_SECRET
-        remoteKey: mycure-production-auth-secret
-      - secretKey: BETTER_AUTH_SECRET
-        remoteKey: mycure-production-better-auth-secret
+    - secretKey: STRIPE_KEY
+      remoteKey: mycure-preprod-stripe-key
+    - secretKey: STRIPE_CHECKOUT_SUCCESS_URL
+      remoteKey: mycure-production-stripe-checkout-success-url
+    - secretKey: STRIPE_CHECKOUT_CANCEL_URL
+      remoteKey: mycure-production-stripe-checkout-cancel-url
+    - secretKey: AUTH_SECRET
+      remoteKey: mycure-production-auth-secret
+    - secretKey: BETTER_AUTH_SECRET
+      remoteKey: mycure-production-better-auth-secret
 
   postgresql:
-    enabled: true
-    external: false
     serviceName: postgresql
-    auth:
-      database: hapihub
-      username: postgres
-      existingSecret: postgresql
-
-# ===== HEALTHCARE: Frontend Application =====
 mycure:
-  enabled: true
-
   image:
-    repository: ghcr.io/mycurelabs/mycureapp
     tag: "10.25.112" # feat/cadence: /oauth/authorize consent page for cadence box onboarding (#2727)
-    pullPolicy: IfNotPresent
-
-  replicaCount: 1
-
   resources:
     requests:
       cpu: 50m
-      memory: 64Mi
-    limits:
-      cpu: 200m
-      memory: 128Mi
-
   gateway:
-    hostname: ""
     sectionName: https-preprod-mycure  # anti-coalescing exact listener (exact-name cert kills HTTP/2 cross-host reuse -> 421s)
 
   config:
     API_URL: "https://hapihub.preprod.localfirsthealth.com"
     HAPIHUB_URL: "https://hapihub.preprod.localfirsthealth.com"
 
-  podDisruptionBudget:
-    enabled: false
-
-# ===== HEALTHCARE: MyCure Local Frontend Application =====
 mycurelocal:
   enabled: false
 
-  image:
-    repository: ghcr.io/mycurelabs/mycurelocal
-    tag: "1.4.2"
-    pullPolicy: IfNotPresent
-
-  replicaCount: 1
-
   resources:
     requests:
       cpu: 50m
-      memory: 64Mi
-    limits:
-      cpu: 200m
-      memory: 128Mi
-
   gateway:
     hostnames:
-      - hostname: mycurelocal.preprod.localfirsthealth.com
-        sectionName: https-preprod-lfh
+    - hostname: mycurelocal.preprod.localfirsthealth.com
+      sectionName: https-preprod-lfh
 
-  podDisruptionBudget:
-    enabled: false
-
-# ===== HEALTHCARE: MyCure MyAccount Application =====
 mycure-myaccount:
   enabled: false
 
-  image:
-    repository: ghcr.io/mycurelabs/myaccount
-    tag: "1.0.1"
-    pullPolicy: IfNotPresent
-
-  replicaCount: 1
-
   resources:
     requests:
       cpu: 50m
-      memory: 64Mi
-    limits:
-      cpu: 200m
-      memory: 128Mi
-
   gateway:
-    hostname: ""
     sectionName: https-preprod-lfh
 
   config:
     API_URL: "https://hapihub.preprod.localfirsthealth.com"
     HAPIHUB_URL: "https://hapihub.preprod.localfirsthealth.com"
 
-  podDisruptionBudget:
-    enabled: false
-
-# ===== HEALTHCARE: HapiHub API Documentation =====
 hapihub-docs:
   enabled: false
-
-  image:
-    repository: ghcr.io/mycurelabs/hapihub-docs
-    tag: "1.1.0"
-    pullPolicy: IfNotPresent
-
-  replicaCount: 1
 
   resources:
     requests:
       cpu: 50m
-      memory: 64Mi
-    limits:
-      cpu: 200m
-      memory: 128Mi
-
   gateway:
     hostname: "docs.preprod.localfirsthealth.com"
     sectionName: https-preprod-lfh
 
-  podDisruptionBudget:
-    enabled: false
-
-# ===== MEDICAL AI: Medley AI Gateway =====
-# Phase 1: enabled — ClusterIP only, reachable at http://medley:8970 in-cluster.
-# MEDLEY_HISTORY_KEY pulled from GCP Secret Manager (mycure-preprod-medley-history-key).
 medley:
   enabled: true
 
@@ -431,8 +255,8 @@ medley:
     secretStoreKind: ClusterSecretStore
     refreshInterval: 1h
     secrets:
-      - secretKey: MEDLEY_HISTORY_KEY
-        remoteKey: mycure-preprod-medley-history-key
+    - secretKey: MEDLEY_HISTORY_KEY
+      remoteKey: mycure-preprod-medley-history-key
 
   podDisruptionBudget:
     enabled: false
@@ -553,23 +377,7 @@ openmed:
 # nonprod-pool memory. Replication failover testing is the only thing lost —
 # schema, query, migration, and index rehearsals all work on a single primary.
 postgresql:
-  enabled: true
-
-  fullnameOverride: "postgresql"
-
   architecture: standalone
-
-  image:
-    repository: bitnamilegacy/postgresql
-    tag: 16.4.0-debian-12-r13
-
-  auth:
-    enabled: true
-    database: hapihub
-    username: postgres
-    existingSecret: postgresql
-    secretKeys:
-      adminPasswordKey: postgres-password
 
   primary:
     # cadence boot opens ~99 per-collection ensure connections simultaneously
@@ -581,8 +389,6 @@ postgresql:
     extendedConfiguration: |
       max_connections = 300
     persistence:
-      enabled: true
-      storageClass: ""
       size: 200Gi
     resources:
       requests:
@@ -597,25 +403,8 @@ postgresql:
 
 # ===== CACHE: Valkey (Redis) =====
 valkey:
-  enabled: true
-
-  global:
-    security:
-      allowInsecureImages: true
-
-  auth:
-    existingSecret: valkey
-
-  architecture: standalone
-
-  image:
-    repository: bitnamilegacy/valkey
-    tag: 8.0.1-debian-12-r2
-
   master:
     persistence:
-      enabled: true
-      storageClass: ""
       size: 4Gi
     resources:
       requests:
@@ -631,79 +420,10 @@ valkey:
 minio:
   enabled: true
 
-  fullnameOverride: "minio"
-
-  image:
-    repository: bitnamilegacy/minio
-    tag: "2025.7.23-debian-12-r3"
-
-  mode: standalone
-
-  statefulset:
-    replicaCount: 1
-
-  auth:
-    existingSecret: minio
-
-  persistence:
-    enabled: true
-    storageClass: ""
-    size: 10Gi
-
-  resources:
-    requests:
-      cpu: 100m
-      memory: 256Mi
-    limits:
-      cpu: 500m
-      memory: 512Mi
-
-  defaultBuckets: "monobase-files"
-
-  buckets:
-    - name: "monobase-files"
-  region: "us-east-1"
-
-  podSecurityContext:
-    enabled: true
-    fsGroup: 1001
-    fsGroupChangePolicy: "OnRootMismatch"
-
-  containerSecurityContext:
-    enabled: true
-    runAsUser: 1001
-    runAsGroup: 1001
-    runAsNonRoot: true
-    privileged: false
-    readOnlyRootFilesystem: true
-    allowPrivilegeEscalation: false
-    capabilities:
-      drop:
-        - ALL
-    seccompProfile:
-      type: RuntimeDefault
-
   gateway:
-    enabled: true
-    hostname: ""
     sectionName: https-preprod-lfh
-    rateLimit:
-      enabled: false
-
-# ===== EMAIL TESTING: Mailpit =====
-# Safety override: enabled in preprod so cloned prod user rows cannot
-# trigger real outbound email on reset/notification flows. HapiHub SMTP
-# should be pointed at the in-cluster mailpit service.
 mailpit:
   enabled: true
-
-  resources:
-    requests:
-      cpu: 25m
-      memory: 32Mi
-    limits:
-      cpu: 100m
-      memory: 64Mi
 
   gateway:
     # Public web UI route is intentionally exposed with NO auth.
@@ -711,47 +431,10 @@ mailpit:
     # tokens / OTPs / PHI to anyone with the URL. Deliberate testing convenience, not a
     # regression. Put it behind gateway auth (NGF AuthenticationFilter basic-auth) if it
     # outlives short-lived testing. Exposure-free alt: kubectl port-forward svc/mailpit-http 8025:80
-    enabled: true
     hostname: "mail.preprod.localfirsthealth.com"
 
 # ===== BACKUP =====
-backup:
-  enabled: false
-
-# ===== SECURITY =====
-podSecurityStandards:
-  enabled: true
-  level: restricted
-
-# ===== RESOURCE QUOTAS =====
-resourceQuotas:
-  enabled: false
-
-# ===== cadence-relay — self-hosted iroh relay for hard-NAT boxes =====
-# Own LB + cert (cadence-relay.preprod.localfirsthealth.com). Anchor + boxes point at it via cadence
-# relay_url once it's verified up (option-a cutover window). Stock n0 relay image, pinned to iroh 1.0.2.
-cadenceRelay:
-  enabled: true
-  image:
-    repository: n0computer/iroh-relay
-    tag: "v1.0.2"
-  # hostname defaults to cadence-relay.{global.domain}; tls via letsencrypt-mycure-cloudflare-prod (DNS-01).
-
-# ===== cadence — iroh 1.0 P2P transport + registry (cadence v2 foundation) =====
-# The anchor node; reachability is provided by the shared gateway's UDPRoute (not an
-# app-owned Service). Image is on the cadence 2.x line (cadence = cadence v2).
-# cadence — cadence v2 data-plane HUB (isolated cadence_v2 DB rehearsal). Full chart: run --config, enroll
-# initContainer, API service + HTTPRoute (cadence.preprod…), direct QUIC via the shared-gateway UDPRoute.
 cadence:
-  enabled: true
-  rustLog: "cadence=info,cadence_routing=debug,warn"
-  image:
-    repository: ghcr.io/mycurelabs/cadence
-    tag: "2.1.47" # any-origin LeafIds push (mono#3111): carrier boxes heal the hub — un-strands alfheim's ~395k fam rows. No wire change. PREPROD-ONLY
-    pullPolicy: Always # mutable tag; Always avoids stale node cache
-  udpPort: 6472
-  # Shared-gateway LB IP (nginx-shared-gateway, UDPRoute path — preprod is port-demuxed
-  # to 6473).
   publicAddr: "104.248.98.161:6473"
   # CUTOVER: anchor homes on our relay (QUIC-addr-disc lets netcheck rank it) + advertises it in the doc.
   # All boxes are being moved to maestroapp 2.0.28 (our-relay-only) in the same window.
@@ -759,15 +442,6 @@ cadence:
   nodePool: "nonprod"
   # Scrape the OpenMetrics /metrics endpoint into Prometheus (reconcile timing/throughput, connect
   # failures, schema drift, reconcile_active, RSS, dirty_depth) — #2727 observability.
-  serviceMonitor:
-    enabled: true
-  # Integrated model (promote cadence to be preprod's cadence, #2727): watch the LIVE hapihub app DB
-  # instead of the isolated cadence_v2 seed, so live cloud writes capture + sync to boxes (matches prod's
-  # legacy cadence, which watches hapihub). cadence installs cadence_* side-tables + capture triggers on the
-  # live tables at startup and baselines existing rows.
-  postgresql:
-    auth:
-      database: hapihub
   gateway:
     # The preprod wildcard listener (*.preprod.localfirsthealth.com) on the shared gateway.
     sectionName: https-preprod-lfh
@@ -778,7 +452,7 @@ cadence:
     # Cutover complete — boxes discover the hub via cadence.preprod (single-URL onboarding, from the AS
     # metadata's cadence_seed_url); the legacy cadence.preprod hostname is dropped.
     hostnames:
-      - cadence.preprod.localfirsthealth.com
+    - cadence.preprod.localfirsthealth.com
   # hapihub is the SOLE AS (#2727) — it mints both box grants AND the hub's own '*' grant. Env-driven (not
   # baked into the verbatim cadence.yaml). The enroll initContainer authorizes '*' against hapihub with a
   # non-expiring service-account API key (--bearer); runtime verification is against hapihub's JWKS.
@@ -792,13 +466,9 @@ cadence:
   # Service-account API key (better-auth, service@mycure.md, non-expiring) → secret cadence-secrets. The hub
   # presents it as --bearer to authorize its '*' grant. hapihub then mints with a coherent status_list.
   externalSecrets:
-    enabled: true
-    secretStore: gcp-secretstore
-    secretStoreKind: ClusterSecretStore
-    refreshInterval: 1h
     secrets:
-      - secretKey: sa-api-key
-        remoteKey: mycure-preprod-cadence-sa-api-key
+    - secretKey: sa-api-key
+      remoteKey: mycure-preprod-cadence-sa-api-key
 
 # cadence issuer RETIRED (#2727): hapihub is the sole AS + minter. The hub enrolls its own '*' grant
 # against hapihub with a service-account API key (see the enroll initContainer). No standalone issuer.

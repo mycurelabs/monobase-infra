@@ -28,6 +28,10 @@ spec:
           # Reference examples are not deployments
           - path: "values/deployments/example-*.yaml"
             exclude: true
+          # Shared bases are merged into deployments, not deployed themselves
+          # (the glob doesn't cross directories; this is an explicit guard)
+          - path: "values/deployments/_base/*.yaml"
+            exclude: true
 
   # Template for the root Applications
   template:
@@ -52,8 +56,13 @@ spec:
         path: charts/argocd-applications
 
         helm:
-          # The discovered file is the values file
+          # Optional product base merges first; the discovered env file wins.
+          # Base path derives from the filename: <product>-<env>.yaml ->
+          # _base/<product>.yaml (files without a base render fine —
+          # ignoreMissingValueFiles). Maps deep-merge; arrays replace wholesale.
+          ignoreMissingValueFiles: true
           valueFiles:
+            - '../../{{"{{"}} .path.path {{"}}"}}/_base/{{"{{"}} .path.filename | trimSuffix ".yaml" | splitList "-" | initial | join "-" {{"}}"}}.yaml'
             - '../../{{"{{"}} .path.path {{"}}"}}/{{"{{"}} .path.filename {{"}}"}}'
           # Inject repoURL (single source of truth)
           values: |
