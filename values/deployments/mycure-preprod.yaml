@@ -434,6 +434,15 @@ mailpit:
     hostname: "mail.preprod.localfirsthealth.com"
 
 # ===== BACKUP =====
+# Relay-via-gateway validation (phase 2 of the cadence LB consolidation): test hostname riding
+# the *.preprod wildcard listener; the real relay hostname/LB are untouched. Success = a relay
+# client homes on https://cadence-relay-gw.preprod... through the gateway.
+cadenceRelay:
+  gatewayRoute:
+    enabled: true
+    hostname: cadence-relay-gw.preprod.localfirsthealth.com
+    sectionName: https-preprod-lfh
+
 cadence:
   publicAddr: "104.248.98.161:6473"
   # CUTOVER: anchor homes on our relay (QUIC-addr-disc lets netcheck rank it) + advertises it in the doc.

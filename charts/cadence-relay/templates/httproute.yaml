@@ -1,0 +1,25 @@
+{{- if and .Values.enabled .Values.gatewayRoute.enabled }}
+# Relay websocket leg via the shared gateway: the gateway terminates the client's TLS on its
+# HTTPS listener and re-encrypts to the relay's own TLS (BackendTLSPolicy — the relay keeps
+# terminating with its cert-manager cert, which its QUIC endpoint needs regardless). external-dns
+# (gateway-httproute source) publishes the hostname → gateway LB IP.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: cadence-relay
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "cadence-relay.labels" . | nindent 4 }}
+spec:
+  parentRefs:
+    - name: {{ .Values.global.gateway.name }}
+      namespace: {{ .Values.global.gateway.namespace }}
+      sectionName: {{ .Values.gatewayRoute.sectionName }}
+  hostnames:
+    - {{ .Values.gatewayRoute.hostname | quote }}
+  rules:
+    - backendRefs:
+        - name: cadence-relay
+          port: {{ .Values.externalHttpsPort }}
+          weight: 1
+{{- end }}

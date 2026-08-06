@@ -27,6 +27,16 @@ quicPort: 7842
 # consolidation needs.
 quicAltPort: ""
 
+# Route the relay's websocket leg (TCP 443) through the shared gateway instead of this chart's own
+# LB: HTTPRoute on an HTTPS listener + BackendTLSPolicy re-encryption to the relay's own TLS.
+# The building block for retiring the per-env relay LBs once the fleet carries relay_quic_port
+# (mono#3166). `hostname` is the route host (a test host during validation; the real relay
+# hostname at cutover); sectionName picks the env's HTTPS listener.
+gatewayRoute:
+  enabled: false
+  hostname: ""
+  sectionName: ""
+
 
 # TLS via cert-manager (DNS-01, works for an L4 service — no HTTP path needed). The issued Secret is
 # mounted read-only and the relay reads it in `Manual` cert mode.
