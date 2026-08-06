@@ -1,6 +1,8 @@
-# DigitalOcean DOKS Cluster Module - Main Configuration
+# DigitalOcean DOKS Cluster Module
 
 locals {
+  default_pool = var.node_pools[var.default_node_pool_key]
+
   kubeconfig = yamlencode({
     apiVersion      = "v1"
     kind            = "Config"
@@ -35,7 +37,10 @@ resource "digitalocean_vpc" "main" {
   ip_range = var.vpc_cidr
 }
 
-# DOKS Cluster
+# DOKS cluster. The pool at var.default_node_pool_key renders inline: the DO
+# provider requires exactly one pool inside the cluster resource, it cannot be
+# deleted separately, and its `size` is ForceNew ON THE CLUSTER — pick the
+# pool least likely to be resized or removed.
 resource "digitalocean_kubernetes_cluster" "main" {
   name    = var.cluster_name
   region  = var.region
@@ -46,83 +51,62 @@ resource "digitalocean_kubernetes_cluster" "main" {
   # HA control plane (3 masters vs 1)
   ha = var.ha_control_plane
 
-  # Auto-upgrade settings
-  auto_upgrade = var.auto_upgrade
+  auto_upgrade  = var.auto_upgrade
   surge_upgrade = var.surge_upgrade
 
-  # Maintenance window
   maintenance_policy {
-    day       = var.maintenance_window_day
+    day        = var.maintenance_window_day
     start_time = var.maintenance_window_hour
   }
 
-  # Default node pool
   node_pool {
-    name       = "general"
-    size       = local.effective_node_pool.node_size
-    node_count = local.effective_node_pool.node_count
+    name       = var.default_node_pool_key
+    size       = local.default_pool.size
+    node_count = local.default_pool.auto_scale ? null : local.default_pool.node_count
+    auto_scale = local.default_pool.auto_scale
+    min_nodes  = local.default_pool.min_nodes
+    max_nodes  = local.default_pool.max_nodes
+    labels     = local.default_pool.labels
+    tags       = local.default_pool.tags
 
-    # Autoscaling
-    auto_scale = true
-    min_nodes  = local.effective_node_pool.min_nodes
-    max_nodes  = local.effective_node_pool.max_nodes
-
-    tags = concat(
-      ["monobase-infrastructure", var.cluster_name],
-      var.tags
-    )
-
-    labels = {
-      "workload-type" = "general"
-      "managed-by"    = "opentofu"
+    dynamic "taint" {
+      for_each = local.default_pool.taints
+      content {
+        key    = taint.value.key
+        value  = taint.value.value
+        effect = taint.value.effect
+      }
     }
   }
 
-  tags = concat(
-    ["monobase-infrastructure", var.cluster_name],
-    var.tags
-  )
+  # Full tag list comes from tfvars verbatim (the provider filters the
+  # auto-managed k8s* tags).
+  tags = var.tags
 }
 
-# Firewall for cluster
-resource "digitalocean_firewall" "cluster" {
-  name = "${var.cluster_name}-firewall"
+# All pools other than the inline default. Renaming a map key is an address
+# change (destroy+create — every node in the pool drains at once); use
+# `tofu state mv` for renames. `size` is ForceNew. node_count is omitted on
+# autoscaled pools — the autoscaler owns it.
+resource "digitalocean_kubernetes_node_pool" "pool" {
+  for_each = { for k, v in var.node_pools : k => v if k != var.default_node_pool_key }
 
-  droplet_ids = flatten([
-    for node in digitalocean_kubernetes_cluster.main.node_pool[0].nodes : node.droplet_id
-  ])
+  cluster_id = digitalocean_kubernetes_cluster.main.id
+  name       = each.key
+  size       = each.value.size
+  node_count = each.value.auto_scale ? null : each.value.node_count
+  auto_scale = each.value.auto_scale
+  min_nodes  = each.value.min_nodes
+  max_nodes  = each.value.max_nodes
+  labels     = each.value.labels
+  tags       = each.value.tags
 
-  # Allow all outbound
-  outbound_rule {
-    protocol              = "tcp"
-    port_range            = "1-65535"
-    destination_addresses = ["0.0.0.0/0", "::/0"]
+  dynamic "taint" {
+    for_each = each.value.taints
+    content {
+      key    = taint.value.key
+      value  = taint.value.value
+      effect = taint.value.effect
+    }
   }
-
-  outbound_rule {
-    protocol              = "udp"
-    port_range            = "1-65535"
-    destination_addresses = ["0.0.0.0/0", "::/0"]
-  }
-
-  outbound_rule {
-    protocol              = "icmp"
-    destination_addresses = ["0.0.0.0/0", "::/0"]
-  }
-
-  # Allow inbound from VPC
-  inbound_rule {
-    protocol         = "tcp"
-    port_range       = "1-65535"
-    source_addresses = [var.vpc_cidr]
-  }
-
-  inbound_rule {
-    protocol         = "udp"
-    port_range       = "1-65535"
-    source_addresses = [var.vpc_cidr]
-  }
-
-  # Allow Kubernetes API access (controlled by DOKS)
-  # Note: DOKS manages API server access, no need to expose port 6443
 }

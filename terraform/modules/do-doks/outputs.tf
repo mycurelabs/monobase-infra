@@ -50,14 +50,12 @@ output "vpc_urn" {
   value       = digitalocean_vpc.main.urn
 }
 
-output "node_pool_id" {
-  description = "Default node pool ID"
-  value       = digitalocean_kubernetes_cluster.main.node_pool[0].id
-}
-
-output "node_pool_nodes" {
-  description = "List of node pool nodes"
-  value       = digitalocean_kubernetes_cluster.main.node_pool[0].nodes
+output "node_pool_ids" {
+  description = "Node pool IDs keyed by pool name (inline default included)"
+  value = merge(
+    { (var.default_node_pool_key) = digitalocean_kubernetes_cluster.main.node_pool[0].id },
+    { for k, p in digitalocean_kubernetes_node_pool.pool : k => p.id }
+  )
 }
 
 output "kubeconfig" {

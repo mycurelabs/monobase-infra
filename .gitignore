@@ -49,7 +49,7 @@ terraform/**/kubeconfig.yaml
 .terragrunt-cache/
 
 # Active cluster configuration (copied from terraform/examples/)
-cluster/
+/cluster/
 
 # IDE and OS files
 .vscode/
@@ -103,3 +103,6 @@ node_modules/
 **/.mcp.json
 !.claude/
 !.claude/agents/.gitkeep
+
+# OpenTofu working dir for the cluster stack (lockfile IS committed)
+/values/cluster/.terraform/
