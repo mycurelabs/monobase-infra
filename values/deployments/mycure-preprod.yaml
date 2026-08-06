@@ -35,6 +35,7 @@ mycure-dashboard:
   config:
     API_URL: "https://hapihub.preprod.localfirsthealth.com"
 
+  chart: app
 mycure-pxp:
   resources:
     requests:
@@ -45,6 +46,7 @@ mycure-pxp:
   config:
     API_URL: "https://hapihub.preprod.localfirsthealth.com"
 
+  chart: app
 hapihub:
   image:
     tag: "11.20.90" # pin to 11.20.85 if the box↔hub reconcile test needs the box's bundled hapihub schema (cadence schema_hash guard)
@@ -183,6 +185,7 @@ mycure:
     API_URL: "https://hapihub.preprod.localfirsthealth.com"
     HAPIHUB_URL: "https://hapihub.preprod.localfirsthealth.com"
 
+  chart: app
 mycurelocal:
   enabled: false
 
@@ -296,6 +299,7 @@ medleyapp:
 # Phase 2: enabled — vision extraction (prescription/lab images) for document-ingestion.
 # Reaches the on-prem Ollama via the in-cluster egress Service (ollama.tailscale.svc); the
 # chart NetworkPolicy allows 11434 via namespaceSelector (not ipBlock — that path is in-cluster).
+  chart: app
 medgemmaWorker:
   enabled: true
 

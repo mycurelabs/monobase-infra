@@ -1,0 +1,23 @@
+{{- $persistence := .Values.persistence | default dict }}
+{{- if and .Values.enabled $persistence.enabled (not $persistence.existingClaim) }}
+# PersistentVolumeClaim for Hugging Face model cache
+# Mounted at /models (HF_HOME=/models) to persist downloaded models across pod restarts.
+# Storage class defaults to global.storage.className or longhorn.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: openmed-model-cache
+  namespace: {{ include "app.namespace" . }}
+  labels:
+    {{- include "app.labels" . | nindent 4 }}
+spec:
+  accessModes:
+    - {{ .Values.persistence.accessMode | default "ReadWriteOnce" }}
+  resources:
+    requests:
+      storage: {{ .Values.persistence.size | default "3Gi" }}
+  {{- $storageClass := include "app.storageClass" . }}
+  {{- if $storageClass }}
+  storageClassName: {{ $storageClass }}
+  {{- end }}
+{{- end }}

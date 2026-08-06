@@ -38,7 +38,7 @@ metadata:
 spec:
   project: default
   source:
-    path: charts/{{ $app.chart | default $app.name }}
+    path: charts/{{ $vals.chart | default $app.chart | default $app.name }}
     repoURL: {{ $root.Values.argocd.repoURL }}
     targetRevision: {{ $root.Values.argocd.targetRevision | default "main" }}
     helm:
