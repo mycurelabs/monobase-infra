@@ -2,7 +2,6 @@
 
 **For:** Management decision
 **Prepared by:** Infrastructure team
-**Date:** June 2026
 **Decision needed by:** _TBD_
 **Companion to:** [`NIFLHEIM_RAID_PROPOSAL.md`](NIFLHEIM_RAID_PROPOSAL.md) — full RAID proposal (₱33,000–36,500)
 

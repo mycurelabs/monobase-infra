@@ -3,8 +3,7 @@
 # expired session rows (it only checks expiry at read time), so they accumulate
 # forever. Runs a plain psql `DELETE FROM "session" WHERE "expires_at" < now()`
 # — bounded, idempotent, only touches already-expired rows, so it never logs
-# anyone out. (Was `hapihub backfill prune-expired-sessions`; that CLI was
-# removed from the hapihub binary — mono#2167 follow-up.)
+# anyone out.
 # Assumes in-cluster PostgreSQL (postgresql.external: false), like containerEnv.
 apiVersion: batch/v1
 kind: CronJob

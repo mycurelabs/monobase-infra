@@ -2,7 +2,6 @@
 
 **For:** Management decision  
 **Prepared by:** Infrastructure team  
-**Date:** May 2026  
 **Decision needed by:** _TBD_
 
 ---
@@ -38,7 +37,7 @@ RAID protects against (1). Choosing the right new drives addresses (2). ZFS (the
 
 ---
 
-## Current state of `hel.niflheim` (verified May 2026)
+## Current state of `hel.niflheim`
 
 | Item | Detail |
 |---|---|
@@ -58,7 +57,7 @@ Free chassis bays and PSU wattage need physical verification on-site before the 
 
 ## Decision matrix
 
-All prices are PHP from actual Philippine retailers (Benson.ph, PCWorx, PCHub, Thinking Tools, Shopee, Lazada) verified **May 2026**. Drive class is **NAS-grade CMR** only — explicitly excluding WD Blue, WD Red WD20EFAX (SMR), and Seagate Barracuda. Allow ±10% movement for promos and exchange rate.
+All prices are PHP from actual Philippine retailers (Benson.ph, PCWorx, PCHub, Thinking Tools, Shopee, Lazada). Drive class is **NAS-grade CMR** only — explicitly excluding WD Blue, WD Red WD20EFAX (SMR), and Seagate Barracuda. Allow ±10% movement for promos and exchange rate, and re-verify current prices before placing the PO.
 
 | Option | Layout | Drives | Usable | Failures tolerated | Bit-rot detection | All-in cost† |
 |---|---|---|---:|:---:|:---:|---:|
@@ -207,7 +206,7 @@ For the engineer executing the change:
 | Quarterly drill works | Execute either path in [`RESTORE_FROM_ONPREM.md`](RESTORE_FROM_ONPREM.md) against the latest snapshot | Postgres restores, row counts within 5% of production |
 | Single-drive failure drill | `zpool offline niflheim <one-drive-id>` then re-run mirror + verify | Pool stays online, both services succeed |
 
-### Appendix C: PH retailer source links (verified May 2026)
+### Appendix C: PH retailer source links
 
 | Store | URL | Notes |
 |---|---|---|

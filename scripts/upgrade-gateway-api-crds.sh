@@ -2,9 +2,9 @@
 # Upgrade the shared Gateway API CRDs to the bundle pinned by our NGF release.
 #
 # The gateway.networking.k8s.io CRDs are cluster-scoped and shared; they are
-# deliberately NOT managed by any ArgoCD Application (the Envoy Gateway
-# teardown, 2026-08-01, showed why: an app-level skipCrds/prune cascade can
-# delete them out from under every HTTPRoute in the cluster). They carry
+# deliberately NOT managed by any ArgoCD Application (an app-level
+# skipCrds/prune cascade can delete them out from under every HTTPRoute in
+# the cluster). They carry
 # argocd.argoproj.io/sync-options=Prune=false + helm.sh/resource-policy=keep
 # and are upgraded only by running this script on purpose.
 #
@@ -13,9 +13,8 @@
 # tested against (v2.6.7 -> Gateway API v1.5.1, experimental channel; the
 # experimental channel is required for UDPRoute/TCPRoute on NGF <= 2.6).
 #
-# Last run: 2026-08-06 — v1.2.0/v1.2.1 mixed -> v1.5.1 experimental.
 # --force-conflicts is intentional: field ownership is reclaimed from stale
-# managers (the deleted Envoy Gateway ArgoCD app, old manual applies).
+# managers (removed ArgoCD apps, manual applies).
 set -euo pipefail
 
 NGF_REF="${NGF_REF:-v2.6.7}"

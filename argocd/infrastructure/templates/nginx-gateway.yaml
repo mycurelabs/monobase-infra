@@ -44,15 +44,13 @@ spec:
               operator: Equal
               value: infra
               effect: NoSchedule
-        # Data-plane (NginxProxy) sizing.
-        # 2026-04-07 incident: data-plane pod was BestEffort QoS with replicas:1
-        # and grew to ~1.2Gi resident; the kubelet evicted it under node memory
-        # pressure on general-03kot, causing a full *.localfirsthealth.com /
-        # *.mycure.md outage (502 Bad Gateway) for ~7 min while the replacement
-        # rolled. Fix: requests promote the pod to Burstable so the kubelet
-        # evicts other BestEffort workloads first; the limit caps growth so a
-        # leak fails fast inside one replica; replicas:2 + anti-affinity keep at
-        # least one healthy replica through any single restart/eviction.
+        # Data-plane (NginxProxy) sizing. A BestEffort single-replica data
+        # plane is a standing outage risk: kubelet eviction under node memory
+        # pressure takes down every hostname (~7 min of 502s while a
+        # replacement rolls). Requests promote the pod to Burstable so
+        # BestEffort workloads evict first; the limit caps growth so a leak
+        # fails fast inside one replica; replicas:2 + spread keep at least
+        # one healthy replica through any single restart/eviction.
         nginx:
           replicas: 2
           container:

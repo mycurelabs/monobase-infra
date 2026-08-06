@@ -103,11 +103,9 @@ mycure-pxp:
     enabled: false
 
 # ===== HEALTHCARE: HapiHub API (v11) =====
-# The canonical hapihub release (releaseName: hapihub). Was the v11 "hapihub-next"
-# cutover sibling; promoted to canonical 2026-07-31 after the v10 stack was retired
-# (#2295) and hapihub.localfirsthealth.com was routed wholesale to v11 (#176). Serves
-# hapihub.localfirsthealth.com (canonical) + hapihub-next.localfirsthealth.com (retained
-# alias — frontends/cadence still call it). PostgreSQL-only.
+# The canonical hapihub release (releaseName: hapihub). Serves
+# hapihub.localfirsthealth.com (canonical) + hapihub-next.localfirsthealth.com
+# (alias — frontends/cadence call it; keep until they migrate). PostgreSQL-only.
 hapihub:
   enabled: true
 
@@ -116,20 +114,16 @@ hapihub:
     tag: "11.20.91" # NEVER deploy 11.20.62 (mid-response abort/502 storm) or 11.20.44 (stale binary)
     pullPolicy: IfNotPresent
 
-  # Valkey response cache (mono#2231). Soaked on preprod 2026-07-07: 2h driven
-  # load, 36k reqs, 79% hit rate, 303/303 write→read freshness assertions,
-  # 0 client errors. Cached endpoints are declared via x-cache in hapihub's
-  # OpenAPI specs (phase 1: fixtures 12h, services 5m, personal-details 5m).
-  # Kill switches: set false here, or
+  # Valkey response cache (mono#2231). Cached endpoints are declared via
+  # x-cache in hapihub's OpenAPI specs (fixtures 12h, services 5m,
+  # personal-details 5m). Kill switches: set false here, or
   # `kubectl exec deploy/hapihub -- hapihub cache flush`.
   #
-  # INTERIM (mono#2839, 2026-07-31): DISABLED. Prod recurrence of the #2617
-  # bentocache lock-backend wedge — Valkey lock store stalled, every same-key
-  # getOrSet hit `timeout while waiting for mutex` → `_FactoryHardTimeout` (10s)
-  # across listOrganizationMembers/listPersonalDetails/retrieveMedicalEncounter
-  # → clients unresponsive. Recreating Valkey cleared it; disabling the response
-  # cache removes the stampede/lock surface until the lock-store stall is
-  # root-caused + a shorter-lock-timeout/degrade-to-direct fix ships.
+  # DISABLED (mono#2839): the #2617 bentocache lock-backend wedge recurs under
+  # prod load — a stalled Valkey lock store turns every same-key getOrSet into
+  # `timeout while waiting for mutex` → `_FactoryHardTimeout` (10s), wedging
+  # clients. Keep disabled until the lock-store stall is root-caused and a
+  # shorter-lock-timeout/degrade-to-direct fix ships.
   cache:
     enabled: false
 
@@ -145,25 +139,22 @@ hapihub:
   resources:
     requests:
       cpu: 500m
-      # Right-sized post mono#2114 fix (11.20.43): steady working set is
-      # 0.5–0.6Gi through business hours with rare ~1.1Gi transients
-      # (25h clean observation, 2026-07-07). The incident-era 2560Mi
-      # emergency request over-reserved ~2.5x and held an extra node.
+      # Steady working set is 0.5–0.6Gi through business hours with rare
+      # ~1.1Gi transients; 1Gi fits without over-reserving.
       memory: 1Gi
     limits:
       cpu: "2"
-      # 2Gi caused a persistent OOMKill loop (exit 137, ~90 restarts/replica)
-      # under slow-query memory spikes (pre-#2114-fix). 4Gi retained as spike
-      # headroom for reports/exports; BUN_JSC_forceRAMSize caps the JS heap.
+      # 4Gi: slow-query/report/export spikes OOM at 2Gi. BUN_JSC_forceRAMSize
+      # caps the JS heap so bursts fail inside the pod, not the node.
       memory: 4Gi
 
   gateway:
     hostnames:
-      # Canonical host (took over from the retired v10 stack, #176). Carries the
-      # cadence OAuth AS metadata (token_endpoint/jwks_uri minted from
-      # EXTERNAL_ADDRESS = this host, immutable = better-auth baseURL).
+      # Canonical host. Carries the cadence OAuth AS metadata
+      # (token_endpoint/jwks_uri minted from EXTERNAL_ADDRESS = this host,
+      # immutable = better-auth baseURL).
       - hapihub.localfirsthealth.com
-      # Retained alias — frontends/cadence still call it. Keep until they migrate.
+      # Alias — frontends/cadence call it; keep until they migrate.
       - hapihub-next.localfirsthealth.com
     sectionName: https-lfh # Use localfirsthealth.com HTTPS listener
     # No additionalSectionNames: not on api.mycure.md (Better Auth rpId is
@@ -491,12 +482,10 @@ hapihub-docs:
   podDisruptionBudget:
     enabled: false
 
-# ===== DATABASE: PostgreSQL (HA, Tier 4.2) =====
+# ===== DATABASE: PostgreSQL (HA) =====
 # Replication mode: 1 primary + 1 read replica with streaming replication.
-# Migrator dual-write grew the DB to ~187GB (5x the original ~35GB MongoDB
-# projection), filling the 200Gi volumes on 2026-06-25 and crashlooping the
-# primary (disk-full during WAL redo). Bumped 200Gi -> 300Gi. Growth rate
-# needs review — this will refill. See plan: tier 4.2 in DIFF.md.
+# The DB is ~190GB and grows quickly — watch volume headroom (disk-full during
+# WAL redo crashloops the primary).
 postgresql:
   enabled: true
 
@@ -526,9 +515,8 @@ postgresql:
     persistence:
       enabled: true
       storageClass: ""
-      # 400Gi: emergency-expanded live on 2026-06-29 during a changelog-spike
-      # disk-fill; this reconciles repo+STS template to the live PVC. Read
-      # replica stays 300Gi. See disk-full incident notes.
+      # 400Gi: ~190GB DB + growth + WAL headroom (max_slot_wal_keep_size=80GB).
+      # Read replica is 300Gi.
       size: 400Gi
     resources:
       requests:
@@ -538,15 +526,13 @@ postgresql:
         # 3500m not 4000m: leaves ~400m for the node's daemonsets (cilium,
         # kube-proxy, velero node-agent, node-exporter) on the 4-vCPU node.
         cpu: 3500m
-        memory: 12Gi  # bumped 8Gi->12Gi 2026-06-29: primary was at ~95% mem (7.6/8Gi), OOM-kill headroom
-    # Perf tuning — replaces PG defaults (shared_buffers 128MB / work_mem 4MB)
-    # for the 35GB DB; sized to the 8Gi pod limit. See node-separation issue
-    # for the CPU-oversubscription follow-up. Applying restarts the primary.
+        memory: 12Gi  # working set ~8Gi; 12Gi gives OOM headroom
+    # Perf tuning — replaces PG defaults (shared_buffers 128MB / work_mem 4MB).
+    # Applying restarts the primary.
     #
-    # shared_preload_libraries: bitnami's default is 'pgaudit' — keep it and
-    # add pg_stat_statements (mono#2129 follow-up: query attribution was
-    # impossible during the incident). Requires the restart this block already
-    # implies; CREATE EXTENSION pg_stat_statements in the hapihub DB after.
+    # shared_preload_libraries: keep bitnami's default 'pgaudit' and add
+    # pg_stat_statements for query attribution (CREATE EXTENSION
+    # pg_stat_statements in the hapihub DB on a fresh install).
     extendedConfiguration: |
       shared_preload_libraries = 'pgaudit, pg_stat_statements'
       shared_buffers = 2GB
@@ -555,13 +541,10 @@ postgresql:
       maintenance_work_mem = 256MB
       random_page_cost = 1.1
       effective_io_concurrency = 200
-      # M4 cutover (2026-07-10): 96 cadence workers connect at boot; default 100
-      # was exhausted on the preprod rehearsal. Restart PG to apply.
+      # 96 cadence workers connect at boot; the default 100 is too small.
+      # Restart PG to apply.
       max_connections = 300
-      # Slow-query logging (2026-07-15 perf review): every finding had to be dug
-      # out of pg_stat_statements because durations weren't logged. Already live
-      # via ALTER SYSTEM (postgresql.auto.conf) — this line just reconciles the
-      # repo; the restart it implies is behaviorally a no-op for this setting.
+      # Log statements >=1s (also set via ALTER SYSTEM in postgresql.auto.conf).
       log_min_duration_statement = 1000
   readReplicas:
     replicaCount: 1
@@ -587,10 +570,10 @@ postgresql:
     # Keep the replica's config in lockstep with the primary (idle today, but
     # ready for read-offload and consistent on promotion). Restarts the replica.
     # primary_slot_name pins the replica to a persistent physical slot
-    # (pg_read_replica) so the primary retains WAL until the replica consumes it
-    # — prevents the "WAL segment already removed" death the replica hit on
-    # 2026-06-25. Capped on the primary by max_slot_wal_keep_size=80GB so a dead
-    # replica can't refill the primary disk.
+    # (pg_read_replica) so the primary retains WAL until the replica consumes
+    # it — prevents "WAL segment already removed" replica death. Capped on the
+    # primary by max_slot_wal_keep_size=80GB so a dead replica can't fill the
+    # primary disk.
     extendedConfiguration: |
       shared_preload_libraries = 'pgaudit, pg_stat_statements'
       shared_buffers = 2GB
@@ -599,15 +582,15 @@ postgresql:
       maintenance_work_mem = 256MB
       random_page_cost = 1.1
       effective_io_concurrency = 200
-      # M4 cutover (2026-07-10): 96 cadence workers connect at boot; default 100
-      # was exhausted on the preprod rehearsal. Restart PG to apply.
+      # 96 cadence workers connect at boot; the default 100 is too small.
+      # Restart PG to apply.
       max_connections = 300
       log_min_duration_statement = 1000
       primary_slot_name = 'pg_read_replica'
-    # Startup probe gates liveness during the initial pg_basebackup. The DB is
-    # ~140GB, so a re-clone takes ~90min — the default liveness probe would
+    # Startup probe gates liveness during the initial pg_basebackup. A full
+    # re-clone of the ~190GB DB takes ~2h — the default liveness probe would
     # SIGKILL the pod every ~90s and restart the clone forever. 180min ceiling
-    # (720 * 15s). See disk-full / replica re-clone incident 2026-06-25.
+    # (720 * 15s).
     customStartupProbe:
       exec:
         command:
@@ -645,20 +628,15 @@ valkey:
     persistence:
       enabled: true
       storageClass: ""
-      # 2026-06-15: bumped 4Gi → 32Gi after the 4Gi PVC filled (cadence
-      # change-log growth), out-of-space write corrupted AOF seqs 13/15/16,
-      # valkey crashlooped 213× over 22h → fleet-wide sync outage. PVC
-      # patched live, AOF repaired via valkey-check-aof --fix, this value
-      # bumped to reconcile the STS template. The underlying root cause
-      # (unbounded change-log growth) is unchanged — 32Gi just moves the
-      # deadline. See: cadence change-log TTL/trim follow-up issue.
+      # 32Gi: cadence change-log growth can fill smaller volumes, and an
+      # out-of-space write corrupts the AOF and crashloops valkey into a
+      # fleet-wide sync outage. Unbounded change-log growth is the root
+      # cause — 32Gi buys headroom, not a fix. See the cadence change-log
+      # TTL/trim follow-up issue.
       size: 32Gi
-    # Resource sizing history: 512Mi -> 277 restarts in 27h (staging,
-    # 2026-04-06); 1Gi still OOMs during AOF replay; 2Gi OOM-crashlooped
-    # 2026-06-11 with a 1.6G AOF (cadence change-log growth). 4Gi unblocks,
-    # but the dataset grows unboundedly — needs change-log trimming/TTL
-    # before this limit is hit again. CPU at 1 core so AOF replay doesn't
-    # starve the liveness probe.
+    # 4Gi limit: AOF replay OOMs at 2Gi with a large AOF, and the dataset
+    # grows unboundedly until change-log trimming/TTL ships. CPU at 1 core so
+    # AOF replay doesn't starve the liveness probe.
     resources:
       requests:
         cpu: 250m
@@ -666,17 +644,12 @@ valkey:
       limits:
         cpu: 1000m
         memory: 4Gi
-    # `--maxmemory 3GB` + `noeviction` dropped 2026-06-25 after cadence
-    # 0.5.36 (Phase 4a, mycurelabs/monobase-mycure#1988) stopped writing
-    # the Valkey changelog when readFrom=Pg. Without changelog writes,
-    # Valkey's working set is the seq counter + peer tokens + JWKS cache
-    # + watermarks — under 100 MiB at prod load. The 3 GiB cap was
-    # triggering false OOM-as-policy events (2026-06-24 09:36 UTC
-    # incident) before the container's k8s limit became relevant. Let
-    # the container limit do the actual ceiling now; if Valkey ever
-    # gets near 4 GiB again something is seriously wrong (changelog
-    # writes back on, or a new dataset class arrived) and we want a
-    # real signal, not an artificial OOM cycle.
+    # No --maxmemory cap: with readFrom=Pg cadence writes no Valkey
+    # changelog, so the working set (seq counter, peer tokens, JWKS cache,
+    # watermarks) stays under ~100 MiB at prod load. A soft cap produces
+    # false OOM-as-policy events; the container limit is the ceiling. If
+    # Valkey nears 4 GiB, changelog writes are back on or a new dataset
+    # class arrived — we want a real signal, not an artificial OOM cycle.
 
 # ===== STORAGE: MinIO Object Storage =====
 minio:
@@ -792,9 +765,8 @@ udpGateway:
   healthPort: 6472
 
 # ===== cadence-relay — self-hosted iroh relay for hard-NAT boxes (prod) =====
-# Own LB + cert (cadence-relay.localfirsthealth.com) + QUIC addr-disc (7842/UDP) so the anchor can home on
-# it. Stands up idle; the anchor/box cutover to it (relayUrl + maestroapp our-relay-only) is a coordinated
-# fleet window. Proven on preprod 2026-07-31.
+# Own LB + cert (cadence-relay.localfirsthealth.com) + QUIC addr-disc (7842/UDP) so the anchor can home
+# on it; the anchor advertises it and boxes run maestroapp our-relay-only.
 cadenceRelay:
   enabled: true
   image:

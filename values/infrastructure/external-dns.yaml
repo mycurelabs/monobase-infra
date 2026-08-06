@@ -56,7 +56,7 @@ instances:
   #       cpu: 50m
   #       memory: 64Mi
 
-# 2026-08-06 pool restructure: ops plane on the tainted infra pool.
+# Ops plane runs on the tainted infra pool.
 nodeSelector:
   node-pool: infra
 tolerations:
