@@ -21,9 +21,11 @@ spec:
   source:
     repoURL: {{ .Values.argocd.repoURL }}
     targetRevision: {{ .Values.argocd.targetRevision }}
-    path: charts/monitoring-resources
-    helm:
-      releaseName: monitoring-resources
+    path: infrastructure/monitoring
+    
+    # Exclude helm-values.yaml (used by main monitoring app)
+    directory:
+      exclude: 'helm-values.yaml'
   
   destination:
     server: https://kubernetes.default.svc
