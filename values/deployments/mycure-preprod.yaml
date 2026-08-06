@@ -434,7 +434,39 @@ mailpit:
     hostname: "mail.preprod.localfirsthealth.com"
 
 # ===== BACKUP =====
+# TEMPORARY (relay_quic_port E2E, mono#3166): expose the relay QUIC endpoint on the alternate
+# public port 7843 — the doc-advertised non-default discovery port under test.
+cadenceRelay:
+  quicAltPort: 7843
+
 cadence:
+  # ── TEMPORARY (relay_quic_port E2E, mono#3166): the -net harness image REPLACES the sync hub ──
+  # Serve-mode doc advertises relay_quic_port 7843 (the relay LB's quicAltPort below) so a
+  # doc-adopting probe proves QUIC address discovery on a NON-default port. Preprod sync hub is
+  # DOWN while this holds. RESTORE = delete rustLog/image/args/netSkSecret overrides here + the
+  # cadenceRelay.quicAltPort below.
+  rustLog: "cadence_net=debug,iroh=info,iroh_gossip=info,warn"
+  image:
+    repository: ghcr.io/mycurelabs/cadence
+    tag: "2.1.48-rqp-net" # branch cadence-relay-quic-port build; NOT the sync engine
+    pullPolicy: Always
+  args:
+    - "--serve"
+    - "--scope"
+    - "net:pressure"
+    - "--listen-port"
+    - "6472"
+    - "--doc-addr"
+    - "0.0.0.0:9464"
+    - "--public-addr"
+    - "104.248.98.161:6473"
+    - "--relay"
+    - "https://cadence-relay.preprod.localfirsthealth.com"
+    - "--relay-quic-port"
+    - "7843"
+    - "--alpn"
+    - "cadence-net-test/1"
+  netSkSecret: "cadence-net-sk"
   publicAddr: "104.248.98.161:6473"
   # CUTOVER: anchor homes on our relay (QUIC-addr-disc lets netcheck rank it) + advertises it in the doc.
   # All boxes are being moved to maestroapp 2.0.28 (our-relay-only) in the same window.

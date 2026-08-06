@@ -22,6 +22,11 @@ externalHttpsPort: 443
 httpsBindPort: 8443
 httpBindPort: 8080
 quicPort: 7842
+# Alternate public QUIC port mapped to the same relay QUIC endpoint (empty ⇒ off). For clients
+# adopting `relay_quic_port` from the bootstrap doc (mono#3166) — the port-demux shape relay
+# consolidation needs.
+quicAltPort: ""
+
 
 # TLS via cert-manager (DNS-01, works for an L4 service — no HTTP path needed). The issued Secret is
 # mounted read-only and the relay reads it in `Manual` cert mode.
