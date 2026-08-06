@@ -1060,7 +1060,7 @@ cadence:
   rustLog: "cadence=info,cadence_routing=debug,warn"
   image:
     repository: ghcr.io/mycurelabs/cadence
-    tag: "2.1.38" # gate-fp drift self-heal (mono#3078) — PREPROD SOAK (image verified pullable pre-merge); prod follows after verification
+    tag: "2.1.39" # keyset priority serve (mono#3089): dense-serve statement-timeout death loop fixed — priority page is index-served O(page)
     pullPolicy: Always # tag was mutated once; Always avoids stale node cache
   udpPort: 6472
   # udp-gateway LB IP — the anchor advertises this so peers connect by EndpointId alone.
