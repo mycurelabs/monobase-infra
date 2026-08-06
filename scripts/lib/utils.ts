@@ -23,7 +23,7 @@ export function generateKey(length: number = 32): string {
  * Infer deployment name from file path
  * Examples:
  *   /path/to/deployments/example-staging/secrets.yaml → example-staging
- *   /path/to/infrastructure/secrets.yaml → infrastructure
+ *   /path/to/values/infrastructure/secrets.yaml → infrastructure
  */
 export function inferDeploymentName(filePath: string): string {
   const normalized = resolve(filePath);

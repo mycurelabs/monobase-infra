@@ -18,10 +18,9 @@ spec:
   source:
     repoURL: {{ .Values.argocd.repoURL }}
     targetRevision: {{ .Values.argocd.targetRevision | default "main" }}
-    path: infrastructure/security/kyverno/policies
-    directory:
-      recurse: false
-      include: '*.yaml'
+    path: charts/kyverno-resources
+    helm:
+      releaseName: kyverno-resources
 
   destination:
     server: https://kubernetes.default.svc

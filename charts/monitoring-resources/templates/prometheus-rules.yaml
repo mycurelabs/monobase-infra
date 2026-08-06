@@ -28,7 +28,7 @@ spec:
           labels:
             severity: critical
           annotations:
-            summary: "Node {{ $labels.instance }} is down"
+            summary: "Node {{ "{{" }} $labels.instance }} is down"
             description: "Node has been unreachable for more than 5 minutes"
 
         - alert: NodeHighCPU
@@ -37,8 +37,8 @@ spec:
           labels:
             severity: warning
           annotations:
-            summary: "Node {{ $labels.instance }} has high CPU usage"
-            description: "CPU usage is {{ $value | humanize }}% for 15+ minutes"
+            summary: "Node {{ "{{" }} $labels.instance }} has high CPU usage"
+            description: "CPU usage is {{ "{{" }} $value | humanize }}% for 15+ minutes"
 
         - alert: NodeHighMemory
           expr: (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100 > 80
@@ -46,8 +46,8 @@ spec:
           labels:
             severity: warning
           annotations:
-            summary: "Node {{ $labels.instance }} has high memory usage"
-            description: "Memory usage is {{ $value | humanize }}% for 15+ minutes"
+            summary: "Node {{ "{{" }} $labels.instance }} has high memory usage"
+            description: "Memory usage is {{ "{{" }} $value | humanize }}% for 15+ minutes"
 
         - alert: NodeDiskFillingUp
           expr: (1 - (node_filesystem_avail_bytes{fstype!="tmpfs"} / node_filesystem_size_bytes{fstype!="tmpfs"})) * 100 > 80
@@ -55,8 +55,8 @@ spec:
           labels:
             severity: warning
           annotations:
-            summary: "Node {{ $labels.instance }} disk filling up"
-            description: "Disk {{ $labels.device }} is {{ $value | humanize }}% full"
+            summary: "Node {{ "{{" }} $labels.instance }} disk filling up"
+            description: "Disk {{ "{{" }} $labels.device }} is {{ "{{" }} $value | humanize }}% full"
 
         - alert: NodeDiskCritical
           expr: (1 - (node_filesystem_avail_bytes{fstype!="tmpfs"} / node_filesystem_size_bytes{fstype!="tmpfs"})) * 100 > 90
@@ -64,8 +64,8 @@ spec:
           labels:
             severity: critical
           annotations:
-            summary: "Node {{ $labels.instance }} disk critically full"
-            description: "Disk {{ $labels.device }} is {{ $value | humanize }}% full - action required"
+            summary: "Node {{ "{{" }} $labels.instance }} disk critically full"
+            description: "Disk {{ "{{" }} $labels.device }} is {{ "{{" }} $value | humanize }}% full - action required"
 
 ---
 # Pod Alerts - Container Health
@@ -88,8 +88,8 @@ spec:
           labels:
             severity: critical
           annotations:
-            summary: "Pod {{ $labels.namespace }}/{{ $labels.pod }} is crash looping"
-            description: "Pod has restarted {{ $value | humanize }} times in 15 minutes"
+            summary: "Pod {{ "{{" }} $labels.namespace }}/{{ "{{" }} $labels.pod }} is crash looping"
+            description: "Pod has restarted {{ "{{" }} $value | humanize }} times in 15 minutes"
 
         - alert: PodNotReady
           # phase=~"Pending|Unknown" only: phase!="Running" also matched terminal
@@ -100,8 +100,8 @@ spec:
           labels:
             severity: warning
           annotations:
-            summary: "Pod {{ $labels.namespace }}/{{ $labels.pod }} not ready"
-            description: "Pod has been in {{ $labels.phase }} state for 15+ minutes"
+            summary: "Pod {{ "{{" }} $labels.namespace }}/{{ "{{" }} $labels.pod }} not ready"
+            description: "Pod has been in {{ "{{" }} $labels.phase }} state for 15+ minutes"
 
         - alert: PodHighMemory
           # Guard the denominator: container_spec_memory_limit_bytes is 0 when no limit
@@ -115,8 +115,8 @@ spec:
           labels:
             severity: warning
           annotations:
-            summary: "Pod {{ $labels.namespace }}/{{ $labels.pod }} high memory"
-            description: "Memory usage at {{ $value | humanize }}% of limit"
+            summary: "Pod {{ "{{" }} $labels.namespace }}/{{ "{{" }} $labels.pod }} high memory"
+            description: "Memory usage at {{ "{{" }} $value | humanize }}% of limit"
 
 ---
 # Application Alerts - Monobase API
@@ -141,8 +141,8 @@ spec:
           labels:
             severity: warning
           annotations:
-            summary: "API error rate high in {{ $labels.namespace }}"
-            description: "5xx error rate is {{ $value | humanize }}% over 5 minutes"
+            summary: "API error rate high in {{ "{{" }} $labels.namespace }}"
+            description: "5xx error rate is {{ "{{" }} $value | humanize }}% over 5 minutes"
 
         - alert: APIHighLatency
           expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m])) > 1
@@ -150,8 +150,8 @@ spec:
           labels:
             severity: warning
           annotations:
-            summary: "API latency high in {{ $labels.namespace }}"
-            description: "P95 latency is {{ $value | humanize }}s"
+            summary: "API latency high in {{ "{{" }} $labels.namespace }}"
+            description: "P95 latency is {{ "{{" }} $value | humanize }}s"
 
         - alert: APIDown
           expr: up{job="api"} == 0
@@ -159,7 +159,7 @@ spec:
           labels:
             severity: critical
           annotations:
-            summary: "API is down in {{ $labels.namespace }}"
+            summary: "API is down in {{ "{{" }} $labels.namespace }}"
             description: "API has been unreachable for 2+ minutes"
 
 ---
@@ -183,8 +183,8 @@ spec:
           labels:
             severity: warning
           annotations:
-            summary: "PVC {{ $labels.namespace }}/{{ $labels.persistentvolumeclaim }} filling up"
-            description: "Volume is {{ $value | humanize }}% full"
+            summary: "PVC {{ "{{" }} $labels.namespace }}/{{ "{{" }} $labels.persistentvolumeclaim }} filling up"
+            description: "Volume is {{ "{{" }} $value | humanize }}% full"
 
         - alert: PersistentVolumeCritical
           expr: (kubelet_volume_stats_used_bytes / kubelet_volume_stats_capacity_bytes) * 100 > 90
@@ -192,8 +192,8 @@ spec:
           labels:
             severity: critical
           annotations:
-            summary: "PVC {{ $labels.namespace }}/{{ $labels.persistentvolumeclaim }} critically full"
-            description: "Volume is {{ $value | humanize }}% full - expansion needed"
+            summary: "PVC {{ "{{" }} $labels.namespace }}/{{ "{{" }} $labels.persistentvolumeclaim }} critically full"
+            description: "Volume is {{ "{{" }} $value | humanize }}% full - expansion needed"
 
 ---
 # Gateway Alerts - Envoy Gateway
@@ -219,7 +219,7 @@ spec:
             severity: warning
           annotations:
             summary: "Gateway 5xx error rate high"
-            description: "5xx error rate is {{ $value | humanize }}%"
+            description: "5xx error rate is {{ "{{" }} $value | humanize }}%"
 
 ---
 # Certificate Alerts
@@ -242,8 +242,8 @@ spec:
           labels:
             severity: warning
           annotations:
-            summary: "Certificate {{ $labels.name }} expiring soon"
-            description: "Certificate expires in {{ $value | humanize }} days"
+            summary: "Certificate {{ "{{" }} $labels.name }} expiring soon"
+            description: "Certificate expires in {{ "{{" }} $value | humanize }} days"
 
         - alert: CertificateExpiryCritical
           expr: (certmanager_certificate_expiration_timestamp_seconds - time()) / 86400 < 2
@@ -251,8 +251,8 @@ spec:
           labels:
             severity: critical
           annotations:
-            summary: "Certificate {{ $labels.name }} expiring imminently"
-            description: "Certificate expires in {{ $value | humanize }} days"
+            summary: "Certificate {{ "{{" }} $labels.name }} expiring imminently"
+            description: "Certificate expires in {{ "{{" }} $value | humanize }} days"
 
 ---
 # Cadence full-config sync program guardrails.
@@ -283,7 +283,7 @@ spec:
           labels:
             severity: warning
           annotations:
-            summary: "PostgreSQL PVC {{ $labels.namespace }}/{{ $labels.persistentvolumeclaim }} over 70%"
+            summary: "PostgreSQL PVC {{ "{{" }} $labels.namespace }}/{{ "{{" }} $labels.persistentvolumeclaim }} over 70%"
             description: "Check cadence.changelog partition growth first (per-collection rollback lever: remove the offending collection from the env values cadenceConfig)."
 
         - alert: HapihubPostgresVolumeCritical
@@ -294,7 +294,7 @@ spec:
           labels:
             severity: critical
           annotations:
-            summary: "PostgreSQL PVC {{ $labels.namespace }}/{{ $labels.persistentvolumeclaim }} over 85% — page"
+            summary: "PostgreSQL PVC {{ "{{" }} $labels.namespace }}/{{ "{{" }} $labels.persistentvolumeclaim }} over 85% — page"
             description: "Changelog growth runbook: services/hapihub/docs + cadence retentionDays; d25 recipe in monobase-mycure history."
 
         - alert: CadenceRestartLoop
@@ -304,7 +304,7 @@ spec:
           labels:
             severity: warning
           annotations:
-            summary: "cadence in {{ $labels.namespace }} restarted >3x in 1h"
+            summary: "cadence in {{ "{{" }} $labels.namespace }} restarted >3x in 1h"
             description: "Watcher consecutive-failure exits or boot crashes; check ensure_sync_infra logs and PG availability."
 
 ---
@@ -328,19 +328,19 @@ spec:
           for: 5m
           labels: {severity: warning}
           annotations:
-            summary: "cadence watcher worker(s) quarantined in {{ $labels.namespace }}"
+            summary: "cadence watcher worker(s) quarantined in {{ "{{" }} $labels.namespace }}"
             description: "A collection stopped syncing after repeated failures; check logs, then restart the pod after fixing the cause."
         - alert: CadenceUnconfiguredDropsGrowing
           expr: rate(cadence_unconfigured_collection_dropped_total[10m]) > 0.1
           for: 15m
           labels: {severity: warning}
           annotations:
-            summary: "cadence dropping unconfigured-collection frames in {{ $labels.namespace }}"
+            summary: "cadence dropping unconfigured-collection frames in {{ "{{" }} $labels.namespace }}"
             description: "A peer is pushing collections outside the allowlist (fleet config skew — check maestroapp versions vs hub config)."
         - alert: CadenceInfraRetriesPersisting
           expr: increase(cadence_watcher_infra_retries_total[30m]) > 2
           for: 30m
           labels: {severity: warning}
           annotations:
-            summary: "cadence ensure_sync_infra retrying persistently in {{ $labels.namespace }}"
+            summary: "cadence ensure_sync_infra retrying persistently in {{ "{{" }} $labels.namespace }}"
             description: "Some collection cannot complete DDL setup (steady retry at the 15m cap); its data is on the degraded legacy path."

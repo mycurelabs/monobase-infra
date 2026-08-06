@@ -34,7 +34,7 @@ spec:
         - docker.io/grafana/* (monitoring)
         - docker.io/prom/* (monitoring)
 
-        Current image: {{ request.object.spec.containers[0].image }}
+        Current image: {{ "{{" }} request.object.spec.containers[0].image }}
 
         If you need to add a registry, update this policy.
       foreach:
@@ -43,7 +43,7 @@ spec:
           conditions:
             all:
             # Deny if image doesn't match any approved registry
-            - key: "{{ element.image }}"
+            - key: "{{ "{{" }} element.image }}"
               operator: NotIn
               value:
               # Your organization registry

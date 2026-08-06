@@ -158,12 +158,12 @@ spec:
       deny:
         conditions:
           any:
-          - key: "{{ request.object.spec.volumes[].hostPath || `[]` | length(@) }}"
+          - key: "{{ "{{" }} request.object.spec.volumes[].hostPath || `[]` | length(@) }}"
             operator: GreaterThan
             value: 0
-          - key: "{{ request.object.spec.volumes[].gcePersistentDisk || `[]` | length(@) }}"
+          - key: "{{ "{{" }} request.object.spec.volumes[].gcePersistentDisk || `[]` | length(@) }}"
             operator: GreaterThan
             value: 0
-          - key: "{{ request.object.spec.volumes[].awsElasticBlockStore || `[]` | length(@) }}"
+          - key: "{{ "{{" }} request.object.spec.volumes[].awsElasticBlockStore || `[]` | length(@) }}"
             operator: GreaterThan
             value: 0

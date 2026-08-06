@@ -20,7 +20,9 @@ spec:
   source:
     repoURL: {{ .Values.argocd.repoURL }}
     targetRevision: {{ .Values.argocd.targetRevision }}
-    path: infrastructure/coredns
+    path: charts/coredns-custom
+    helm:
+      releaseName: coredns-custom
 
   destination:
     server: https://kubernetes.default.svc

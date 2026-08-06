@@ -1,0 +1,15 @@
+# Falco Resources Configuration
+# Custom detection rules for Monobase applications
+
+# Namespace where Falco is deployed
+namespace: falco
+
+# Enable/disable specific rule sets
+rules:
+  # API application security rules
+  api:
+    enabled: true
+
+  # PostgreSQL database security rules
+  database:
+    enabled: true

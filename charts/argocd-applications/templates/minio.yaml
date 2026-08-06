@@ -93,7 +93,7 @@ spec:
     {{- if .Values.minio.gateway.enabled }}
     # Source 2: HTTPRoute for Gateway API integration
     - repoURL: {{ .Values.argocd.repoURL }}
-      path: infrastructure/httproutes/minio
+      path: charts/minio-httproute
       targetRevision: {{ .Values.argocd.targetRevision | default "main" }}
       helm:
         releaseName: minio-httproute

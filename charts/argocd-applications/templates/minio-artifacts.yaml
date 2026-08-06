@@ -139,7 +139,7 @@ spec:
 
     # Source 2: HTTPRoute exposing the bucket at artifacts.<domain>
     - repoURL: {{ .Values.argocd.repoURL }}
-      path: infrastructure/httproutes/minio-artifacts
+      path: charts/minio-artifacts-httproute
       targetRevision: {{ .Values.argocd.targetRevision | default "main" }}
       helm:
         releaseName: minio-artifacts-httproute
