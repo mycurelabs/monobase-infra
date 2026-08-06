@@ -188,7 +188,7 @@ hapihub:
 
   image:
     repository: ghcr.io/mycurelabs/hapihub
-    tag: "11.20.89" # was pinned to 11.20.85 to match the box's bundled hapihub schema (cadence schema_hash guard) for the 2.1.4 box↔hub reconcile test — re-pin if that test needs the exact schema again
+    tag: "11.20.90" # was pinned to 11.20.85 to match the box's bundled hapihub schema (cadence schema_hash guard) for the 2.1.4 box↔hub reconcile test — re-pin if that test needs the exact schema again
     pullPolicy: IfNotPresent
 
   # Valkey response cache (mono#2231) — preprod is the pilot environment.
