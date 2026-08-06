@@ -466,6 +466,10 @@ cadence:
   nodePool: "prod-apps"
   postgresql:
     serviceName: postgresql-primary
+    # Read-plane split: the hub's reconcile/serve scan queries go to the (previously idle)
+    # replica via CADENCE_DB_READ_URL; writes + LWW admission reads stay on the primary.
+    # Preprod-verified: scan plane 386s/10min -> 19ms on the primary.
+    readServiceName: postgresql-read
   gateway:
     sectionName: https-lfh
     hostnames:

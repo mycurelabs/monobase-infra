@@ -370,7 +370,7 @@ cadence:
   rustLog: "cadence=info,cadence_routing=debug,warn"
   image:
     repository: ghcr.io/mycurelabs/cadence
-    tag: "2.1.47" # lockstep fleet roll (boxes on maestroapp 2.1.47, mono#2833): any-origin LeafIds push (mono#3111); preprod-soaked (#245)
+    tag: "2.1.49" # read-plane split + P2 scheduler (mono#3170, preprod-verified as 2.1.49-rp1); hub-only, wire-compatible with 2.1.47 boxes
     pullPolicy: Always # relay cutover; also avoids stale node cache from any reused tag
   udpPort: 6472
   # Shared-gateway LB IP (nginx-shared-gateway, UDPRoute path — prod keeps canonical port
