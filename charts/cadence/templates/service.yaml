@@ -17,6 +17,11 @@ spec:
       targetPort: {{ .Values.service.targetPort }}
       protocol: TCP
       name: api
+    # QUIC — backend port for the shared-gateway UDPRoute (udproute.yaml).
+    - port: {{ .Values.udpPort }}
+      targetPort: {{ .Values.udpPort }}
+      protocol: UDP
+      name: quic
   selector:
     {{- include "cadence.selectorLabels" . | nindent 4 }}
 {{- end }}

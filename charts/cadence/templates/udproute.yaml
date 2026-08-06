@@ -1,0 +1,23 @@
+{{- if and .Values.enabled .Values.gateway.enabled .Values.gateway.udpListener }}
+# Attaches QUIC to the shared gateway's per-env UDP listener (UDP has no SNI,
+# so envs are demuxed by port — listeners defined in
+# values/infrastructure/main.yaml). Replaces the per-env udp-gateway LB;
+# publicAddr must advertise <shared-LB-IP>:<listener port>.
+apiVersion: gateway.networking.k8s.io/v1alpha2
+kind: UDPRoute
+metadata:
+  name: cadence
+  namespace: {{ include "cadence.namespace" . }}
+  labels:
+    {{- include "cadence.labels" . | nindent 4 }}
+spec:
+  parentRefs:
+    - name: {{ include "cadence.gateway.name" . }}
+      namespace: {{ include "cadence.gateway.namespace" . }}
+      sectionName: {{ .Values.gateway.udpListener }}
+  rules:
+    - backendRefs:
+        - name: cadence
+          port: {{ .Values.udpPort }}
+          weight: 1
+{{- end }}

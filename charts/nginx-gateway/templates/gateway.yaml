@@ -13,7 +13,10 @@ spec:
     - name: {{ .name }}
       port: {{ .port }}
       protocol: {{ .protocol }}
-      hostname: {{ .hostname | quote }}
+      {{- /* UDP/TCP listeners carry no hostname (L4, no SNI) — omit when unset */}}
+      {{- with .hostname }}
+      hostname: {{ . | quote }}
+      {{- end }}
       allowedRoutes:
         namespaces:
           from: All

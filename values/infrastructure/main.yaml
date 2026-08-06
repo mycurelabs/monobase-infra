@@ -50,7 +50,11 @@ certManagerIssuers:
 # (Envoy Gateway was torn down — see git history)
 nginxGateway:
   enabled: true
-  version: "2.4.1"
+  # Keep in lockstep with the Gateway API CRD bundle —
+  # scripts/upgrade-gateway-api-crds.sh (2.6.7 -> Gateway API 1.5.1).
+  # 2.6.x picks up the 2.5 L4 route fixes needed before cadence QUIC
+  # (UDPRoute) rides the shared gateway; 2.4.x shipped the first UDP cut.
+  version: "2.6.7"
 
 # NGINX Gateway Resources
 nginxGatewayResources:
@@ -109,6 +113,19 @@ nginxGatewayResources:
         port: 80
         protocol: HTTP
         hostname: "*.localfirsthealth.com"
+      # Cadence QUIC (UDPRoute; cadence LB consolidation). UDP has no SNI, so
+      # envs are demuxed by port on the shared LB IP: prod keeps the canonical
+      # 6472, preprod takes 6473. Each env's cadence chart attaches a UDPRoute
+      # via sectionName; publicAddr in the deployment values advertises
+      # <shared-LB-IP>:<port>. NGF adds these ports to its LB Service (DO LB is
+      # REGIONAL_NETWORK — updates in place, IP stable). Never add a TCP
+      # listener on these port numbers (DO CCM same-port TCP+UDP update bug).
+      - name: cadence-quic-prod
+        port: 6472
+        protocol: UDP
+      - name: cadence-quic-preprod
+        port: 6473
+        protocol: UDP
       # Production mycure.md
       - name: https-mycure
         port: 443

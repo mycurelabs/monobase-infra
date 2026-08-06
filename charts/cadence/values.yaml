@@ -85,6 +85,9 @@ gateway:
   hostname: ""          # defaults to cadence.{global.domain}
   hostnames: []
   sectionName: https
+  # Shared-gateway UDP listener name for QUIC (e.g. "cadence-quic-preprod", see
+  # values/infrastructure/main.yaml). Empty ⇒ no UDPRoute (legacy udp-gateway LB path).
+  udpListener: ""
   snippetsPolicy:
     enabled: false
     proxyReadTimeout: "3600s"

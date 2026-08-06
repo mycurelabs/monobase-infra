@@ -26,6 +26,14 @@ spec:
         nginxGateway:
           snippets:
             enable: true
+          # UDPRoute/TCPRoute support (cadence QUIC LB consolidation). The
+          # experimental-channel CRDs are already installed cluster-wide
+          # (udproutes/tcproutes v1alpha2, Prune=false — see the skipCrds
+          # cascade note in the Envoy Gateway teardown). UDPRoute itself
+          # graduated to Standard in Gateway API v1.6; NGF 2.4.x still gates
+          # it behind this flag.
+          gwAPIExperimentalFeatures:
+            enable: true
           # 2026-08-06 pool restructure: the gateway is the prod request path —
           # it gets the tainted infra pool, away from preprod bursts and the
           # noisy ops jobs (prometheus, velero kopia) that stay on nonprod.

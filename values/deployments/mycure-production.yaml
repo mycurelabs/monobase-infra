@@ -1132,6 +1132,10 @@ cadence:
     sectionName: https-lfh
     hostnames:
       - cadence.localfirsthealth.com
+    # QUIC via the shared gateway (UDPRoute; cadence LB consolidation). Prod keeps
+    # canonical port 6472 on the shared LB IP. Route is live alongside the legacy
+    # udp-gateway LB; cutover = flipping publicAddr after preprod soak.
+    udpListener: cadence-quic-prod
   # hapihub is the SOLE AS (mints box grants + the hub's own '*' grant). The enroll initContainer
   # authorizes '*' against the programmatic /sync/authorize with the service-account API key (--bearer);
   # runtime grant verification is against hapihub's JWKS.
