@@ -466,6 +466,9 @@ mailpit:
 # on it; the anchor advertises it and boxes run maestroapp our-relay-only.
 cadenceRelay:
   nodePool: "prod-apps"
+  # Phase-1 gateway path verified: anchor QAD on 7843 (hairpin, 0 probe failures) + external box
+  # (443 homing + 7843 QAD via gateway). Drop the prod relay LB → ClusterIP.
+  serviceType: ClusterIP
   # Whole relay on the shared gateway (retires the prod relay LB). Prod is the SECOND relay on the
   # shared IP so it takes QUIC port 7843 (preprod owns the default 7842) — pod, Service, UDPRoute
   # backend, and the anchor's hairpin all land on 7843. 443 leg via HTTPRoute + BackendTLSPolicy.
