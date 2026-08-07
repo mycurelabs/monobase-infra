@@ -506,6 +506,12 @@ cadenceRelay:
     udpListener: relay-quic-preprod
 
 cadence:
+  # PREPROD-ONLY override (prod stays on _base 2.1.51 until this soaks): dense_verdict spread-cost
+  # trigger — a large diff spread across all buckets (where the responder is the superset) routes to
+  # DENSE (resumable, windowed) instead of an endless sparse descent (mono#3187). Converges the
+  # alfheim medical_records_history tail. Carries #3186 too (2.1.52 ⊇ 2.1.51).
+  image:
+    tag: "2.1.52"
   publicAddr: "104.248.98.161:6473"
   # CUTOVER: anchor homes on our relay (QUIC-addr-disc lets netcheck rank it) + advertises it in the doc.
   # All boxes are being moved to maestroapp 2.0.28 (our-relay-only) in the same window.
