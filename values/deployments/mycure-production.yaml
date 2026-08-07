@@ -349,10 +349,14 @@ postgresql:
       size: 300Gi
     resources:
       requests:
-        cpu: 100m
+        cpu: 500m
         memory: 4Gi
       limits:
-        cpu: 2000m
+        # 3000m (was 2000m): the replica now carries the cadence read plane; a big dense
+        # catch-up pinned it at 2000m and the slowed scans tripped the 5s data-plane
+        # statement_timeout -> serve rounds errored fleet-wide ("range: no verdict",
+        # 2026-08-07). Node (prod-apps) has headroom.
+        cpu: 3000m
         memory: 8Gi
     # Keep the replica's config in lockstep with the primary (idle today, but
     # ready for read-offload and consistent on promotion). Restarts the replica.
