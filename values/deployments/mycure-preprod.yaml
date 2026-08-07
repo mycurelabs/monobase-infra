@@ -506,12 +506,13 @@ cadenceRelay:
     udpListener: relay-quic-preprod
 
 cadence:
-  # PREPROD-ONLY override (prod stays on _base 2.1.51 until this soaks): dense_verdict spread-cost
-  # trigger — a large diff spread across all buckets (where the responder is the superset) routes to
-  # DENSE (resumable, windowed) instead of an endless sparse descent (mono#3187). Converges the
-  # alfheim medical_records_history tail. Carries #3186 too (2.1.52 ⊇ 2.1.51).
+  # PREPROD-ONLY override (prod stays on _base 2.1.51 until this soaks): WINDOWED SPARSE reconcile
+  # (mono#3190) — sparse negotiates a bounded keyspace window from the advisory cursor and banks it,
+  # so a large diff spread across a huge scope converges over bounded, resumable, diff-sized rounds
+  # over the reliable box-INITIATED direction (no gossip dependency). Converges the alfheim
+  # medical_records_history tail; retires 2.1.52's dense-spread trigger. Superset of 2.1.51/2.1.52.
   image:
-    tag: "2.1.52"
+    tag: "2.1.53"
   publicAddr: "104.248.98.161:6473"
   # CUTOVER: anchor homes on our relay (QUIC-addr-disc lets netcheck rank it) + advertises it in the doc.
   # All boxes are being moved to maestroapp 2.0.28 (our-relay-only) in the same window.
