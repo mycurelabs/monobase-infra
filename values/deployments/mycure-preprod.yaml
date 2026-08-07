@@ -506,6 +506,10 @@ cadenceRelay:
     udpListener: relay-quic-preprod
 
 cadence:
+  image:
+    # Serve-plane fair-share (heavy-serve admission + windowing, mono#3186). PREPROD-ONLY verify tag;
+    # base bumps to 2.1.51 for prod after this soaks.
+    tag: "2.1.51"
   publicAddr: "104.248.98.161:6473"
   # CUTOVER: anchor homes on our relay (QUIC-addr-disc lets netcheck rank it) + advertises it in the doc.
   # All boxes are being moved to maestroapp 2.0.28 (our-relay-only) in the same window.
