@@ -136,6 +136,11 @@ nginxGatewayResources:
       - name: relay-quic-preprod
         port: 7842
         protocol: UDP
+      # Prod relay QUIC — second relay on the shared IP, so port 7843 (preprod owns 7842). Anchor
+      # advertises relay_quic_port=7843 in its doc so #3166-release boxes probe here.
+      - name: relay-quic-prod
+        port: 7843
+        protocol: UDP
       # Production mycure.md
       - name: https-mycure
         port: 443

@@ -466,6 +466,18 @@ mailpit:
 # on it; the anchor advertises it and boxes run maestroapp our-relay-only.
 cadenceRelay:
   nodePool: "prod-apps"
+  # Whole relay on the shared gateway (retires the prod relay LB). Prod is the SECOND relay on the
+  # shared IP so it takes QUIC port 7843 (preprod owns the default 7842) — pod, Service, UDPRoute
+  # backend, and the anchor's hairpin all land on 7843. 443 leg via HTTPRoute + BackendTLSPolicy.
+  # Boxes adopt 7843 from the anchor's doc (deployed fleet carries mono#3166); running boxes keep the
+  # relay via 443 (homing survives QUIC-discovery failure) until they restart onto 7843. Phase 1 keeps
+  # serviceType LoadBalancer as a DNS-revert path; phase 2 flips to ClusterIP to drop the LB.
+  quicPort: 7843
+  gatewayRoute:
+    enabled: true
+    hostname: cadence-relay.localfirsthealth.com
+    sectionName: https-lfh
+    udpListener: relay-quic-prod
 
 # ===== P2P SYNC: Cadence v2 (iroh 1.0 QUIC) — Tier 4.4 =====
 # The anchor hub. Reachability via the shared gateway's UDPRoute (preprod's
@@ -475,6 +487,11 @@ cadence:
   publicAddr: "104.248.98.161:6472"
   # Home on the self-hosted relay + advertise it so boxes (maestroapp 2.0.28, our-relay-only) adopt it.
   relayUrl: "https://cadence-relay.localfirsthealth.com"
+  # Relay QUIC discovery port advertised in the doc (mono#3166) — 7843 because the prod relay shares
+  # the gateway IP with preprod's relay (7842). The anchor reaches the relay via the coredns hairpin
+  # → relay Service:7843. Boxes on a #3166 release adopt it; older/unrestarted boxes keep 7842 QAD
+  # (benign — relay stays up via 443) until they cycle.
+  relayQuicPort: "7843"
   nodePool: "prod-apps"
   postgresql:
     serviceName: postgresql-primary
