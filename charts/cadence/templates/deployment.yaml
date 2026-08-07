@@ -132,6 +132,13 @@ spec:
         - name: CADENCE_RELAY_URL
           value: {{ .Values.relayUrl | quote }}
         {{- end }}
+        {{- with .Values.relayQuicPort }}
+        # Relay QUIC address-discovery port (mono#3166), advertised in the doc so boxes adopt it.
+        # Set when the relay's QUIC endpoint is on a non-default port (relays sharing one gateway IP,
+        # demuxed by port). Unset ⇒ iroh's default 7842.
+        - name: CADENCE_RELAY_QUIC_PORT
+          value: {{ . | quote }}
+        {{- end }}
         - name: RUST_LOG
           value: {{ .Values.rustLog | default "cadence=info,warn" | quote }}
         - name: CADENCE_LOG_FORMAT

@@ -35,6 +35,10 @@ publicAddr: "165.245.145.61:6472"
 # Self-hosted relay URL. Set per-env to point the anchor (and, via the bootstrap doc, hard-NAT boxes) at
 # the cadence-relay LB instead of n0's public relays. Empty ⇒ n0 relays (RelayMode::custom off).
 relayUrl: ""
+# Relay QUIC address-discovery port advertised in the bootstrap doc (mono#3166). Empty ⇒ iroh's
+# default 7842. Set (e.g. "7843") when the relay's QUIC endpoint is on a non-default port because
+# multiple relays share one gateway IP demuxed by port. Boxes need a release carrying #3166 to adopt it.
+relayQuicPort: ""
 
 # Isolated cadence_v2 database (the v2 hub anchors here — legacy cadence is untouched). The PG password
 # comes from the existing Bitnami `postgresql` k8s secret (postgres-password); the URL is assembled from
