@@ -494,10 +494,15 @@ mailpit:
 # the *.preprod wildcard listener; the real relay hostname/LB are untouched. Success = a relay
 # client homes on https://cadence-relay-gw.preprod... through the gateway.
 cadenceRelay:
+  # Whole relay on the shared gateway (retires the per-env relay LB). 443 leg via HTTPRoute +
+  # BackendTLSPolicy; QUIC leg via UDPRoute on the relay-quic-preprod listener (7842). Phase 1
+  # keeps serviceType LoadBalancer (LB alive as a DNS-revert path) while the HTTPRoute takes over
+  # the real hostname; phase 2 flips serviceType to ClusterIP to drop the LB.
   gatewayRoute:
     enabled: true
-    hostname: cadence-relay-gw.preprod.localfirsthealth.com
+    hostname: cadence-relay.preprod.localfirsthealth.com
     sectionName: https-preprod-lfh
+    udpListener: relay-quic-preprod
 
 cadence:
   publicAddr: "104.248.98.161:6473"

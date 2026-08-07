@@ -130,6 +130,12 @@ nginxGatewayResources:
       - name: cadence-quic-preprod
         port: 6473
         protocol: UDP
+      # Cadence RELAY QUIC (UDPRoute) — retires the per-env cadence-relay LB. Preprod is the first
+      # relay on the shared LB so it keeps iroh's default 7842 (no fleet relay_quic_port needed);
+      # prod joins later on a distinct port once the fleet carries mono#3166.
+      - name: relay-quic-preprod
+        port: 7842
+        protocol: UDP
       # Production mycure.md
       - name: https-mycure
         port: 443

@@ -6,7 +6,10 @@ metadata:
   namespace: {{ .Values.global.namespace }}
   labels:
     {{- include "cadence-relay.labels" . | nindent 4 }}
+  {{- $isLB := eq (.Values.serviceType | default "LoadBalancer") "LoadBalancer" }}
+  {{- if or $isLB (not .Values.gatewayRoute.enabled) }}
   annotations:
+    {{- if $isLB }}
     # Stable LB name → DO reuses the same LoadBalancer + IP across Service recreation, so the relay's
     # public address doesn't churn.
     service.beta.kubernetes.io/do-loadbalancer-name: {{ printf "%s-cadence-relay" .Values.global.namespace | quote }}
@@ -15,11 +18,18 @@ metadata:
     # is marked unhealthy and the LB drops all traffic.
     service.beta.kubernetes.io/do-loadbalancer-healthcheck-protocol: "tcp"
     service.beta.kubernetes.io/do-loadbalancer-healthcheck-port: {{ .Values.externalHttpsPort | quote }}
-    # external-dns creates the A record for the relay hostname → this LB's IP.
+    {{- end }}
+    {{- if not .Values.gatewayRoute.enabled }}
+    # external-dns creates the A record for the relay hostname → this LB's IP. When gatewayRoute is
+    # on, the HTTPRoute owns the record (→ gateway LB IP) instead, so the Service must not claim it.
     external-dns.alpha.kubernetes.io/hostname: {{ include "cadence-relay.hostname" . | quote }}
+    {{- end }}
+  {{- end }}
 spec:
-  type: LoadBalancer
+  type: {{ .Values.serviceType | default "LoadBalancer" }}
+  {{- if $isLB }}
   externalTrafficPolicy: Cluster
+  {{- end }}
   selector:
     app.kubernetes.io/name: cadence-relay
   ports:

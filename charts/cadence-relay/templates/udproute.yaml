@@ -1,0 +1,22 @@
+{{- if and .Values.enabled .Values.gatewayRoute.enabled .Values.gatewayRoute.udpListener }}
+# Relay QUIC address-discovery via the shared gateway (UDPRoute → relay Service quicPort). Pairs
+# with the HTTPRoute (443 leg) to move the whole relay onto the shared gateway LB and retire the
+# per-env relay LoadBalancer. UDP has no SNI → the listener is a dedicated per-env port.
+apiVersion: gateway.networking.k8s.io/v1alpha2
+kind: UDPRoute
+metadata:
+  name: cadence-relay
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "cadence-relay.labels" . | nindent 4 }}
+spec:
+  parentRefs:
+    - name: {{ .Values.global.gateway.name }}
+      namespace: {{ .Values.global.gateway.namespace }}
+      sectionName: {{ .Values.gatewayRoute.udpListener }}
+  rules:
+    - backendRefs:
+        - name: cadence-relay
+          port: {{ .Values.quicPort }}
+          weight: 1
+{{- end }}

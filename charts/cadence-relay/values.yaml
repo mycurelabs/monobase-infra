@@ -27,15 +27,23 @@ quicPort: 7842
 # consolidation needs.
 quicAltPort: ""
 
-# Route the relay's websocket leg (TCP 443) through the shared gateway instead of this chart's own
-# LB: HTTPRoute on an HTTPS listener + BackendTLSPolicy re-encryption to the relay's own TLS.
-# The building block for retiring the per-env relay LBs once the fleet carries relay_quic_port
-# (mono#3166). `hostname` is the route host (a test host during validation; the real relay
+# Service type. LoadBalancer ⇒ this chart's own DO LB (the standalone relay). ClusterIP ⇒ no LB;
+# public reachability comes wholly from the shared gateway (gatewayRoute below) — the end state
+# that retires the per-env relay LB.
+serviceType: LoadBalancer
+
+# Route the relay through the shared gateway instead of this chart's own LB:
+#  - websocket leg (TCP 443): HTTPRoute on an HTTPS listener + BackendTLSPolicy re-encryption to
+#    the relay's own TLS (it keeps its cert-manager cert; the QUIC endpoint needs it anyway).
+#  - QUIC leg (UDP): UDPRoute on `udpListener` → relay quicPort (udpListener empty ⇒ 443 leg only).
+# When enabled, the Service drops its external-dns claim (the HTTPRoute owns the DNS record → the
+# gateway LB IP). `hostname` is the route host (a test host during validation; the real relay
 # hostname at cutover); sectionName picks the env's HTTPS listener.
 gatewayRoute:
   enabled: false
   hostname: ""
   sectionName: ""
+  udpListener: ""
 
 
 # TLS via cert-manager (DNS-01, works for an L4 service — no HTTP path needed). The issued Secret is
