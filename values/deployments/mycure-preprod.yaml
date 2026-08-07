@@ -435,6 +435,10 @@ postgresql:
       shared_preload_libraries = 'pgaudit, pg_stat_statements'
       max_connections = 300
       primary_slot_name = 'pg_read_replica'
+      # Standby-conflict tuning (see prod): reconcile scans must not be canceled
+      # by WAL replay; lag is over-reconcile-safe for the sync plane.
+      hot_standby_feedback = on
+      max_standby_streaming_delay = 120s
     # Gates liveness during the initial pg_basebackup (~42GB clone) — the
     # default liveness probe would SIGKILL the pod mid-clone and restart it
     # forever. 180min ceiling (720 * 15s), same as prod.

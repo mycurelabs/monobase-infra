@@ -378,6 +378,14 @@ postgresql:
       max_connections = 300
       log_min_duration_statement = 1000
       primary_slot_name = 'pg_read_replica'
+      # The replica serves the cadence read plane: long reconcile scans were being
+      # canceled by WAL-replay conflicts ("conflict with recovery", 2026-08-07 —
+      # the dominant serve-death class after the 30s timeout fix). Feedback makes
+      # the primary retain tuples the standby's queries still need (bloat bounded
+      # by the 30s read statement cap); the delay lets replay wait out a long scan
+      # instead of killing it (lag is over-reconcile-safe for the sync plane).
+      hot_standby_feedback = on
+      max_standby_streaming_delay = 120s
     # Startup probe gates liveness during the initial pg_basebackup. A full
     # re-clone of the ~190GB DB takes ~2h — the default liveness probe would
     # SIGKILL the pod every ~90s and restart the clone forever. 180min ceiling
