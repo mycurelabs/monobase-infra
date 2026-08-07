@@ -495,9 +495,10 @@ mailpit:
 # client homes on https://cadence-relay-gw.preprod... through the gateway.
 cadenceRelay:
   # Whole relay on the shared gateway (retires the per-env relay LB). 443 leg via HTTPRoute +
-  # BackendTLSPolicy; QUIC leg via UDPRoute on the relay-quic-preprod listener (7842). Phase 1
-  # keeps serviceType LoadBalancer (LB alive as a DNS-revert path) while the HTTPRoute takes over
-  # the real hostname; phase 2 flips serviceType to ClusterIP to drop the LB.
+  # BackendTLSPolicy; QUIC leg via UDPRoute on the relay-quic-preprod listener (7842). Both legs
+  # verified from a real box (alfheim) through the gateway, so the own LB is dropped: ClusterIP.
+  # The in-cluster anchor reaches the relay via the coredns hairpin → this Service's ClusterIP.
+  serviceType: ClusterIP
   gatewayRoute:
     enabled: true
     hostname: cadence-relay.preprod.localfirsthealth.com
