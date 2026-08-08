@@ -506,14 +506,14 @@ cadenceRelay:
     udpListener: relay-quic-preprod
 
 cadence:
-  # PREPROD-ONLY override (prod stays on _base): layered-convergence program L2 test build
+  # PREPROD-ONLY override (prod stays on _base): layered-convergence program L3 test build
   # (branch worktree-cadence-layered-convergence, unreleased, superset of 2.1.54): L1 capture
   # (pending-capture-aware LWW apply, loud capture failure signals, DLQ failures fail the tick)
-  # + L2 durable state (evict/GC digest integrity incl. count-blind acc-drift heal via rebuild_fp
+  # + L2 durable state + L3 transport (gossip re-subscribe escalation heals the pod-roll zombie-join; evict/GC digest integrity incl. count-blind acc-drift heal via rebuild_fp
   # on no-progress, tagset-keyed baseline gates, per-scope GC horizon + apply_below_gc_horizon
   # resurrection telemetry, gc/dlq/reroute maintenance-error counters).
   image:
-    tag: "2.1.55-l2"
+    tag: "2.1.55-l3"
   publicAddr: "104.248.98.161:6473"
   # CUTOVER: anchor homes on our relay (QUIC-addr-disc lets netcheck rank it) + advertises it in the doc.
   # All boxes are being moved to maestroapp 2.0.28 (our-relay-only) in the same window.
