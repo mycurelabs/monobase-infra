@@ -43,7 +43,7 @@ mycure-pxp:
 
 hapihub:
   image:
-    tag: "11.20.92" # NEVER deploy 11.20.62 (mid-response abort/502 storm) or 11.20.44 (stale binary)
+    tag: "11.20.91" # NEVER deploy 11.20.62 (mid-response abort/502 storm) or 11.20.44 (stale binary)
   cache:
     enabled: false
 
@@ -231,7 +231,7 @@ hapihubWorker:
 # ===== HEALTHCARE: Frontend Application =====
 mycure:
   image:
-    tag: "10.25.114"
+    tag: "10.25.113"
   resources:
     requests:
       cpu: 10m
