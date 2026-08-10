@@ -47,7 +47,7 @@ mycure-pxp:
 
 hapihub:
   image:
-    tag: "11.20.90" # pin to 11.20.85 if the box↔hub reconcile test needs the box's bundled hapihub schema (cadence schema_hash guard)
+    tag: "11.20.94" # pin to 11.20.85 if the box↔hub reconcile test needs the box's bundled hapihub schema (cadence schema_hash guard)
   cache:
     enabled: true
 
