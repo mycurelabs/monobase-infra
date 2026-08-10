@@ -370,7 +370,7 @@ cadence:
   rustLog: "cadence=info,cadence_routing=debug,warn"
   image:
     repository: ghcr.io/mycurelabs/cadence
-    tag: "2.1.51" # serve-plane fair-share: heavy-serve admission + windowing (mono#3186); hub-only, wire-compatible with 2.1.49/2.1.50 boxes
+    tag: "2.1.74" # L5 10x series (mono#3199): concurrent listings + time-budgeted rounds + planned-listing grace + O(page) baseline pager. Wire-compatible with ≥2.1.4x boxes box-initiated; hub-initiated pushes need the box on ≥2.1.68 (phase-4 ack) — fleet latest.json moves to 2.1.74 in the same window
     pullPolicy: Always # relay cutover; also avoids stale node cache from any reused tag
   udpPort: 6472
   # Shared-gateway LB IP (nginx-shared-gateway, UDPRoute path — prod keeps canonical port
