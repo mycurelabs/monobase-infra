@@ -5,7 +5,7 @@ Complete backup procedures, restore operations, and disaster recovery plans.
 ## Implementation
 
 **Current Tool**: Velero (Kubernetes backup/restore solution)  
-**Setup Guide**: [infrastructure/velero/README.md](../../infrastructure/velero/README.md)
+**Setup Guide**: [charts/velero-resources/README.md](../../charts/velero-resources/README.md)
 
 > Velero is the current implementation but can be replaced with alternative solutions. This document focuses on backup **strategy** and **procedures** that remain consistent regardless of the underlying tool.
 
@@ -224,7 +224,7 @@ velero restore create cluster-rebuild \\
 kubectl get pods -n myclient-prod
 
 # 7. Update DNS to new LoadBalancer IP
-GATEWAY_IP=$(kubectl get gateway shared-gateway -n gateway-system \\
+GATEWAY_IP=$(kubectl get gateway shared-gateway -n nginx-gateway-system \\
   -o jsonpath='{.status.addresses[0].value}')
 
 # 8. Verify endpoints

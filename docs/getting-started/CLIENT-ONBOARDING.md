@@ -28,8 +28,8 @@ mkdir -p deployments/myclient-prod
 mkdir -p deployments/myclient-staging
 
 # Copy base templates
-cp deployments/templates/production-base.yaml deployments/myclient-prod/values.yaml
-cp deployments/templates/staging-base.yaml deployments/myclient-staging/values.yaml
+cp values/deployments/mycure-production.yaml values/deployments/myclient-prod.yaml
+cp values/deployments/mycure-preprod.yaml values/deployments/myclient-staging.yaml
 ```
 
 ## Step 3: Customize Configuration
@@ -143,7 +143,7 @@ git push origin main
 
 ```bash
 # Run bootstrap script to install ArgoCD + Infrastructure
-./scripts/bootstrap.sh
+mise run bootstrap
 
 # This installs:
 # 1. ArgoCD itself
@@ -220,7 +220,7 @@ If your client has their own domain (e.g., `app.client.com`) instead of using a 
 ### Step 1: Get LoadBalancer IP
 
 ```bash
-kubectl get gateway shared-gateway -n gateway-system \
+kubectl get gateway shared-gateway -n nginx-gateway-system \
   -o jsonpath='{.status.addresses[0].value}'
 
 # Example output: 203.0.113.42
@@ -247,7 +247,7 @@ See detailed instructions in [Certificate Management Operations Guide](../operat
 
 **Quick summary:**
 
-Edit `infrastructure/certificates.yaml`:
+Edit `values/infrastructure/main.yaml`:
 
 ```yaml
 certificates:
@@ -261,7 +261,7 @@ certificates:
 Commit and deploy:
 
 ```bash
-git add infrastructure/certificates.yaml
+git add values/infrastructure/main.yaml
 git commit -m "feat: Add certificate for app.client.com"
 git push
 ```
@@ -269,7 +269,7 @@ git push
 **Wait for certificate provisioning (2-5 minutes):**
 
 ```bash
-kubectl get certificate myclient-domain-tls -n gateway-system
+kubectl get certificate myclient-domain-tls -n nginx-gateway-system
 # Status should show: Ready=True
 ```
 
@@ -343,7 +343,7 @@ curl -v https://app.client.com/health
 
 ### Gateway Not Working
 
-- Check Gateway status: `kubectl get gateway -n gateway-system`
+- Check Gateway status: `kubectl get gateway -n nginx-gateway-system`
 - Check HTTPRoute status: `kubectl get httproute -n myclient-prod`
 - Check DNS resolution: `nslookup api.myclient.com`
 

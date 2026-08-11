@@ -7,10 +7,10 @@ Production security hardening for compliant deployments.
 ### Network Security
 
 - [ ] NetworkPolicies applied (default-deny + explicit allow)
-- [ ] Cross-namespace traffic blocked
-- [ ] Gateway rate limiting enabled
+- [ ] Cross-namespace traffic blocked (deny-cross-namespace)
+- [ ] Auth-endpoint rate limiting enabled (in-app; gateway-level optional via NGF SnippetsPolicy)
 - [ ] DDoS protection configured
-- [ ] Security headers enabled (HSTS, CSP, X-Frame-Options)
+- [ ] Security headers enabled (HSTS, CSP, X-Frame-Options — njs filter SnippetsPolicy)
 - [ ] TLS 1.3 enforced
 - [ ] Weak ciphers disabled
 
@@ -34,7 +34,7 @@ Production security hardening for compliant deployments.
 
 ### Encryption
 
-- [ ] Encryption at rest (Longhorn volumes)
+- [ ] Encryption at rest (cloud CSI volumes / Longhorn on-prem)
 - [ ] Encryption in transit (TLS everywhere)
 - [ ] PostgreSQL encryption enabled
 - [ ] Backup encryption enabled (S3 + KMS)
@@ -65,21 +65,26 @@ Production security hardening for compliant deployments.
 
 ### 1. NetworkPolicies
 
-**Apply Zero-Trust Model:**
+**Zero-Trust Model (deployed per-tenant via ArgoCD):**
+
+NetworkPolicies live in `charts/security-baseline/templates/` and are applied
+into each tenant namespace by the security-baseline Application. The model is:
+
+- `default-deny-all` — default-deny for both ingress and egress (the foundation).
+- `deny-cross-namespace` — allows same-namespace traffic plus the monitoring
+  namespace; it also allows the gateway namespace unless strict mode is on.
+- Per-app port-scoped allows — each app's own chart (`charts/app`,
+  `charts/hapihub`, `charts/mailpit`, `charts/cadence`, ...) carries the
+  NetworkPolicy that opens only the ports that app needs.
+- `allow-gateway-to-minio` — baseline allow for gateway-to-MinIO traffic.
+
+The `networkPolicies.strictGatewayIngress` flag (set per deployment as
+`securityBaseline.strictGatewayIngress`) drops the blanket gateway allow so apps
+rely solely on their port-scoped rules. preprod runs in strict mode.
 
 ```bash
-# Step 1: Deny all traffic (foundation)
-kubectl apply -f infrastructure/security/networkpolicies/default-deny-all.yaml
-
-# Step 2: Allow specific patterns
-kubectl apply -f infrastructure/security/networkpolicies/allow-gateway-to-apps.yaml
-kubectl apply -f infrastructure/security/networkpolicies/allow-apps-to-db.yaml
-kubectl apply -f infrastructure/security/networkpolicies/allow-apps-to-storage.yaml
-
-# Step 3: Deny cross-namespace
-kubectl apply -f infrastructure/security/networkpolicies/deny-cross-namespace.yaml
-
-# Verify
+# NetworkPolicies are rendered from the security-baseline chart and each app
+# chart, then synced by ArgoCD. Verify what landed in a tenant namespace:
 kubectl get networkpolicy -n myclient-prod
 ```
 
@@ -90,8 +95,8 @@ kubectl get networkpolicy -n myclient-prod
 kubectl run test --image=busybox -n myclient-prod -it --rm -- \\
   wget -O- http://api.other-namespace:7500
 
-# Should SUCCEED (allowed by allow rules):
-kubectl run test --image=busybox -n gateway-system -it --rm -- \\
+# Should SUCCEED (allowed by the app's port-scoped policy, unless strict mode):
+kubectl run test --image=busybox -n nginx-gateway-system -it --rm -- \\
   wget -O- http://api.myclient-prod:7500
 ```
 
@@ -244,7 +249,7 @@ cosign verify ghcr.io/monobaselabs/api:5.215.2
 
 ```bash
 # Each app has minimal permissions
-# See: infrastructure/security/rbac/
+# See: charts/security-baseline/templates/ (RBAC deployed per-tenant)
 
 # Verify permissions
 kubectl auth can-i get secrets \\
@@ -274,7 +279,7 @@ kubectl describe role api -n myclient-prod
 
 ```bash
 # ArgoCD admin access via SSO (not password)
-# Configure in infrastructure/argocd/helm-values.yaml
+# Configure in charts/argocd-infrastructure / charts/argocd-bootstrap
 
 # kubectl access via RBAC
 # Create read-only role for developers:
@@ -306,21 +311,22 @@ kubectl create clusterrolebinding developers \\
 
 ### 1. Encryption at Rest
 
-**Longhorn Volume Encryption:**
+**Volume Encryption:**
 
 ```bash
-# Enable encryption in StorageClass
-# See: infrastructure/longhorn/storageclass.yaml
+# The live DOKS cluster uses the DigitalOcean block-storage cloud CSI
+# (storageClass: do-block-storage). Volumes are encrypted at rest by the
+# cloud provider — there is no Longhorn StorageClass to configure here.
 
+# Longhorn applies only to the on-prem / bare-metal profile. On that profile,
+# enable per-volume encryption in the Longhorn StorageClass:
 parameters:
   encrypted: "true"
 
-# Create encryption passphrase
+# and provide the passphrase via External Secrets (recommended):
 kubectl create secret generic longhorn-crypto \\
   --from-literal=CRYPTO_KEY_VALUE=$(openssl rand -base64 32) \\
   -n longhorn-system
-
-# Or use External Secrets (recommended)
 ```
 
 **PostgreSQL Encryption:**
@@ -483,7 +489,7 @@ auditLog:
 **Configure in Prometheus:**
 
 ```yaml
-# See: infrastructure/monitoring/prometheus-rules.yaml
+# See: charts/monitoring-resources/
 
 # Alerts for:
 - Failed authentication attempts
@@ -802,7 +808,9 @@ kubectl get networkpolicy -A
 
 - [HIPAA-COMPLIANCE.md](HIPAA-COMPLIANCE.md) - Compliance checklist
 - [BACKUP-RECOVERY.md](BACKUP-RECOVERY.md) - DR procedures
-- infrastructure/security/ - Security policy files
+- charts/security-baseline/ - NetworkPolicies + RBAC (deployed per-tenant)
+- charts/kyverno-resources/ - Kyverno admission policies (opt-in, currently off)
+- charts/falco-resources/ - Falco runtime threat detection (opt-in, currently off)
 
 ### External
 

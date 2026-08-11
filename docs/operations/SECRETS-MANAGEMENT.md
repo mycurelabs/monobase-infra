@@ -116,7 +116,7 @@ echo -n "YOUR_CLOUDFLARE_TOKEN" | gcloud secrets create cloudflare-api-token \
 ```bash
 # Set variables
 PROJECT_ID="your-gcp-project"
-NAMESPACE="example-staging"
+NAMESPACE="mycure-preprod"
 KSA_NAME="external-secrets"
 GSA_NAME="external-secrets"
 
@@ -138,13 +138,15 @@ gcloud iam service-accounts add-iam-policy-binding \
 
 #### 4. Deploy ClusterSecretStore
 
-```bash
-# Create from template
-cat > infrastructure/external-secrets/gcp-secretstore.yaml <<EOF
+The `ClusterSecretStore` (named `gcp-secretstore`) is defined declaratively in
+`values/infrastructure/main.yaml` and rendered by the `charts/external-secrets-stores`
+chart. It looks like:
+
+```yaml
 apiVersion: external-secrets.io/v1beta1
 kind: ClusterSecretStore
 metadata:
-  name: gcp-backend
+  name: gcp-secretstore
 spec:
   provider:
     gcpsm:
@@ -156,17 +158,20 @@ spec:
           serviceAccountRef:
             name: ${KSA_NAME}
             namespace: ${NAMESPACE}
-EOF
-
-# Apply via ArgoCD or manually
-kubectl apply -f infrastructure/external-secrets/gcp-secretstore.yaml
 ```
+
+Edit `values/infrastructure/main.yaml`, commit, and push — ArgoCD renders the
+`charts/external-secrets-stores` chart and applies the store to the
+`external-secrets-system` namespace.
 
 #### 5. Create ExternalSecret Manifests
 
-```bash
+`ExternalSecret` resources are rendered by the app charts; the tenant config that
+drives them lives in `values/deployments/<client>-<env>.yaml`. A rendered manifest
+looks like:
+
+```yaml
 # Example: Cloudflare API token for cert-manager
-cat > infrastructure/tls/cloudflare-token-externalsecret.yaml <<EOF
 apiVersion: external-secrets.io/v1beta1
 kind: ExternalSecret
 metadata:
@@ -175,7 +180,7 @@ metadata:
 spec:
   refreshInterval: 1h
   secretStoreRef:
-    name: gcp-backend
+    name: gcp-secretstore
     kind: ClusterSecretStore
   target:
     name: cloudflare-api-token-secret
@@ -184,19 +189,17 @@ spec:
     - secretKey: api-token
       remoteRef:
         key: cloudflare-api-token
-EOF
-
-# Commit to Git for GitOps
-git add infrastructure/tls/cloudflare-token-externalsecret.yaml
-git commit -m "feat: Add Cloudflare token ExternalSecret"
 ```
+
+Edit the relevant `values/` file, commit, and push — ArgoCD applies the
+ExternalSecret for GitOps.
 
 #### 6. Verify Secrets Sync
 
 ```bash
 # Check ClusterSecretStore
-kubectl get clustersecretstore gcp-backend
-kubectl describe clustersecretstore gcp-backend
+kubectl get clustersecretstore gcp-secretstore
+kubectl describe clustersecretstore gcp-secretstore
 
 # Check ExternalSecrets
 kubectl get externalsecrets -A
@@ -214,7 +217,7 @@ kubectl get secret cloudflare-api-token-secret -n cert-manager
 
 To add AWS support:
 1. Implement `scripts/secrets-aws.sh` (use `scripts/secrets-gcp.sh` as template)
-2. Create `infrastructure/external-secrets/aws-secretstore.yaml.template`
+2. Add an AWS `ClusterSecretStore` to `values/infrastructure/main.yaml` (chart `charts/external-secrets-stores`)
 3. Update deployment values to use `provider: aws`
 
 For now, use GCP Secret Manager as the default provider.
@@ -225,7 +228,7 @@ For now, use GCP Secret Manager as the default provider.
 
 To add Azure support:
 1. Implement `scripts/secrets-azure.sh` (use `scripts/secrets-gcp.sh` as template)
-2. Create `infrastructure/external-secrets/azure-secretstore.yaml.template`
+2. Add an Azure `ClusterSecretStore` to `values/infrastructure/main.yaml` (chart `charts/external-secrets-stores`)
 3. Update deployment values to use `provider: azure`
 
 For now, use GCP Secret Manager as the default provider.
@@ -245,10 +248,10 @@ echo -n "$NEW_SECRET" | gcloud secrets versions add api-jwt-secret --data-file=-
 # Or force refresh:
 kubectl annotate externalsecret api-secrets \
   force-sync=$(date +%s) \
-  -n example-staging
+  -n mycure-production
 
 # 4. Restart pods to use new secret
-kubectl rollout restart deployment api -n example-staging
+kubectl rollout restart deployment api -n mycure-production
 ```
 
 ### Rotate Cloudflare API Token
@@ -273,8 +276,12 @@ kubectl logs -n cert-manager deploy/cert-manager -f
 
 ### Reference ExternalSecret in Helm Values
 
+Tenant config lives in `values/deployments/<client>-<env>.yaml` (e.g.
+`values/deployments/mycure-production.yaml`, `mycure-preprod.yaml`) overlaying
+`values/deployments/_base/mycure.yaml`:
+
 ```yaml
-# In deployments/example-staging/values.yaml
+# In values/deployments/mycure-production.yaml
 postgresql:
   auth:
     existingSecret: postgresql-secrets
@@ -282,19 +289,25 @@ postgresql:
       adminPasswordKey: root-password
 ```
 
+A `global.secretPrefix` scopes the remote-key namespace. For example
+`mycure-preprod` intentionally sets `secretPrefix: mycure-production` so it reads
+the `mycure-production-*` keys for restored-PVC credential parity.
+
 ### Create ExternalSecret for Deployment
 
+The app charts render the `ExternalSecret` from these values. The rendered
+resource looks like:
+
 ```yaml
-# In deployments/example-staging/external-secrets/postgresql.yaml
 apiVersion: external-secrets.io/v1beta1
 kind: ExternalSecret
 metadata:
   name: postgresql-secrets
-  namespace: example-staging
+  namespace: mycure-production
 spec:
   refreshInterval: 1h
   secretStoreRef:
-    name: gcp-backend
+    name: gcp-secretstore
     kind: ClusterSecretStore
   target:
     name: postgresql-secrets
@@ -302,8 +315,11 @@ spec:
   data:
     - secretKey: root-password
       remoteRef:
-        key: postgresql-root-password
+        key: mycure-production-postgresql-root-password
 ```
+
+hapihub is PostgreSQL-backed; its Postgres, Valkey, and MinIO credentials are all
+delivered this way via ESO.
 
 ## Security Best Practices
 
@@ -325,10 +341,10 @@ spec:
 kubectl describe externalsecret <name> -n <namespace>
 
 # Check ESO logs
-kubectl logs -n external-secrets-operator deploy/external-secrets -f
+kubectl logs -n external-secrets-system deploy/external-secrets -f
 
 # Check ClusterSecretStore
-kubectl describe clustersecretstore gcp-backend
+kubectl describe clustersecretstore gcp-secretstore
 
 # Verify Workload Identity binding
 gcloud iam service-accounts get-iam-policy \
@@ -391,12 +407,12 @@ External Secrets Operator uses a **declarative, GitOps-first approach**:
 **Step 1: Create ExternalSecret in Git**
 
 ```yaml
-# deployments/example-staging/cloudflare-externalsecret.yaml
+# Rendered from values/deployments/mycure-preprod.yaml
 apiVersion: external-secrets.io/v1beta1
 kind: ExternalSecret
 metadata:
   name: cloudflare-api-token
-  namespace: example-staging
+  namespace: mycure-preprod
 spec:
   refreshInterval: 1h
   secretStoreRef:
@@ -424,10 +440,10 @@ echo -n "YOUR_CLOUDFLARE_TOKEN" | gcloud secrets create infrastructure-cloudflar
 
 ```bash
 # Watch ExternalSecret status
-kubectl get externalsecret -n example-staging cloudflare-api-token -w
+kubectl get externalsecret -n mycure-preprod cloudflare-api-token -w
 
 # Verify synced Kubernetes Secret
-kubectl get secret -n example-staging cloudflare-api-token
+kubectl get secret -n mycure-preprod cloudflare-api-token
 ```
 
 ### Common Patterns

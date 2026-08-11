@@ -132,7 +132,7 @@ sudo docker exec -it pg-restore psql -U postgres -d hapihub
 sudo scripts/onprem-backup-restore.sh cleanup
 ```
 
-Other PVCs follow the same pattern — e.g. `--pvc=datadir-mongodb-0` extracts the mongo PVC, after which you'd boot a `mongo:7` container manually rather than `boot-postgres`.
+Other PVCs follow the same pattern — e.g. `--pvc=data-postgresql-primary-0` extracts the Postgres data volume for `boot-postgres`, or a Valkey/MinIO PVC to boot the matching container manually.
 
 ### 2. Long-form (what the script does)
 
@@ -283,5 +283,5 @@ If a quarterly drill fails, treat it as a P1 incident — the secondary backup i
 - [ONPREM_BACKUP_SETUP.md](ONPREM_BACKUP_SETUP.md) — how to add a new mirror host
 - [`scripts/onprem-backup-restore.sh`](../../scripts/onprem-backup-restore.sh) — Path B restore + drill helper
 - [`scripts/onprem-backup-setup.sh`](../../scripts/onprem-backup-setup.sh) — host-side mirror installer
-- [infrastructure/velero/](../../infrastructure/velero/) — Velero schedules and BackupStorageLocation config
-- [infrastructure/external-secrets/velero-repo-credentials-externalsecret.yaml](../../infrastructure/external-secrets/velero-repo-credentials-externalsecret.yaml) — Kopia password source
+- [charts/velero-resources/](../../charts/velero-resources/) — Velero schedules and BackupStorageLocation config
+- [charts/velero-resources/credentials-template.yaml](../../charts/velero-resources/credentials-template.yaml) — Kopia password source

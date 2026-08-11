@@ -7,9 +7,9 @@ Navigate to comprehensive guides organized by category.
 New to monobase-infra? Start here.
 
 - **[CLUSTER-PROVISIONING.md](getting-started/CLUSTER-PROVISIONING.md)** - Provision Kubernetes clusters (AWS/Azure/GCP/DOKS/k3d)
-- **[CLIENT-ONBOARDING.md](getting-started/CLIENT-ONBOARDING.md)** - Fork, configure, and deploy your first client
-- **[DEPLOYMENT.md](getting-started/DEPLOYMENT.md)** - Complete step-by-step deployment guide
-- **[TEMPLATE-USAGE.md](getting-started/TEMPLATE-USAGE.md)** - Template fork workflow and maintenance
+- **[CLIENT-ONBOARDING.md](getting-started/CLIENT-ONBOARDING.md)** - Configure and deploy a new client/environment
+- **[DEPLOYMENT.md](getting-started/DEPLOYMENT.md)** - How GitOps deployment works (edit values → commit → ArgoCD syncs)
+- **[CLUSTERS.md](getting-started/CLUSTERS.md)** - Cluster configuration patterns
 - **[INFRASTRUCTURE-REQUIREMENTS.md](getting-started/INFRASTRUCTURE-REQUIREMENTS.md)** - Cluster specifications and prerequisites
 
 ## 🏗️ Architecture
@@ -89,10 +89,10 @@ Security hardening, compliance, and policies.
 
 **Configure values:**
 
-1. [../deployments/README.md](../deployments/README.md) - Deployment configuration guide
-2. [../charts/README.md](../charts/README.md) - Global parameters and chart overview
-3. [../charts/api/README.md](../charts/api/README.md) - API-specific parameters
-4. [../charts/account/README.md](../charts/account/README.md) - Account frontend parameters
+1. [../values/README.md](../values/README.md) - Values layout (deployments overlays + infrastructure)
+2. [../charts/README.md](../charts/README.md) - Chart overview and global parameters
+3. [../charts/app/README.md](../charts/app/README.md) - Generic frontend/service chart parameters
+4. [../charts/hapihub/README.md](../charts/hapihub/README.md) - HapiHub chart parameters
 
 ---
 

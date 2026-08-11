@@ -55,7 +55,7 @@ argocd/
 
 ```bash
 # Step 1: Install ArgoCD (manual, once)
-./scripts/bootstrap.sh
+mise run bootstrap
 
 # This installs:
 # 1. ArgoCD itself
@@ -64,7 +64,7 @@ argocd/
 
 # Step 2: Add client/env configurations
 mkdir deployments/myclient-prod
-cp deployments/templates/production-base.yaml deployments/myclient-prod/values.yaml
+cp values/deployments/mycure-production.yaml values/deployments/myclient-prod.yaml
 vim deployments/myclient-prod/values.yaml  # Edit domain, namespace, etc.
 git add deployments/myclient-prod/
 git commit -m "Add myclient-prod"
@@ -128,7 +128,7 @@ git push
 ```bash
 # Add new client
 mkdir deployments/newclient-prod
-cp deployments/templates/production-base.yaml deployments/newclient-prod/values.yaml
+cp values/deployments/mycure-production.yaml values/deployments/newclient-prod.yaml
 vim deployments/newclient-prod/values.yaml
 git add deployments/newclient-prod/ && git commit -m "Add newclient-prod" && git push
 # ✓ ArgoCD auto-creates all Applications for newclient-prod
@@ -215,7 +215,7 @@ argocd app get infrastructure
 
 ```bash
 mkdir deployments/newclient-staging
-cp deployments/templates/staging-base.yaml deployments/newclient-staging/values.yaml
+cp values/deployments/mycure-preprod.yaml values/deployments/newclient-staging.yaml
 
 # Edit values
 vim deployments/newclient-staging/values.yaml
@@ -306,7 +306,7 @@ kubectl logs -n myclient-prod -l app=api
 
 ## References
 
-- Bootstrap script: `scripts/bootstrap.sh`
+- Bootstrap script: `mise run bootstrap`
 - Infrastructure values: `charts/argocd-infrastructure/values.yaml`
 - Application templates: `charts/argocd-applications/templates/`
 - Deployment configs: `deployments/*/values.yaml`

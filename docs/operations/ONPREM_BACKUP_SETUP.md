@@ -305,4 +305,4 @@ sudo userdel mycure-backup 2>/dev/null || true
 - [BACKUP_DR.md](BACKUP_DR.md) — overall 4-tier strategy and RPO/RTO.
 - [RESTORE_FROM_ONPREM.md](RESTORE_FROM_ONPREM.md) — using the mirror to recover.
 - [`scripts/onprem-backup-setup.sh`](../../scripts/onprem-backup-setup.sh) — the script itself.
-- [`infrastructure/external-secrets/velero-repo-credentials-externalsecret.yaml`](../../infrastructure/external-secrets/velero-repo-credentials-externalsecret.yaml) — source of the Kopia repo password.
+- [`charts/velero-resources/credentials-template.yaml`](../../charts/velero-resources/credentials-template.yaml) — source of the Kopia repo password.
