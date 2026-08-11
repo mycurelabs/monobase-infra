@@ -43,6 +43,7 @@ vim deployments/myclient-prod/values.yaml
 **Key items to customize:**
 
 1. **Domain and namespace:**
+
    ```yaml
    global:
      domain: myclient.com
@@ -50,6 +51,7 @@ vim deployments/myclient-prod/values.yaml
    ```
 
 2. **Image tags** (IMPORTANT - don't use "latest"):
+
    ```yaml
    api:
      image:
@@ -57,6 +59,7 @@ vim deployments/myclient-prod/values.yaml
    ```
 
 3. **Resource limits:**
+
    ```yaml
    resources:
      requests:
@@ -68,6 +71,7 @@ vim deployments/myclient-prod/values.yaml
    ```
 
 4. **Storage sizes:**
+
    ```yaml
    postgresql:
      persistence:
@@ -75,12 +79,14 @@ vim deployments/myclient-prod/values.yaml
    ```
 
 5. **Replica counts:**
+
    ```yaml
    api:
      replicas: 3  # HA for production
    ```
 
 6. **Optional components:**
+
    ```yaml
    api-worker:
      enabled: true  # Enable if needed
@@ -191,7 +197,8 @@ Point your domains to the Gateway LoadBalancer IP:
 
 ```bash
 # Get LoadBalancer IP
-kubectl get svc -n gateway-system envoy-gateway
+kubectl get gateway -n nginx-gateway-system nginx-shared-gateway \
+  -o jsonpath='{.status.addresses[0].value}'
 
 # Create DNS records:
 # A api.myclient.com → <LoadBalancer-IP>
@@ -228,6 +235,7 @@ app.client.com    A    203.0.113.42
 ```
 
 **Verify DNS propagation:**
+
 ```bash
 dig app.client.com +short
 # Should return: 203.0.113.42
@@ -240,6 +248,7 @@ See detailed instructions in [Certificate Management Operations Guide](../operat
 **Quick summary:**
 
 Edit `infrastructure/certificates.yaml`:
+
 ```yaml
 certificates:
   # Add new client certificate
@@ -250,6 +259,7 @@ certificates:
 ```
 
 Commit and deploy:
+
 ```bash
 git add infrastructure/certificates.yaml
 git commit -m "feat: Add certificate for app.client.com"
@@ -257,6 +267,7 @@ git push
 ```
 
 **Wait for certificate provisioning (2-5 minutes):**
+
 ```bash
 kubectl get certificate myclient-domain-tls -n gateway-system
 # Status should show: Ready=True
@@ -303,11 +314,13 @@ curl -v https://app.client.com/health
 ### Certificate Options
 
 **Option 1: Auto-Provisioned (HTTP-01) - Recommended**
+
 - Platform manages certificate via Let's Encrypt
 - Automatic renewal every 60 days
 - Client only needs to create DNS A record
 
 **Option 2: Client-Provided Certificate**
+
 - Client uploads their own certificate to GCP Secret Manager
 - Client manages certificate renewal
 - See [Certificate Management Guide](../operations/CERTIFICATE-MANAGEMENT.md) for details
@@ -317,16 +330,19 @@ curl -v https://app.client.com/health
 ## Troubleshooting
 
 ### Secrets Not Syncing
+
 - Check SecretStore is created: `kubectl get secretstore -n myclient-prod`
 - Check IAM permissions (IRSA, Workload Identity)
 - Check KMS secret exists and is accessible
 
 ### Pods Not Starting
+
 - Check events: `kubectl describe pod <pod-name> -n myclient-prod`
 - Check logs: `kubectl logs <pod-name> -n myclient-prod`
 - Check resource quotas: `kubectl describe resourcequota -n myclient-prod`
 
 ### Gateway Not Working
+
 - Check Gateway status: `kubectl get gateway -n gateway-system`
 - Check HTTPRoute status: `kubectl get httproute -n myclient-prod`
 - Check DNS resolution: `nslookup api.myclient.com`

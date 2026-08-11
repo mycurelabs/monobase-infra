@@ -43,6 +43,7 @@ values/deployments/newclient-prod.yaml     →  newclient-prod-root
 ### Namespace Mapping
 
 Filename (without `.yaml`) becomes the target namespace:
+
 ```
 mycure-production.yaml  →  namespace: mycure-production
 mycure-staging.yaml     →  namespace: mycure-staging
@@ -58,6 +59,7 @@ goTemplateOptions: ["missingkey=error"]  # Fail on missing keys
 ```
 
 Key expressions:
+
 ```yaml
 name: '{{.path.filename | trimSuffix ".yaml"}}-root'
 namespace: '{{.path.filename | trimSuffix ".yaml"}}'
@@ -68,12 +70,14 @@ valueFiles:
 ## Sync Policies
 
 ### ApplicationSet Level
+
 ```yaml
 syncPolicy:
   preserveResourcesOnDeletion: true    # Don't cascade-delete namespace resources
 ```
 
 ### Per-Application Level (in template)
+
 ```yaml
 syncPolicy:
   automated:
@@ -105,7 +109,8 @@ source:
 ```
 
 This deploys:
-- cert-manager + issuers, Envoy Gateway + proxy config
+
+- cert-manager + issuers, NGINX Gateway Fabric + shared gateways
 - External Secrets Operator + secret stores
 - Monitoring (Prometheus + Grafana), Velero + resources
 - Kyverno + policies, Falco + rules
@@ -125,6 +130,7 @@ This deploys:
 ```
 
 After bootstrap, everything is Git-driven:
+
 - Edit `values/infrastructure/main.yaml` → infrastructure changes
 - Edit `values/deployments/*.yaml` → tenant deployment changes
 - Add/remove files in `values/deployments/` → add/remove tenants
@@ -132,6 +138,7 @@ After bootstrap, everything is Git-driven:
 ## Ignored Differences
 
 The ApplicationSet template ignores expected Helm-managed annotations:
+
 ```yaml
 ignoreDifferences:
   - group: "*"

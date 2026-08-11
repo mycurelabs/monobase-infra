@@ -9,6 +9,7 @@ allowed-tools: Read, Write, Edit, Glob, Grep, Bash
 ## Kubeconfig Resolution
 
 All helm commands use this priority order:
+
 1. Explicit `--kubeconfig` flag (if provided)
 2. `KUBECONFIG` environment variable
 3. **Default:** `~/.kube/mycure-doks-main` (if exists)
@@ -16,6 +17,7 @@ All helm commands use this priority order:
 5. Fall back to `~/.kube/config`
 
 Set kubeconfig before running commands:
+
 ```bash
 export KUBECONFIG=~/.kube/mycure-doks-main
 ```
@@ -25,6 +27,7 @@ export KUBECONFIG=~/.kube/mycure-doks-main
 ## Quick Operations
 
 ### diff — Compare local chart changes vs deployed release
+
 ```bash
 # Requires helm-diff plugin: helm plugin install https://github.com/databus23/helm-diff
 
@@ -43,6 +46,7 @@ helm diff upgrade hapihub charts/hapihub -f values/deployments/mycure-production
 ```
 
 ### values — Get values from deployed release
+
 ```bash
 # Get user-supplied values
 helm get values {release} -n {namespace}
@@ -59,6 +63,7 @@ helm get values hapihub -n mycure-production -a -o yaml
 ```
 
 ### template — Render templates locally for validation
+
 ```bash
 # Basic template rendering
 helm template {release} charts/{chart} -f values/deployments/{deployment}.yaml
@@ -78,6 +83,7 @@ helm template hapihub charts/hapihub -f values/deployments/mycure-production.yam
 ```
 
 ### lint — Validate chart structure
+
 ```bash
 # Lint single chart
 helm lint charts/{chart}
@@ -94,6 +100,7 @@ helm lint charts/hapihub -f values/deployments/mycure-staging.yaml
 ```
 
 ### history — View release history
+
 ```bash
 # Show release history
 helm history {release} -n {namespace}
@@ -114,6 +121,7 @@ helm history hapihub -n mycure-production
 ## Chart Categories
 
 ### Healthcare Applications (9)
+
 - `hapihub` — HapiHub API (Bun/MongoDB, healthcare backend)
 - `mycure` — MyCure frontend (Vue.js patient app)
 - `mycurelocal` — MyCure Local (local-first variant)
@@ -124,13 +132,14 @@ helm history hapihub -n mycure-production
 - `dentalemon-website` — DentaLemon marketing site
 
 ### Core Services (2)
+
 - `api` — Monobase API (Hono/Bun backend)
 - `account` — Monobase Account App (React/Vite frontend)
 
 ### Infrastructure (9)
+
 - `namespace` — Namespace creation with security and resource quotas
-- `gateway` — Shared Gateway for multi-tenant routing
-- `envoy-proxy-config` — Cloud-specific LoadBalancer settings
+- `nginx-gateway` — Shared Gateways (public + internal) for multi-tenant routing
 - `cert-manager-issuers` — Multi-provider ClusterIssuer management
 - `database-secrets` — External Secrets for database credentials
 - `external-dns` — Automatic DNS record management
@@ -177,7 +186,9 @@ global:
 ## Key Template Patterns
 
 ### HTTPRoute (Gateway API)
+
 Routes use `parentRefs` pointing to shared gateway with optional `sectionName` for multi-domain:
+
 ```yaml
 parentRefs:
   - name: {{ include "{chart}.gateway.name" . }}
@@ -186,6 +197,7 @@ parentRefs:
 ```
 
 ### ExternalSecret
+
 ```yaml
 spec:
   secretStoreRef:
@@ -201,7 +213,9 @@ spec:
 ```
 
 ### Conditional `.enabled` Flags
+
 Every major component uses `.enabled` flags for toggling:
+
 ```yaml
 {{- if .Values.autoscaling.enabled }}
 {{- if .Values.externalSecrets.enabled }}
@@ -209,6 +223,7 @@ Every major component uses `.enabled` flags for toggling:
 ```
 
 ### Node Pool Scheduling
+
 ```yaml
 {{- $nodePool := include "{chart}.nodePool" . }}
 {{- if $nodePool }}
@@ -225,9 +240,11 @@ tolerations:
 ## Creating a New Chart
 
 1. Copy closest existing chart as template:
+
    ```bash
    cp -r charts/mycure charts/{new-chart}
    ```
+
 2. Update `Chart.yaml` (name, description, appVersion)
 3. Update `values.yaml` (image, resources, gateway hostname)
 4. Update `_helpers.tpl` (replace all `mycure.` prefixes with `{new-chart}.`)

@@ -5,6 +5,7 @@ Production security hardening for compliant deployments.
 ## Security Checklist
 
 ### Network Security
+
 - [ ] NetworkPolicies applied (default-deny + explicit allow)
 - [ ] Cross-namespace traffic blocked
 - [ ] Gateway rate limiting enabled
@@ -14,6 +15,7 @@ Production security hardening for compliant deployments.
 - [ ] Weak ciphers disabled
 
 ### Pod Security
+
 - [ ] Pod Security Standards enforced (restricted)
 - [ ] All containers run as non-root
 - [ ] No privilege escalation allowed
@@ -22,6 +24,7 @@ Production security hardening for compliant deployments.
 - [ ] Read-only root filesystem (where possible)
 
 ### Access Control
+
 - [ ] RBAC configured (least privilege)
 - [ ] Service accounts per application
 - [ ] No default service accounts used
@@ -30,6 +33,7 @@ Production security hardening for compliant deployments.
 - [ ] API keys rotated regularly
 
 ### Encryption
+
 - [ ] Encryption at rest (Longhorn volumes)
 - [ ] Encryption in transit (TLS everywhere)
 - [ ] PostgreSQL encryption enabled
@@ -38,6 +42,7 @@ Production security hardening for compliant deployments.
 - [ ] TLS certificates from trusted CA
 
 ### Secrets Management
+
 - [ ] External Secrets Operator deployed
 - [ ] All secrets in KMS
 - [ ] Secret rotation policy documented
@@ -46,6 +51,7 @@ Production security hardening for compliant deployments.
 - [ ] Secrets refreshed automatically (1h interval)
 
 ### Monitoring & Audit
+
 - [ ] Audit logging enabled for all components
 - [ ] Security alerts configured
 - [ ] Failed login attempts monitored
@@ -94,23 +100,19 @@ kubectl run test --image=busybox -n gateway-system -it --rm -- \\
 **Rate Limiting:**
 
 ```yaml
-# Applied via BackendTrafficPolicy
-# See: infrastructure/envoy-gateway/rate-limit-policy.yaml
-
-# Per-IP limits:
-# - 100 requests/second
-# - 1000 requests/minute burst
+# Gateway-level rate limiting is not configured; auth endpoints are
+# rate-limited in-app (BETTER_AUTH_RATE_LIMIT_* in deployment values).
+# Gateway-level limits can be added via an NGF SnippetsPolicy
+# (limit_req) in values/infrastructure/main.yaml if needed.
 ```
 
 **Security Headers:**
 
 ```yaml
-# Automatically added by SecurityPolicy:
-X-Frame-Options: DENY
-X-Content-Type-Options: nosniff
-X-XSS-Protection: 1; mode=block
-Strict-Transport-Security: max-age=31536000; includeSubDomains
-Referrer-Policy: strict-origin-when-cross-origin
+# Added by the njs header filter on the shared gateway
+# (charts/nginx-gateway/files/security-headers.js, registered via
+# SnippetsPolicy in values/infrastructure/main.yaml). Also strips the
+# Server response header (vapt-2025#10 L-001).
 ```
 
 **CORS Configuration:**
@@ -128,7 +130,7 @@ allowOrigins:
 **Enforce TLS 1.3:**
 
 ```bash
-# Via Gateway EnvoyProxy config
+# Via the NGF NginxProxy config (charts/nginx-gateway)
 # Weak ciphers automatically disabled
 # Only strong ciphers allowed:
 # - TLS_AES_128_GCM_SHA256
@@ -169,6 +171,7 @@ kubectl get namespace myclient-prod -o yaml | grep pod-security
 ```
 
 **All Pods Must:**
+
 - ✅ Run as non-root user
 - ✅ Drop ALL Linux capabilities
 - ✅ Disable privilege escalation
@@ -550,6 +553,7 @@ helm install fluent-bit fluent/fluent-bit \\
 ### Security Incident Procedure
 
 **1. Detection:**
+
 - Monitor alerts in Alertmanager
 - Review audit logs daily
 - Automated security scanning
@@ -610,6 +614,7 @@ velero restore create incident-recovery \\
 ```
 
 **5. Post-Incident:**
+
 - Document incident
 - Update security controls
 - Notify affected parties (as required by compliance, e.g., HIPAA breach notification if PHI accessed)
@@ -667,11 +672,13 @@ helm dependency list charts/api
 ### 1. Penetration Testing
 
 **Schedule:**
+
 - Annual external penetration test
 - Quarterly internal security review
 - After major infrastructure changes
 
 **Scope:**
+
 - External attack surface (Gateway, APIs)
 - Internal lateral movement
 - Privilege escalation
@@ -680,6 +687,7 @@ helm dependency list charts/api
 ### 2. Compliance Audits
 
 **HIPAA Audit:**
+
 - Annual risk assessment
 - Review access controls
 - Verify encryption
@@ -711,6 +719,7 @@ kubectl get networkpolicy -A
 ### 1. Credential Stuffing
 
 **Mitigation:**
+
 - Rate limiting (100 req/min)
 - Account lockout after 5 failed attempts
 - MFA for all accounts
@@ -719,6 +728,7 @@ kubectl get networkpolicy -A
 ### 2. SQL Injection
 
 **Mitigation:**
+
 - Parameterized queries in Monobase API (already done)
 - Input validation
 - WAF rules (if using external WAF)
@@ -727,6 +737,7 @@ kubectl get networkpolicy -A
 ### 3. DDoS Attacks
 
 **Mitigation:**
+
 - Gateway rate limiting (per IP)
 - CloudFlare / AWS Shield (optional)
 - Auto-scaling (HPA)
@@ -735,6 +746,7 @@ kubectl get networkpolicy -A
 ### 4. Data Exfiltration
 
 **Mitigation:**
+
 - Egress NetworkPolicies
 - Monitor large data transfers
 - S3 bucket policies (restrict IPs)
@@ -743,6 +755,7 @@ kubectl get networkpolicy -A
 ### 5. Container Escape
 
 **Mitigation:**
+
 - Pod Security Standards (restricted)
 - seccomp profile
 - AppArmor / SELinux
@@ -786,11 +799,13 @@ kubectl get networkpolicy -A
 ## Security Resources
 
 ### Internal
+
 - [HIPAA-COMPLIANCE.md](HIPAA-COMPLIANCE.md) - Compliance checklist
 - [BACKUP-RECOVERY.md](BACKUP-RECOVERY.md) - DR procedures
 - infrastructure/security/ - Security policy files
 
 ### External
+
 - [CIS Kubernetes Benchmark](https://www.cisecurity.org/benchmark/kubernetes)
 - [OWASP Kubernetes Top 10](https://owasp.org/www-project-kubernetes-top-ten/)
 - [NSA Kubernetes Hardening Guide](https://media.defense.gov/2022/Aug/29/2003066362/-1/-1/0/CTR_KUBERNETES_HARDENING_GUIDANCE_1.2_20220829.PDF)
@@ -801,15 +816,18 @@ kubectl get networkpolicy -A
 ## Security Incident Contacts
 
 **Internal:**
-- Security Team: security@example.com
+
+- Security Team: <security@example.com>
 - On-Call: See PagerDuty rotation
 
 **External:**
+
 - Cloud Provider Support
 - Compliance-specific notifications (e.g., HIPAA Breach Notification: HHS OCR)
 - Legal Team (for breach notification)
 
 **Report Security Issues:**
-- Email: security@example.com
+
+- Email: <security@example.com>
 - PGP Key: [link]
 - Response SLA: 24 hours

@@ -3,13 +3,16 @@
 ## Naming Pattern
 
 ### Tenant Namespaces
+
 Format: `{client}-{environment}`
 
 Examples:
+
 - `mycure-production` — MyCure production environment
 - `mycure-staging` — MyCure staging environment
 
 Each tenant namespace contains:
+
 - Application deployments (hapihub, mycure, cadence, etc.)
 - Database StatefulSets (MongoDB, PostgreSQL)
 - Cache (Valkey/Redis)
@@ -22,8 +25,7 @@ Each tenant namespace contains:
 
 | Namespace | Purpose | Managed By |
 |-----------|---------|------------|
-| `gateway-system` | Shared Envoy Gateway | Infrastructure ArgoCD App |
-| `envoy-gateway-system` | Envoy Gateway controller | Infrastructure ArgoCD App |
+| `nginx-gateway-system` | NGINX Gateway Fabric + shared gateways | Infrastructure ArgoCD App |
 | `external-dns` | Automatic DNS management | Infrastructure ArgoCD App |
 | `longhorn-system` | Distributed block storage (optional) | Infrastructure ArgoCD App |
 | `argocd` | ArgoCD GitOps controller | Bootstrap (manual) |
@@ -49,22 +51,27 @@ Each tenant namespace contains:
 A typical tenant namespace (`mycure-production`) contains:
 
 **Applications:**
+
 - Deployments: hapihub, mycure, mycurelocal, mycurev8, mycure-myaccount, dentalemon, dentalemon-myaccount, dentalemon-website, api, account
 - Each with: Service, HTTPRoute, ConfigMap
 
 **Data stores:**
+
 - StatefulSet: mongodb (replicaset), postgresql (standalone)
 - StatefulSet: valkey (standalone), minio (standalone)
 
 **Secrets:**
+
 - ExternalSecrets → Kubernetes Secrets (synced from GCP Secret Manager)
 - Database credential secrets (mongodb, postgresql, minio)
 
 **Networking:**
+
 - HTTPRoutes (one per exposed app, referencing shared-gateway)
 - NetworkPolicies (if security-baseline chart enabled)
 
 **Scaling & Reliability:**
+
 - HorizontalPodAutoscalers (hapihub)
 - PodDisruptionBudgets (when enabled)
 
@@ -84,6 +91,7 @@ cp values/deployments/mycure-staging.yaml values/deployments/{client}-{env}.yaml
 ```
 
 The `namespace` chart can also be used for additional namespace configuration:
+
 - Pod Security Standards enforcement (`podSecurityStandards.level: restricted`)
 - Resource quotas
 - Label policies

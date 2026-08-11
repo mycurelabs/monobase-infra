@@ -1,8 +1,8 @@
-# Static IP Prerequisites for Envoy Gateway
+# Static IP Prerequisites for the Gateway LoadBalancer
 
 ## Overview
 
-This document provides instructions for creating static IP addresses for the Envoy Gateway LoadBalancer across all supported Kubernetes providers. A static IP ensures that your gateway's IP address doesn't change, which is essential for:
+This document covers creating static IP addresses for the gateway LoadBalancer (NGINX Gateway Fabric) across all supported Kubernetes providers. A static IP ensures that your gateway's IP address doesn't change, which is essential for:
 
 - Stable DNS records
 - SSL/TLS certificate validation
@@ -11,88 +11,92 @@ This document provides instructions for creating static IP addresses for the Env
 
 ## Supported Cloud Providers
 
-- **Azure AKS** - Azure Kubernetes Service
+- **DigitalOcean DOKS** - DigitalOcean Kubernetes (current live cluster)
 - **AWS EKS** - Amazon Elastic Kubernetes Service
+- **Azure AKS** - Azure Kubernetes Service
 - **GCP GKE** - Google Kubernetes Engine
-- **DigitalOcean DOKS** - DigitalOcean Kubernetes
+
+## How Configuration Lands
+
+NGINX Gateway Fabric provisions the LoadBalancer Service for each Gateway. Provider-specific Service annotations are set via the Gateway's `infrastructure.annotations`, which NGF propagates onto the provisioned data-plane Service:
+
+```yaml
+# values/infrastructure/main.yaml
+nginxGatewayResources:
+  gateway:
+    name: nginx-shared-gateway
+    infrastructure:
+      annotations:
+        # provider-specific static-IP annotations go here, e.g.
+        service.beta.kubernetes.io/do-loadbalancer-name: "production-gateway-lb"
+```
+
+Template: `charts/nginx-gateway/templates/gateway.yaml`. ArgoCD syncs the change automatically.
 
 ## Quick Start
 
 1. Choose your cloud provider from the list below
-2. Follow the provider-specific guide
-3. Save the required configuration values
-4. Provide these values to your DevOps team for deployment configuration
+2. Follow the provider-specific guide to reserve the IP
+3. Add the provider's Service annotations under `infrastructure.annotations` in `values/infrastructure/main.yaml`
+4. Let ArgoCD sync, then point DNS at the static IP
 
 ## Provider-Specific Guides
 
-### Azure AKS (Current Environment)
+### DigitalOcean (DOKS) — current live cluster
 
-See: [Azure Static IP Guide](./static-ip-azure.md)
+See: [DigitalOcean Static IP Guide](./static-ip-digitalocean.md)
 
 **Quick Summary:**
-- Create Static Public IP in node resource group
-- Requires: Public IP Name and Node Resource Group
-- Option to preserve existing IP or create new one
+
+- Option 1: LoadBalancer name annotation (simple, IP survives in-place updates)
+- Option 2: FLIPOP operator with a reserved IP (true static IP)
 
 ### AWS EKS
 
 See: [AWS Static IP Guide](./static-ip-aws.md)
 
 **Quick Summary:**
+
 - Allocate Elastic IPs (one per subnet/AZ)
 - Requires: EIP Allocation IDs (comma-separated)
 - Uses Network Load Balancer (NLB)
+
+### Azure AKS
+
+See: [Azure Static IP Guide](./static-ip-azure.md)
+
+**Quick Summary:**
+
+- Create Static Public IP in the node resource group (`MC_*`)
+- Requires: Public IP name and node resource group
+- Option to preserve an existing IP or create a new one
 
 ### Google Cloud (GKE)
 
 See: [GCP Static IP Guide](./static-ip-gcp.md)
 
 **Quick Summary:**
-- Reserve Regional Static IP
-- Requires: IP Address or Name
-- Must match cluster region
 
-### DigitalOcean (DOKS)
+- Reserve a regional static IP
+- Requires: IP name (must match cluster region)
 
-See: [DigitalOcean Static IP Guide](./static-ip-digitalocean.md)
+## Annotations Per Provider
 
-**Quick Summary:**
-- Option 1: Use LoadBalancer Name (simple)
-- Option 2: Use FLIPOP Operator with Reserved IP (recommended)
-
-## Configuration Values Needed
-
-After completing the prerequisite steps for your cloud provider, you'll need to provide the following information to your DevOps team:
-
-### For Azure AKS:
 ```yaml
-cloudProvider: azure
-azure:
-  publicIpName: "your-gateway-ip-name"
-  resourceGroup: "MC_your-rg_your-cluster_region"
-```
+# DigitalOcean
+service.beta.kubernetes.io/do-loadbalancer-name: "production-gateway-lb"
 
-### For AWS EKS:
-```yaml
-cloudProvider: aws
-aws:
-  eipAllocations: "eipalloc-xxx,eipalloc-yyy,eipalloc-zzz"
-```
+# AWS (NLB via AWS Load Balancer Controller)
+service.beta.kubernetes.io/aws-load-balancer-type: "external"
+service.beta.kubernetes.io/aws-load-balancer-nlb-target-type: "ip"
+service.beta.kubernetes.io/aws-load-balancer-eip-allocations: "eipalloc-xxx,eipalloc-yyy,eipalloc-zzz"
 
-### For GCP GKE:
-```yaml
-cloudProvider: gcp
-gcp:
-  staticIpAddress: "35.123.456.789"
-```
+# Azure
+service.beta.kubernetes.io/azure-pip-name: "production-gateway-ip"
+service.beta.kubernetes.io/azure-load-balancer-resource-group: "MC_your-rg_your-cluster_region"
 
-### For DigitalOcean DOKS:
-```yaml
-cloudProvider: digitalocean
-digitalocean:
-  loadBalancerName: "your-gateway-lb"
-  # OR with FLIPOP:
-  # loadBalancerId: "lb-xxx-yyy-zzz"
+# GCP
+networking.gke.io/load-balancer-ip-addresses: "production-gateway-ip"
 ```
 
 ## Important Notes
@@ -101,21 +105,4 @@ digitalocean:
 2. **Regions**: Static IPs must be in the same region as your Kubernetes cluster
 3. **High Availability**: AWS requires multiple EIPs for HA (one per availability zone)
 4. **Permissions**: You'll need appropriate cloud provider permissions to create/manage IPs
-5. **DNS**: After static IP is configured, update your DNS records to point to the new IP
-
-## Support
-
-For provider-specific questions or issues:
-- See the detailed guides linked above
-- Consult your cloud provider's documentation
-- Contact your DevOps team for assistance
-
-## Next Steps
-
-1. Complete the prerequisite steps for your cloud provider
-2. Save the configuration values
-3. Provide values to DevOps team
-4. DevOps team will update infrastructure configuration
-5. ArgoCD will automatically deploy the changes
-6. Update DNS records to point to the static IP
-7. Verify connectivity and SSL/TLS certificates
+5. **DNS**: After the static IP is configured, update your DNS records to point to it

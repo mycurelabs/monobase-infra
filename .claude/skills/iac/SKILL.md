@@ -9,6 +9,7 @@ allowed-tools: Read, Write, Edit, Glob, Grep, Bash
 ## Quick Operations
 
 ### plan — Preview infrastructure changes
+
 ```bash
 # Navigate to module and run plan
 cd terraform/modules/{provider}
@@ -26,6 +27,7 @@ cd terraform/modules/aws-eks && tofu plan -var-file=../../../cluster/terraform.t
 ```
 
 ### apply — Apply infrastructure changes ⚠️ DESTRUCTIVE
+
 ```bash
 # ⚠️ CONFIRM BEFORE EXECUTING - modifies cloud infrastructure and costs money
 
@@ -44,6 +46,7 @@ cd terraform/modules/do-doks && tofu apply -var-file=../../../cluster/terraform.
 ```
 
 ### state — Inspect current Terraform state
+
 ```bash
 # List all resources in state
 cd terraform/modules/{provider}
@@ -66,6 +69,7 @@ tofu output -raw configure_kubectl
 ```
 
 ### destroy — Destroy infrastructure ⚠️ VERY DESTRUCTIVE
+
 ```bash
 # ⚠️ EXTREME CAUTION - destroys all cluster resources permanently
 
@@ -78,6 +82,7 @@ mise run teardown
 ```
 
 ### init — Initialize module (first time or after provider changes)
+
 ```bash
 cd terraform/modules/{provider}
 tofu init
@@ -109,6 +114,7 @@ tofu init -reconfigure
 | `local-k3d` | Local dev | k3d + Gateway API CRDs | `docker` |
 
 All modules share common patterns:
+
 - Deployment profiles: `small`, `medium`, `large` (auto-configures node sizes/counts)
 - Outputs: `cluster_name`, `cluster_endpoint`, `configure_kubectl`
 - Terraform >= 1.6 required
@@ -151,6 +157,7 @@ mise run bootstrap
 ```
 
 Or use the automated script:
+
 ```bash
 mise run provision
 ```
@@ -179,38 +186,44 @@ mise run fmt
 ## Provider-Specific Notes
 
 ### AWS EKS
+
 - Requires: VPC CIDR, availability zones, API access CIDRs
 - Creates: VPC, subnets, NAT gateway, EKS cluster, managed node groups
 - Static IPs: Elastic IPs (one per subnet/AZ) — see `docs/infrastructure/static-ip-aws.md`
 - Auth: IRSA (IAM Roles for Service Accounts) for ESO, Velero, cert-manager
 
 ### Azure AKS
+
 - Requires: resource group name, location
 - Creates: VNet, AKS cluster, node pools, managed identities
 - Static IPs: Public IP in node resource group (MC_*) — see `docs/infrastructure/static-ip-azure.md`
 - Auth: Workload Identity for ESO, Velero
 
 ### GCP GKE
+
 - Requires: project ID, region
 - Creates: VPC, GKE cluster, node pools, service accounts
 - Static IPs: Regional static IP — see `docs/infrastructure/static-ip-gcp.md`
 - Auth: Workload Identity Federation for ESO, Velero, cert-manager
 
 ### DigitalOcean DOKS
+
 - Requires: region
 - Creates: VPC, DOKS cluster, node pool
 - Static IPs: LoadBalancer name or FLIPOP operator — see `docs/infrastructure/static-ip-digitalocean.md`
 - Auth: API token for ESO via External Secrets
 
 ### On-Prem K3s
+
 - Requires: server IPs, SSH access, K3s token
 - Creates: K3s cluster via SSH, optional Longhorn + MetalLB
 - HA mode requires 3+ servers
 
 ### Local k3d
+
 - Development/testing only
 - Creates: k3d cluster with port mappings (8080→80, 8443→443)
-- Disables Traefik (uses Envoy Gateway instead)
+- Disables Traefik (uses NGINX Gateway Fabric instead)
 - Auto-installs Gateway API CRDs
 
 ## Teardown (Destructive)
