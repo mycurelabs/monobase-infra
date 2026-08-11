@@ -350,7 +350,7 @@ kubectl get pvc my-pvc -n myclient-prod
 **Configure in Prometheus:**
 
 ```yaml
-# See: infrastructure/monitoring/prometheus-rules.yaml
+# See: charts/monitoring-resources/
 
 # Alerts:
 - PersistentVolumeFillingUp (>80% full)

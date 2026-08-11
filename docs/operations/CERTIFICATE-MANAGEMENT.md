@@ -7,19 +7,19 @@ Practical guide for managing TLS certificates in the multi-domain gateway archit
 ## Quick Reference
 
 **Add Client Domain:**
-1. Edit `infrastructure/certificates.yaml`
+1. Edit `values/infrastructure/main.yaml` (under `nginxGatewayResources.tls.certificates`)
 2. Commit and push
 3. Wait 2-5 minutes for certificate provisioning
-4. Verify with `kubectl get certificate -n gateway-system`
+4. Verify with `kubectl get certificate -n nginx-gateway-system`
 
 **Check Certificate Status:**
 ```bash
-kubectl get certificate -n gateway-system
+kubectl get certificate -n nginx-gateway-system
 ```
 
 **Troubleshoot Issues:**
 ```bash
-kubectl describe certificate <name> -n gateway-system
+kubectl describe certificate <name> -n nginx-gateway-system
 kubectl logs -n cert-manager -l app=cert-manager
 ```
 
@@ -27,23 +27,19 @@ kubectl logs -n cert-manager -l app=cert-manager
 
 ## Certificate Configuration Reference
 
-### File: infrastructure/certificates.yaml
+### File: values/infrastructure/main.yaml
 
-All certificates are declared in a single file for centralized management.
+All certificates are declared under `nginxGatewayResources.tls.certificates` for centralized management. The `charts/nginx-gateway` chart renders these into cert-manager `Certificate` resources.
 
 **Schema:**
 ```yaml
-certificates:
-  - name: string              # Unique identifier (becomes Secret name with -tls suffix)
-    domain: string            # Fully qualified domain name
-    issuer: string            # ClusterIssuer name
-    challengeType: dns01|http01  # ACME challenge type
-    
-    # Optional: For client-provided certificates
-    certificateSource: provided
-    externalSecret:
-      gcpSecretName: string   # GCP Secret Manager secret name for certificate
-      gcpSecretKey: string    # GCP Secret Manager secret name for private key
+nginxGatewayResources:
+  tls:
+    certificates:
+      - secretName: string        # TLS Secret name (e.g. nginx-gateway-tls-prod)
+        clusterIssuer: string     # ClusterIssuer name
+        dnsNames:                 # One or more fully qualified domain names
+          - string
 ```
 
 ---
@@ -56,11 +52,13 @@ certificates:
 
 **Example:**
 ```yaml
-certificates:
-  - name: client1-domain
-    domain: "app.client.com"
-    issuer: letsencrypt-prod
-    challengeType: http01
+nginxGatewayResources:
+  tls:
+    certificates:
+      - secretName: nginx-gateway-tls-client1
+        clusterIssuer: letsencrypt-nginx-http01
+        dnsNames:
+          - "app.client.com"
 ```
 
 **Requirements:**
@@ -83,7 +81,7 @@ certificates:
 2. Platform adds certificate declaration
 3. cert-manager creates temporary HTTPRoute for ACME challenge
 4. Let's Encrypt validates via HTTP
-5. Certificate issued and stored in `gateway-system` namespace
+5. Certificate issued and stored in `nginx-gateway-system` namespace
 6. Gateway automatically uses certificate
 
 **Time:** 2-5 minutes
@@ -95,15 +93,7 @@ certificates:
 **Purpose:** Client provides their own TLS certificate
 
 **Example:**
-```yaml
-certificates:
-  - name: client2-domain
-    domain: "portal.client.com"
-    certificateSource: provided
-    externalSecret:
-      gcpSecretName: client2-domain-cert
-      gcpSecretKey: client2-domain-key
-```
+Client-provided certificates are synced from GCP Secret Manager into a TLS Secret in `nginx-gateway-system` via an ExternalSecret, then referenced by the gateway listener. The TLS Secret follows the `nginx-gateway-tls-*` naming scheme (e.g. `nginx-gateway-tls-client2`).
 
 **Requirements:**
 - Client uploads certificate and private key to GCP Secret Manager
@@ -149,7 +139,7 @@ certificates:
 #### Step 1: Get LoadBalancer IP
 
 ```bash
-kubectl get gateway shared-gateway -n gateway-system \
+kubectl get gateway nginx-shared-gateway -n nginx-gateway-system \
   -o jsonpath='{.status.addresses[0].value}'
 
 # Example output: 203.0.113.42
@@ -171,28 +161,30 @@ dig app.client.com +short
 
 #### Step 3: Add Certificate Declaration
 
-Edit `infrastructure/certificates.yaml`:
+Edit `values/infrastructure/main.yaml` under `nginxGatewayResources.tls.certificates`:
 
 ```yaml
-certificates:
-  # Existing certificates...
-  
-  # New client certificate
-  - name: client1-domain
-    domain: "app.client.com"
-    issuer: letsencrypt-prod
-    challengeType: http01
+nginxGatewayResources:
+  tls:
+    certificates:
+      # Existing certificates...
+
+      # New client certificate
+      - secretName: nginx-gateway-tls-client1
+        clusterIssuer: letsencrypt-nginx-http01
+        dnsNames:
+          - "app.client.com"
 ```
 
 **Naming Convention:**
 - Use lowercase, hyphens for spaces
-- Format: `client-{name}-{purpose}`
-- Examples: `client-acme-main`, `client-globex-portal`
+- Format: `nginx-gateway-tls-{name}`
+- Examples: `nginx-gateway-tls-acme`, `nginx-gateway-tls-globex`
 
 #### Step 4: Commit and Deploy
 
 ```bash
-git add infrastructure/certificates.yaml
+git add values/infrastructure/main.yaml
 git commit -m "feat: Add certificate for app.client.com"
 git push
 ```
@@ -203,14 +195,14 @@ ArgoCD syncs automatically (check ArgoCD UI for status).
 
 ```bash
 # Check certificate status
-kubectl get certificate client1-domain-tls -n gateway-system
+kubectl get certificate nginx-gateway-tls-client1 -n nginx-gateway-system
 
 # Expected output:
-# NAME                  READY   SECRET                AGE
-# client1-domain-tls    True    client1-domain-tls    2m
+# NAME                        READY   SECRET                      AGE
+# nginx-gateway-tls-client1   True    nginx-gateway-tls-client1   2m
 
 # If not Ready, check details:
-kubectl describe certificate client1-domain-tls -n gateway-system
+kubectl describe certificate nginx-gateway-tls-client1 -n nginx-gateway-system
 ```
 
 **Common statuses during provisioning:**
@@ -221,12 +213,12 @@ kubectl describe certificate client1-domain-tls -n gateway-system
 #### Step 6: Verify Gateway References Certificate
 
 ```bash
-kubectl get gateway shared-gateway -n gateway-system -o yaml | grep -A 5 certificateRefs
+kubectl get gateway nginx-shared-gateway -n nginx-gateway-system -o yaml | grep -A 5 certificateRefs
 
 # Should show:
 # certificateRefs:
-#   - name: gateway-tls  # Platform certificate
-#   - name: client1-domain-tls  # ← New certificate
+#   - name: nginx-gateway-tls-prod  # Platform certificate
+#   - name: nginx-gateway-tls-client1  # ← New certificate
 ```
 
 #### Step 7: Test TLS Handshake
@@ -261,28 +253,28 @@ curl -v https://app.client.com
 #### Check All Certificates
 
 ```bash
-kubectl get certificate -n gateway-system
+kubectl get certificate -n nginx-gateway-system
 
 # Example output:
-# NAME                     READY   SECRET                   AGE
-# gateway-tls              True    gateway-tls              30d
-# client1-domain-tls       True    client1-domain-tls       5d
-# client2-domain-tls       True    client2-domain-tls       2d
+# NAME                        READY   SECRET                      AGE
+# nginx-gateway-tls-prod      True    nginx-gateway-tls-prod      30d
+# nginx-gateway-tls-client1   True    nginx-gateway-tls-client1   5d
+# nginx-gateway-tls-client2   True    nginx-gateway-tls-client2   2d
 ```
 
 #### Check Certificate Expiry
 
 ```bash
 # Get expiry dates for all TLS secrets
-kubectl get secret -n gateway-system -o json | \
+kubectl get secret -n nginx-gateway-system -o json | \
   jq -r '.items[] | select(.type=="kubernetes.io/tls") | 
     .metadata.name + ": " + 
     (.data["tls.crt"] | @base64d | 
     capture("Not After : (?<date>[^\n]+)") | .date)'
 
 # Example output:
-# gateway-tls: Jan 15 12:00:00 2025 GMT
-# client1-domain-tls: Feb 20 15:30:00 2025 GMT
+# nginx-gateway-tls-prod: Jan 15 12:00:00 2025 GMT
+# nginx-gateway-tls-client1: Feb 20 15:30:00 2025 GMT
 ```
 
 #### Monitor cert-manager Logs
@@ -303,13 +295,13 @@ cert-manager exposes metrics for monitoring:
 
 ```promql
 # Certificate expiry (days remaining)
-certmanager_certificate_expiration_timestamp_seconds{namespace="gateway-system"}
+certmanager_certificate_expiration_timestamp_seconds{namespace="nginx-gateway-system"}
 
 # Certificate renewal status
-certmanager_certificate_renewal_total{namespace="gateway-system"}
+certmanager_certificate_renewal_total{namespace="nginx-gateway-system"}
 
 # Challenge failures
-certmanager_acme_orders_total{namespace="gateway-system", status="invalid"}
+certmanager_acme_orders_total{namespace="nginx-gateway-system", status="invalid"}
 ```
 
 **Recommended Alerts:**
@@ -340,10 +332,10 @@ If needed, force renewal before automatic window:
 
 ```bash
 # Trigger renewal by deleting Secret
-kubectl delete secret client1-domain-tls -n gateway-system
+kubectl delete secret nginx-gateway-tls-client1 -n nginx-gateway-system
 
 # cert-manager recreates immediately
-kubectl get certificate client1-domain-tls -n gateway-system -w
+kubectl get certificate nginx-gateway-tls-client1 -n nginx-gateway-system -w
 ```
 
 **When to force renewal:**
@@ -369,7 +361,7 @@ External Secrets Operator syncs automatically (default: 1 hour refresh interval)
 **Force immediate sync:**
 ```bash
 # Delete Secret to trigger ESO re-sync
-kubectl delete secret client2-domain-tls -n gateway-system
+kubectl delete secret nginx-gateway-tls-client2 -n nginx-gateway-system
 
 # ESO recreates within seconds
 ```
@@ -380,20 +372,23 @@ kubectl delete secret client2-domain-tls -n gateway-system
 
 #### Step 1: Remove Certificate Declaration
 
-Edit `infrastructure/certificates.yaml` and remove certificate entry:
+Edit `values/infrastructure/main.yaml` and remove the certificate entry from `nginxGatewayResources.tls.certificates`:
 
 ```yaml
-certificates:
-  # Remove this:
-  # - name: client1-domain
-  #   domain: "app.client.com"
-  #   ...
+nginxGatewayResources:
+  tls:
+    certificates:
+      # Remove this:
+      # - secretName: nginx-gateway-tls-client1
+      #   clusterIssuer: letsencrypt-nginx-http01
+      #   dnsNames:
+      #     - "app.client.com"
 ```
 
 #### Step 2: Commit and Deploy
 
 ```bash
-git add infrastructure/certificates.yaml
+git add values/infrastructure/main.yaml
 git commit -m "chore: Remove client1 certificate"
 git push
 ```
@@ -402,11 +397,11 @@ git push
 
 ```bash
 # Certificate resource should be deleted
-kubectl get certificate client1-domain-tls -n gateway-system
+kubectl get certificate nginx-gateway-tls-client1 -n nginx-gateway-system
 # Error: NotFound (expected)
 
 # Secret should be deleted
-kubectl get secret client1-domain-tls -n gateway-system
+kubectl get secret nginx-gateway-tls-client1 -n nginx-gateway-system
 # Error: NotFound (expected)
 ```
 
@@ -418,7 +413,7 @@ kubectl get secret client1-domain-tls -n gateway-system
 
 **Symptoms:**
 ```bash
-kubectl get certificate client1-domain-tls -n gateway-system
+kubectl get certificate nginx-gateway-tls-client1 -n nginx-gateway-system
 # STATUS: Ready=False
 ```
 
@@ -426,7 +421,7 @@ kubectl get certificate client1-domain-tls -n gateway-system
 
 1. **Check Certificate status:**
    ```bash
-   kubectl describe certificate client1-domain-tls -n gateway-system
+   kubectl describe certificate nginx-gateway-tls-client1 -n nginx-gateway-system
    
    # Look for:
    # - Status conditions
@@ -436,8 +431,8 @@ kubectl get certificate client1-domain-tls -n gateway-system
 
 2. **Check Order status:**
    ```bash
-   kubectl get order -n gateway-system
-   kubectl describe order <order-name> -n gateway-system
+   kubectl get order -n nginx-gateway-system
+   kubectl describe order <order-name> -n nginx-gateway-system
    
    # Look for:
    # - Order state (pending, valid, invalid)
@@ -446,8 +441,8 @@ kubectl get certificate client1-domain-tls -n gateway-system
 
 3. **Check Challenge status:**
    ```bash
-   kubectl get challenge -n gateway-system
-   kubectl describe challenge <challenge-name> -n gateway-system
+   kubectl get challenge -n nginx-gateway-system
+   kubectl describe challenge <challenge-name> -n nginx-gateway-system
 
    # Look for:
    # - Challenge type (http-01)
@@ -471,7 +466,7 @@ kubectl get certificate client1-domain-tls -n gateway-system
 |-------|-------|----------|
 | DNS not resolving | DNS not propagated yet | Wait 5-10 minutes, verify with `dig` |
 | HTTP-01 challenge failed | Port 80 not accessible | Check NetworkPolicies, Security Groups |
-| Rate limit exceeded | Too many cert requests | Use `letsencrypt-staging` for testing |
+| Rate limit exceeded | Too many cert requests | Validate DNS/routing before re-requesting; space out additions |
 | Invalid domain | Domain doesn't match DNS | Verify domain spelling in config |
 | Certificate already exists | Duplicate request | Check existing certificates |
 
@@ -483,7 +478,7 @@ kubectl get certificate client1-domain-tls -n gateway-system
 
 ```bash
 # Check challenge details
-kubectl describe challenge <name> -n gateway-system
+kubectl describe challenge <name> -n nginx-gateway-system
 
 # Common errors:
 # - "Connection refused" → Port 80 blocked
@@ -494,7 +489,7 @@ kubectl describe challenge <name> -n gateway-system
 **Debug:**
 ```bash
 # Verify HTTPRoute created by cert-manager
-kubectl get httproute -n gateway-system | grep acme
+kubectl get httproute -n nginx-gateway-system | grep acme
 
 # Test challenge endpoint directly
 curl -v http://app.client.com/.well-known/acme-challenge/test
@@ -525,14 +520,14 @@ curl -v http://app.client.com/.well-known/acme-challenge/test
    kubectl describe httproute <name> -n <client-namespace>
    
    # Look for:
-   # - parentRefs pointing to shared-gateway
+   # - parentRefs pointing to nginx-shared-gateway
    # - hostname matching certificate domain
    # - Status showing attached
    ```
 
 3. **Check Gateway certificate list:**
    ```bash
-   kubectl get gateway shared-gateway -n gateway-system -o yaml | \
+   kubectl get gateway nginx-shared-gateway -n nginx-gateway-system -o yaml | \
      grep -A 10 certificateRefs
    
    # Verify certificate for domain is listed
@@ -553,7 +548,7 @@ curl -v http://app.client.com/.well-known/acme-challenge/test
 **Check expiry:**
 ```bash
 # Check specific certificate
-kubectl get secret client1-domain-tls -n gateway-system -o json | \
+kubectl get secret nginx-gateway-tls-client1 -n nginx-gateway-system -o json | \
   jq -r '.data["tls.crt"] | @base64d' | \
   openssl x509 -noout -dates
 
@@ -566,7 +561,7 @@ kubectl get secret client1-domain-tls -n gateway-system -o json | \
 
 1. **Check cert-manager renewing:**
    ```bash
-   kubectl get certificate client1-domain-tls -n gateway-system -o yaml
+   kubectl get certificate nginx-gateway-tls-client1 -n nginx-gateway-system -o yaml
    
    # Look for:
    # - renewalTime (should be 30 days before expiry)
@@ -576,7 +571,7 @@ kubectl get secret client1-domain-tls -n gateway-system -o json | \
 2. **Force renewal:**
    ```bash
    # Delete certificate secret
-   kubectl delete secret client1-domain-tls -n gateway-system
+   kubectl delete secret nginx-gateway-tls-client1 -n nginx-gateway-system
    
    # cert-manager recreates immediately
    ```
@@ -606,15 +601,8 @@ kubectl logs -n cert-manager -l app=cert-manager | grep -i "rate limit"
 
 **Solutions:**
 
-1. **Use staging for testing:**
-   ```yaml
-   # infrastructure/certificates.yaml
-   certificates:
-     - name: test-domain
-       domain: "test.client.com"
-       issuer: letsencrypt-staging  # ← Use staging
-       challengeType: http01
-   ```
+1. **Validate before requesting:**
+   - Confirm DNS resolves to the LoadBalancer IP (`dig`) and port 80 is reachable before adding the certificate, so each request succeeds on the first attempt.
 
 2. **Wait for rate limit window:**
    - Limits reset weekly (rolling window)
@@ -628,17 +616,25 @@ kubectl logs -n cert-manager -l app=cert-manager | grep -i "rate limit"
 
 ## Best Practices
 
-### 1. Testing New Certificates
+### 1. Choosing a ClusterIssuer
 
-Always test with staging before production:
+Match the issuer to the challenge type the domain requires:
 
 ```yaml
-# Test with staging first
-certificates:
-  - name: client1-domain-staging
-    domain: "app.client.com"
-    issuer: letsencrypt-staging  # HTTP-01 staging
-    challengeType: http01
+nginxGatewayResources:
+  tls:
+    certificates:
+      # HTTP-01 (single hostnames routed through the NGINX gateway)
+      - secretName: nginx-gateway-tls-client1
+        clusterIssuer: letsencrypt-nginx-http01
+        dnsNames:
+          - "app.client.com"
+
+      # DNS-01 via Cloudflare (wildcards / multi-level subdomains)
+      - secretName: nginx-gateway-tls-client1-wild
+        clusterIssuer: letsencrypt-mycure-cloudflare-prod
+        dnsNames:
+          - "*.client.com"
 ```
 
 **Verify:**
@@ -647,24 +643,15 @@ certificates:
 3. HTTP routing works
 4. No errors in logs
 
-**Then switch to production:**
-```yaml
-certificates:
-  - name: client1-domain
-    domain: "app.client.com"
-    issuer: letsencrypt-prod  # ← HTTP-01 production
-    challengeType: http01
-```
-
 ### 2. Certificate Naming
 
 **Consistent naming convention:**
-- Format: `{type}-{client}-{purpose}`
+- Format: `nginx-gateway-tls-{name}`
 - Examples:
-  - `client-acme-main`
-  - `client-globex-portal`
-  - `client-initech-api`
-  - `platform-api`
+  - `nginx-gateway-tls-acme`
+  - `nginx-gateway-tls-globex`
+  - `nginx-gateway-tls-initech`
+  - `nginx-gateway-tls-prod`
 
 **Benefits:**
 - Easy to identify certificate purpose
@@ -674,20 +661,22 @@ certificates:
 ### 3. Documentation
 
 **For each client certificate:**
-- Add comment in `infrastructure/certificates.yaml`
+- Add comment in `values/infrastructure/main.yaml`
 - Document client contact information
 - Note special requirements (renewal process, etc.)
 
 **Example:**
 ```yaml
-certificates:
-  # ACME Corp - Main Application
-  # Contact: john@acme.com
-  # Renewal: Auto (HTTP-01)
-  - name: client-acme-main
-    domain: "app.acme.com"
-    issuer: letsencrypt-prod
-    challengeType: http01
+nginxGatewayResources:
+  tls:
+    certificates:
+      # ACME Corp - Main Application
+      # Contact: john@acme.com
+      # Renewal: Auto (HTTP-01)
+      - secretName: nginx-gateway-tls-acme
+        clusterIssuer: letsencrypt-nginx-http01
+        dnsNames:
+          - "app.acme.com"
 ```
 
 ### 4. Monitoring and Alerts
@@ -702,7 +691,7 @@ certificates:
 ```yaml
 - alert: CertificateExpiringSoon
   expr: |
-    certmanager_certificate_expiration_timestamp_seconds{namespace="gateway-system"} - time() < (14 * 24 * 3600)
+    certmanager_certificate_expiration_timestamp_seconds{namespace="nginx-gateway-system"} - time() < (14 * 24 * 3600)
   labels:
     severity: warning
   annotations:
@@ -713,7 +702,7 @@ certificates:
 
 **Certificate Storage:**
 - Enable Kubernetes Secret encryption at rest
-- Limit RBAC access to gateway-system namespace
+- Limit RBAC access to nginx-gateway-system namespace
 - Audit certificate access regularly
 
 **Client-Provided Certificates:**

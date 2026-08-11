@@ -165,13 +165,15 @@ variable "cluster_name" {
 - Include NOTES.txt for post-install instructions
 - Add helpers in _helpers.tpl for reusable templates
 
-### Shell Scripts
+### Scripts
 
-- Use `#!/bin/bash` shebang
-- Add `set -e` for error handling
-- Include usage function
-- Use color codes for output (RED, GREEN, YELLOW)
-- Add comments for complex operations
+Operational scripts live in `scripts/` and are TypeScript run via bun (wired
+as `mise run <task>` in `mise.toml`, e.g. `bootstrap.ts`, `provision.ts`,
+`admin.ts`).
+
+- Prefer a mise task over invoking the script directly
+- Type inputs; fail loudly with clear messages
+- Keep side effects idempotent where possible
 
 ### YAML Files
 
@@ -208,17 +210,15 @@ variable "cluster_name" {
    mise run secrets  # Scan for secrets
    ```
 
-4. **Run integration tests (if applicable)**
+4. **Render the app-of-apps trees** (validates every chart against real values)
    ```bash
-   # Creates k3d cluster and deploys full stack
-   .github/workflows/integration.yml
+   mise run lint-helm
    ```
 
 ### Adding Tests
 
-- Add Helm unit tests in `charts/*/tests/`
-- Add integration test scenarios
-- Document test procedures
+- Add Helm unit tests under `charts/*/tests/`
+- Extend `mise run lint-helm` / `validate-helm` coverage when adding a chart
 
 ## Pull Request Process
 
@@ -239,7 +239,6 @@ variable "cluster_name" {
    - [ ] Code follows project coding standards
    - [ ] Tests pass locally
    - [ ] Documentation updated
-   - [ ] CHANGELOG.md updated (for user-facing changes)
    - [ ] Commit messages follow conventional commits format
    - [ ] No merge conflicts with main branch
 
@@ -272,13 +271,11 @@ variable "cluster_name" {
 - Include code examples
 - Add diagrams for complex concepts (use Mermaid)
 - Keep docs in sync with code changes
-- Update CHANGELOG.md for user-facing changes
 
 ### Where to Add Documentation
 
 - `README.md` - Overview and quick start
 - `docs/` - Detailed documentation
-- `CHANGELOG.md` - User-facing changes
 - Inline comments - Complex code logic
 - Helm chart NOTES.txt - Post-install instructions
 

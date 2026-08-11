@@ -197,7 +197,7 @@ kubectl get nodes
 ### 2. Bootstrap GitOps
 
 ```bash
-./scripts/bootstrap.sh
+mise run bootstrap
 ```
 
 This installs:
@@ -209,7 +209,7 @@ This installs:
 
 ```bash
 # Copy appropriate example
-cp -r deployments/example-prod deployments/myclient-prod
+cp values/deployments/mycure-production.yaml values/deployments/myclient-prod.yaml
 
 # Customize
 vim deployments/myclient-prod/values.yaml

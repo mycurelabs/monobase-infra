@@ -20,7 +20,7 @@ If you're deploying healthcare applications handling Protected Health Informatio
   - ✅ RBAC with service accounts per application
   - ✅ No shared credentials
   - ✅ Audit logging of all access
-  - Location: `infrastructure/security/rbac/`
+  - Location: `charts/security-baseline/` (RBAC)
 
 - [ ] **Emergency Access Procedure (Required)**
   - ✅ Break-glass admin access documented
@@ -33,10 +33,10 @@ If you're deploying healthcare applications handling Protected Health Informatio
   - Configure: Application-level session management
 
 - [ ] **Encryption and Decryption (Addressable)**
-  - ✅ Encryption at rest (Longhorn, PostgreSQL)
+  - ✅ Encryption at rest (DOKS cloud block storage `do-block-storage`; Longhorn for the on-prem profile)
   - ✅ Encryption in transit (TLS everywhere)
-  - ✅ KMS for key management
-  - Location: `infrastructure/security/encryption/`
+  - ✅ GCP Secret Manager for key management (via External Secrets Operator)
+  - Location: `values/infrastructure/main.yaml`, `charts/security-baseline/`
 
 ### Audit Controls (§164.312(b))
 
@@ -161,7 +161,7 @@ If you're deploying healthcare applications handling Protected Health Informatio
 - [ ] **Access Authorization (Addressable)**
   - ✅ Role-based access (RBAC)
   - ✅ Documented roles and permissions
-  - Location: `infrastructure/security/rbac/`
+  - Location: `charts/security-baseline/` (RBAC)
 
 - [ ] **Access Establishment and Modification (Addressable)**
   - ✅ Git-based access control changes
@@ -176,10 +176,10 @@ If you're deploying healthcare applications handling Protected Health Informatio
 ### Contingency Plan (§164.308(a)(7))
 
 - [ ] **Data Backup Plan (Required)**
-  - ✅ 3-tier backup strategy implemented
+  - ✅ Velero backup schedules (production-daily 14d, infrastructure-daily 30d, cluster-resources-weekly 90d) + on-prem niflheim mirror
   - ✅ Automated schedules
   - ✅ Monthly restore testing
-  - Location: `infrastructure/velero/`, `infrastructure/longhorn/`
+  - Location: `charts/velero-resources/`, `values/infrastructure/main.yaml`
 
 - [ ] **Disaster Recovery Plan (Required)**
   - ✅ DR procedures documented
@@ -229,7 +229,7 @@ If you're deploying healthcare applications handling Protected Health Informatio
 
 - [ ] **Disposal (Required)**
   - ✅ PVC deletion removes data
-  - ✅ Longhorn secure erase supported
+  - ✅ Block-storage volume deletion reclaims data (Longhorn secure erase on the on-prem profile)
   - Document: Data disposal procedures
 
 - [ ] **Media Re-use (Required)**
@@ -242,7 +242,7 @@ If you're deploying healthcare applications handling Protected Health Informatio
 
 ### Infrastructure (Template Provides)
 
-- [x] Encryption at rest (Longhorn, PostgreSQL)
+- [x] Encryption at rest (DOKS block storage `do-block-storage`; Longhorn on-prem)
 - [x] Encryption in transit (TLS everywhere)
 - [x] Access controls (RBAC, NetworkPolicies)
 - [x] Audit logging (enabled and configured)
@@ -290,7 +290,7 @@ Examples:
 
 ```bash
 # 1. Immediate containment
-kubectl delete gateway shared-gateway -n gateway-system  # Stop all traffic
+kubectl delete gateway nginx-shared-gateway -n nginx-gateway-system  # Stop all traffic
 
 # 2. Assessment
 # - What PHI was accessed?
@@ -378,8 +378,8 @@ kubectl delete gateway shared-gateway -n gateway-system  # Stop all traffic
    ```bash
    # Generate compliance report
    
-   # 1. Encryption status
-   kubectl get storageclass longhorn -o yaml | grep encrypted
+   # 1. Storage class (DOKS block storage on the live cluster; longhorn on-prem)
+   kubectl get storageclass do-block-storage -o yaml
    
    # 2. NetworkPolicy list
    kubectl get networkpolicy -A -o yaml

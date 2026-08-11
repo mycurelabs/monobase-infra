@@ -36,7 +36,7 @@ Layer 1: Infrastructure (THIS GUIDE)
 ├── Terragrunt manages configurations
 └── Creates: VPC, K8s cluster, IAM, networking
 
-Layer 2: Applications (../PLAN.md, ../charts/, ../deployments/)
+Layer 2: Applications (../charts/, ../values/deployments/)
 ├── Helm charts deploy applications
 └── ArgoCD manages GitOps
 ```
@@ -247,7 +247,7 @@ kubectl get pods -A
 
 # 10. Bootstrap cluster with ArgoCD + Infrastructure
 cd ../../../
-./scripts/bootstrap.sh
+mise run bootstrap
 
 # Then add client configurations in deployments/
 # ArgoCD ApplicationSet will auto-discover and deploy them
@@ -345,9 +345,9 @@ tofu output -raw kubeconfig > ~/.kube/monobase-local
 export KUBECONFIG=~/.kube/monobase-local
 kubectl get nodes
 
-# 6. Test Monobase deployment
-kubectl create namespace test-client
-helm install api ../../charts/api -n test-client
+# 6. Smoke-test a chart render (deploys are GitOps via ArgoCD, not manual helm)
+helm template test ../../charts/app --set enabled=true \\
+  --set image.repository=nginx --set-string image.tag=stable | head
 
 # 7. Cleanup when done
 tofu destroy
@@ -412,7 +412,7 @@ tofu output -raw kubeconfig > ~/.kube/clinic-prod
 
 ### Understanding default-cluster/
 
-The `clusters/default-cluster/` is a **reference configuration** (like `deployments/example.com/` for apps).
+The `clusters/default-cluster/` is a **reference configuration** (like `values/deployments/` for apps).
 
 **Files:**
 
@@ -698,7 +698,7 @@ tofu apply
 
 # 2. Bootstrap cluster once
 cd ../../..
-./scripts/bootstrap.sh
+mise run bootstrap
 
 # 3. Add client configurations in deployments/
 mkdir -p deployments/client-a-prod deployments/client-b-prod deployments/client-c-prod
@@ -1066,7 +1066,7 @@ After successfully provisioning a cluster:
   ```bash
   # Create client deployment config
   mkdir -p deployments/client-a-prod
-  cp deployments/templates/production-base.yaml deployments/client-a-prod/values.yaml
+  cp values/deployments/mycure-production.yaml values/deployments/client-a-prod.yaml
   vim deployments/client-a-prod/values.yaml  # Customize
   git add deployments/client-a-prod/ && git commit && git push
   

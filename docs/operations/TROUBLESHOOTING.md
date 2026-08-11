@@ -50,8 +50,8 @@ kubectl describe externalsecret api-secrets -n myclient-prod
 
 ```bash
 # Check Gateway status
-kubectl get gateway -n gateway-system
-kubectl describe gateway shared-gateway -n gateway-system
+kubectl get gateway -n nginx-gateway-system
+kubectl describe gateway shared-gateway -n nginx-gateway-system
 
 # Check HTTPRoutes
 kubectl get httproute -A
@@ -96,11 +96,11 @@ velero backup logs <backup-name>
 kubectl cluster-info
 
 # 2. Check critical pods
-kubectl get pods -n gateway-system
+kubectl get pods -n nginx-gateway-system
 kubectl get pods -n myclient-prod
 
 # 3. If Gateway down, restart
-kubectl rollout restart deployment -n gateway-system
+kubectl rollout restart deployment -n nginx-gateway-system
 
 # 4. If database down, check Longhorn
 kubectl get pods -n longhorn-system

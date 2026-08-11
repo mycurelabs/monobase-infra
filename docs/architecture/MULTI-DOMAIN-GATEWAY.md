@@ -6,17 +6,22 @@ Comprehensive guide to the centralized certificate management architecture for s
 
 ## Overview
 
-The mono-infra Gateway supports **two types of domains**:
+Ingress is served by NGINX Gateway Fabric (gateway class `nginx`) via two Gateways in the `nginx-gateway-system` namespace:
 
-1. **Platform Subdomains** (`*.example.com`)
-   - Covered by wildcard certificate
+- **`nginx-shared-gateway`** — public, prod-only, internet-exposed
+- **`nginx-internal-gateway`** — tailnet-only, cluster-default (deny-first)
+
+The Gateway supports **two types of domains**:
+
+1. **Platform Subdomains** — the wildcard domains served: `*.mycureapp.com`, `*.localfirsthealth.com`, `*.stg.localfirsthealth.com`, `*.mycure.md`
+   - Covered by wildcard certificates
    - Automatic for all deployments
    
 2. **Client Custom Domains** (`app.client.com`)
    - Per-domain certificates
    - Client provides domain, platform manages certificate
 
-**Key Principle:** All certificates stored centrally in `gateway-system` namespace, not distributed per client namespace.
+**Key Principle:** All certificates stored centrally in `nginx-gateway-system` namespace, not distributed per client namespace.
 
 ---
 
@@ -41,7 +46,7 @@ The mono-infra Gateway supports **two types of domains**:
        │
        ↓
 ┌──────────────────────────────────────────────────────────────┐
-│  Gateway (gateway-system namespace)                            │
+│  Gateway (nginx-gateway-system namespace)                            │
 │  ┌──────────────────────────────────────────────────────────┐│
 │  │ TLS Termination:                                           ││
 │  │ - SNI-based certificate selection                          ││
@@ -75,11 +80,11 @@ The mono-infra Gateway supports **two types of domains**:
 ### 1. Security Advantages
 
 **Centralized (Recommended):**
-- ✅ All certificates in one highly-controlled namespace (`gateway-system`)
+- ✅ All certificates in one highly-controlled namespace (`nginx-gateway-system`)
 - ✅ No cross-namespace secret access needed
 - ✅ No ReferenceGrants required (eliminates attack surface)
 - ✅ Simpler RBAC = fewer misconfiguration risks
-- ✅ If Gateway compromised: Attacker only accesses gateway-system secrets
+- ✅ If Gateway compromised: Attacker only accesses nginx-gateway-system secrets
 
 **Distributed (Not Recommended):**
 - ❌ Certificates scattered across N client namespaces
@@ -93,21 +98,21 @@ The mono-infra Gateway supports **two types of domains**:
 
 **Centralized:**
 ```
-gateway-system/
+nginx-gateway-system/
   ├── wildcard-example-tls (Secret)
   ├── client1-domain-tls (Secret)
   ├── client2-domain-tls (Secret)
   └── client3-domain-tls (Secret)
 
 Operations:
-- Add client: Create ONE Certificate in gateway-system
+- Add client: Create ONE Certificate in nginx-gateway-system
 - Debug: Check ONE namespace
 - RBAC: ONE namespace needs cert-manager permissions
 ```
 
 **Distributed:**
 ```
-gateway-system/
+nginx-gateway-system/
   └── wildcard-example-tls
 
 client1/
@@ -154,7 +159,7 @@ Operations:
 - Domain: `app.client.com`
 - Certificate: Single domain (no wildcard support with HTTP-01)
 - Type: HTTP-01 challenge (no DNS API access needed)
-- Issuer: `letsencrypt-prod` ClusterIssuer
+- Issuer: `letsencrypt-nginx-http01` ClusterIssuer
 
 **When to Use:**
 - Client owns domain
@@ -168,20 +173,22 @@ Operations:
 3. Let's Encrypt can reach domain via HTTP
 
 **Process:**
-1. Certificate declared in `infrastructure/certificates.yaml`
+1. Certificate declared in `values/infrastructure/main.yaml` under `nginxGatewayResources.tls.certificates`
 2. cert-manager creates temporary HTTPRoute for `/.well-known/acme-challenge/`
 3. Let's Encrypt validates via HTTP request
 4. Certificate issued (2-5 minutes)
-5. Secret stored in `gateway-system` namespace
+5. Secret stored in `nginx-gateway-system` namespace
 
 **Configuration:**
 ```yaml
-# infrastructure/certificates.yaml
-certificates:
-  - name: client1-domain
-    domain: "app.client.com"
-    issuer: letsencrypt-prod
-    challengeType: http01
+# values/infrastructure/main.yaml
+nginxGatewayResources:
+  tls:
+    certificates:
+      - secretName: nginx-gateway-tls-client1
+        clusterIssuer: letsencrypt-nginx-http01  # HTTP-01 via NGINX Gateway
+        dnsNames:
+          - "app.client.com"
 ```
 
 **Limitations:**
@@ -209,20 +216,23 @@ certificates:
 
 **Process:**
 1. Client uploads cert/key to GCP Secret Manager
-2. Configuration added to `infrastructure/certificates.yaml`
-3. External Secrets Operator syncs to `gateway-system` namespace
+2. Configuration added to `values/infrastructure/main.yaml`
+3. External Secrets Operator syncs to `nginx-gateway-system` namespace
 4. Gateway references certificate
 
 **Configuration:**
 ```yaml
-# infrastructure/certificates.yaml
-certificates:
-  - name: client2-domain
-    domain: "portal.client.com"
-    certificateSource: provided
-    externalSecret:
-      gcpSecretName: client2-domain-cert
-      gcpSecretKey: client2-domain-key
+# values/infrastructure/main.yaml
+nginxGatewayResources:
+  tls:
+    certificates:
+      - secretName: nginx-gateway-tls-client2
+        certificateSource: provided
+        externalSecret:
+          gcpSecretName: client2-domain-cert
+          gcpSecretKey: client2-domain-key
+        dnsNames:
+          - "portal.client.com"
 ```
 
 **Certificate Format Requirements:**
@@ -239,13 +249,15 @@ certificates:
 
 **Key Change:** Gateway listener hostname set to `"*"` (accept all domains)
 
+Listeners are declared in `values/infrastructure/main.yaml` under `nginxGatewayResources.gateway.listeners` (public gateway) and `nginxGatewayResources.extraGateways` (internal gateway). The rendered Gateway resource:
+
 ```yaml
-# Gateway in gateway-system namespace
+# nginx-shared-gateway in nginx-gateway-system namespace
 apiVersion: gateway.networking.k8s.io/v1
 kind: Gateway
 metadata:
-  name: shared-gateway
-  namespace: gateway-system
+  name: nginx-shared-gateway
+  namespace: nginx-gateway-system
 spec:
   gatewayClassName: nginx
   listeners:
@@ -289,10 +301,10 @@ apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
   name: http-to-https-redirect
-  namespace: gateway-system
+  namespace: nginx-gateway-system
 spec:
   parentRefs:
-    - name: shared-gateway
+    - name: nginx-shared-gateway
       sectionName: http
   hostnames:
     - "*"
@@ -316,20 +328,24 @@ spec:
 
 ### 1. Declaration
 
-Platform team adds to `infrastructure/certificates.yaml`:
+Platform team adds to `values/infrastructure/main.yaml` under `nginxGatewayResources.tls.certificates`:
 
 ```yaml
-certificates:
-  - name: client1-domain
-    domain: "app.client.com"
-    issuer: letsencrypt-prod
-    challengeType: http01
+nginxGatewayResources:
+  tls:
+    certificates:
+      - secretName: nginx-gateway-tls-client1
+        clusterIssuer: letsencrypt-nginx-http01  # HTTP-01 via NGINX Gateway
+        dnsNames:
+          - "app.client.com"
 ```
+
+Commit and push — ArgoCD syncs the `charts/nginx-gateway` chart. No manual apply.
 
 ### 2. Provisioning
 
 **For HTTP-01:**
-1. ArgoCD syncs, creates Certificate resource in `gateway-system`
+1. ArgoCD syncs, creates Certificate resource in `nginx-gateway-system`
 2. cert-manager sees new Certificate
 3. cert-manager creates Order, Challenge resources
 4. cert-manager creates temporary HTTPRoute for ACME challenge
@@ -343,10 +359,10 @@ certificates:
 **Time:** 2-5 minutes
 
 **For Client-Provided:**
-1. ArgoCD syncs, creates ExternalSecret in `gateway-system`
+1. ArgoCD syncs, creates ExternalSecret in `nginx-gateway-system`
 2. External Secrets Operator sees new ExternalSecret
 3. ESO fetches certificate from GCP Secret Manager
-4. ESO creates Secret: `client2-domain-tls` in `gateway-system`
+4. ESO creates Secret: `client2-domain-tls` in `nginx-gateway-system`
 5. Gateway automatically picks up new certificate
 
 **Time:** 10-30 seconds
@@ -363,8 +379,8 @@ metadata:
   namespace: client1
 spec:
   parentRefs:
-    - name: shared-gateway
-      namespace: gateway-system
+    - name: nginx-shared-gateway
+      namespace: nginx-gateway-system
       sectionName: https
   hostnames:
     - app.client.com
@@ -392,13 +408,13 @@ spec:
 **Certificate Status:**
 ```bash
 # Check all certificates
-kubectl get certificate -n gateway-system
+kubectl get certificate -n nginx-gateway-system
 
 # Check specific certificate
-kubectl describe certificate client1-domain-tls -n gateway-system
+kubectl describe certificate client1-domain-tls -n nginx-gateway-system
 
 # Check expiry dates
-kubectl get secret -n gateway-system -o json | \
+kubectl get secret -n nginx-gateway-system -o json | \
   jq -r '.items[] | select(.type=="kubernetes.io/tls") | .metadata.name + ": " + (.data["tls.crt"] | @base64d | capture("notAfter=(?<date>[^\n]+)") | .date)'
 ```
 
@@ -419,8 +435,8 @@ client1/
   ├── client1-domain-tls (Secret)
   └── client1-referencegrant (ReferenceGrant)
 
-gateway-system/
-  └── shared-gateway (references client1/client1-domain-tls)
+nginx-gateway-system/
+  └── nginx-shared-gateway (references client1/client1-domain-tls)
 ```
 
 **Pros:**
@@ -497,7 +513,7 @@ Backend Pod (terminates TLS)
 ### 1. Certificate Private Keys
 
 - Stored in Kubernetes Secrets (encrypted at rest if cluster has encryption enabled)
-- Access controlled by RBAC (only gateway-system ServiceAccounts)
+- Access controlled by RBAC (only nginx-gateway-system ServiceAccounts)
 - Gateway pods read via mounted secrets (not environment variables)
 
 **Best Practice:** Enable encryption at rest for Secrets
@@ -569,7 +585,7 @@ certificates:
 ### 3. Documentation
 
 **For Each Client:**
-- Document domain in `infrastructure/certificates.yaml` comments
+- Document domain in `values/infrastructure/main.yaml` comments
 - Note certificate type (auto-provisioned vs client-provided)
 - Record renewal process (if client-managed)
 
@@ -590,20 +606,20 @@ certificates:
 
 **Symptoms:**
 ```bash
-kubectl get certificate client1-domain-tls -n gateway-system
+kubectl get certificate client1-domain-tls -n nginx-gateway-system
 # Status: Ready=False
 ```
 
 **Debug:**
 ```bash
 # Check Certificate status
-kubectl describe certificate client1-domain-tls -n gateway-system
+kubectl describe certificate client1-domain-tls -n nginx-gateway-system
 
 # Check Order status
-kubectl get order -n gateway-system
+kubectl get order -n nginx-gateway-system
 
 # Check Challenge status
-kubectl get challenge -n gateway-system
+kubectl get challenge -n nginx-gateway-system
 
 # Check cert-manager logs
 kubectl logs -n cert-manager -l app=cert-manager
@@ -630,7 +646,7 @@ kubectl get httproute -n client-namespace
 kubectl describe httproute client-api -n client-namespace
 
 # Check Gateway attached routes
-kubectl get gateway shared-gateway -n gateway-system -o yaml
+kubectl get gateway nginx-shared-gateway -n nginx-gateway-system -o yaml
 
 # Check nginx config
 kubectl exec -n nginx-gateway-system deploy/nginx-shared-gateway-nginx -- \

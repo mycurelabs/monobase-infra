@@ -296,12 +296,12 @@ The Gateway architecture supports **two types of domains**:
 
 **Configuration:**
 ```yaml
-# infrastructure/certificates.yaml
+# values/infrastructure/main.yaml
 certificates:
-  - name: client1-domain
-    domain: "app.client.com"
-    issuer: letsencrypt-prod
-    challengeType: http01
+  - secretName: nginx-gateway-tls-client1
+    clusterIssuer: letsencrypt-nginx-http01   # HTTP-01 via the nginx gateway
+    dnsNames:
+      - app.client.com
 ```
 
 **How it Works:**

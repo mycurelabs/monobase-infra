@@ -84,7 +84,7 @@ velero restore create cluster-rebuild-$(date +%Y%m%d) \
 kubectl get all -n myclient-prod
 
 # 7. Get new LoadBalancer IP
-kubectl get gateway shared-gateway -n gateway-system \
+kubectl get gateway shared-gateway -n nginx-gateway-system \
   -o jsonpath='{.status.addresses[0].value}'
 
 # 8. Update DNS records
@@ -154,7 +154,7 @@ kubectl logs -f deployment/api -n myclient-prod
 
 ```bash
 # Run restore test to verify backups work
-# See: infrastructure/velero/restore-examples.yaml
+# See: charts/velero-resources/
 # Test procedure documented in BACKUP-RECOVERY.md
 
 # 1. Restore to test namespace

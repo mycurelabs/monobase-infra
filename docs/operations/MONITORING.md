@@ -56,7 +56,7 @@ argocd app sync myclient-prod-monitoring
 helm install monitoring prometheus-community/kube-prometheus-stack \
   -n monitoring \
   --create-namespace \
-  -f infrastructure/monitoring/helm-values.yaml
+  -f values/infrastructure/main.yaml
 ```
 
 ## Access Grafana

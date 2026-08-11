@@ -58,7 +58,7 @@ echo -n "YOUR_CLOUDFLARE_TOKEN" | gcloud secrets create infrastructure-cloudflar
 ### 3. Create ExternalSecret
 
 ```yaml
-# deployments/example-staging/cloudflare-externalsecret.yaml
+# values/deployments/mycure-preprod.yaml
 apiVersion: external-secrets.io/v1beta1
 kind: ExternalSecret
 metadata:
@@ -81,7 +81,7 @@ spec:
 ### 4. Enable External-DNS
 
 ```yaml
-# deployments/example-staging/values.yaml
+# values/deployments/mycure-preprod.yaml
 externalDNS:
   enabled: true
 

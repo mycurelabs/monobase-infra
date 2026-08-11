@@ -1,672 +1,244 @@
 # Deployment Guide
 
-Complete deployment procedures for Monobase Infrastructure.
+How deployments happen in Monobase Infrastructure.
 
-## ⚡ Quick Start: GitOps-First Approach (Recommended)
-
-**For the automated GitOps deployment using ArgoCD and bootstrap.sh**, see:
-- **[CLIENT-ONBOARDING.md](CLIENT-ONBOARDING.md)** - Complete GitOps workflow with bootstrap.sh
-- **[GITOPS-ARGOCD.md](../architecture/GITOPS-ARGOCD.md)** - GitOps architecture details
-
-The sections below document **manual deployment steps** as an alternative or reference.
-
----
+Everything is GitOps. ArgoCD watches this repo and reconciles the cluster to
+match it. You deploy by editing a file under `values/`, committing, and pushing
+— ArgoCD auto-syncs. There is no manual `helm install` or `kubectl apply` step
+for application or infrastructure workloads.
 
 ## Table of Contents
 
-1. [Pre-Deployment Checklist](#pre-deployment-checklist)
-2. [Infrastructure Deployment](#infrastructure-deployment) *(Manual alternative to bootstrap.sh)*
-3. [Application Deployment](#application-deployment)
-4. [Post-Deployment Verification](#post-deployment-verification)
-5. [DNS Configuration](#dns-configuration)
-6. [Backup Configuration](#backup-configuration)
-7. [Monitoring Setup](#monitoring-setup)
+1. [Mental Model](#mental-model)
+2. [Where Everything Lives](#where-everything-lives)
+3. [One-Time Bootstrap](#one-time-bootstrap)
+4. [Deploying a Change](#deploying-a-change)
+5. [Verification](#verification)
+6. [DNS Configuration](#dns-configuration)
+7. [Rollback](#rollback)
+8. [Related Docs](#related-docs)
 
 ---
 
-## Pre-Deployment Checklist
+## Mental Model
 
-### Prerequisites
+- **Everything deployable is a Helm chart** under `charts/`.
+- **All configuration lives in `values/`.**
+- **ArgoCD is the only deployer.** A root App-of-Apps plus an auto-discover
+  ApplicationSet turn files in `values/` into running workloads. See
+  [../architecture/GITOPS-ARGOCD.md](../architecture/GITOPS-ARGOCD.md).
+- **The cluster itself is OpenTofu-managed** from `values/cluster/`
+  (`mise run cluster-plan` / `cluster-apply`). See
+  [CLUSTER-PROVISIONING.md](CLUSTER-PROVISIONING.md).
 
-- [ ] Kubernetes cluster provisioned (EKS, AKS, GKE, or self-hosted)
-- [ ] kubectl configured and authenticated
-- [ ] Helm 3.x installed
-- [ ] Domain names registered
-- [ ] DNS access for configuration
-- [ ] KMS access (AWS Secrets Manager / Azure Key Vault / GCP Secret Manager)
-- [ ] S3 bucket for backups
-- [ ] Repository forked and client config created
-
-### Cluster Requirements
-
-**Minimum (Core Stack):**
-- 3 nodes
-- 4 CPU per node (12 CPU total)
-- 16GB RAM per node (48GB total)
-- 100GB storage per node
-
-**Recommended (Full Stack):**
-- 5 nodes
-- 8 CPU per node (40 CPU total)
-- 32GB RAM per node (160GB total)
-- 500GB storage per node
-
-### Configuration Checklist
-
-- [ ] Client config created: `deployments/{client}/`
-- [ ] values-production.yaml customized
-- [ ] Image tags set to specific versions (not "latest")
-- [ ] Resource limits configured
-- [ ] Secrets created in KMS
-- [ ] secrets-mapping.yaml updated
-- [ ] Backup S3 bucket created
-- [ ] Configuration committed to Git
+The only imperative step in the entire lifecycle is the one-time bootstrap that
+installs ArgoCD and points it at the repo. After that, Git is the interface.
 
 ---
 
-## Infrastructure Deployment
+## Where Everything Lives
 
-Deploy infrastructure in specific order (dependencies):
+### Charts (`charts/`)
 
-### Step 1: Create Namespace
+| Chart | Purpose |
+|-------|---------|
+| `charts/app` | Generic frontend/service chart — every clinic app, dashboard, myaccount, etc. is an instance of this |
+| `charts/hapihub` | HapiHub API (PostgreSQL-backed; no in-cluster MongoDB) |
+| `charts/cadence` | Cadence sync service |
+| `charts/nginx-gateway` | NGINX Gateway Fabric install |
+| `charts/security-baseline` | Namespace-level PSA, NetworkPolicies, RBAC |
+| `charts/velero-resources` | Backup schedules and storage locations |
+| `charts/monitoring-resources` | Prometheus rules, dashboards, alert routes |
+| `charts/argocd-bootstrap` | Root App-of-Apps + auto-discover ApplicationSet |
+| `charts/argocd-applications` | Per-deployment Application factory + dedicated templates |
+| `charts/argocd-infrastructure` | Cluster-wide infrastructure Applications (gateway, cert-manager, ESO, monitoring, velero, …) |
 
-```bash
-# Label namespace for Gateway access
-kubectl create namespace gateway-system
-kubectl label namespace gateway-system kubernetes.io/metadata.name=gateway-system
+### Configuration (`values/`)
 
-# Create client namespace
-kubectl create namespace myclient-prod
-kubectl label namespace myclient-prod \\
-  pod-security.kubernetes.io/enforce=restricted \\
-  pod-security.kubernetes.io/audit=restricted \\
-  pod-security.kubernetes.io/warn=restricted \\
-  kubernetes.io/metadata.name=myclient-prod
+| Path | Purpose |
+|------|---------|
+| `values/deployments/<client>-<env>.yaml` | Per-deployment overlay (e.g. `values/deployments/mycure-production.yaml`, `values/deployments/mycure-preprod.yaml`) |
+| `values/deployments/_base/mycure.yaml` | Shared base each overlay layers on top of |
+| `values/infrastructure/main.yaml` | Cluster-wide infrastructure config (gateway, cert-manager, ESO, monitoring, velero) + secrets registry |
+| `values/cluster/` | OpenTofu root for the live DOKS cluster (imported state) |
 
-# Or use template
-cat infrastructure/namespaces/namespace.yaml.template | \\
-  sed 's/{{ .Values.global.namespace }}/myclient-prod/g' | \\
-  kubectl apply -f -
-```
+An overlay is a thin file: it sets image tags, replica counts, domains,
+resource requests, and which components are enabled. The base carries
+everything common. To add a whole new deployment, see
+[CLIENT-ONBOARDING.md](CLIENT-ONBOARDING.md).
 
-### Step 2: Deploy Longhorn (Storage)
+---
 
-```bash
-# Add Helm repository
-helm repo add longhorn https://charts.longhorn.io
-helm repo update
+## One-Time Bootstrap
 
-# Install Longhorn
-helm install longhorn longhorn/longhorn \\
-  --namespace longhorn-system \\
-  --create-namespace \\
-  --values infrastructure/longhorn/helm-values.yaml
-
-# Wait for ready
-kubectl wait --for=condition=ready pod \\
-  -l app=longhorn-manager \\
-  -n longhorn-system \\
-  --timeout=600s
-
-# Apply StorageClass
-kubectl apply -f infrastructure/longhorn/storageclass.yaml
-
-# Apply backup configuration
-kubectl apply -f infrastructure/longhorn/backup-config.yaml
-
-# Verify
-kubectl get storageclass longhorn
-kubectl get pods -n longhorn-system
-```
-
-**Time:** ~5-10 minutes
-
-### Step 3: Deploy cert-manager (TLS)
+Run once against a freshly-provisioned cluster. This is the single imperative
+step — it installs ArgoCD, the root App-of-Apps, and the auto-discover
+ApplicationSet. From then on ArgoCD deploys everything else (gateway,
+cert-manager, External Secrets Operator, monitoring, velero, and all app
+workloads) straight from the repo.
 
 ```bash
-# Add Helm repository
-helm repo add jetstack https://charts.jetstack.io
-helm repo update
-
-# Install cert-manager
-helm install cert-manager jetstack/cert-manager \\
-  --namespace cert-manager \\
-  --create-namespace \\
-  --set installCRDs=true
-
-# Wait for ready
-kubectl wait --for=condition=ready pod \\
-  -l app.kubernetes.io/name=cert-manager \\
-  -n cert-manager \\
-  --timeout=300s
-
-# Apply ClusterIssuer (replace values)
-cat infrastructure/cert-manager/clusterissuer.yaml.template | \\
-  sed 's/{{ .Values.global.domain }}/myclient.com/g' | \\
-  kubectl apply -f -
-
-# Verify
-kubectl get clusterissuer
+mise run bootstrap
 ```
 
-**Time:** ~3-5 minutes
+Prerequisites:
 
-### Step 4: Verify the Gateway
+- Cluster provisioned and `kubectl` context pointed at it
+  (`mise run provision`, or `mise run cluster-apply` for the live DOKS cluster).
+  See [CLUSTER-PROVISIONING.md](CLUSTER-PROVISIONING.md) and
+  [INFRASTRUCTURE-REQUIREMENTS.md](INFRASTRUCTURE-REQUIREMENTS.md).
+- Secrets present in GCP Secret Manager (External Secrets Operator syncs them
+  in; never commit secrets).
 
-NGINX Gateway Fabric is deployed by the ArgoCD infrastructure app
-(`charts/argocd-infrastructure/templates/nginx-gateway.yaml`; config in
-`values/infrastructure/main.yaml` under `nginxGateway:`). Nothing to install
-manually — verify it:
+Operational scripts are TypeScript run via bun through mise tasks — there are no
+`*.sh` scripts to invoke by hand.
+
+After bootstrap, retrieve the ArgoCD admin password:
+
+```bash
+kubectl -n argocd get secret argocd-initial-admin-secret \
+  -o jsonpath="{.data.password}" | base64 -d
+```
+
+---
+
+## Deploying a Change
+
+The entire day-to-day workflow:
+
+```bash
+# 1. Edit the relevant file under values/
+$EDITOR values/deployments/mycure-production.yaml   # e.g. bump an image tag
+
+# 2. Validate locally
+mise run lint
+mise run validate
+
+# 3. Commit and push
+git add values/deployments/mycure-production.yaml
+git commit -m "chore(prod): bump app image to X.Y.Z"
+git push
+```
+
+ArgoCD detects the commit and auto-syncs. Watch it land:
+
+```bash
+# In the UI, or via CLI:
+argocd app list
+argocd app get <app-name> --refresh
+```
+
+Notes:
+
+- Changes under `values/deployments/*.yaml` sync to the corresponding
+  environment automatically — production included. Push deliberately.
+- Direct `kubectl edit`/`apply` changes are reverted by ArgoCD self-heal. Edit
+  the repo, not the cluster.
+- Cluster-wide infrastructure changes go in `values/infrastructure/main.yaml`
+  and sync the same way.
+
+---
+
+## Verification
+
+### Workloads
+
+```bash
+# Pods in a deployment namespace (namespace = <client>-<environment>)
+kubectl get pods -n mycure-production
+
+# Services
+kubectl get svc -n mycure-production
+```
+
+### Ingress / Gateway
+
+Ingress is NGINX Gateway Fabric (Gateway API, not Ingress). Two gateways live in
+`nginx-gateway-system`:
+
+- `nginx-shared-gateway` — public LoadBalancer
+- `nginx-internal-gateway` — tailnet-internal (cluster default)
 
 ```bash
 # Control plane + data plane pods
 kubectl get pods -n nginx-gateway-system
 
-# Shared Gateway and its LoadBalancer IP
+# Gateways and their LoadBalancer IPs
 kubectl get gateway -n nginx-gateway-system
-kubectl get svc -n nginx-gateway-system nginx-shared-gateway-nginx
+kubectl get svc -n nginx-gateway-system
+
+# Routes for a deployment
+kubectl get httproute -n mycure-production
 ```
 
+### Secrets
 
-### Step 5: Deploy External Secrets Operator
+External Secrets Operator syncs from GCP Secret Manager:
 
 ```bash
-# Add Helm repository
-helm repo add external-secrets https://charts.external-secrets.io
-helm repo update
-
-# Install External Secrets Operator
-helm install external-secrets external-secrets/external-secrets \\
-  --namespace external-secrets-system \\
-  --create-namespace \\
-  --values infrastructure/external-secrets-operator/helm-values.yaml
-
-# Wait for ready
-kubectl wait --for=condition=ready pod \\
-  -l app.kubernetes.io/name=external-secrets \\
-  -n external-secrets-system \\
-  --timeout=300s
-
-# Create SecretStore (choose your provider)
-# AWS:
-cat infrastructure/external-secrets-operator/secretstore/aws-secretsmanager.yaml.template | \\
-  sed 's/{{ .Values.global.namespace }}/myclient-prod/g' | \\
-  kubectl apply -f -
-
-# Azure:
-# cat infrastructure/external-secrets-operator/secretstore/azure-keyvault.yaml.template | ...
-
-# GCP:
-# cat infrastructure/external-secrets-operator/secretstore/gcp-secretmanager.yaml.template | ...
-
-# Verify
-kubectl get secretstore -n myclient-prod
+kubectl get externalsecrets -n mycure-production
+kubectl describe externalsecret <name> -n mycure-production
 ```
 
-**Time:** ~3-5 minutes
-
-### Step 6: Deploy Velero (Backups)
+### Endpoints
 
 ```bash
-# Install Velero CLI
-brew install velero  # macOS
-# Or download from https://velero.io
-
-# Create backup credentials secret (via External Secrets)
-# See infrastructure/velero/helm-values.yaml for configuration
-
-# Add Helm repository
-helm repo add vmware-tanzu https://vmware-tanzu.github.io/helm-charts
-helm repo update
-
-# Install Velero
-helm install velero vmware-tanzu/velero \\
-  --namespace velero \\
-  --create-namespace \\
-  --values infrastructure/velero/helm-values.yaml \\
-  --set configuration.backupStorageLocation[0].bucket=myclient-prod-backups \\
-  --set configuration.backupStorageLocation[0].config.region=us-east-1
-
-# Wait for ready
-kubectl wait --for=condition=ready pod \\
-  -l app.kubernetes.io/name=velero \\
-  -n velero \\
-  --timeout=300s
-
-# Deploy backup schedules (replace values)
-cat infrastructure/velero/backup-schedules/hourly-critical.yaml | \\
-  sed 's/{{ .Values.global.namespace }}/myclient-prod/g' | \\
-  kubectl apply -f -
-
-cat infrastructure/velero/backup-schedules/daily-full.yaml | \\
-  sed 's/{{ .Values.global.namespace }}/myclient-prod/g' | \\
-  kubectl apply -f -
-
-cat infrastructure/velero/backup-schedules/weekly-archive.yaml | \\
-  sed 's/{{ .Values.global.namespace }}/myclient-prod/g' | \\
-  kubectl apply -f -
-
-# Verify
-velero schedule get
-velero backup get
-```
-
-**Time:** ~5 minutes
-
-### Step 7: Deploy ArgoCD (GitOps)
-
-```bash
-# Add Helm repository
-helm repo add argo https://argoproj.github.io/argo-helm
-helm repo update
-
-# Install ArgoCD
-helm install argocd argo/argo-cd \\
-  --namespace argocd \\
-  --create-namespace \\
-  --values infrastructure/argocd/helm-values.yaml
-
-# Wait for ready
-kubectl wait --for=condition=ready pod \\
-  -l app.kubernetes.io/name=argocd-server \\
-  -n argocd \\
-  --timeout=600s
-
-# Create HTTPRoute for UI access
-cat infrastructure/argocd/httproute.yaml.template | \\
-  sed 's/{{ .Values.global.domain }}/myclient.com/g' | \\
-  kubectl apply -f -
-
-# Get admin password
-ARGOCD_PASSWORD=$(kubectl -n argocd get secret argocd-initial-admin-secret \\
-  -o jsonpath="{.data.password}" | base64 -d)
-
-echo "ArgoCD Admin Password: $ARGOCD_PASSWORD"
-echo "ArgoCD URL: https://argocd.myclient.com"
-```
-
-**Time:** ~5-10 minutes
-
-### Step 8: Apply Security Policies
-
-```bash
-# Apply NetworkPolicies
-kubectl apply -f infrastructure/security/networkpolicies/default-deny-all.yaml
-kubectl apply -f infrastructure/security/networkpolicies/allow-gateway-to-apps.yaml
-kubectl apply -f infrastructure/security/networkpolicies/allow-apps-to-db.yaml
-kubectl apply -f infrastructure/security/networkpolicies/allow-apps-to-storage.yaml
-kubectl apply -f infrastructure/security/networkpolicies/deny-cross-namespace.yaml
-
-# Apply RBAC
-cat infrastructure/security/rbac/*.yaml.template | \\
-  sed 's/{{ .Values.global.namespace }}/myclient-prod/g' | \\
-  kubectl apply -f -
-
-# Verify
-kubectl get networkpolicy -n myclient-prod
-kubectl get serviceaccount -n myclient-prod
-kubectl get role -n myclient-prod
-```
-
-**Time:** ~2 minutes
-
-**Total Infrastructure Deployment Time:** ~30-40 minutes
-
----
-
-## Application Deployment
-
-### Option A: Via Helm (Direct)
-
-```bash
-# Deploy PostgreSQL
-helm install postgresql charts/api \\
-  --namespace myclient-prod \\
-  --values deployments/myclient/values-production.yaml \\
-  --set postgresql.enabled=true \\
-  --set api.enabled=false
-
-# Deploy Monobase API
-helm install api charts/api \\
-  --namespace myclient-prod \\
-  --values deployments/myclient/values-production.yaml \\
-  --set postgresql.enabled=false
-
-# Deploy API Worker (if enabled)
-helm install api-worker charts/api-worker \\
-  --namespace myclient-prod \\
-  --values deployments/myclient/values-production.yaml
-
-# Deploy Monobase Account
-helm install account charts/account \\
-  --namespace myclient-prod \\
-  --values deployments/myclient/values-production.yaml
-```
-
-### Option B: Via ArgoCD (Recommended)
-
-```bash
-# 1. Ensure ArgoCD is deployed
-# 2. Create ArgoCD Application (App-of-Apps)
-
-cat charts/argocd-bootstrap/root-app.yaml.template | \\
-  sed 's/{{ .Values.global.namespace }}/myclient-prod/g' | \\
-  sed 's/{{ .Values.argocd.repoURL }}/https:\\/\\/github.com\\/myclient\\/client-infra.git/g' | \\
-  kubectl apply -f -
-
-# 3. Watch deployment in ArgoCD UI
-# Open: https://argocd.myclient.com
-# Login with admin password from Step 7
-
-# 4. Or watch via CLI
-argocd app get myclient-prod-root --refresh
-
-# 5. Sync applications
-argocd app sync myclient-prod-root --async
-```
-
-**Time:** ~10-15 minutes for all applications
-
----
-
-## Post-Deployment Verification
-
-### 1. Verify All Pods Running
-
-```bash
-# Check all pods
-kubectl get pods -n myclient-prod
-
-# Expected pods:
-# - api-xxx (2-3 replicas)
-# - api-worker-xxx (2 replicas, if enabled)
-# - account-xxx (2 replicas)
-# - postgresql-xxx (3 replicas)
-# - minio-xxx (6 replicas, if enabled)
-# - valkey-xxx (3 replicas, if enabled)
-
-# Check pod status
-kubectl get pods -n myclient-prod -o wide
-
-# All should show STATUS: Running, READY: 1/1
-```
-
-### 2. Verify Services
-
-```bash
-# List services
-kubectl get svc -n myclient-prod
-
-# Expected services:
-# - api (ClusterIP)
-# - api-worker (ClusterIP)
-# - account (ClusterIP)
-# - postgresql (ClusterIP)
-# - minio (ClusterIP, if enabled)
-# - valkey (ClusterIP, if enabled)
-```
-
-### 3. Verify HTTPRoutes
-
-```bash
-# Check HTTPRoutes
-kubectl get httproute -n myclient-prod
-
-# Expected routes:
-# - api → api.myclient.com
-# - api-worker → sync.myclient.com (if enabled)
-# - account → app.myclient.com
-# - minio → storage.myclient.com (if enabled)
-
-# Check route status
-kubectl describe httproute api -n myclient-prod
-```
-
-### 4. Verify External Secrets
-
-```bash
-# Check ExternalSecrets
-kubectl get externalsecrets -n myclient-prod
-
-# Check sync status
-kubectl describe externalsecret api-secrets -n myclient-prod
-
-# Verify secrets created
-kubectl get secrets -n myclient-prod | grep secrets
-```
-
-### 5. Test Endpoints
-
-```bash
-# Test Monobase API health
-curl https://api.myclient.com/health
-# Expected: {"status": "ok"}
-
-# Test Monobase Account
-curl -I https://app.myclient.com
-# Expected: HTTP/2 200
-
-# Test API Worker (if enabled)
-curl https://sync.myclient.com/health
+curl https://api.mycureapp.com/health      # HapiHub API health
+curl -I https://app.mycureapp.com          # frontend
 ```
 
 ---
 
 ## DNS Configuration
 
-### Get LoadBalancer IP
+Point client domains at the public gateway's LoadBalancer IP.
 
 ```bash
-# Get Gateway LoadBalancer IP
-kubectl get gateway shared-gateway -n gateway-system \\
+# Public gateway LoadBalancer IP
+kubectl get gateway nginx-shared-gateway -n nginx-gateway-system \
   -o jsonpath='{.status.addresses[0].value}'
-
-# Example output: 54.123.456.789
 ```
 
-### Create DNS Records
-
-Create A records pointing to the LoadBalancer IP:
-
-```
-Type  | Name                  | Value
-------|-----------------------|----------------
-A     | api.myclient.com      | 54.123.456.789
-A     | app.myclient.com      | 54.123.456.789
-A     | sync.myclient.com     | 54.123.456.789
-A     | storage.myclient.com  | 54.123.456.789
-A     | argocd.myclient.com   | 54.123.456.789
-A     | grafana.myclient.com  | 54.123.456.789
-```
-
-**Or use wildcard:**
-
-```
-Type  | Name            | Value
-------|-----------------|----------------
-A     | *.myclient.com  | 54.123.456.789
-```
-
-### Verify DNS
+Create A records (wildcards preferred) for the served domains — e.g.
+`*.mycureapp.com`, `*.localfirsthealth.com`, `*.mycure.md`. See
+[../architecture/MULTI-DOMAIN-GATEWAY.md](../architecture/MULTI-DOMAIN-GATEWAY.md).
 
 ```bash
-# Check DNS resolution
-nslookup api.myclient.com
-dig api.myclient.com
-
-# Test TLS certificate
-curl -v https://api.myclient.com 2>&1 | grep subject
+nslookup app.mycureapp.com
+curl -v https://app.mycureapp.com 2>&1 | grep subject   # TLS cert (cert-manager)
 ```
 
 ---
 
-## Backup Configuration
+## Rollback
 
-### Configure Longhorn Backup Target
-
-```bash
-# Set backup target (S3 or NFS)
-kubectl -n longhorn-system patch settings.longhorn.io backup-target \\
-  --type=merge \\
-  --patch='{"value": "s3://myclient-prod-backups@us-east-1/longhorn"}'
-
-# Set backup credentials
-kubectl -n longhorn-system patch settings.longhorn.io backup-target-credential-secret \\
-  --type=merge \\
-  --patch='{"value": "longhorn-backup-credentials"}'
-
-# Verify
-kubectl get settings.longhorn.io backup-target -n longhorn-system -o yaml
-```
-
-### Test Backups
+Roll back by reverting the commit that caused the change — that is the source of
+truth ArgoCD reconciles to.
 
 ```bash
-# Test Velero backup
-velero backup create test-backup \\
-  --include-namespaces myclient-prod \\
-  --wait
-
-# Check backup status
-velero backup describe test-backup
-
-# List backups
-velero backup get
-
-# Test restore (to different namespace)
-kubectl create namespace myclient-restore-test
-velero restore create test-restore \\
-  --from-backup test-backup \\
-  --namespace-mappings myclient-prod:myclient-restore-test
-
-# Cleanup
-kubectl delete namespace myclient-restore-test
+git revert <commit>
+git push
 ```
+
+For an out-of-band emergency, ArgoCD can roll an app to a prior synced revision:
+
+```bash
+argocd app history <app-name>
+argocd app rollback <app-name> <revision>
+```
+
+This is temporary — the next sync reconciles back to Git, so follow up with a
+`git revert`. For data-level recovery, restore from a Velero backup (verify the
+backup first).
 
 ---
 
-## Monitoring Setup
+## Related Docs
 
-### Deploy Monitoring Stack (Optional)
-
-```bash
-# Add Helm repository
-helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
-helm repo update
-
-# Install kube-prometheus-stack
-helm install monitoring prometheus-community/kube-prometheus-stack \\
-  --namespace monitoring \\
-  --create-namespace \\
-  --values infrastructure/monitoring/helm-values.yaml
-
-# Wait for ready
-kubectl wait --for=condition=ready pod \\
-  -l app.kubernetes.io/name=prometheus \\
-  -n monitoring \\
-  --timeout=600s
-
-# Apply custom alert rules
-kubectl apply -f infrastructure/monitoring/prometheus-rules.yaml
-
-# Create HTTPRoute for Grafana
-cat infrastructure/monitoring/httproute.yaml.template | \\
-  sed 's/{{ .Values.global.domain }}/myclient.com/g' | \\
-  kubectl apply -f -
-
-# Get Grafana password
-GRAFANA_PASSWORD=$(kubectl get secret -n monitoring monitoring-grafana \\
-  -o jsonpath="{.data.admin-password}" | base64 -d)
-
-echo "Grafana URL: https://grafana.myclient.com"
-echo "Username: admin"
-echo "Password: $GRAFANA_PASSWORD"
-```
-
-**Time:** ~10-15 minutes
-
----
-
-## Deployment Checklist
-
-### Infrastructure
-- [ ] Longhorn deployed and healthy
-- [ ] cert-manager deployed
-- [ ] NGINX Gateway Fabric deployed
-- [ ] LoadBalancer IP assigned
-- [ ] External Secrets Operator deployed
-- [ ] Velero deployed
-- [ ] ArgoCD deployed
-- [ ] Security policies applied
-
-### Applications
-- [ ] PostgreSQL replica set healthy (3 nodes)
-- [ ] Monobase API pods running
-- [ ] API Worker pods running (if enabled)
-- [ ] Monobase Account pods running
-- [ ] MinIO cluster healthy (if enabled)
-- [ ] Valkey running (if enabled)
-
-### Networking
-- [ ] HTTPRoutes created
-- [ ] DNS records configured
-- [ ] TLS certificates issued
-- [ ] All endpoints accessible
-
-### Security
-- [ ] NetworkPolicies applied
-- [ ] Pod Security Standards enforced
-- [ ] Secrets synced from KMS
-- [ ] RBAC configured
-
-### Backups
-- [ ] Backup schedules created
-- [ ] Test backup successful
-- [ ] S3 bucket configured
-- [ ] Encryption enabled
-
----
-
-## Rollback Procedures
-
-### Rollback Application
-
-```bash
-# Via Helm
-helm rollback api -n myclient-prod
-
-# Via ArgoCD
-argocd app rollback myclient-prod-api
-
-# To specific revision
-helm rollback api 3 -n myclient-prod
-```
-
-### Rollback Infrastructure
-
-```bash
-# Restore from Velero backup
-velero restore create rollback-$(date +%Y%m%d) \\
-  --from-backup daily-full-20250115020000
-
-# Or selective restore
-velero restore create \\
-  --from-backup daily-full-20250115020000 \\
-  --include-resources deployments,services
-```
-
----
-
-## Next Steps
-
-1. **Configure monitoring alerts** - Update Alertmanager with Slack/PagerDuty webhooks
-2. **Test disaster recovery** - Perform restore test monthly
-3. **Security hardening** - Review [SECURITY-HARDENING.md](SECURITY-HARDENING.md)
-4. **Performance tuning** - Monitor and adjust resource limits
-5. **Documentation** - Document any client-specific procedures
-
----
-
-## Troubleshooting
-
-See [TROUBLESHOOTING.md](TROUBLESHOOTING.md) for common issues and solutions.
+- [CLUSTER-PROVISIONING.md](CLUSTER-PROVISIONING.md) — provisioning a cluster
+- [CLIENT-ONBOARDING.md](CLIENT-ONBOARDING.md) — adding a new deployment
+- [INFRASTRUCTURE-REQUIREMENTS.md](INFRASTRUCTURE-REQUIREMENTS.md) — cluster sizing and prerequisites
+- [../architecture/GITOPS-ARGOCD.md](../architecture/GITOPS-ARGOCD.md) — App-of-Apps and auto-discovery
+- [../architecture/GATEWAY-API.md](../architecture/GATEWAY-API.md) — Gateway API / NGINX Gateway Fabric
+- [../architecture/MULTI-DOMAIN-GATEWAY.md](../architecture/MULTI-DOMAIN-GATEWAY.md) — multi-domain listeners
+- [TROUBLESHOOTING.md](TROUBLESHOOTING.md) — common issues
