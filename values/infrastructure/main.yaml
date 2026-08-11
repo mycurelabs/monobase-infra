@@ -152,6 +152,54 @@ nginxGatewayResources:
         protocol: HTTP
         hostname: "*.mycure.md"
 
+  # Tailnet-only gateway — the CLUSTER-DEFAULT ingress (deny-first): every
+  # deployment's routes land here unless the deployment explicitly opts into
+  # the public shared gateway above (prod does, tagged PUBLIC). ClusterIP data
+  # plane (never a DO LB) exposed on the tailnet by the Tailscale operator;
+  # devs + test boxes reach it via the device's 100.x IP, the internet can't.
+  extraGateways:
+    - name: nginx-tailnet-gateway
+      gatewayClassName: nginx
+      infrastructure:
+        annotations:
+          tailscale.com/expose: "true"
+          tailscale.com/hostname: "nginx-tailnet-gateway"
+      nginxProxy:
+        serviceType: ClusterIP
+        # Preprod-grade availability; the tailscale proxy pod is single anyway.
+        replicas: 1
+      listeners:
+        # Exact-hostname listeners for the preprod app<->api pair (anti-HTTP/2-
+        # coalescing, see the shared-gateway note above / mono#2540).
+        - name: https-preprod-mycure
+          port: 443
+          protocol: HTTPS
+          hostname: "mycure.preprod.localfirsthealth.com"
+          tlsSecretName: nginx-gateway-tls-preprod-mycure
+        - name: https-preprod-hapihub
+          port: 443
+          protocol: HTTPS
+          hostname: "hapihub.preprod.localfirsthealth.com"
+          tlsSecretName: nginx-gateway-tls-preprod-hapihub
+        - name: https-preprod-lfh
+          port: 443
+          protocol: HTTPS
+          hostname: "*.preprod.localfirsthealth.com"
+          tlsSecretName: nginx-gateway-tls-preprod
+        - name: http-preprod-lfh
+          port: 80
+          protocol: HTTP
+          hostname: "*.preprod.localfirsthealth.com"
+        # Cadence QUIC (UDPRoute): preprod hub port 6473, preprod relay 7842.
+        # No SNI on UDP — port-demuxed. publicAddr in the deployment values
+        # advertises <tailnet-IP>:6473 once the tailscale device exists.
+        - name: cadence-quic-preprod
+          port: 6473
+          protocol: UDP
+        - name: relay-quic-preprod
+          port: 7842
+          protocol: UDP
+
   tls:
     certificates:
       # Exact-name certs for the anti-coalescing listeners above — MUST stay

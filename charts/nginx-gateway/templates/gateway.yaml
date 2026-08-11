@@ -1,15 +1,44 @@
+{{- $gateways := list }}
 {{- if .Values.gateway.listeners }}
+{{- $gateways = append $gateways .Values.gateway }}
+{{- end }}
+{{- range .Values.extraGateways }}
+{{- $gateways = append $gateways . }}
+{{- end }}
+{{- range $gw := $gateways }}
+---
 apiVersion: gateway.networking.k8s.io/v1
 kind: Gateway
 metadata:
-  name: {{ .Values.gateway.name }}
-  namespace: {{ include "nginx-gateway.namespace" . }}
+  name: {{ $gw.name }}
+  namespace: {{ include "nginx-gateway.namespace" $ }}
   labels:
-    {{- include "nginx-gateway.labels" . | nindent 4 }}
+    {{- include "nginx-gateway.labels" $ | nindent 4 }}
+  {{- with $gw.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
 spec:
-  gatewayClassName: {{ .Values.gateway.gatewayClassName }}
+  gatewayClassName: {{ $gw.gatewayClassName }}
+  {{- if or $gw.infrastructure $gw.nginxProxy }}
+  infrastructure:
+    {{- with $gw.infrastructure }}
+    {{- with .annotations }}
+    {{- /* Propagated by NGF onto the provisioned data-plane resources (incl. the
+           Service) — how the tailnet gateway gets its tailscale.com/expose. */}}
+    annotations:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
+    {{- end }}
+    {{- if $gw.nginxProxy }}
+    parametersRef:
+      group: gateway.nginx.org
+      kind: NginxProxy
+      name: {{ $gw.name }}-proxy-config
+    {{- end }}
+  {{- end }}
   listeners:
-    {{- range .Values.gateway.listeners }}
+    {{- range $gw.listeners }}
     - name: {{ .name }}
       port: {{ .port }}
       protocol: {{ .protocol }}

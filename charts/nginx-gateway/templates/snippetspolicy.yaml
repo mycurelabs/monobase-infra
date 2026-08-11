@@ -23,6 +23,11 @@ spec:
     - group: gateway.networking.k8s.io
       kind: Gateway
       name: {{ $.Values.gateway.name }}
+    {{- range $.Values.extraGateways }}
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      name: {{ .name }}
+    {{- end }}
   snippets:
     {{- range .snippets }}
     - context: {{ .context }}

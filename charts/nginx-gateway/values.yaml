@@ -20,6 +20,23 @@ gateway:
   #   protocol: HTTP
   #   hostname: "*.stg.localfirsthealth.com"
 
+# Additional Gateways (same listener schema as `gateway`), each optionally with
+# its own data-plane config via a per-Gateway NginxProxy (merged over the
+# class-level one by NGF) and infrastructure annotations propagated onto the
+# provisioned Service. Used for the tailnet-only gateway (deny-first default).
+extraGateways: []
+# Example:
+# - name: nginx-tailnet-gateway
+#   gatewayClassName: nginx
+#   annotations: {}                      # Gateway object annotations (e.g. external-dns target)
+#   infrastructure:
+#     annotations:
+#       tailscale.com/expose: "true"     # lands on the data-plane Service
+#   nginxProxy:
+#     serviceType: ClusterIP
+#     replicas: 1
+#   listeners: []                        # same schema as gateway.listeners
+
 # Cluster-wide SnippetsPolicies attached to the shared Gateway.
 # Owned here (not per-app chart) so two releases can never inject the
 # same directive into the same nginx context — that triggers

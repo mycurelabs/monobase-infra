@@ -1,0 +1,27 @@
+{{- /*
+Per-Gateway NginxProxy (attached via spec.infrastructure.parametersRef in
+gateway.yaml). NGF merges it over the GatewayClass-level NginxProxy, so the
+data plane inherits infra-pool placement, njs mounts and sizing — only the
+fields set here differ. Used by the tailnet gateway to get a ClusterIP data
+plane (born ClusterIP: must never provision a DO LB).
+*/ -}}
+{{- range $gw := .Values.extraGateways }}
+{{- if $gw.nginxProxy }}
+---
+apiVersion: gateway.nginx.org/v1alpha2
+kind: NginxProxy
+metadata:
+  name: {{ $gw.name }}-proxy-config
+  namespace: {{ include "nginx-gateway.namespace" $ }}
+  labels:
+    {{- include "nginx-gateway.labels" $ | nindent 4 }}
+spec:
+  kubernetes:
+    {{- with $gw.nginxProxy.replicas }}
+    deployment:
+      replicas: {{ . }}
+    {{- end }}
+    service:
+      type: {{ $gw.nginxProxy.serviceType }}
+{{- end }}
+{{- end }}
