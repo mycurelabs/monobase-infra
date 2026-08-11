@@ -59,14 +59,14 @@ Get the namespace for resources
 Get the gateway name
 */}}
 {{- define "signoz.gateway.name" -}}
-{{- .Values.global.gateway.name | default "shared-gateway" }}
+{{- .Values.global.gateway.name | default "nginx-tailnet-gateway" }}
 {{- end }}
 
 {{/*
 Get the gateway namespace
 */}}
 {{- define "signoz.gateway.namespace" -}}
-{{- .Values.global.gateway.namespace | default "gateway-system" }}
+{{- .Values.global.gateway.namespace | default "nginx-gateway-system" }}
 {{- end }}
 
 {{/*

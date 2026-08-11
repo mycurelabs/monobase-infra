@@ -5,6 +5,6 @@ namespace: default
 # serves the `artifacts` bucket with clean object-key paths (no /bucket prefix).
 minioDomain: example.com
 gateway:
-  name: nginx-shared-gateway
+  name: nginx-tailnet-gateway
   namespace: nginx-gateway-system
   sectionName: https-lfh

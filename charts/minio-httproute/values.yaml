@@ -1,5 +1,5 @@
 hostname: storage.example.com
 namespace: default
 gateway:
-  name: shared-gateway
+  name: nginx-tailnet-gateway
   namespace: gateway-system
