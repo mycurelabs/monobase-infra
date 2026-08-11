@@ -160,6 +160,11 @@ nginxGatewayResources:
   extraGateways:
     - name: nginx-tailnet-gateway
       gatewayClassName: nginx
+      annotations:
+        # external-dns publishes attached routes' hostnames with THIS target
+        # (the gateway's tailnet device IP) instead of the Gateway's status
+        # address (a ClusterIP, useless off-cluster).
+        external-dns.alpha.kubernetes.io/target: "100.101.16.24"
       infrastructure:
         annotations:
           tailscale.com/expose: "true"
