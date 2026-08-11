@@ -1,6 +1,7 @@
 {{- if .Values.ollamaEgress.enabled }}
 # ArgoCD Application: ollama-egress
-# Sync Wave 1 — Tailscale egress to the vanaheim workstation's Ollama (medical-AI inference backend).
+# Sync Wave 1 — egress Service to the vanaheim workstation's Ollama (medical-AI
+# inference backend), proxied on the tailnet by the tailscale-operator.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:

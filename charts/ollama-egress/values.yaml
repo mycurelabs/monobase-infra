@@ -1,13 +1,7 @@
-# Egress to an Ollama on the tailnet. Lives in its own privileged namespace because the app
-# namespaces are PSA=restricted (which forbids the NET_ADMIN the tailscale kernel mode needs).
+# Egress to an Ollama on the tailnet, via the Tailscale operator (cluster
+# egress). This chart owns the `tailscale` namespace: PSA=privileged because
+# the operator's proxy pods need NET_ADMIN (app namespaces are restricted).
 namespace: tailscale
-destIP: "100.120.88.93"          # vanaheim's tailnet IP
+# MagicDNS name of the Ollama host (vanaheim) — survives tailnet IP changes.
+tailnetFqdn: office-vanaheim.tail06ec7f.ts.net
 port: 11434
-hostname: ollama-egress-preprod
-tailscaleImage: tailscale/tailscale:v1.84.3
-socatImage: alpine/socat:latest
-externalSecret:
-  enabled: true
-  secretStore: gcp-secretstore
-  secretStoreKind: ClusterSecretStore
-  remoteKey: mycure-preprod-tailscale-ollama-authkey

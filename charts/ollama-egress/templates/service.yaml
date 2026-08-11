@@ -1,9 +1,22 @@
+{{- /*
+Tailscale-operator cluster egress: the operator sees the annotation, spins up a
+proxy pod in this (privileged) namespace and rewrites externalName to it.
+Consumers keep the stable URL ollama.{{ .Values.namespace }}.svc:{{ .Values.port }};
+same-port DNAT to the tailnet target, so consumer NetworkPolicies (any-ns:11434)
+still match. Replaces the hand-rolled tailscaled+socat pod (and its expiring
+device authkey — the operator mints its own via OAuth).
+*/ -}}
 apiVersion: v1
 kind: Service
 metadata:
   name: ollama
   namespace: {{ .Values.namespace }}
+  annotations:
+    tailscale.com/tailnet-fqdn: {{ .Values.tailnetFqdn }}
 spec:
-  selector: { app: ollama-egress }
+  type: ExternalName
+  externalName: placeholder  # operator-managed
   ports:
-    - { name: ollama, port: {{ .Values.port }}, targetPort: {{ .Values.port }}, protocol: TCP }
+    - name: ollama
+      port: {{ .Values.port }}
+      protocol: TCP
