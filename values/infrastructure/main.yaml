@@ -100,11 +100,12 @@ nginxGatewayResources:
       - name: cadence-quic-prod
         port: 6472
         protocol: UDP
-      # Prod relay QUIC — port 7843 (7842 is iroh's default, kept by the preprod
-      # relay on the tailnet gateway). Anchor advertises relay_quic_port=7843 in
-      # its doc so #3166-release boxes probe here.
+      # Prod relay QUIC — iroh's DEFAULT 7842. Free on the public gateway now that
+      # the preprod relay lives on the internal (tailnet) gateway, so no port
+      # collision and no relay_quic_port advertisement needed: boxes probe the
+      # default, no dependency on #3166 adoption across the fleet.
       - name: relay-quic-prod
-        port: 7843
+        port: 7842
         protocol: UDP
       # Production mycure.md
       - name: https-mycure

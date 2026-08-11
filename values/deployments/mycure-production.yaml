@@ -473,11 +473,20 @@ mailpit:
 # on it; the anchor advertises it and boxes run maestroapp our-relay-only.
 cadenceRelay:
   nodePool: "prod-apps"
-  # REVERTED 2026-08-07: prod relay stays on its own LB. The gateway cutover failed at PROD SCALE —
-  # the full hard-NAT box fleet reconnecting through the gateway at once flooded the relay
-  # ("did not reach established state" storm) and the gateway→relay path timed out. Preprod (single
-  # box, alfheim) never surfaced this. Retiring the prod relay LB needs the gateway/relay path to
-  # handle the reconnect herd (capacity + connection settings) — investigate before retrying.
+  # Whole relay on the PUBLIC gateway (retires the dedicated DO LB, #328). 443 leg via HTTPRoute +
+  # BackendTLSPolicy; QUIC leg via UDPRoute on relay-quic-prod (iroh default 7842). Mirrors the
+  # proven preprod config. The in-cluster anchor reaches the relay via the coredns hairpin → this
+  # Service's ClusterIP.
+  # The 2026-08-07 attempt failed only because it was a MID-DAY cutover: the full online fleet
+  # reconnected in one synchronized herd and flooded the relay. Retried OFF-HOURS (no clinic hours,
+  # fleet powered down) so the at-cutover reconnect is negligible and the morning power-on ramp is
+  # naturally staggered — the reconnect load the relay already absorbs daily.
+  serviceType: ClusterIP
+  gatewayRoute:
+    enabled: true
+    hostname: cadence-relay.localfirsthealth.com
+    sectionName: https-lfh
+    udpListener: relay-quic-prod
 
 # ===== P2P SYNC: Cadence v2 (iroh 1.0 QUIC) — Tier 4.4 =====
 # The anchor hub. Reachability via the shared gateway's UDPRoute (preprod's
