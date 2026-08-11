@@ -43,7 +43,13 @@ jobs:
           install: true
           cache: true
 
+      # GITHUB_TOKEN authenticates the plugin downloads — unauthenticated
+      # api.github.com hits the 60/hr rate limit and 403s. continue-on-error so a
+      # transient hiccup can't red this report-only job.
       - name: tflint --init (install ruleset plugins)
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: tflint --init --config="${GITHUB_WORKSPACE}/.tflint.hcl"
 
       - name: mise run lint (report-only)
