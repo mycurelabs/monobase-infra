@@ -11,7 +11,7 @@ global:
   # exposure is an explicit opt-in — an overlay must set the PUBLIC-tagged
   # nginx-shared-gateway override (prod does).
   gateway:
-    name: nginx-tailnet-gateway
+    name: nginx-internal-gateway
     namespace: nginx-gateway-system
 
   storage:

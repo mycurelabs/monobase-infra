@@ -56,11 +56,11 @@ Gateway hostname - defaults to nocodb.{global.domain}
 {{- end }}
 
 {{- define "nocodb.gateway.name" -}}
-{{- default "nginx-tailnet-gateway" .Values.global.gateway.name }}
+{{- required "global.gateway.name is required (set in the deployment values, e.g. values/deployments/_base)" .Values.global.gateway.name }}
 {{- end }}
 
 {{- define "nocodb.gateway.namespace" -}}
-{{- default "nginx-gateway-system" .Values.global.gateway.namespace }}
+{{- required "global.gateway.namespace is required (set in the deployment values)" .Values.global.gateway.namespace }}
 {{- end }}
 
 {{/*

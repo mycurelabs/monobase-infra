@@ -1,5 +1,5 @@
 hostname: storage.example.com
 namespace: default
 gateway:
-  name: nginx-tailnet-gateway
-  namespace: gateway-system
+  name: ""       # required — injected from global.gateway by argocd-applications
+  namespace: ""

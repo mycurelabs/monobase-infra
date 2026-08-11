@@ -21,6 +21,6 @@ data:
     # the same listeners/certs, so https URLs (cadence -> hapihub auth/JWKS)
     # keep working. Exact relay rewrite above must stay first.
     rewrite stop {
-      name regex (.*)\.preprod\.localfirsthealth\.com nginx-tailnet-gateway-nginx.nginx-gateway-system.svc.cluster.local
+      name regex (.*)\.preprod\.localfirsthealth\.com nginx-internal-gateway-nginx.nginx-gateway-system.svc.cluster.local
       answer auto
     }
