@@ -1,7 +1,7 @@
 {{- if .Values.tailscaleOperator.enabled }}
 # ArgoCD Application: tailscale-operator
 # Sync Wave 1 — Tailscale K8s operator: exposes annotated Services on the tailnet.
-# Backs the nginx-tailnet-gateway (deny-first: tailnet-only is the cluster default).
+# Backs the nginx-internal-gateway (deny-first: tailnet-only is the cluster default).
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:

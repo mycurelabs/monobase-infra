@@ -59,14 +59,14 @@ Get the namespace for resources
 Get the gateway name
 */}}
 {{- define "grafana.gateway.name" -}}
-{{- .Values.global.gateway.name | default "nginx-tailnet-gateway" }}
+{{- required "global.gateway.name is required (set in the deployment values)" .Values.global.gateway.name }}
 {{- end }}
 
 {{/*
 Get the gateway namespace
 */}}
 {{- define "grafana.gateway.namespace" -}}
-{{- .Values.global.gateway.namespace | default "nginx-gateway-system" }}
+{{- required "global.gateway.namespace is required (set in the deployment values)" .Values.global.gateway.namespace }}
 {{- end }}
 
 {{/*

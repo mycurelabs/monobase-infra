@@ -66,7 +66,7 @@ nginxGatewayResources:
     enabled: false  # GatewayClass created by operator chart
 
   # PUBLIC gateway — prod only, internet-exposed BY INTENT. Nonprod/internal
-  # listeners live on nginx-tailnet-gateway below (deny-first default).
+  # listeners live on nginx-internal-gateway below (deny-first default).
   gateway:
     name: nginx-shared-gateway
     namespace: nginx-gateway-system
@@ -109,13 +109,14 @@ nginxGatewayResources:
         protocol: HTTP
         hostname: "*.mycure.md"
 
-  # Tailnet-only gateway — the CLUSTER-DEFAULT ingress (deny-first): every
+  # INTERNAL gateway — the CLUSTER-DEFAULT ingress (deny-first): every
   # deployment's routes land here unless the deployment explicitly opts into
   # the public shared gateway above (prod does, tagged PUBLIC). ClusterIP data
-  # plane (never a DO LB) exposed on the tailnet by the Tailscale operator;
-  # devs + test boxes reach it via the device's 100.x IP, the internet can't.
+  # plane (never a DO LB). Private access is provider-agnostic — today the
+  # Tailscale operator exposes it on the tailnet (devs + boxes hit the device's
+  # 100.x IP); a VPN/subnet-router could front the same Service later.
   extraGateways:
-    - name: nginx-tailnet-gateway
+    - name: nginx-internal-gateway
       gatewayClassName: nginx
       annotations:
         # external-dns publishes attached routes' hostnames with THIS target
@@ -125,7 +126,7 @@ nginxGatewayResources:
       infrastructure:
         annotations:
           tailscale.com/expose: "true"
-          tailscale.com/hostname: "nginx-tailnet-gateway"
+          tailscale.com/hostname: "nginx-internal-gateway"
       nginxProxy:
         serviceType: ClusterIP
         # Preprod-grade availability; the tailscale proxy pod is single anyway.
@@ -468,7 +469,7 @@ ollamaEgress:
   enabled: true
 
 # Tailscale K8s operator — tailnet exposure for cluster services. Backs the
-# nginx-tailnet-gateway: tailnet-only is the cluster-default gateway (deny-first),
+# nginx-internal-gateway: tailnet-only is the cluster-default gateway (deny-first),
 # public exposure is an explicit prod opt-in on nginx-shared-gateway.
 tailscaleOperator:
   enabled: true

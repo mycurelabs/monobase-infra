@@ -5,8 +5,8 @@ metadata:
   namespace: {{ .Values.namespace }}
 spec:
   parentRefs:
-    - name: {{ .Values.gateway.name }}
-      namespace: {{ .Values.gateway.namespace }}
+    - name: {{ required "gateway.name is required (injected from global.gateway)" .Values.gateway.name }}
+      namespace: {{ required "gateway.namespace is required (injected from global.gateway)" .Values.gateway.namespace }}
       sectionName: {{ .Values.gateway.sectionName }}
   hostnames:
     - {{ .Values.hostname }}

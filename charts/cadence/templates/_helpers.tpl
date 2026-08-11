@@ -57,10 +57,10 @@ app.kubernetes.io/name: cadence
 
 {{/* Gateway parent ref */}}
 {{- define "cadence.gateway.name" -}}
-{{- default "nginx-tailnet-gateway" .Values.global.gateway.name }}
+{{- required "global.gateway.name is required (set in the deployment values, e.g. values/deployments/_base)" .Values.global.gateway.name }}
 {{- end }}
 {{- define "cadence.gateway.namespace" -}}
-{{- default "nginx-gateway-system" .Values.global.gateway.namespace }}
+{{- required "global.gateway.namespace is required (set in the deployment values)" .Values.global.gateway.namespace }}
 {{- end }}
 {{- define "cadence.gateway.hostname" -}}
 {{- if .Values.gateway.hostname }}{{ .Values.gateway.hostname }}{{ else }}{{ printf "cadence.%s" .Values.global.domain }}{{ end }}

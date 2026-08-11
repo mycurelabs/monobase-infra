@@ -26,7 +26,7 @@ gateway:
 # provisioned Service. Used for the tailnet-only gateway (deny-first default).
 extraGateways: []
 # Example:
-# - name: nginx-tailnet-gateway
+# - name: nginx-internal-gateway
 #   gatewayClassName: nginx
 #   annotations: {}                      # Gateway object annotations (e.g. external-dns target)
 #   infrastructure:
