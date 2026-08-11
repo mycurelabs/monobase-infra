@@ -458,3 +458,9 @@ signoz:
 # Tailscale egress to the vanaheim workstation Ollama (medical-AI preprod inference)
 ollamaEgress:
   enabled: true
+
+# Tailscale K8s operator — tailnet exposure for cluster services. Backs the
+# nginx-tailnet-gateway: tailnet-only is the cluster-default gateway (deny-first),
+# public exposure is an explicit prod opt-in on nginx-shared-gateway.
+tailscaleOperator:
+  enabled: true

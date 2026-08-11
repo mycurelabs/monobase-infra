@@ -1,0 +1,23 @@
+# Tailscale Kubernetes operator wrapper. The operator joins the tailnet as
+# tag:k8s-operator and provisions proxy devices (tag:k8s) for Services annotated
+# tailscale.com/expose — used by the nginx-tailnet-gateway (deny-first: tailnet-only
+# is the cluster default, public exposure is an explicit prod opt-in).
+# Lives in the privileged `tailscale` namespace (proxy pods need NET_ADMIN;
+# app namespaces are PSA=restricted).
+namespace: tailscale
+
+externalSecret:
+  enabled: true
+  secretStore: gcp-secretstore
+  secretStoreKind: ClusterSecretStore
+  clientIdRemoteKey: infrastructure-tailscale-operator-oauth-client-id
+  clientSecretRemoteKey: infrastructure-tailscale-operator-oauth-client-secret
+
+# ===== Upstream tailscale-operator chart values (nested for the subchart) =====
+# oauth is intentionally unset: the upstream chart then uses the pre-created
+# operator-oauth Secret (ExternalSecret above) — never commit credentials.
+tailscale-operator:
+  operatorConfig:
+    hostname: doks-operator
+  proxyConfig:
+    defaultTags: tag:k8s
