@@ -1,0 +1,37 @@
+{{- if .Values.tailscaleOperator.enabled }}
+# ArgoCD Application: tailscale-operator
+# Sync Wave 1 — Tailscale K8s operator: exposes annotated Services on the tailnet.
+# Backs the nginx-tailnet-gateway (deny-first: tailnet-only is the cluster default).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: tailscale-operator
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: {{ .Values.argocd.repoURL }}
+    targetRevision: {{ .Values.argocd.targetRevision }}
+    path: charts/tailscale-operator
+    helm:
+      releaseName: tailscale-operator
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: tailscale
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false
+      - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 10s
+        maxDuration: 5m
+{{- end }}
