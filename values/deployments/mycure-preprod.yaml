@@ -514,6 +514,18 @@ cadence:
   # resurrection telemetry, gc/dlq/reroute maintenance-error counters).
   image:
     tag: "2.1.78"
+  # Never share a node with the PG primary: co-location (both on one 4-core nonprod node,
+  # 2026-08-11) cut baseline mint throughput ~3x — hashing and PG execution compete for the
+  # same cores. Required (not preferred): on a small pool a silent re-co-location would just
+  # re-break measurements; an unschedulable pod is the visible failure we want.
+  affinity:
+    podAntiAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+      - labelSelector:
+          matchLabels:
+            app.kubernetes.io/name: postgresql
+            app.kubernetes.io/component: primary
+        topologyKey: kubernetes.io/hostname
   publicAddr: "100.74.26.73:6473"
   # CUTOVER: anchor homes on our relay (QUIC-addr-disc lets netcheck rank it) + advertises it in the doc.
   # All boxes are being moved to maestroapp 2.0.28 (our-relay-only) in the same window.
