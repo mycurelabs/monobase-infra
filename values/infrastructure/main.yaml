@@ -71,6 +71,14 @@ nginxGatewayResources:
     name: nginx-shared-gateway
     namespace: nginx-gateway-system
     gatewayClassName: nginx
+    # STEP 1 of the nginx-shared-gateway -> nginx-public-gateway rename (#306):
+    # disown the DO LB so it SURVIVES this Service's deletion. The renamed
+    # gateway's Service is then born with the load-balancer-id annotation and
+    # adopts the same LB (IP 104.248.98.161 preserved). Must land on the live
+    # Service BEFORE the rename deletes it. Removed once the rename is done.
+    infrastructure:
+      annotations:
+        service.kubernetes.io/do-loadbalancer-disown: "true"
     listeners:
       # Production localfirsthealth.com
       - name: https-lfh
