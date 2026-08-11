@@ -95,13 +95,3 @@ gateway:
   parentRefs:
     - name: shared-gateway
       namespace: gateway-system
-
-  # Optional: Rate limiting for Grafana web UI
-  rateLimit:
-    enabled: false
-    perIP:
-      requests: 100
-      unit: Minute
-    burst:
-      requests: 500
-      unit: Hour

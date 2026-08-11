@@ -9,16 +9,12 @@ global:
 
 # NetworkPolicy configuration
 networkPolicies:
-  # Enable default deny all policy (recommended for zero-trust security)
-  defaultDenyAll: true
-
-  # Enable cross-namespace traffic restrictions
-  denyCrossNamespace: true
-
-  # Enable application-specific policies
-  allowAppsToDb: true
-  allowAppsToStorage: true
-  allowGatewayToApps: true
+  # false = deny-cross-namespace carries a blanket allow: nginx-gateway-system
+  # may reach every pod on every port.
+  # true (strict) = the blanket allow is dropped; each app must carry its own
+  # port-scoped gateway ingress rule (charts/app, hapihub, cadence, cadence-relay
+  # and mailpit templates do; plain minio is covered by allow-gateway-to-minio here).
+  strictGatewayIngress: false
 
 # RBAC configuration
 rbac:

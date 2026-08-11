@@ -25,6 +25,12 @@ global:
   # Velero-restored PVCs (their bitnami init state is keyed to prod passwords).
   secretPrefix: "mycure-production"
 
+# Strict gateway ingress canary (preprod-first): drops the baseline's blanket
+# nginx-gateway-system → all-pods allow; apps rely on their own port-scoped
+# gateway rules. Promote to prod once preprod routes verify clean.
+securityBaseline:
+  strictGatewayIngress: true
+
 mycure-dashboard:
   resources:
     requests:

@@ -12,4 +12,14 @@ spec:
       {{- include "app.selectorLabels" . | nindent 6 }}
   policyTypes:
     {{- toYaml .Values.networkPolicy.policyTypes | nindent 4 }}
+  ingress:
+    # NGINX Gateway Fabric data plane → app port. Required once the
+    # security-baseline runs strictGatewayIngress (no blanket gateway allow).
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .Values.global.gateway.namespace }}
+      ports:
+        - protocol: TCP
+          port: {{ .Values.service.targetPort }}
 {{- end }}

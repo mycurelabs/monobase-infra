@@ -117,9 +117,10 @@ echo "Validating Terraform modules..."
 description = "Validate Helm charts"
 run = """
 echo "Validating Helm charts..."
-helm template test charts/api --dry-run > /dev/null
-helm template test charts/account --dry-run > /dev/null
 helm template test charts/namespace --dry-run > /dev/null
+helm template test charts/security-baseline --dry-run > /dev/null
+helm template test charts/security-baseline --set networkPolicies.strictGatewayIngress=true --dry-run > /dev/null
+helm template test charts/app --set enabled=true --set image.repository=test --set-string image.tag=test --dry-run > /dev/null
 """
 
 [tasks.validate]
