@@ -519,7 +519,7 @@ cadence:
   # on no-progress, tagset-keyed baseline gates, per-scope GC horizon + apply_below_gc_horizon
   # resurrection telemetry, gc/dlq/reroute maintenance-error counters).
   image:
-    tag: "2.1.80"
+    tag: "2.1.81"
   # Never share a node with the PG primary: co-location (both on one 4-core nonprod node,
   # 2026-08-11) cut baseline mint throughput ~3x — hashing and PG execution compete for the
   # same cores. Required (not preferred): on a small pool a silent re-co-location would just
