@@ -1,0 +1,26 @@
+{{- if .Values.enabled }}
+# Gateway → mailpit UI. SMTP ingress (apps → mailpit-smtp) rides the
+# baseline's same-namespace allow. Named port: the upstream chart exposes
+# the UI container port as "http".
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "mailpit.fullname" . }}
+  namespace: {{ include "mailpit.namespace" . }}
+  labels:
+    {{- include "mailpit.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: mailpit
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ include "mailpit.gateway.namespace" . }}
+      ports:
+        - protocol: TCP
+          port: http
+{{- end }}

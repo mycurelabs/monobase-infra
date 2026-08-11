@@ -49,16 +49,3 @@ gateway:
   # parentRefs:
   #   - name: custom-gateway
   #     namespace: custom-namespace
-
-  # Optional: Rate limiting configuration for Mailpit web UI
-  # Mailpit is typically for internal/staging use, lighter limits than MinIO
-  rateLimit:
-    enabled: false
-    # Per-IP rate limit
-    perIP:
-      requests: 50
-      unit: Second
-    # Burst limit
-    burst:
-      requests: 200
-      unit: Minute

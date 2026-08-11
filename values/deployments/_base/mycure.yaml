@@ -139,6 +139,22 @@ hapihub:
   podDisruptionBudget:
     enabled: false
 
+  # Port-scoped gateway ingress — required under the security-baseline's
+  # strictGatewayIngress (no blanket gateway allow). Egress stays governed
+  # by the namespace-wide baseline rules.
+  networkPolicy:
+    enabled: true
+    policyTypes:
+      - Ingress
+    ingress:
+      - from:
+          - namespaceSelector:
+              matchLabels:
+                kubernetes.io/metadata.name: nginx-gateway-system
+        ports:
+          - protocol: TCP
+            port: 7500
+
   externalSecrets:
     enabled: true
     secretStore: gcp-secretstore
@@ -346,8 +362,6 @@ minio:
   gateway:
     enabled: true
     hostname: ""
-    rateLimit:
-      enabled: false
 
 # ===== ARTIFACTS STORE: public-read MinIO for desktop releases =====
 # Dedicated MinIO serving Tauri auto-updater manifests + installers at

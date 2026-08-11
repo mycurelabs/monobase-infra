@@ -21,11 +21,14 @@ spec:
     - from:
         - podSelector: {}
 
-    # Allow from Gateway proxies (exception)
+    {{- if not .Values.networkPolicies.strictGatewayIngress }}
+    # Allow from Gateway proxies (blanket, any port). strictGatewayIngress=true
+    # drops this in favor of port-scoped per-app allows.
     - from:
         - namespaceSelector:
             matchLabels:
               kubernetes.io/metadata.name: nginx-gateway-system
+    {{- end }}
 
     # Allow from monitoring (exception, if enabled)
     - from:

@@ -29,6 +29,8 @@ spec:
       valuesObject:
         global:
           namespace: {{ .Values.global.namespace }}
+        networkPolicies:
+          strictGatewayIngress: {{ if .Values.securityBaseline }}{{ .Values.securityBaseline.strictGatewayIngress | default false }}{{ else }}false{{ end }}
 
   destination:
     server: https://kubernetes.default.svc
