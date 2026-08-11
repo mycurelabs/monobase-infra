@@ -22,6 +22,18 @@ spec:
   destination:
     server: https://kubernetes.default.svc
     namespace: tailscale
+  # The tailscale operator rewrites the egress Service's externalName to its
+  # provisioned proxy (placeholder -> ts-ollama-*.tailscale.svc) and adds its
+  # own finalizer. Ignore those so ArgoCD doesn't flap OutOfSync or fight the
+  # operator on selfHeal.
+  ignoreDifferences:
+    - group: ""
+      kind: Service
+      name: ollama
+      namespace: tailscale
+      jsonPointers:
+        - /spec/externalName
+        - /metadata/finalizers
   syncPolicy:
     automated:
       prune: true
