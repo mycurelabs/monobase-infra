@@ -3,15 +3,18 @@
 ## Pod Lifecycle Debugging
 
 ### Pending State
+
 Pod is waiting to be scheduled.
 
 **Common causes:**
+
 - Insufficient CPU/memory on nodes
 - PVC not bound (StorageClass missing or no available PV)
 - Node selector or affinity mismatch (e.g., `nodePool` label doesn't match)
 - Resource quotas exceeded
 
 **Diagnostics:**
+
 ```bash
 kubectl describe pod {pod} -n {namespace}
 # Look at Events section for scheduling failures
@@ -20,15 +23,18 @@ kubectl get nodes -o custom-columns=NAME:.metadata.name,CPU:.status.allocatable.
 ```
 
 ### CrashLoopBackOff
+
 Container starts but crashes repeatedly.
 
 **Common causes:**
+
 - Missing environment variables or secrets
 - Database connection failure (wrong URI, auth failure, network policy blocking)
 - Application startup error (bad config, missing dependency)
 - OOM kill (memory limit too low)
 
 **Diagnostics:**
+
 ```bash
 kubectl logs {pod} -n {namespace} --previous  # Logs from crashed container
 kubectl describe pod {pod} -n {namespace}      # Check exit code and OOM events
@@ -36,29 +42,35 @@ kubectl get events -n {namespace} --field-selector involvedObject.name={pod}
 ```
 
 **Exit codes:**
+
 - `0`: Normal exit
 - `1`: Application error
 - `137`: OOM killed (SIGKILL) — increase memory limits
 - `143`: Graceful termination (SIGTERM)
 
 ### ImagePullBackOff
+
 Container image cannot be pulled.
 
 **Common causes:**
+
 - Wrong image name or tag
 - Private registry without imagePullSecrets
 - Registry rate limiting (Docker Hub)
 
 **Diagnostics:**
+
 ```bash
 kubectl describe pod {pod} -n {namespace}  # Check Events for pull error
 kubectl get events -n {namespace} --field-selector reason=Failed
 ```
 
 ### OOMKilled
+
 Container exceeded memory limit.
 
 **Diagnostics:**
+
 ```bash
 kubectl describe pod {pod} -n {namespace}  # Look for OOMKilled in lastState
 kubectl top pod {pod} -n {namespace}       # Current memory usage
@@ -69,6 +81,7 @@ kubectl top pod {pod} -n {namespace}       # Current memory usage
 ## Service Connectivity Debugging
 
 ### App Unreachable via Gateway
+
 ```bash
 # 1. Check Gateway is programmed
 kubectl get gateway shared-gateway -n gateway-system
@@ -93,6 +106,7 @@ kubectl describe certificate gateway-tls -n gateway-system
 ```
 
 ### DNS Not Resolving
+
 ```bash
 # Check external-dns is running
 kubectl get pods -n external-dns
@@ -107,6 +121,7 @@ kubectl get httproute -n {namespace} -o yaml | grep hostname
 ## Storage Debugging
 
 ### PVC Stuck Pending
+
 ```bash
 kubectl describe pvc {name} -n {namespace}
 # Check Events for provisioning errors
@@ -119,6 +134,7 @@ kubectl get pods -n longhorn-system
 ```
 
 ### Volume Full
+
 ```bash
 # Check PVC usage
 kubectl exec {pod} -n {namespace} -- df -h
@@ -133,14 +149,18 @@ mise run resize-storage
 ## Gateway/Routing Debugging
 
 ### HTTP 431 (Request Header Fields Too Large)
-The EnvoyPatchPolicy increases max headers to 96KB. If still hitting 431:
+
+nginx default header limits apply. To raise them, add a SnippetsPolicy
+(`large_client_header_buffers`) under `snippetsPolicies` in
+`values/infrastructure/main.yaml`:
+
 ```bash
-# Verify EnvoyPatchPolicy exists
-kubectl get envoypatchpolicy -n gateway-system
-kubectl describe envoypatchpolicy -n gateway-system
+# Inspect current snippets policies
+kubectl get snippetspolicy -n nginx-gateway-system
 ```
 
 ### Certificate Issues
+
 ```bash
 # Check certificate status
 kubectl get certificates -n gateway-system
@@ -159,6 +179,7 @@ kubectl describe clusterissuer letsencrypt-mycure-cloudflare-prod
 ```
 
 ### Route Not Matching
+
 ```bash
 # Check HTTPRoute matches
 kubectl get httproute -A -o wide
@@ -174,6 +195,7 @@ kubectl get gateway shared-gateway -n gateway-system -o yaml | grep -A3 "listene
 ## Secrets Debugging
 
 ### ExternalSecret Not Syncing
+
 ```bash
 # Check ExternalSecret status
 kubectl get externalsecrets -n {namespace}
@@ -198,6 +220,7 @@ gcloud secrets list --project=mc-v4-prod --filter="name:{remote-key}"
 ## ArgoCD Sync Issues
 
 ### Application Out of Sync
+
 ```bash
 # Check sync status
 kubectl get application {name}-root -n argocd
@@ -213,6 +236,7 @@ argocd app sync {name}-root
 ```
 
 ### Sync Failed
+
 ```bash
 # Check sync result
 argocd app get {name}-root

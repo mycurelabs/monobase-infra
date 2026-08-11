@@ -18,7 +18,7 @@ Understand the system design and core components.
 
 - **[ARCHITECTURE.md](architecture/ARCHITECTURE.md)** - System architecture, design decisions, component overview
 - **[GITOPS-ARGOCD.md](architecture/GITOPS-ARGOCD.md)** - GitOps workflow with ArgoCD App-of-Apps pattern
-- **[GATEWAY-API.md](architecture/GATEWAY-API.md)** - Envoy Gateway, HTTPRoutes, and traffic routing
+- **[GATEWAY-API.md](architecture/GATEWAY-API.md)** - NGINX Gateway Fabric, HTTPRoutes, and traffic routing
 
 ## ⚙️ Operations
 
@@ -44,43 +44,50 @@ Security hardening, compliance, and policies.
 ## 🧪 Development
 
 **Terraform/OpenTofu Module Development:**
+
 - **[../terraform/CONTRIBUTING.md](../terraform/CONTRIBUTING.md)** - Build custom OpenTofu modules
-
-
 
 ---
 
 ## Quick Navigation by Task
 
-### I want to...
+### I want to
 
 **Provision a Kubernetes cluster:**
+
 1. [CLUSTER-PROVISIONING.md](getting-started/CLUSTER-PROVISIONING.md)
 2. [CLUSTER-SIZING.md](operations/CLUSTER-SIZING.md)
 
 **Deploy a new client:**
+
 1. [CLIENT-ONBOARDING.md](getting-started/CLIENT-ONBOARDING.md)
 2. [DEPLOYMENT.md](getting-started/DEPLOYMENT.md)
 
 **Understand the architecture:**
+
 1. [ARCHITECTURE.md](architecture/ARCHITECTURE.md)
 2. [GITOPS-ARGOCD.md](architecture/GITOPS-ARGOCD.md)
 
 **Set up backups:**
+
 1. [BACKUP_DR.md](operations/BACKUP_DR.md)
 
 **Recover from an incident:**
+
 1. [DISASTER_RECOVERY_RUNBOOKS.md](operations/DISASTER_RECOVERY_RUNBOOKS.md)
 2. [TROUBLESHOOTING.md](operations/TROUBLESHOOTING.md)
 
 **Secure the infrastructure:**
+
 1. [SECURITY-HARDENING.md](security/SECURITY-HARDENING.md)
 2. [SECURITY_COMPLIANCE.md](security/SECURITY_COMPLIANCE.md)
 
 **Build custom Terraform modules:**
+
 1. [../terraform/CONTRIBUTING.md](../terraform/CONTRIBUTING.md)
 
 **Configure values:**
+
 1. [../deployments/README.md](../deployments/README.md) - Deployment configuration guide
 2. [../charts/README.md](../charts/README.md) - Global parameters and chart overview
 3. [../charts/api/README.md](../charts/api/README.md) - API-specific parameters

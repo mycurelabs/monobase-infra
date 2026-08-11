@@ -60,11 +60,9 @@ curl https://api.myclient.com/health
 # 1. Provision new Kubernetes cluster
 # (Use same cloud provider for S3 access)
 
-# 2. Deploy core infrastructure
-kubectl apply -f infrastructure/longhorn/
-kubectl apply -f infrastructure/envoy-gateway/
-kubectl apply -f infrastructure/external-secrets-operator/
-kubectl apply -f infrastructure/cert-manager/
+# 2. Deploy core infrastructure (ArgoCD bootstrap installs the gateway,
+#    external-secrets, cert-manager, etc. via GitOps)
+mise run bootstrap
 
 # 3. Install Velero with SAME S3 bucket
 helm install velero vmware-tanzu/velero \
@@ -181,18 +179,21 @@ kubectl logs -f deployment/api -n myclient-prod
 ## Backup Strategy (3-Tier)
 
 **Tier 1: Hourly Snapshots (Fast Recovery)**
+
 - Storage: Longhorn local
 - Retention: 72 hours
 - RTO: 5 minutes
 - RPO: 1 hour
 
 **Tier 2: Daily Backups (Medium Recovery)**
+
 - Storage: S3
 - Retention: 30 days
 - RTO: 1 hour
 - RPO: 24 hours
 
 **Tier 3: Weekly Archives (Long-Term)**
+
 - Storage: S3 Glacier
 - Retention: 90+ days
 - RTO: 4 hours
@@ -201,17 +202,20 @@ kubectl logs -f deployment/api -n myclient-prod
 ## Emergency Contacts
 
 **Internal:**
-- DevOps Team: devops@example.com
+
+- DevOps Team: <devops@example.com>
 - On-Call: See PagerDuty rotation
-- Management: escalation@example.com
+- Management: <escalation@example.com>
 
 **External:**
+
 - Cloud Provider Support
 - Managed Services (if applicable)
 
 ## Communication Plan
 
 **During DR Event:**
+
 1. Notify management immediately
 2. Update status page
 3. Email affected customers

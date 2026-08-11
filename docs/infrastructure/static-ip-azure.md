@@ -16,6 +16,7 @@ This guide provides step-by-step instructions for creating and configuring stati
 ### Node Resource Group
 
 When you create an AKS cluster, Azure automatically creates a second resource group called the "node resource group" (starts with `MC_`). This resource group contains all the infrastructure resources for your cluster, including:
+
 - Virtual machines (nodes)
 - Virtual network
 - Load balancers
@@ -84,15 +85,16 @@ echo "Static IP Address: $IP_ADDRESS"
 
 ### Step 4: Save Configuration Values
 
-Save these values for your infrastructure configuration:
+Set the annotations on the Gateway's provisioned Service via `infrastructure.annotations` in `values/infrastructure/main.yaml` (see [static-ip-prerequisites.md](./static-ip-prerequisites.md)):
 
 ```yaml
-# Configuration values to provide to DevOps team:
-cloudProvider: azure
-azure:
-  publicIpName: "production-gateway-ip"  # From Step 2
-  resourceGroup: "MC_example-rg_example-aks_eastus"  # From Step 1
-  # Note: The IP address ($IP_ADDRESS) will be automatically assigned
+nginxGatewayResources:
+  gateway:
+    infrastructure:
+      annotations:
+        service.beta.kubernetes.io/azure-pip-name: "production-gateway-ip"  # From Step 2
+        service.beta.kubernetes.io/azure-load-balancer-resource-group: "MC_example-rg_example-aks_eastus"  # From Step 1
+        # Note: The IP address ($IP_ADDRESS) will be automatically assigned
 ```
 
 ## Method 2: Preserve Existing IP
@@ -147,11 +149,12 @@ echo "IP promoted to Static successfully!"
 ### Step 4: Save Configuration Values
 
 ```yaml
-# Configuration values:
-cloudProvider: azure
-azure:
-  publicIpName: "kubernetes-xxx-yyy-zzz"  # Actual name from Step 1
-  resourceGroup: "MC_example-rg_example-aks_eastus"  # Node RG from Step 1
+nginxGatewayResources:
+  gateway:
+    infrastructure:
+      annotations:
+        service.beta.kubernetes.io/azure-pip-name: "kubernetes-xxx-yyy-zzz"  # Actual name from Step 1
+        service.beta.kubernetes.io/azure-load-balancer-resource-group: "MC_example-rg_example-aks_eastus"  # Node RG from Step 1
 ```
 
 ## Method 3: Using Direct IP Address (Alternative)
@@ -159,13 +162,15 @@ azure:
 Instead of using the Public IP name, you can configure using the IP address directly:
 
 ```yaml
-cloudProvider: azure
-azure:
-  ipv4Address: "135.171.153.160"  # Your static IP address
-  resourceGroup: "MC_example-rg_example-aks_eastus"  # Node resource group
+nginxGatewayResources:
+  gateway:
+    infrastructure:
+      annotations:
+        service.beta.kubernetes.io/azure-load-balancer-ipv4: "135.171.153.160"  # Your static IP address
+        service.beta.kubernetes.io/azure-load-balancer-resource-group: "MC_example-rg_example-aks_eastus"  # Node resource group
 ```
 
-**Note**: Using `publicIpName` (Methods 1 & 2) is recommended over `ipv4Address` as it's more explicit and maintainable.
+**Note**: Using `azure-pip-name` (Methods 1 & 2) is recommended over the direct IP as it's more explicit and maintainable.
 
 ## Verification
 
@@ -181,6 +186,7 @@ az network public-ip show \
 ```
 
 Expected output:
+
 ```
 Name                          IP               Allocation  SKU       Location
 ----------------------------  ---------------  ----------  --------  ----------
@@ -190,20 +196,24 @@ production-gateway-ip         135.171.153.160  Static      Standard  eastus
 ## Important Notes
 
 ### SKU Requirements
+
 - **Must use `Standard` SKU** for AKS LoadBalancer services
 - `Basic` SKU is not supported with AKS
 - Standard SKU IPs are zone-redundant by default
 
 ### Location Requirements
+
 - Public IP **must** be in the same region as your AKS cluster
 - Cross-region IPs will not work
 
 ### Costs
+
 - Static Public IPs incur a small hourly charge (~$0.004/hour or ~$3/month)
 - Charged whether in use or not once created
 - See [Azure Pricing](https://azure.microsoft.com/en-us/pricing/details/ip-addresses/) for current rates
 
 ### Permissions Required
+
 - `Microsoft.Network/publicIPAddresses/write` on node resource group
 - `Microsoft.ContainerService/managedClusters/read` on AKS resource group
 
@@ -232,23 +242,27 @@ az network public-ip create \
 ## Troubleshooting
 
 ### Error: Public IP not found
+
 - Verify you're using the **node resource group** (starts with `MC_`), not your main resource group
 - Check the IP name spelling
 
 ### Error: Cannot create IP - quota exceeded
+
 - Check your Azure subscription's public IP quota
 - Request quota increase if needed
 
 ### IP not assigning to LoadBalancer
+
 - Verify the IP is in the same region as the cluster
 - Check that SKU is `Standard`, not `Basic`
 - Ensure the IP is in the correct resource group (node RG)
-- Verify infrastructure configuration has correct `publicIpName` and `resourceGroup`
+- Verify the annotations reference the correct IP name and node resource group
 
 ### Load Balancer still gets dynamic IP
+
 - Confirm ArgoCD has synced the infrastructure changes
-- Check EnvoyProxy resource annotations: `kubectl get envoyproxy -n envoy-gateway-system custom-proxy-config -o yaml`
-- Verify LoadBalancer service annotations: `kubectl get svc -n envoy-gateway-system -o yaml`
+- Check the Gateway's infrastructure annotations: `kubectl get gateway -n nginx-gateway-system nginx-shared-gateway -o yaml`
+- Verify LoadBalancer service annotations: `kubectl get svc -n nginx-gateway-system -o yaml`
 
 ## Next Steps
 

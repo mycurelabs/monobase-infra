@@ -15,6 +15,7 @@ allowed-tools: Bash, Read, Grep, Glob
 ## Quick Operations
 
 ### logs — Stream pod logs (handles multi-pod deployments)
+
 ```bash
 # Stream logs from deployment (all pods)
 kubectl logs -f -n {namespace} deployment/{name} --all-containers --prefix
@@ -34,6 +35,7 @@ kubectl logs -n mycure-production deployment/hapihub --tail=100
 ```
 
 ### restart — Rolling restart deployment/statefulset ⚠️ DESTRUCTIVE
+
 ```bash
 # ⚠️ CONFIRM BEFORE EXECUTING - causes brief downtime during rollout
 
@@ -52,6 +54,7 @@ kubectl rollout status deployment/api -n mycure-staging
 ```
 
 ### debug — Combined troubleshooting (describe + logs + events)
+
 ```bash
 # Full debug sequence for a pod/deployment:
 
@@ -73,6 +76,7 @@ kubectl get events -n mycure-staging --sort-by=.lastTimestamp | grep api
 ```
 
 ### exec — Shell into pod
+
 ```bash
 # Interactive shell
 kubectl exec -it {pod} -n {namespace} -- /bin/sh
@@ -86,6 +90,7 @@ kubectl exec api-7d8f9b6c4-x2k3l -n mycure-staging -- env
 ```
 
 ### events — Show recent events for namespace
+
 ```bash
 # All events sorted by time
 kubectl get events -n {namespace} --sort-by=.lastTimestamp
@@ -105,6 +110,7 @@ kubectl get events -A --field-selector type=Warning
 ```
 
 ### scale — Scale deployment/statefulset replicas ⚠️ DESTRUCTIVE if scaling to 0
+
 ```bash
 # ⚠️ CONFIRM if scaling to 0 - this stops all pods
 
@@ -124,6 +130,7 @@ kubectl scale deployment/hapihub -n mycure-staging --replicas=0  # ⚠️ STOPS 
 ## Database Operations
 
 ### db-shell — Quick database CLI access
+
 ```bash
 # PostgreSQL shell
 kubectl exec -it -n {namespace} postgresql-0 -- psql -U postgres
@@ -148,6 +155,7 @@ kubectl exec -it -n mycure-production mongodb-0 -- mongosh
 ## Secrets Operations
 
 ### secrets-sync — Force External Secrets to refresh
+
 ```bash
 # Force sync by updating annotation (triggers immediate refresh)
 kubectl annotate externalsecret {name} -n {namespace} force-sync=$(date +%s) --overwrite
@@ -160,6 +168,7 @@ kubectl annotate externalsecret api-secrets -n mycure-staging force-sync=$(date 
 ```
 
 ### secrets-status — Check External Secret sync status
+
 ```bash
 # List all external secrets with status
 kubectl get externalsecret -n {namespace} -o wide
@@ -184,6 +193,7 @@ kubectl describe externalsecret api-secrets -n mycure-staging
 ## Cluster Operations
 
 ### cluster-health — Overall cluster health check
+
 ```bash
 # Node status
 kubectl get nodes -o wide
@@ -208,6 +218,7 @@ echo "=== Recent Warnings ===" && kubectl get events -A --sort-by=.lastTimestamp
 ```
 
 ### cluster-nodes — Node status and resource capacity
+
 ```bash
 # Node overview
 kubectl get nodes -o wide
@@ -240,19 +251,21 @@ kubectl get nodes -o wide && kubectl top nodes
 ## Namespace Conventions
 
 - Tenant namespaces: `{client}-{environment}` (e.g., `mycure-production`, `mycure-staging`)
-- Infrastructure namespaces: `gateway-system`, `argocd`, `monitoring`, `velero`, `cert-manager`, `external-secrets-system`, `envoy-gateway-system`, `external-dns`, `kyverno`, `falco`, `longhorn-system`
+- Infrastructure namespaces: `nginx-gateway-system`, `argocd`, `monitoring`, `velero`, `cert-manager`, `external-secrets-system`, `external-dns`, `tailscale`
 
 ## Gateway Architecture
 
-- Shared gateway: `shared-gateway` in `gateway-system` namespace
-- Gateway class: `envoy-gateway` (Envoy Gateway implementation)
+- Public gateway: `nginx-shared-gateway` in `nginx-gateway-system` (prod-only, internet-exposed by intent)
+- Internal gateway: `nginx-internal-gateway` — cluster-default ingress, ClusterIP data plane exposed on the tailnet
+- Gateway class: `nginx` (NGINX Gateway Fabric)
 - Multi-domain listeners: `*.mycureapp.com`, `*.localfirsthealth.com`, `*.stg.localfirsthealth.com`, `*.mycure.md`
-- HTTPRoutes in each tenant namespace reference the shared gateway via `parentRefs`
-- EnvoyPatchPolicy increases max request headers to 96KB (prevents HTTP 431 errors)
+- HTTPRoutes in each tenant namespace reference the gateways via `parentRefs`
+- Cluster-wide nginx tweaks (timeouts, body size, header filters) via SnippetsPolicies in `values/infrastructure/main.yaml`
 
 ## Common Operations
 
 ### Status & Inspection
+
 ```bash
 # Namespace overview
 kubectl get all -n {namespace}
@@ -269,6 +282,7 @@ kubectl top nodes
 ```
 
 ### Logs & Debugging
+
 ```bash
 # Application logs
 kubectl logs -n {namespace} deployment/{app} --tail=100
@@ -284,6 +298,7 @@ kubectl exec -it {pod} -n {namespace} -- sh
 ```
 
 ### Scaling & Restarts
+
 ```bash
 # Restart deployment (rolling)
 kubectl rollout restart deployment/{app} -n {namespace}
@@ -296,6 +311,7 @@ kubectl rollout status deployment/{app} -n {namespace}
 ```
 
 ### Gateway & Networking
+
 ```bash
 # Check gateway status
 kubectl get gateway -n gateway-system
@@ -313,6 +329,7 @@ kubectl describe certificate {name} -n {namespace}
 ```
 
 ### Secrets & ExternalSecrets
+
 ```bash
 # Check ExternalSecret sync status
 kubectl get externalsecrets -n {namespace}
@@ -324,6 +341,7 @@ kubectl describe clustersecretstore gcp-secretstore
 ```
 
 ### Port Forwarding
+
 ```bash
 # ArgoCD UI
 kubectl port-forward svc/argocd-server -n argocd 8080:443

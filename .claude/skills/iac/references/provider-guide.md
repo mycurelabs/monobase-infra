@@ -24,6 +24,7 @@ terraform version
 ```
 
 ### Per-Provider CLI
+
 ```bash
 # AWS
 aws --version
@@ -44,43 +45,51 @@ doctl account get
 
 ## Static IP Setup
 
-Each cloud provider requires static IPs for the Envoy Gateway LoadBalancer.
+Each cloud provider requires static IPs for the gateway LoadBalancer. Provider annotations go under `nginxGatewayResources.gateway.infrastructure.annotations` in `values/infrastructure/main.yaml` — NGF propagates them onto the provisioned Service. See `docs/infrastructure/static-ip-prerequisites.md`.
 
 ### AWS EKS
+
 - **Method**: Elastic IPs (one per subnet/AZ, typically 3)
-- **Config**: `envoyProxyConfig.aws.eipAllocations: "eipalloc-xxx,eipalloc-yyy,eipalloc-zzz"`
+- **Config**: annotation `service.beta.kubernetes.io/aws-load-balancer-eip-allocations: "eipalloc-xxx,eipalloc-yyy,eipalloc-zzz"`
 - **Guide**: `docs/infrastructure/static-ip-aws.md`
 - **Commands**:
+
   ```bash
   aws ec2 allocate-address --domain vpc --region us-east-1
   aws ec2 describe-addresses --allocation-ids eipalloc-xxx
   ```
 
 ### Azure AKS
+
 - **Method**: Static Public IP in node resource group (MC_*)
-- **Config**: `envoyProxyConfig.azure.publicIpName`, `envoyProxyConfig.azure.resourceGroup`, `envoyProxyConfig.azure.ipv4Address`
+- **Config**: annotations `service.beta.kubernetes.io/azure-pip-name`, `service.beta.kubernetes.io/azure-load-balancer-resource-group`
 - **Guide**: `docs/infrastructure/static-ip-azure.md`
 - **Commands**:
+
   ```bash
   NODE_RG=$(az aks show --resource-group $RG --name $CLUSTER --query nodeResourceGroup -o tsv)
   az network public-ip create --resource-group $NODE_RG --name production-gateway-ip --sku Standard --allocation-method Static
   ```
 
 ### GCP GKE
+
 - **Method**: Regional static IP
-- **Config**: `envoyProxyConfig.gcp.staticIpAddress: "35.x.x.x"`
+- **Config**: annotation `networking.gke.io/load-balancer-ip-addresses: "production-gateway-ip"`
 - **Guide**: `docs/infrastructure/static-ip-gcp.md`
 - **Commands**:
+
   ```bash
   gcloud compute addresses create production-gateway-ip --region=us-central1 --network-tier=PREMIUM
   gcloud compute addresses describe production-gateway-ip --region=us-central1 --format="get(address)"
   ```
 
 ### DigitalOcean DOKS
+
 - **Method**: LoadBalancer name (or FLIPOP operator for true static IP)
-- **Config**: `envoyProxyConfig.digitalocean.loadBalancerName`, optionally `loadBalancerId`
+- **Config**: annotation `service.beta.kubernetes.io/do-loadbalancer-name` (live cluster uses this; LB is REGIONAL_NETWORK, updates in place)
 - **Guide**: `docs/infrastructure/static-ip-digitalocean.md`
 - **Commands**:
+
   ```bash
   doctl compute load-balancer list --format ID,Name,IP,Status
   ```
@@ -123,6 +132,7 @@ Each cloud provider requires static IPs for the Envoy Gateway LoadBalancer.
 ## DNS Provider
 
 All environments use **Cloudflare** for DNS management:
+
 - External DNS automatically creates/updates DNS records from HTTPRoutes
 - cert-manager uses Cloudflare DNS-01 challenge for wildcard certificates
 - Cloudflare API token stored via External Secrets

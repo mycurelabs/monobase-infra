@@ -55,6 +55,7 @@ These have `PruneLast=true` / `preserveResourcesOnDeletion: true` protections fo
 ## Quick Operations
 
 ### sync — Force sync application (bypass 3-min polling cycle)
+
 ```bash
 # Sync single application
 argocd app sync {app-name}
@@ -71,6 +72,7 @@ argocd app sync mycure-production-root --prune
 ```
 
 ### diff — Preview pending changes before sync
+
 ```bash
 # Show what would change on next sync
 argocd app diff {app-name}
@@ -81,6 +83,7 @@ argocd app diff infrastructure
 ```
 
 ### status — Check sync/health status
+
 ```bash
 # List all applications with status
 argocd app list -o wide
@@ -101,6 +104,7 @@ argocd app get mycure-staging-root
 ```
 
 ### rollback — Rollback to previous revision ⚠️ DESTRUCTIVE
+
 ```bash
 # ⚠️ CONFIRM BEFORE EXECUTING - this reverts to a previous state
 
@@ -118,6 +122,7 @@ argocd app rollback mycure-staging-root 5
 **Stateful safety:** Rollback only undoes the manifest sync, not data migrations. Before rolling back any app whose name matches `*mongodb*`, `*postgres*`, `*valkey*`, `*minio*`, or `*migrator*`, **stop and confirm with the user** that they understand a schema/data migration may have already run forward and will not be reversed.
 
 ### pause — Pause/resume auto-sync for maintenance
+
 ```bash
 # Pause auto-sync (for manual maintenance)
 kubectl patch application {app-name} -n argocd --type merge \
@@ -132,6 +137,7 @@ kubectl patch application mycure-staging-root -n argocd --type merge -p '{"spec"
 ```
 
 ### refresh — Hard refresh from Git (re-read manifests)
+
 ```bash
 argocd app get {app-name} --hard-refresh
 
@@ -171,7 +177,7 @@ ApplicationSet (monobase-auto-discover)
 
 Application (infrastructure)
   ├── cert-manager
-  ├── envoy-gateway
+  ├── nginx-gateway
   ├── external-secrets
   ├── monitoring (prometheus + grafana)
   ├── gateway chart
@@ -181,6 +187,7 @@ Application (infrastructure)
 ## Common Operations
 
 ### Add New Deployment
+
 ```bash
 # 1. Copy from existing deployment or example
 cp values/deployments/mycure-staging.yaml values/deployments/{client}-{env}.yaml
@@ -197,6 +204,7 @@ git push
 ```
 
 ### Update Existing Deployment
+
 ```bash
 # Edit values file
 # e.g., update image tag, change replicas, enable/disable components
@@ -209,6 +217,7 @@ git push
 ```
 
 ### Remove Deployment
+
 ```bash
 # Remove values file — ArgoCD removes the Application
 # Note: preserveResourcesOnDeletion=true prevents data loss
@@ -218,6 +227,7 @@ git push
 ```
 
 ### Check Sync Status
+
 ```bash
 # Via kubectl (requires argocd CLI or kubectl)
 kubectl get applications -n argocd
@@ -233,6 +243,7 @@ kubectl port-forward svc/argocd-server -n argocd 8080:443
 ```
 
 ### Force Sync
+
 ```bash
 # Via ArgoCD CLI
 argocd app sync {name}-root
@@ -245,6 +256,7 @@ argocd app get {name}-root --hard-refresh
 ```
 
 ### Troubleshoot Sync Failure
+
 ```bash
 # Check application status
 kubectl get application {name}-root -n argocd -o yaml
@@ -270,6 +282,7 @@ kubectl logs -n argocd deployment/argocd-repo-server --tail=100
 ## Bootstrap Operations
 
 Initial cluster setup (one-time):
+
 ```bash
 # Full bootstrap (installs ArgoCD, deploys infrastructure, enables auto-discover)
 mise run bootstrap

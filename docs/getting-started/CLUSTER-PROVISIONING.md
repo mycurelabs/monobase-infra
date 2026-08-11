@@ -20,6 +20,7 @@ Complete guide for provisioning Kubernetes clusters using OpenTofu modules for M
 ### What This Guide Covers
 
 This guide walks you through:
+
 1. **Choosing the right module** for your deployment target
 2. **Setting up credentials** and prerequisites
 3. **Creating cluster configurations** using the reference template
@@ -126,7 +127,6 @@ No cloud credentials needed!
 
 Choose the right module based on your deployment target:
 
-
 ### Decision Matrix
 
 | Scenario | Module | When to Use |
@@ -173,6 +173,7 @@ vim terraform.tfvars
 ```
 
 Edit `terraform.tfvars`:
+
 ```hcl
 cluster_name       = "monobase-prod"
 region             = "us-east-1"
@@ -212,6 +213,7 @@ vim backend.tf
 ```
 
 Edit `backend.tf`:
+
 ```hcl
 terraform {
   backend "s3" {
@@ -260,8 +262,8 @@ cd ../../../
 vim terraform/terragrunt.hcl
 ```
 
-
 Root config (already configured):
+
 ```hcl
 # terraform/terragrunt.hcl
 
@@ -298,6 +300,7 @@ terragrunt output -raw kubeconfig > ~/.kube/monobase-prod
 ```
 
 **Benefits:**
+
 - DRY backend configuration
 - Shared provider versions
 - Easier multi-cluster management
@@ -316,6 +319,7 @@ vim main.tf
 ```
 
 Change module source:
+
 ```hcl
 module "cluster" {
   source = "../../modules/local-k3d"  # Changed from aws-eks
@@ -368,6 +372,7 @@ vim main.tf
 ```
 
 Change module:
+
 ```hcl
 module "cluster" {
   source = "../../modules/on-prem-k3s"
@@ -441,6 +446,7 @@ cluster_name = "monobase-{environment}-{region}"
 See [CLUSTER-SIZING.md](../operations/CLUSTER-SIZING.md) for detailed guidance.
 
 **Small (5-10 clients):**
+
 ```hcl
 node_groups = {
   general = {
@@ -453,6 +459,7 @@ node_groups = {
 ```
 
 **Medium (10-20 clients):**
+
 ```hcl
 node_groups = {
   general = {
@@ -465,6 +472,7 @@ node_groups = {
 ```
 
 **Large (20-30 clients):**
+
 ```hcl
 node_groups = {
   general = {
@@ -576,6 +584,7 @@ clusters/my-cluster/
 ```
 
 **⚠️ WARNING:** Local state is not suitable for:
+
 - Production clusters
 - Team collaboration
 - CI/CD pipelines
@@ -641,6 +650,7 @@ tofu init -migrate-state
 ### State Best Practices
 
 ✅ **DO:**
+
 - Use remote state for all production clusters
 - Enable state locking (DynamoDB)
 - Enable versioning on S3 bucket
@@ -649,6 +659,7 @@ tofu init -migrate-state
 - Backup state regularly
 
 ❌ **DON'T:**
+
 - Commit state files to git (.gitignore them)
 - Share state files manually
 - Edit state files directly
@@ -669,7 +680,6 @@ S3 Bucket: your-company-terraform-state
 
 ## Multi-Cluster Scenarios
 
-
 ### Scenario 1: Single Multi-Tenant Cluster (Most Common)
 
 **Goal:** One cluster for all clients (5-30 clients)
@@ -680,6 +690,7 @@ clusters/
 ```
 
 **Workflow:**
+
 ```bash
 # 1. Provision shared cluster
 cd clusters/shared-prod
@@ -699,6 +710,7 @@ mkdir -p deployments/client-a-prod deployments/client-b-prod deployments/client-
 ```
 
 **Benefits:**
+
 - Cost-effective (shared infrastructure)
 - Easier management (one cluster)
 - Efficient resource utilization
@@ -715,6 +727,7 @@ clusters/
 ```
 
 **Workflow:**
+
 ```bash
 # Provision each cluster
 for cluster in us-east-prod eu-west-prod ap-south-prod; do
@@ -738,6 +751,7 @@ clusters/
 ```
 
 **Workflow:**
+
 ```bash
 # Provision both clusters
 cd clusters/production
@@ -762,6 +776,7 @@ clusters/
 ```
 
 **When to use:**
+
 - Client requires dedicated infrastructure
 - Compliance/regulatory requirements
 - Very high resource usage
@@ -798,11 +813,13 @@ kubectx eu-prod
 ### Issue 1: Authentication Failure
 
 **Symptom:**
+
 ```
 Error: error configuring Terraform AWS Provider: no valid credential sources
 ```
 
 **Solution:**
+
 ```bash
 # Verify credentials
 aws sts get-caller-identity    # AWS
@@ -818,12 +835,14 @@ gcloud auth application-default login
 ### Issue 2: Insufficient Permissions
 
 **Symptom:**
+
 ```
 Error: creating EKS Cluster: AccessDeniedException
 ```
 
 **Solution:**
 Check IAM permissions. Required AWS permissions:
+
 - `eks:*`
 - `ec2:*`
 - `iam:CreateRole`, `iam:AttachRolePolicy`
@@ -832,11 +851,13 @@ Check IAM permissions. Required AWS permissions:
 ### Issue 3: Quota Limits
 
 **Symptom:**
+
 ```
 Error: creating EKS Node Group: LimitExceededException
 ```
 
 **Solution:**
+
 ```bash
 # Check AWS service quotas
 aws service-quotas get-service-quota \
@@ -849,6 +870,7 @@ aws service-quotas get-service-quota \
 ### Issue 4: State Lock
 
 **Symptom:**
+
 ```
 Error: acquiring the state lock
 Lock Info:
@@ -856,6 +878,7 @@ Lock Info:
 ```
 
 **Solution:**
+
 ```bash
 # If you're sure no one else is running tofu:
 tofu force-unlock abc123
@@ -869,11 +892,13 @@ aws dynamodb get-item \
 ### Issue 5: Cluster Creation Timeout
 
 **Symptom:**
+
 ```
 Error: timeout while waiting for cluster to become active
 ```
 
 **Solution:**
+
 - Check AWS/Azure/GCP console for error messages
 - Verify VPC/subnet configuration
 - Check IAM role trust relationships
@@ -896,6 +921,7 @@ resource "aws_eks_cluster" "main" {
 Cluster created but no nodes visible in `kubectl get nodes`
 
 **Solution:**
+
 ```bash
 # Check node group status in cloud console
 aws eks describe-nodegroup --cluster-name my-cluster --nodegroup-name general
@@ -911,11 +937,13 @@ aws eks describe-nodegroup --cluster-name my-cluster --nodegroup-name general
 ### Issue 7: kubectl Can't Connect
 
 **Symptom:**
+
 ```
 Unable to connect to the server: dial tcp: lookup xyz.eks.amazonaws.com: no such host
 ```
 
 **Solution:**
+
 ```bash
 # Verify kubeconfig
 cat ~/.kube/config
@@ -932,11 +960,13 @@ aws eks update-kubeconfig --name my-cluster --region us-east-1
 ### Issue 8: Module Not Found
 
 **Symptom:**
+
 ```
 Error: Module not installed
 ```
 
 **Solution:**
+
 ```bash
 # Re-initialize to download modules
 tofu init
@@ -948,11 +978,13 @@ tofu init -upgrade
 ### Issue 9: Provider Version Conflict
 
 **Symptom:**
+
 ```
 Error: Incompatible provider version
 ```
 
 **Solution:**
+
 ```bash
 # Remove lock file and re-initialize
 rm .terraform.lock.hcl
@@ -966,12 +998,14 @@ If issues persist:
 1. **Check module README**: `terraform/modules/{module}/README.md`
 2. **Review module code**: `terraform/modules/{module}/main.tf`
 3. **Enable debug logging**:
+
    ```bash
    export TF_LOG=DEBUG
    tofu apply
    ```
+
 4. **Check cloud provider logs**: CloudWatch, Azure Monitor, Cloud Logging
-5. **OpenTofu community**: https://discuss.opentofu.org/
+5. **OpenTofu community**: <https://discuss.opentofu.org/>
 
 ---
 
@@ -982,12 +1016,14 @@ After successfully provisioning a cluster:
 ### Immediate Tasks
 
 - [ ] **Verify cluster access**
+
   ```bash
   kubectl get nodes
   kubectl get pods -A
   ```
 
 - [ ] **Test core functionality**
+
   ```bash
   # Test DNS
   kubectl run test --image=busybox --rm -it -- nslookup kubernetes.default
@@ -1015,26 +1051,18 @@ After successfully provisioning a cluster:
 
 ### Deploy Monobase Applications
 
-- [ ] **Install core infrastructure**
-  ```bash
-  # Install Envoy Gateway
-  helm install eg oci://docker.io/envoyproxy/gateway-helm \
-    --version v1.0.0 -n envoy-gateway-system --create-namespace
-  
-  # Install External Secrets Operator
-  helm install external-secrets external-secrets/external-secrets \
-    -n external-secrets --create-namespace
-  
-  # Install Velero (backups)
-  # See ../charts/velero/
-  ```
-
 - [ ] **Bootstrap cluster**
+
+  Core infrastructure (NGINX Gateway Fabric, External Secrets Operator,
+  cert-manager, Velero, ...) is installed via the ArgoCD bootstrap — no
+  manual helm installs:
+
   ```bash
-  ./scripts/bootstrap.sh
+  mise run bootstrap
   ```
 
 - [ ] **Add client configuration**
+
   ```bash
   # Create client deployment config
   mkdir -p deployments/client-a-prod
@@ -1064,7 +1092,6 @@ After successfully provisioning a cluster:
 - [ ] **Configure network policies**
 - [ ] **Set up resource quotas per namespace**
 - [ ] **Review IAM/RBAC permissions**
-
 
 ### Cost Optimization
 

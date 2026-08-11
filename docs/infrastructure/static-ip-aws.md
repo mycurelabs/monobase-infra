@@ -14,11 +14,13 @@ AWS EKS uses Elastic IPs (EIPs) with Network Load Balancers (NLB) to provide sta
 ## Key Concepts
 
 ### High Availability Requirements
+
 - AWS NLB requires **one Elastic IP per subnet** where your cluster runs
 - Typical setup: 3 subnets = 3 Elastic IPs needed
 - All 3 IPs are active; first IP is typically used for DNS
 
 ### Network Load Balancer (NLB)
+
 - Required for static IP support (Classic LB doesn't support EIPs)
 - Operates at Layer 4 (TCP/UDP)
 - Zone-aware and highly available
@@ -93,6 +95,7 @@ aws ec2 describe-addresses \
 ```
 
 **Example output:**
+
 ```
 ---------------------------------------------------------------------
 |                         DescribeAddresses                          |
@@ -116,12 +119,16 @@ echo "eipAllocations: \"$EIP1,$EIP2,$EIP3\""
 
 ## Configuration
 
-Provide these values to your DevOps team:
+Set the NLB annotations on the Gateway's provisioned Service via `infrastructure.annotations` in `values/infrastructure/main.yaml` (see [static-ip-prerequisites.md](./static-ip-prerequisites.md)):
 
 ```yaml
-cloudProvider: aws
-aws:
-  eipAllocations: "eipalloc-0abc123,eipalloc-0def456,eipalloc-0ghi789"
+nginxGatewayResources:
+  gateway:
+    infrastructure:
+      annotations:
+        service.beta.kubernetes.io/aws-load-balancer-type: "external"
+        service.beta.kubernetes.io/aws-load-balancer-nlb-target-type: "ip"
+        service.beta.kubernetes.io/aws-load-balancer-eip-allocations: "eipalloc-0abc123,eipalloc-0def456,eipalloc-0ghi789"
 ```
 
 **For DNS:** Use the first IP address in your list (52.123.45.67 in the example above).
@@ -143,16 +150,19 @@ Status should show `None` until the LoadBalancer is created.
 ## Important Notes
 
 ### Cost
+
 - EIPs are **free when in use** (associated with running resources)
 - **$0.005/hour (~$3.60/month)** per EIP when **not in use**
 - Once LoadBalancer is running, no additional charge
 
 ### Subnet Requirements
+
 - Must have one EIP per subnet where NLB will be deployed
 - Typically 3 subnets across 3 availability zones
 - All subnets must be in the same region
 
 ### Permissions Required
+
 ```json
 {
   "Effect": "Allow",
@@ -168,15 +178,18 @@ Status should show `None` until the LoadBalancer is created.
 ## Troubleshooting
 
 ### Error: Cannot allocate more addresses
+
 - Check your EIP quota: `aws service-quotas get-service-quota --service-code ec2 --quota-code L-0263D0A3`
 - Request quota increase if needed
 
 ### LoadBalancer not using EIPs
+
 - Verify `aws-load-balancer-type` annotation is set to `external` or `nlb`
 - Check that allocation IDs are correct and comma-separated
 - Ensure EIPs are in the same region as cluster
 
 ### Only one IP responding
+
 - This is normal - AWS distributes traffic across all IPs
 - All IPs are active but DNS typically points to first IP
 - Use all 3 IPs for high availability across AZs
