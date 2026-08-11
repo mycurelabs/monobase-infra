@@ -4,7 +4,7 @@ gatewayClass:
   controllerName: gateway.nginx.org/nginx-gateway-controller
 
 gateway:
-  name: nginx-shared-gateway
+  name: nginx-public-gateway
   namespace: nginx-gateway-system
   gatewayClassName: nginx
   # Flat list of listeners — each HTTPS listener references a certificate by tlsSecretName

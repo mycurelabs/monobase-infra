@@ -7,7 +7,7 @@ to inject the same `proxy_read_timeout` directive twice and fail config
 reload with "directive is duplicate" — taking down hapihub.localfirsthealth.com.
 
 Owning it once at the gateway level mirrors the resource's actual scope:
-the snippet applies to every request through nginx-shared-gateway.
+the snippet applies to every request through nginx-public-gateway.
 */ -}}
 {{- range .Values.snippetsPolicies }}
 ---

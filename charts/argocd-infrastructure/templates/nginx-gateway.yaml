@@ -89,7 +89,7 @@ spec:
                 whenUnsatisfiable: ScheduleAnyway
                 labelSelector:
                   matchLabels:
-                    app.kubernetes.io/name: nginx-shared-gateway-nginx
+                    app.kubernetes.io/name: nginx-public-gateway-nginx
             volumes:
               - name: njs-security-headers
                 configMap:
