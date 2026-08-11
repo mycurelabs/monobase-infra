@@ -17,9 +17,8 @@ spec:
   template:
     includedNamespaces:
       - cert-manager
-      - envoy-gateway-system
+      - nginx-gateway-system
       - external-secrets-system
-      - longhorn-system
       - velero
       - monitoring
       - kube-system
