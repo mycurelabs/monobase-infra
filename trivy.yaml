@@ -1,0 +1,25 @@
+---
+# Trivy config-scan settings (IaC misconfiguration). Committed so CI and local
+# `mise run scan-trivy` behave identically. Scans Terraform + OpenTofu (.tf is
+# universal) + Helm charts + K8s manifests.
+#
+# Kept deliberately simple for the first report-only rollout: no --helm-values
+# wiring, because charts here are consumed through ArgoCD app-of-apps value trees
+# (values/deployments/*) rather than per-chart value files, so feeding them to
+# Trivy would misrender. If Helm template false positives are noisy, restrict this
+# to terraform/ only and let `mise run lint-helm` own Helm rendering. Add a root
+# .trivyignore to suppress accepted findings once the first run sets a baseline.
+scan:
+  scanners:
+    - misconfig
+  skip-dirs:
+    - "**/.terraform"
+    - "**/.terragrunt-cache"
+    - "node_modules"
+    - "backups"
+
+misconfiguration:
+  include-non-failures: false
+
+# Report-only; the workflow also sets exit-code 0 explicitly.
+exit-code: 0

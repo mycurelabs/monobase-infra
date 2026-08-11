@@ -19,6 +19,9 @@ k3d = "5.8.3"
 doctl = "latest"
 yq = "latest"
 
+# Security scanning
+trivy = "latest"
+
 # Runtime
 bun = "latest"
 
@@ -156,15 +159,18 @@ else
 fi
 """
 
-[tasks.detect-secrets]
-description = "Scan for secrets"
+[tasks.scan-trivy]
+description = "Trivy IaC misconfiguration scan (Terraform + Helm + K8s), report-only"
 run = """
-echo "Scanning for secrets..."
-if command -v detect-secrets >/dev/null 2>&1; then
-    detect-secrets scan --baseline .secrets.baseline || echo "Run: detect-secrets scan --update .secrets.baseline"
-else
-    echo "⚠ detect-secrets not installed. Install: pip install detect-secrets"
-fi
+echo "Scanning IaC for misconfigurations (report-only)..."
+trivy config --config trivy.yaml --exit-code 0 .
+"""
+
+[tasks.scan-secrets]
+description = "Trivy secret scan of the working tree (report-only). CI uses TruffleHog verified-only."
+run = """
+echo "Scanning working tree for secrets (report-only)..."
+trivy fs --scanners secret --exit-code 0 .
 """
 
 # Utilities
