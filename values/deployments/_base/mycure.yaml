@@ -6,8 +6,12 @@
 # Production environment on DigitalOcean Kubernetes (DOKS)
 
 global:
+  # DENY-FIRST default: every deployment's routes land on the tailnet-only
+  # gateway (reachable by tailnet members, invisible to the internet). Public
+  # exposure is an explicit opt-in — an overlay must set the PUBLIC-tagged
+  # nginx-shared-gateway override (prod does).
   gateway:
-    name: nginx-shared-gateway
+    name: nginx-tailnet-gateway
     namespace: nginx-gateway-system
 
   storage:

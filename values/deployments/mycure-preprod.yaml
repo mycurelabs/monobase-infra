@@ -514,7 +514,7 @@ cadence:
   # resurrection telemetry, gc/dlq/reroute maintenance-error counters).
   image:
     tag: "2.1.78"
-  publicAddr: "104.248.98.161:6473"
+  publicAddr: "100.101.16.24:6473"
   # CUTOVER: anchor homes on our relay (QUIC-addr-disc lets netcheck rank it) + advertises it in the doc.
   # All boxes are being moved to maestroapp 2.0.28 (our-relay-only) in the same window.
   relayUrl: "https://cadence-relay.preprod.localfirsthealth.com"
@@ -528,10 +528,10 @@ cadence:
   # Scrape the OpenMetrics /metrics endpoint into Prometheus (reconcile timing/throughput, connect
   # failures, schema drift, reconcile_active, RSS, dirty_depth) — #2727 observability.
   gateway:
-    # The preprod wildcard listener (*.preprod.localfirsthealth.com) on the shared gateway.
+    # The preprod wildcard listener (*.preprod.localfirsthealth.com) on the tailnet gateway.
     sectionName: https-preprod-lfh
-    # QUIC via the shared gateway (UDPRoute; cadence LB consolidation). Preprod is
-    # port-demuxed to 6473 on the shared LB IP — publicAddr must advertise that port.
+    # QUIC via the tailnet gateway (UDPRoute). Preprod is port-demuxed to 6473 —
+    # publicAddr advertises <tailnet-device-IP>:6473; boxes are tailnet members.
     udpListener: cadence-quic-preprod
     # Re-domained to cadence.preprod (#2727), reclaiming the domain freed by retiring cadence v1.
     # Cutover complete — boxes discover the hub via cadence.preprod (single-URL onboarding, from the AS

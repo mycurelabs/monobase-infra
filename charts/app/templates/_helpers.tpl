@@ -82,14 +82,14 @@ Namespace - uses global.namespace or Release.Namespace
 Gateway parent reference name
 */}}
 {{- define "app.gateway.name" -}}
-{{- default "shared-gateway" .Values.global.gateway.name }}
+{{- default "nginx-tailnet-gateway" .Values.global.gateway.name }}
 {{- end }}
 
 {{/*
 Gateway parent reference namespace
 */}}
 {{- define "app.gateway.namespace" -}}
-{{- default "gateway-system" .Values.global.gateway.namespace }}
+{{- default "nginx-gateway-system" .Values.global.gateway.namespace }}
 {{- end }}
 
 {{/*
