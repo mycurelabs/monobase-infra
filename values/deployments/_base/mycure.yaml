@@ -9,7 +9,7 @@ global:
   # DENY-FIRST default: every deployment's routes land on the tailnet-only
   # gateway (reachable by tailnet members, invisible to the internet). Public
   # exposure is an explicit opt-in — an overlay must set the PUBLIC-tagged
-  # nginx-shared-gateway override (prod does).
+  # nginx-public-gateway override (prod does).
   gateway:
     name: nginx-internal-gateway
     namespace: nginx-gateway-system
@@ -391,7 +391,7 @@ cadence:
     tag: "2.1.74" # L5 10x series (mono#3199): concurrent listings + time-budgeted rounds + planned-listing grace + O(page) baseline pager. Wire-compatible with ≥2.1.4x boxes box-initiated; hub-initiated pushes need the box on ≥2.1.68 (phase-4 ack) — fleet latest.json moves to 2.1.74 in the same window
     pullPolicy: Always # relay cutover; also avoids stale node cache from any reused tag
   udpPort: 6472
-  # Shared-gateway LB IP (nginx-shared-gateway, UDPRoute path — prod keeps canonical port
+  # Shared-gateway LB IP (nginx-public-gateway, UDPRoute path — prod keeps canonical port
   # 6472). Path proven from a real box network (alfheim net-probe: direct=true, 18 Mbps).
   serviceMonitor:
     enabled: true

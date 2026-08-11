@@ -28,7 +28,7 @@ certManagerIssuers:
       server: production
       provider: http01
       http01:
-        gatewayName: nginx-shared-gateway
+        gatewayName: nginx-public-gateway
         gatewayNamespace: nginx-gateway-system
 
     # Cloudflare DNS-01 challenge (for wildcard and multi-level subdomains)
@@ -65,20 +65,20 @@ nginxGatewayResources:
   gatewayClass:
     enabled: false  # GatewayClass created by operator chart
 
-  # PUBLIC gateway — prod only, internet-exposed BY INTENT. Nonprod/internal
-  # listeners live on nginx-internal-gateway below (deny-first default).
+  # PUBLIC gateway — prod only, internet-exposed BY INTENT. Named for its role
+  # (public) vs the internal gateway below. Nonprod/internal listeners live on
+  # nginx-internal-gateway (deny-first default).
   gateway:
-    name: nginx-shared-gateway
+    name: nginx-public-gateway
     namespace: nginx-gateway-system
     gatewayClassName: nginx
-    # STEP 1 of the nginx-shared-gateway -> nginx-public-gateway rename (#306):
-    # disown the DO LB so it SURVIVES this Service's deletion. The renamed
-    # gateway's Service is then born with the load-balancer-id annotation and
-    # adopts the same LB (IP 104.248.98.161 preserved). Must land on the live
-    # Service BEFORE the rename deletes it. Removed once the rename is done.
+    # Adopts the pre-existing DO LB from the old nginx-shared-gateway Service
+    # (which was disowned first, #306) — keeps IP 104.248.98.161, so prod DNS
+    # and cadence publicAddr (…:6472/7843) are untouched. This annotation is the
+    # stable binding; leave it in place.
     infrastructure:
       annotations:
-        service.kubernetes.io/do-loadbalancer-disown: "true"
+        kubernetes.digitalocean.com/load-balancer-id: 486635e9-511a-45c8-8fda-9f98eed2c358
     listeners:
       # Production localfirsthealth.com
       - name: https-lfh
@@ -226,11 +226,11 @@ nginxGatewayResources:
 # Gateway metadata consumed by the grafana/signoz Application templates
 # (route hostname + parentRef derivation only). Both routes are disabled today
 # — grafana is admin port-forward, signoz is off — so these values are inert;
-# if either route is re-enabled it attaches to the nginx shared-gateway.
+# if either route is re-enabled it attaches to the nginx public gateway.
 gateway:
   domain: mycureapp.com
   gateway:
-    name: nginx-shared-gateway
+    name: nginx-public-gateway
     namespace: nginx-gateway-system
 
 # External Secrets - Secret management
@@ -478,6 +478,6 @@ ollamaEgress:
 
 # Tailscale K8s operator — tailnet exposure for cluster services. Backs the
 # nginx-internal-gateway: tailnet-only is the cluster-default gateway (deny-first),
-# public exposure is an explicit prod opt-in on nginx-shared-gateway.
+# public exposure is an explicit prod opt-in on nginx-public-gateway.
 tailscaleOperator:
   enabled: true

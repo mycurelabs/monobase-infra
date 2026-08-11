@@ -9,10 +9,10 @@ global:
   environment: production
 
   # PUBLIC: client-facing prod is internet-exposed BY INTENT — the only
-  # deployment allowed on the public shared gateway. Everything else inherits
-  # the tailnet-only default from _base (deny-first).
+  # deployment allowed on the public gateway. Everything else inherits the
+  # tailnet-only default from _base (deny-first).
   gateway:
-    name: nginx-shared-gateway
+    name: nginx-public-gateway
     namespace: nginx-gateway-system
 
   # Role-based pools: prod-db / prod-apps / infra / nonprod. Taints

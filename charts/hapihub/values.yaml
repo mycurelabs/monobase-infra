@@ -67,7 +67,7 @@ gateway:
       namespace: gateway-system
   
   # HTTPRoute timeout configuration
-  # Disabled by default — nginx-shared-gateway (NGF 2.4.1) doesn't
+  # Disabled by default — nginx-public-gateway (NGF 2.4.1) doesn't
   # implement spec.rules[].timeouts and reports UnsupportedField, which
   # propagates as Degraded health in ArgoCD. Use snippetsPolicy below
   # to apply proxy_read_timeout via NGF SnippetsPolicy instead.
