@@ -1,12 +1,14 @@
 # Velero Backup Implementation
 
 > **Note**: This document covers Velero-specific implementation details. For backup strategy, disaster recovery procedures, and runbooks, see:
+>
 > - [Backup & DR Strategy](../../docs/operations/BACKUP_DR.md)
 > - [Disaster Recovery Runbooks](../../docs/operations/DISASTER_RECOVERY_RUNBOOKS.md)
 
 ## Overview
 
 Velero is the current backup implementation for the monobase infrastructure. It provides:
+
 - Cluster-level backups (infrastructure namespaces + cluster resources)
 - Per-application backups (tenant namespaces via app charts)
 - Multi-cloud support (AWS, Azure, GCP, DigitalOcean, MinIO)
@@ -17,11 +19,13 @@ Velero is the current backup implementation for the monobase infrastructure. It 
 ### Cloud Identity (Automated)
 
 Terraform modules automatically provision cloud identities:
+
 - **AWS**: IRSA role for S3/EBS access
 - **Azure**: Workload Identity for Blob Storage/Disk access
 - **GCP**: Service Account for GCS/PD access
 
 Check terraform outputs:
+
 ```bash
 cd terraform/clusters/your-cluster
 terraform output | grep velero
@@ -32,6 +36,7 @@ terraform output | grep velero
 **Terraform does NOT create storage buckets** - create them manually:
 
 #### AWS S3
+
 ```bash
 aws s3 mb s3://my-cluster-velero-backups --region us-east-1
 aws s3api put-bucket-versioning \
@@ -40,6 +45,7 @@ aws s3api put-bucket-versioning \
 ```
 
 #### Azure Blob Storage
+
 ```bash
 az storage account create \
   --name myclustervelero \
@@ -51,12 +57,14 @@ az storage container create \
 ```
 
 #### GCP Cloud Storage
+
 ```bash
 gsutil mb -l us-central1 gs://my-cluster-velero-backups
 gsutil versioning set on gs://my-cluster-velero-backups
 ```
 
 #### DigitalOcean Spaces
+
 ```bash
 doctl compute space create my-cluster-velero-backups --region nyc3
 ```
@@ -95,6 +103,7 @@ velero:
 **AWS/Azure/GCP**: No credentials needed - uses cloud-native auth (IRSA/Workload Identity)
 
 **DigitalOcean/MinIO**: Create secret manually:
+
 ```bash
 kubectl create secret generic velero-credentials \
   --namespace velero \
@@ -114,6 +123,7 @@ git push
 ```
 
 ArgoCD will automatically deploy:
+
 1. Velero operator (sync wave 0)
 2. Backup locations and schedules (sync wave 1)
 
@@ -141,6 +151,7 @@ aws s3 ls s3://my-cluster-velero-backups/infrastructure/
 ## Multi-Cloud Configuration Examples
 
 ### AWS (IRSA Authentication)
+
 ```yaml
 velero:
   enabled: true
@@ -152,6 +163,7 @@ velero:
 ```
 
 ### Azure (Workload Identity)
+
 ```yaml
 velero:
   enabled: true
@@ -164,6 +176,7 @@ velero:
 ```
 
 ### GCP (Workload Identity)
+
 ```yaml
 velero:
   enabled: true
@@ -176,6 +189,7 @@ velero:
 ```
 
 ### DigitalOcean (S3-Compatible)
+
 ```yaml
 velero:
   enabled: true
@@ -191,6 +205,7 @@ velero:
 ## Troubleshooting
 
 ### BackupStorageLocation Unavailable
+
 ```bash
 # Check status
 kubectl describe backupstoragelocation default -n velero
@@ -207,6 +222,7 @@ kubectl logs -n velero deployment/velero | grep -i error
 ### Cloud Authentication Issues
 
 **AWS IRSA:**
+
 ```bash
 # Verify service account annotation
 kubectl get sa velero -n velero -o yaml | grep eks.amazonaws.com
@@ -217,6 +233,7 @@ aws iam get-role --role-name my-cluster-velero
 ```
 
 **Azure Workload Identity:**
+
 ```bash
 # Verify service account annotation
 kubectl get sa velero -n velero -o yaml | grep azure.workload.identity
@@ -227,6 +244,7 @@ az role assignment list --assignee <identity-client-id>
 ```
 
 **GCP Workload Identity:**
+
 ```bash
 # Verify service account annotation
 kubectl get sa velero -n velero -o yaml | grep iam.gke.io
@@ -239,6 +257,7 @@ gcloud projects get-iam-policy <project-id> \
 ```
 
 ### Volume Snapshots Not Working
+
 ```bash
 # Verify CSI driver installed
 kubectl get csidriver
@@ -252,6 +271,7 @@ kubectl describe volumesnapshotlocation default -n velero
 ```
 
 ### Scheduled Backups Not Running
+
 ```bash
 # Check schedule status
 kubectl get schedule -n velero
@@ -282,8 +302,8 @@ kubectl logs -n velero deployment/velero | grep schedule
 
 - **Backup Strategy**: [docs/operations/BACKUP_DR.md](../../docs/operations/BACKUP_DR.md)
 - **DR Runbooks**: [docs/operations/DISASTER_RECOVERY_RUNBOOKS.md](../../docs/operations/DISASTER_RECOVERY_RUNBOOKS.md)
-- **Velero Docs**: https://velero.io/docs/
-- **Velero GitHub**: https://github.com/vmware-tanzu/velero
+- **Velero Docs**: <https://velero.io/docs/>
+- **Velero GitHub**: <https://github.com/vmware-tanzu/velero>
 
 ---
 

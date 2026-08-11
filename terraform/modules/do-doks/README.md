@@ -51,6 +51,7 @@ module "doks_cluster" {
 ## Available Regions
 
 DigitalOcean data centers:
+
 - `nyc1`, `nyc3` - New York (US East)
 - `sfo3` - San Francisco (US West)
 - `tor1` - Toronto (Canada)
@@ -63,6 +64,7 @@ DigitalOcean data centers:
 ## Outputs
 
 ### Cluster Outputs
+
 - `cluster_name` - DOKS cluster name
 - `cluster_endpoint` - API server endpoint
 - `cluster_version` - Kubernetes version
@@ -70,11 +72,13 @@ DigitalOcean data centers:
 - `kubeconfig` - Complete kubectl configuration
 
 ### Network Outputs
+
 - `vpc_id` - VPC UUID
 - `vpc_cidr` - VPC CIDR block
 - `cluster_ipv4_address` - Public IPv4 address of cluster
 
 ### Node Pool Outputs
+
 - `node_pool_id` - Default node pool ID
 - `node_pool_nodes` - List of nodes in the pool
 
@@ -83,6 +87,7 @@ DigitalOcean data centers:
 ### Multi-Tenant Sizing
 
 **Small (1-5 clients):**
+
 ```hcl
 deployment_profile = "small"
 # 3 nodes, s-2vcpu-4gb (2 vCPU, 4GB RAM)
@@ -90,6 +95,7 @@ deployment_profile = "small"
 ```
 
 **Medium (5-15 clients):**
+
 ```hcl
 deployment_profile = "medium"
 # 5 nodes, s-4vcpu-8gb (4 vCPU, 8GB RAM)
@@ -97,6 +103,7 @@ deployment_profile = "medium"
 ```
 
 **Large (15+ clients):**
+
 ```hcl
 deployment_profile = "large"
 # 10 nodes, s-8vcpu-16gb (8 vCPU, 16GB RAM)
@@ -199,6 +206,7 @@ kubectl patch storageclass do-block-storage -p '{"metadata": {"annotations":{"st
 ## Cost Estimate
 
 **Medium cluster (5 nodes, s-4vcpu-8gb):**
+
 - Control plane: Free (included with cluster)
 - Worker nodes: ~$180/month (5 × $36)
 - Load balancer: ~$12/month per LoadBalancer service
@@ -210,6 +218,7 @@ kubectl patch storageclass do-block-storage -p '{"metadata": {"annotations":{"st
 ## Kubernetes Versions
 
 List available versions:
+
 ```bash
 doctl kubernetes options versions
 ```
@@ -219,21 +228,25 @@ Versions follow format: `1.28.2-do.0`
 ## Troubleshooting
 
 ### Check cluster status
+
 ```bash
 doctl kubernetes cluster get monobase-prod
 ```
 
 ### View cluster events
+
 ```bash
 kubectl get events --all-namespaces --sort-by='.lastTimestamp'
 ```
 
 ### Scale node pool manually
+
 ```bash
 doctl kubernetes cluster node-pool update monobase-prod <node-pool-id> --count 7
 ```
 
 ### Upgrade Kubernetes version
+
 ```bash
 # List available upgrades
 doctl kubernetes options versions

@@ -20,6 +20,7 @@ Comprehensive guide for creating new OpenTofu modules for Monobase Infrastructur
 ### What is a Module?
 
 An OpenTofu module is a reusable package of infrastructure code that:
+
 - Provisions a complete Kubernetes cluster (EKS, AKS, GKE, K3s, k3d)
 - Provides consistent interface (inputs/outputs)
 - Encapsulates complexity
@@ -57,6 +58,7 @@ modules/
 ### File Descriptions
 
 **README.md**
+
 - Module purpose and features
 - Requirements (tools, credentials)
 - Quick start example
@@ -66,12 +68,14 @@ modules/
 - Known limitations
 
 **main.tf**
+
 - Primary cluster resource (EKS cluster, AKS cluster, k3d cluster, etc.)
 - Core dependencies
 - Module dependencies
 - Data sources (availability zones, AMIs, etc.)
 
 **variables.tf**
+
 - All configurable parameters
 - Type definitions
 - Default values
@@ -79,6 +83,7 @@ modules/
 - Clear descriptions
 
 **outputs.tf**
+
 - Cluster endpoint
 - Kubeconfig
 - OIDC/Workload Identity provider
@@ -86,10 +91,12 @@ modules/
 - All sensitive values marked
 
 **versions.tf**
+
 - Terraform/OpenTofu version constraint
 - Provider versions (pinned to major versions)
 
 **{resource}.tf** (optional splits)
+
 - `vpc.tf` - VPC, subnets, routing
 - `iam.tf` - IAM roles, policies
 - `network.tf` - Network configuration
@@ -237,6 +244,7 @@ Before creating a module, understand:
 6. **Workload Identity** - IRSA (AWS), Workload Identity (Azure/GCP)
 
 **Resources:**
+
 - [Terraform Registry](https://registry.terraform.io/browse/providers)
 - Provider documentation
 - Cloud provider best practices
@@ -315,6 +323,7 @@ variable "enable_autoscaling" {
 ```
 
 **Guidelines:**
+
 - Use `description` for all variables
 - Provide sensible `default` values
 - Use `validation` blocks for constraints
@@ -383,6 +392,7 @@ resource "aws_eks_node_group" "main" {
 Split complex resources into separate files:
 
 **vpc.tf** - Networking
+
 ```hcl
 resource "aws_vpc" "main" {
   cidr_block           = var.vpc_cidr
@@ -409,6 +419,7 @@ resource "aws_subnet" "private" {
 ```
 
 **iam.tf** - IAM Roles
+
 ```hcl
 resource "aws_iam_role" "cluster" {
   name = "${var.cluster_name}-cluster-role"
@@ -482,6 +493,7 @@ See [Documentation](#documentation) section below.
 ### Code Organization
 
 ✅ **DO:**
+
 - Split large files logically (vpc.tf, iam.tf, security-groups.tf)
 - Use consistent naming conventions
 - Group related resources together
@@ -490,6 +502,7 @@ See [Documentation](#documentation) section below.
 - Tag all resources consistently
 
 ❌ **DON'T:**
+
 - Hardcode values that should be variables
 - Create overly complex modules (split if needed)
 - Mix different resource types in one file randomly
@@ -498,6 +511,7 @@ See [Documentation](#documentation) section below.
 ### Variable Design
 
 ✅ **DO:**
+
 - Provide sensible defaults for most variables
 - Use validation blocks for constraints
 - Document each variable clearly
@@ -505,6 +519,7 @@ See [Documentation](#documentation) section below.
 - Support optional features with boolean flags
 
 ❌ **DON'T:**
+
 - Require too many mandatory variables
 - Use vague variable names (e.g., `enable_feature`)
 - Mix units (use seconds OR milliseconds, not both)
@@ -512,6 +527,7 @@ See [Documentation](#documentation) section below.
 ### Security
 
 ✅ **DO:**
+
 - Enable encryption by default
 - Mark sensitive outputs as `sensitive = true`
 - Use IAM least privilege
@@ -519,6 +535,7 @@ See [Documentation](#documentation) section below.
 - Use private endpoints when possible
 
 ❌ **DON'T:**
+
 - Disable security features by default
 - Store secrets in variables
 - Use overly permissive security groups
@@ -528,6 +545,7 @@ See [Documentation](#documentation) section below.
 For Monobase Infrastructure, modules must support multiple clients per cluster:
 
 ✅ **DO:**
+
 - Size for 5-30 clients per cluster
 - Enable autoscaling (3-20 nodes)
 - Support namespace isolation
@@ -536,6 +554,7 @@ For Monobase Infrastructure, modules must support multiple clients per cluster:
 - Use appropriate instance sizes (m6i.2xlarge or larger)
 
 ❌ **DON'T:**
+
 - Size for single client only
 - Disable autoscaling
 - Use small instance types (t3.medium)
@@ -544,6 +563,7 @@ For Monobase Infrastructure, modules must support multiple clients per cluster:
 ### Cost Optimization
 
 ✅ **DO:**
+
 - Use spot instances where appropriate
 - Enable autoscaling
 - Use gp3 volumes (AWS) instead of gp2
@@ -552,6 +572,7 @@ For Monobase Infrastructure, modules must support multiple clients per cluster:
 - Enable cluster autoscaler
 
 ❌ **DON'T:**
+
 - Use on-demand instances only
 - Over-provision resources
 - Use older generation instance types
@@ -562,6 +583,7 @@ For Monobase Infrastructure, modules must support multiple clients per cluster:
 For healthcare deployments:
 
 ✅ **DO:**
+
 - Enable encryption at rest
 - Enable encryption in transit
 - Configure audit logging
@@ -579,6 +601,7 @@ For healthcare deployments:
 Before considering a module complete:
 
 1. **Provision Test Cluster**
+
    ```bash
    cd modules/{your-module}
    tofu init
@@ -587,6 +610,7 @@ Before considering a module complete:
    ```
 
 2. **Verify Cluster Access**
+
    ```bash
    tofu output -raw kubeconfig > ~/.kube/test-cluster
    export KUBECONFIG=~/.kube/test-cluster
@@ -603,6 +627,7 @@ Before considering a module complete:
    - [ ] LoadBalancer service type works (if applicable)
 
 4. **Test Multi-Tenant Features**
+
    ```bash
    # Create test namespace
    kubectl create namespace test-client
@@ -613,6 +638,7 @@ Before considering a module complete:
    ```
 
 5. **Test Workload Identity (if supported)**
+
    ```bash
    # Verify OIDC provider (AWS)
    aws eks describe-cluster --name test-cluster --query "cluster.identity.oidc.issuer"
@@ -621,6 +647,7 @@ Before considering a module complete:
    ```
 
 6. **Test Autoscaling (if enabled)**
+
    ```bash
    # Deploy resource-intensive workload
    kubectl run stress --image=polinux/stress -- stress --cpu 8
@@ -630,6 +657,7 @@ Before considering a module complete:
    ```
 
 7. **Clean Up**
+
    ```bash
    tofu destroy -var-file=test.tfvars
    ```
@@ -639,6 +667,7 @@ Before considering a module complete:
 For production modules, consider:
 
 **Terratest (Go)**
+
 ```go
 package test
 
@@ -666,6 +695,7 @@ func TestEKSModule(t *testing.T) {
 ```
 
 **Kitchen-Terraform**
+
 - Test infrastructure with InSpec
 - Verify compliance requirements
 - Test multiple scenarios
@@ -750,6 +780,7 @@ For issues, see [main repository](../../README.md).
 ### Documentation Best Practices
 
 ✅ **DO:**
+
 - Document every variable and output
 - Provide cost estimates
 - Include complete examples
@@ -758,6 +789,7 @@ For issues, see [main repository](../../README.md).
 - Add troubleshooting section
 
 ❌ **DON'T:**
+
 - Assume users know the cloud provider
 - Skip examples
 - Leave outdated documentation
@@ -876,12 +908,14 @@ output "kubeconfig" {
 Use this checklist when creating a new module:
 
 ### Planning
+
 - [ ] Research provider requirements and best practices
 - [ ] Review existing modules for consistency
 - [ ] Design variable interface (standard + provider-specific)
 - [ ] Plan resource organization (main.tf vs split files)
 
 ### Implementation
+
 - [ ] Create directory structure
 - [ ] Define versions.tf with provider constraints
 - [ ] Implement variables.tf with validation
@@ -892,6 +926,7 @@ Use this checklist when creating a new module:
 - [ ] Tag all resources appropriately
 
 ### Testing
+
 - [ ] Test module provisioning with test.tfvars
 - [ ] Verify cluster access with kubectl
 - [ ] Test core features (DNS, networking, storage)
@@ -902,6 +937,7 @@ Use this checklist when creating a new module:
 - [ ] Clean up test resources
 
 ### Documentation
+
 - [ ] Write comprehensive README.md
 - [ ] Document all variables with descriptions
 - [ ] Document all outputs
@@ -912,6 +948,7 @@ Use this checklist when creating a new module:
 - [ ] Add usage examples
 
 ### Security & Compliance
+
 - [ ] Enable encryption at rest
 - [ ] Enable encryption in transit
 - [ ] Configure audit logging
@@ -922,6 +959,7 @@ Use this checklist when creating a new module:
 - [ ] Tag for compliance tracking
 
 ### Multi-Tenant Requirements
+
 - [ ] Size for 5-30 clients
 - [ ] Enable autoscaling (3-20 nodes)
 - [ ] Use appropriate instance sizes
@@ -930,6 +968,7 @@ Use this checklist when creating a new module:
 - [ ] Enable network policies
 
 ### Finalization
+
 - [ ] Run `tofu fmt` on all files
 - [ ] Run `tofu validate`
 - [ ] Update terraform/README.md with new module
@@ -943,6 +982,7 @@ Use this checklist when creating a new module:
 ### Pitfall 1: Hardcoding Values
 
 ❌ **Bad:**
+
 ```hcl
 resource "aws_subnet" "private" {
   cidr_block = "10.0.1.0/24"  # Hardcoded
@@ -950,6 +990,7 @@ resource "aws_subnet" "private" {
 ```
 
 ✅ **Good:**
+
 ```hcl
 resource "aws_subnet" "private" {
   cidr_block = cidrsubnet(var.vpc_cidr, 4, 1)  # Calculated
@@ -959,6 +1000,7 @@ resource "aws_subnet" "private" {
 ### Pitfall 2: Missing Validation
 
 ❌ **Bad:**
+
 ```hcl
 variable "node_count_min" {
   type = number
@@ -966,6 +1008,7 @@ variable "node_count_min" {
 ```
 
 ✅ **Good:**
+
 ```hcl
 variable "node_count_min" {
   type = number
@@ -979,6 +1022,7 @@ variable "node_count_min" {
 ### Pitfall 3: Forgetting Dependencies
 
 ❌ **Bad:**
+
 ```hcl
 resource "aws_eks_node_group" "main" {
   cluster_name = aws_eks_cluster.main.name
@@ -987,6 +1031,7 @@ resource "aws_eks_node_group" "main" {
 ```
 
 ✅ **Good:**
+
 ```hcl
 resource "aws_eks_node_group" "main" {
   cluster_name = aws_eks_cluster.main.name
@@ -1000,6 +1045,7 @@ resource "aws_eks_node_group" "main" {
 ### Pitfall 4: Exposing Sensitive Data
 
 ❌ **Bad:**
+
 ```hcl
 output "kubeconfig" {
   value = local.kubeconfig
@@ -1007,6 +1053,7 @@ output "kubeconfig" {
 ```
 
 ✅ **Good:**
+
 ```hcl
 output "kubeconfig" {
   value     = local.kubeconfig
@@ -1017,6 +1064,7 @@ output "kubeconfig" {
 ### Pitfall 5: Poor Resource Naming
 
 ❌ **Bad:**
+
 ```hcl
 resource "aws_vpc" "vpc" {
   # Name collision risk
@@ -1024,6 +1072,7 @@ resource "aws_vpc" "vpc" {
 ```
 
 ✅ **Good:**
+
 ```hcl
 resource "aws_vpc" "main" {
   tags = {

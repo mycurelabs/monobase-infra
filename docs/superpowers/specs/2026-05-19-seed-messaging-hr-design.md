@@ -256,6 +256,7 @@ await api('POST', '/clock/clocks', {
 ```
 
 For today (the current weekday), the rule is:
+
 - If `now` ≥ `baseStart`, create the attendance with `startAt = baseStart`
   and `endAt = null` (it's still open — realistic).
 - Otherwise skip — the user hasn't clocked in yet.

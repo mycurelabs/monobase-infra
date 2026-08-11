@@ -47,6 +47,7 @@ If you're deploying healthcare applications handling Protected Health Informatio
   - ✅ 7-year retention (via S3 lifecycle)
   
   **Enable:**
+
   ```bash
   # Kubernetes audit (EKS example)
   # Enable in cluster logging configuration
@@ -67,6 +68,7 @@ If you're deploying healthcare applications handling Protected Health Informatio
   - ✅ PostgreSQL integrity validation
   
   **Verify:**
+
   ```bash
   # Backup integrity via Velero
   velero backup describe <backup-name>
@@ -81,6 +83,7 @@ If you're deploying healthcare applications handling Protected Health Informatio
   - ✅ MFA recommended for admin access
   
   **Verify:**
+
   ```bash
   # Test unauthenticated access (should fail)
   curl https://api.myclient.com/patients
@@ -95,6 +98,7 @@ If you're deploying healthcare applications handling Protected Health Informatio
   - ✅ Checksum verification
   
   **Verify:**
+
   ```bash
   # Check TLS version
   openssl s_client -connect api.myclient.com:443 -tls1_3
@@ -105,6 +109,7 @@ If you're deploying healthcare applications handling Protected Health Informatio
   - ✅ No unencrypted PHI transmission
   
   **Verify:**
+
   ```bash
   # All endpoints should use HTTPS
   curl -v https://api.myclient.com 2>&1 | grep "TLS"
@@ -275,6 +280,7 @@ If you're deploying healthcare applications handling Protected Health Informatio
 **Breach = Unauthorized access/disclosure of PHI**
 
 Examples:
+
 - Database exposed to internet
 - Stolen laptop with PHI
 - Ransomware accessing PHI
@@ -335,14 +341,17 @@ kubectl delete gateway nginx-shared-gateway -n nginx-gateway-system  # Stop all 
 ### Cloud Provider BAAs
 
 **AWS:**
+
 - Sign via AWS Artifact
 - Covers: EC2, EKS, S3, Secrets Manager, KMS, CloudWatch
 
 **Azure:**
+
 - Sign via Microsoft Trust Center
 - Covers: AKS, Azure Storage, Key Vault, Monitor
 
 **GCP:**
+
 - Sign via Google Cloud compliance page
 - Covers: GKE, Cloud Storage, Secret Manager, Cloud Monitoring
 
@@ -375,6 +384,7 @@ kubectl delete gateway nginx-shared-gateway -n nginx-gateway-system  # Stop all 
    - Penetration test reports
 
 4. **Configuration Evidence**
+
    ```bash
    # Generate compliance report
    
@@ -399,24 +409,28 @@ kubectl delete gateway nginx-shared-gateway -n nginx-gateway-system  # Stop all 
 ## Annual Compliance Tasks
 
 ### Q1 (January-March)
+
 - [ ] Annual risk assessment
 - [ ] Security policy review
 - [ ] BAA renewal (if needed)
 - [ ] Penetration testing
 
 ### Q2 (April-June)
+
 - [ ] Security awareness training
 - [ ] Audit log review
 - [ ] Backup restore testing
 - [ ] DR plan testing
 
 ### Q3 (July-September)
+
 - [ ] Mid-year risk review
 - [ ] Security control testing
 - [ ] Vendor assessment
 - [ ] Incident response drill
 
 ### Q4 (October-December)
+
 - [ ] Annual compliance audit
 - [ ] Policy updates
 - [ ] Next year planning
@@ -427,6 +441,7 @@ kubectl delete gateway nginx-shared-gateway -n nginx-gateway-system  # Stop all 
 ## Summary
 
 **Compliance Status:**
+
 - ✅ **Technical Safeguards:** Fully implemented
 - ✅ **Encryption:** At rest + in transit
 - ✅ **Access Controls:** RBAC + NetworkPolicies

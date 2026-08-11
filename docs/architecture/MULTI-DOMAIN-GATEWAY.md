@@ -16,7 +16,7 @@ The Gateway supports **two types of domains**:
 1. **Platform Subdomains** — the wildcard domains served: `*.mycureapp.com`, `*.localfirsthealth.com`, `*.stg.localfirsthealth.com`, `*.mycure.md`
    - Covered by wildcard certificates
    - Automatic for all deployments
-   
+
 2. **Client Custom Domains** (`app.client.com`)
    - Per-domain certificates
    - Client provides domain, platform manages certificate
@@ -80,6 +80,7 @@ The Gateway supports **two types of domains**:
 ### 1. Security Advantages
 
 **Centralized (Recommended):**
+
 - ✅ All certificates in one highly-controlled namespace (`nginx-gateway-system`)
 - ✅ No cross-namespace secret access needed
 - ✅ No ReferenceGrants required (eliminates attack surface)
@@ -87,6 +88,7 @@ The Gateway supports **two types of domains**:
 - ✅ If Gateway compromised: Attacker only accesses nginx-gateway-system secrets
 
 **Distributed (Not Recommended):**
+
 - ❌ Certificates scattered across N client namespaces
 - ❌ Requires ReferenceGrant for each namespace (cross-namespace access)
 - ❌ If Gateway compromised: Attacker accesses ALL client namespaces via ReferenceGrants
@@ -97,6 +99,7 @@ The Gateway supports **two types of domains**:
 ### 2. Operational Simplicity
 
 **Centralized:**
+
 ```
 nginx-gateway-system/
   ├── wildcard-example-tls (Secret)
@@ -111,6 +114,7 @@ Operations:
 ```
 
 **Distributed:**
+
 ```
 nginx-gateway-system/
   └── wildcard-example-tls
@@ -156,23 +160,27 @@ Operations:
 **Purpose:** Auto-provision certificates for client-owned domains
 
 **Example:**
+
 - Domain: `app.client.com`
 - Certificate: Single domain (no wildcard support with HTTP-01)
 - Type: HTTP-01 challenge (no DNS API access needed)
 - Issuer: `letsencrypt-nginx-http01` ClusterIssuer
 
 **When to Use:**
+
 - Client owns domain
 - Client can create DNS A record
 - Client does NOT have DNS provider API access
 - Most common scenario
 
 **Requirements:**
+
 1. Client creates DNS: `app.client.com` → A → `<LoadBalancer-IP>`
 2. Port 80 accessible for ACME challenge
 3. Let's Encrypt can reach domain via HTTP
 
 **Process:**
+
 1. Certificate declared in `values/infrastructure/main.yaml` under `nginxGatewayResources.tls.certificates`
 2. cert-manager creates temporary HTTPRoute for `/.well-known/acme-challenge/`
 3. Let's Encrypt validates via HTTP request
@@ -180,6 +188,7 @@ Operations:
 5. Secret stored in `nginx-gateway-system` namespace
 
 **Configuration:**
+
 ```yaml
 # values/infrastructure/main.yaml
 nginxGatewayResources:
@@ -192,6 +201,7 @@ nginxGatewayResources:
 ```
 
 **Limitations:**
+
 - ❌ No wildcard support (HTTP-01 limitation)
 - ❌ Domain must be publicly accessible
 - ⚠️ Rate limits: 50 certificates/week per domain
@@ -203,24 +213,28 @@ nginxGatewayResources:
 **Purpose:** Client provides their own certificate
 
 **Example:**
+
 - Domain: `portal.client.com`
 - Certificate: Client uploads to GCP Secret Manager
 - Type: External Secrets Operator syncs to Kubernetes
 - Renewal: Client manages certificate lifecycle
 
 **When to Use:**
+
 - Client has existing certificate
 - Client wants to manage certificate lifecycle
 - Client uses internal CA
 - Regulatory requirements for specific certificate authority
 
 **Process:**
+
 1. Client uploads cert/key to GCP Secret Manager
 2. Configuration added to `values/infrastructure/main.yaml`
 3. External Secrets Operator syncs to `nginx-gateway-system` namespace
 4. Gateway references certificate
 
 **Configuration:**
+
 ```yaml
 # values/infrastructure/main.yaml
 nginxGatewayResources:
@@ -236,6 +250,7 @@ nginxGatewayResources:
 ```
 
 **Certificate Format Requirements:**
+
 - PEM-encoded X.509 certificate
 - Include full certificate chain (intermediate CAs)
 - PEM-encoded private key (RSA 2048+ or ECDSA P-256+)
@@ -279,6 +294,7 @@ spec:
 ```
 
 **How it works:**
+
 1. Client connects with SNI: `app.client.com`
 2. Gateway matches SNI against available certificates
 3. Gateway presents `client1-domain-tls` certificate
@@ -317,6 +333,7 @@ spec:
 ```
 
 **Why it works:**
+
 - cert-manager creates: `path: /.well-known/acme-challenge/TOKEN` (exact path)
 - Redirect HTTPRoute: `path: /` (prefix)
 - Gateway API routing: More specific path wins
@@ -345,6 +362,7 @@ Commit and push — ArgoCD syncs the `charts/nginx-gateway` chart. No manual app
 ### 2. Provisioning
 
 **For HTTP-01:**
+
 1. ArgoCD syncs, creates Certificate resource in `nginx-gateway-system`
 2. cert-manager sees new Certificate
 3. cert-manager creates Order, Challenge resources
@@ -359,6 +377,7 @@ Commit and push — ArgoCD syncs the `charts/nginx-gateway` chart. No manual app
 **Time:** 2-5 minutes
 
 **For Client-Provided:**
+
 1. ArgoCD syncs, creates ExternalSecret in `nginx-gateway-system`
 2. External Secrets Operator sees new ExternalSecret
 3. ESO fetches certificate from GCP Secret Manager
@@ -393,11 +412,13 @@ spec:
 ### 4. Renewal
 
 **For HTTP-01 (Automatic):**
+
 - cert-manager renews automatically 30 days before expiry
 - Zero-downtime renewal (new secret created, Gateway picks up seamlessly)
 - No manual intervention needed
 
 **For Client-Provided (Manual):**
+
 - Client manages renewal
 - Client uploads new certificate to GCP Secret Manager
 - ESO syncs automatically (refresh interval: 1 hour default)
@@ -406,6 +427,7 @@ spec:
 ### 5. Monitoring
 
 **Certificate Status:**
+
 ```bash
 # Check all certificates
 kubectl get certificate -n nginx-gateway-system
@@ -419,6 +441,7 @@ kubectl get secret -n nginx-gateway-system -o json | \
 ```
 
 **Recommendations:**
+
 - Monitor cert-manager logs for provisioning failures
 - Alert on certificates expiring in < 14 days
 - Alert on cert-manager Certificate resources with Ready=False
@@ -430,6 +453,7 @@ kubectl get secret -n nginx-gateway-system -o json | \
 ### Alternative 1: Per-Namespace Certificates (Not Recommended)
 
 **Architecture:**
+
 ```
 client1/
   ├── client1-domain-tls (Secret)
@@ -440,9 +464,11 @@ nginx-gateway-system/
 ```
 
 **Pros:**
+
 - Certificates in client namespaces (logical isolation)
 
 **Cons:**
+
 - ❌ Requires ReferenceGrant for each namespace
 - ❌ Cross-namespace secret access (security risk)
 - ❌ Complex RBAC (N namespaces need permissions)
@@ -456,6 +482,7 @@ nginx-gateway-system/
 ### Alternative 2: Dedicated Gateway per Client
 
 **Architecture:**
+
 ```
 client1/
   ├── client1-gateway (Gateway with own LoadBalancer)
@@ -464,17 +491,20 @@ client1/
 ```
 
 **Pros:**
+
 - ✅ Complete isolation per client
 - ✅ No shared infrastructure concerns
 - ✅ Client-specific Gateway configuration
 
 **Cons:**
+
 - ❌ Expensive: N × LoadBalancer cost ($15-30/month each)
 - ❌ N LoadBalancer IPs to manage
 - ❌ Client needs to point DNS to their specific IP
 - ❌ Wasteful for small clients
 
 **When to Use:**
+
 - Client pays for their own infrastructure
 - Strict network isolation required
 - >50 client domains (shared Gateway becomes unwieldy)
@@ -487,6 +517,7 @@ client1/
 ### Alternative 3: TLS Passthrough (No Termination at Gateway)
 
 **Architecture:**
+
 ```
 Gateway (TLS passthrough mode)
   ↓ (encrypted traffic)
@@ -494,10 +525,12 @@ Backend Pod (terminates TLS)
 ```
 
 **Pros:**
+
 - Gateway doesn't handle certificates
 - Backend fully controls TLS
 
 **Cons:**
+
 - ❌ No L7 routing (can't route based on HTTP headers/path)
 - ❌ Can't do HTTP to HTTPS redirect
 - ❌ Can't inspect/modify requests
@@ -517,6 +550,7 @@ Backend Pod (terminates TLS)
 - Gateway pods read via mounted secrets (not environment variables)
 
 **Best Practice:** Enable encryption at rest for Secrets
+
 ```bash
 # For managed Kubernetes (EKS, GKE, AKS): Usually enabled by default
 # Verify encryption provider configured
@@ -529,6 +563,7 @@ Backend Pod (terminates TLS)
 - If hit: Wait until rate limit window resets OR use staging for testing
 
 **Mitigation:**
+
 - Use `letsencrypt-staging` ClusterIssuer for testing
 - Plan certificate additions (batch if adding many clients)
 - Monitor rate limit usage
@@ -536,6 +571,7 @@ Backend Pod (terminates TLS)
 ### 3. ACME Challenge Security
 
 **HTTP-01 Challenges:**
+
 - Temporary HTTPRoute created by cert-manager
 - Only routes `/.well-known/acme-challenge/*` to solver
 - Deleted immediately after validation
@@ -544,12 +580,14 @@ Backend Pod (terminates TLS)
 ### 4. Client-Provided Certificates
 
 **Validation:**
+
 - Verify certificate matches domain
 - Check certificate chain completeness
 - Verify not expired
 - Test in staging first
 
 **Storage:**
+
 - Store in GCP Secret Manager (encrypted)
 - IAM controls access
 - ESO syncs to Kubernetes (also encrypted if cluster encryption enabled)
@@ -572,12 +610,14 @@ certificates:
 ### 2. Certificate Monitoring
 
 **Metrics to Track:**
+
 - Certificate expiry dates (alert < 14 days)
 - Certificate provisioning failures
 - ACME challenge failures
 - Rate limit violations
 
 **Tools:**
+
 - cert-manager Prometheus metrics
 - Alertmanager rules for expiry
 - cert-manager status dashboard
@@ -585,6 +625,7 @@ certificates:
 ### 3. Documentation
 
 **For Each Client:**
+
 - Document domain in `values/infrastructure/main.yaml` comments
 - Note certificate type (auto-provisioned vs client-provided)
 - Record renewal process (if client-managed)
@@ -592,6 +633,7 @@ certificates:
 ### 4. Testing
 
 **Before Production:**
+
 1. Use `letsencrypt-staging` ClusterIssuer
 2. Verify certificate issued successfully
 3. Test TLS handshake
@@ -605,12 +647,14 @@ certificates:
 ### Certificate Not Issuing
 
 **Symptoms:**
+
 ```bash
 kubectl get certificate client1-domain-tls -n nginx-gateway-system
 # Status: Ready=False
 ```
 
 **Debug:**
+
 ```bash
 # Check Certificate status
 kubectl describe certificate client1-domain-tls -n nginx-gateway-system
@@ -626,6 +670,7 @@ kubectl logs -n cert-manager -l app=cert-manager
 ```
 
 **Common Issues:**
+
 - DNS not pointing to LoadBalancer IP → Verify with `dig domain.com`
 - Port 80 not accessible → Check NetworkPolicies, Security Groups
 - Rate limit hit → Use staging issuer for testing
@@ -635,9 +680,11 @@ kubectl logs -n cert-manager -l app=cert-manager
 ### Gateway Not Routing
 
 **Symptoms:**
+
 - TLS handshake succeeds but 404/503 errors
 
 **Debug:**
+
 ```bash
 # Check HTTPRoute exists
 kubectl get httproute -n client-namespace
@@ -654,6 +701,7 @@ kubectl exec -n nginx-gateway-system deploy/nginx-shared-gateway-nginx -- \
 ```
 
 **Common Issues:**
+
 - HTTPRoute hostname doesn't match certificate domain
 - HTTPRoute not attached to Gateway (check parentRefs)
 - Backend service not reachable

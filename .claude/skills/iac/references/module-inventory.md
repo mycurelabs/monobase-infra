@@ -6,6 +6,7 @@
 **Terraform**: >= 1.6
 
 ### Key Variables
+
 | Variable | Type | Default | Description |
 |----------|------|---------|-------------|
 | `cluster_name` | string | (required) | EKS cluster name |
@@ -18,11 +19,13 @@
 | `deployment_profile` | string | `"small"` | Size preset (small/medium/large) |
 
 ### Deployment Profiles
+
 - **small**: m6i.xlarge (4 vCPU, 16GB), 3-10 nodes
 - **medium**: m6i.xlarge (4 vCPU, 16GB), 5-15 nodes
 - **large**: m6i.2xlarge (8 vCPU, 32GB), 5-20 nodes
 
 ### Key Outputs
+
 - `cluster_id`, `cluster_name`, `cluster_endpoint`, `cluster_version`
 - `cluster_arn`, `cluster_certificate_authority_data`
 - `cluster_security_group_id`, `oidc_provider_arn`
@@ -36,6 +39,7 @@
 **Terraform**: >= 1.6
 
 ### Key Variables
+
 | Variable | Type | Default | Description |
 |----------|------|---------|-------------|
 | `cluster_name` | string | (required) | AKS cluster name |
@@ -48,6 +52,7 @@
 | `tags` | map(string) | `{}` | Resource tags |
 
 ### Key Outputs
+
 - `cluster_name`, `cluster_id`, `cluster_endpoint`
 - `kubeconfig` (sensitive), `configure_kubectl` command
 - `oidc_issuer_url`, `external_secrets_identity_client_id`
@@ -61,6 +66,7 @@
 **Terraform**: >= 1.6
 
 ### Key Variables
+
 | Variable | Type | Default | Description |
 |----------|------|---------|-------------|
 | `cluster_name` | string | (required) | GKE cluster name |
@@ -73,6 +79,7 @@
 | `tags` | map(string) | `{}` | Resource labels |
 
 ### Key Outputs
+
 - `cluster_name`, `cluster_id`, `cluster_endpoint`
 - `cluster_ca_certificate` (sensitive), `configure_kubectl` command
 - `external_secrets_sa_email`, `velero_sa_email`, `cert_manager_sa_email`
@@ -85,6 +92,7 @@
 **Terraform**: >= 1.6
 
 ### Key Variables
+
 | Variable | Type | Default | Description |
 |----------|------|---------|-------------|
 | `cluster_name` | string | (required) | DOKS cluster name |
@@ -96,11 +104,13 @@
 | `min_nodes` | number | `0` | Min autoscale (overrides profile) |
 
 ### Deployment Profiles
+
 - **small**: s-2vcpu-4gb (2 vCPU, 4GB), 3-10 nodes
 - **medium**: s-4vcpu-8gb (4 vCPU, 8GB), 5-15 nodes
 - **large**: s-8vcpu-16gb (8 vCPU, 16GB), 5-20 nodes
 
 ### Key Outputs
+
 - `cluster_id`, `cluster_name`, `cluster_endpoint`, `cluster_version`
 - `cluster_urn`, `cluster_ipv4_address`, `cluster_status`
 - `vpc_id`, `configure_kubectl` command
@@ -113,6 +123,7 @@
 **Terraform**: >= 1.6
 
 ### Key Variables
+
 | Variable | Type | Default | Description |
 |----------|------|---------|-------------|
 | `cluster_name` | string | (required) | Cluster name |
@@ -128,6 +139,7 @@
 | `metallb_ip_range` | string | `""` | MetalLB IP range |
 
 ### Key Outputs
+
 - `cluster_name`, `server_ips`, `agent_ips`
 - `api_endpoint`, `kubeconfig_path`, `configure_kubectl`
 - `metallb_ip_range`
@@ -140,6 +152,7 @@
 **Terraform**: >= 1.6
 
 ### Key Variables
+
 | Variable | Type | Default | Description |
 |----------|------|---------|-------------|
 | `cluster_name` | string | `"monobase-test"` | k3d cluster name |
@@ -152,5 +165,6 @@
 | `install_gateway_api` | bool | `true` | Install Gateway API CRDs |
 
 ### Key Outputs
+
 - `cluster_name`, `kubeconfig_file`, `kubeconfig` (sensitive)
 - `cluster_endpoint`, `configure_kubectl`

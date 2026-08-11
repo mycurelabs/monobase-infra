@@ -156,6 +156,7 @@ No index on `test`, or on any other column.
 The `$expand=queueing.meta.testPackage.tests` nested expansion is firing one `count(*) FROM diagnostic_order_tests` **per test** in the expanded test packages. Per-row count queries inside a nested expansion are the classic N+1 signature.
 
 We don't know from the DB side alone whether each count is:
+
 - "How many times has this test been ordered?" — a per-test-catalog-entry count
 - "How many diagnostic orders reference this test right now?" — a liveness check
 - A subtle enrichment ("test is recently used / recently popular")
@@ -165,6 +166,7 @@ Whichever semantic it is, doing it once per test per request is not right for a 
 ### Secondary — `$limit` parser accepts invalid values
 
 The client sent `$limit=%2310` (decoded: `$limit=#10`). Either:
+
 - mycure built the URL incorrectly (placeholder template that wasn't substituted), or
 - hapihub's parser doesn't reject non-integer values and falls through to "no limit".
 

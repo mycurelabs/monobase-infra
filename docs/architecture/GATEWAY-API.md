@@ -7,6 +7,7 @@ NGINX Gateway Fabric (NGF) configuration, HTTPRoute management, and zero-downtim
 **Key Architecture Decision:** 1 Shared Gateway + Dynamic HTTPRoutes
 
 **Benefits:**
+
 - ✅ Zero-downtime client onboarding (add HTTPRoute, no Gateway restart)
 - ✅ Single LoadBalancer IP (cost-effective)
 - ✅ Clean namespace isolation
@@ -19,6 +20,7 @@ NGINX Gateway Fabric (NGF) configuration, HTTPRoute management, and zero-downtim
 The Gateway is deployed **automatically by ArgoCD** during bootstrap.
 
 **What gets created:**
+
 - ✅ `nginx-shared-gateway` Gateway resource in `nginx-gateway-system` namespace
 - ✅ Wildcard TLS certificates via cert-manager
 - ✅ HTTP to HTTPS redirect
@@ -52,6 +54,7 @@ spec:
 ```
 
 **Why single listener?**
+
 - HTTPRoutes specify exact hostnames
 - Gateway accepts all via wildcard
 - Adding clients = adding HTTPRoutes (no Gateway change)
@@ -290,11 +293,13 @@ The Gateway architecture supports **two types of domains**:
 **Use Case:** White-label deployments, client branding, client-owned domains
 
 **Example:**
+
 - `app.client.com` → Client's application
 - `portal.enterprise.io` → Enterprise customer portal
 - `dashboard.startup.dev` → Startup's custom domain
 
 **Configuration:**
+
 ```yaml
 # values/infrastructure/main.yaml
 certificates:
@@ -305,6 +310,7 @@ certificates:
 ```
 
 **How it Works:**
+
 1. Client creates DNS: `app.client.com` → A → LoadBalancer IP
 2. Platform adds certificate declaration
 3. cert-manager provisions certificate via HTTP-01 challenge
@@ -312,6 +318,7 @@ certificates:
 5. HTTPRoute routes traffic based on hostname
 
 **Certificate Options:**
+
 - **HTTP-01 Auto-Provisioned:** Platform manages via Let's Encrypt (recommended)
 - **Client-Provided:** Client uploads own certificate to GCP Secret Manager
 
@@ -331,12 +338,14 @@ nginx-gateway-system/
 ```
 
 **Why Centralized?**
+
 - ✅ **Security:** No cross-namespace secret access needed
 - ✅ **Simplicity:** Single namespace to manage
 - ✅ **Industry Standard:** Matches Istio, NGINX Ingress, Kong patterns
 - ✅ **Operational:** Easier debugging and monitoring
 
 **Gateway Configuration:**
+
 ```yaml
 apiVersion: gateway.networking.k8s.io/v1
 kind: Gateway
@@ -354,6 +363,7 @@ spec:
 ```
 
 **SNI-Based Certificate Selection:**
+
 - Client connects with SNI: `app.client.com`
 - Gateway matches SNI against available certificates
 - Gateway presents correct certificate
@@ -389,13 +399,15 @@ For detailed information on multi-domain support:
 ## Summary
 
 **Gateway API provides:**
+
 - ✅ Modern, Kubernetes-native routing
 - ✅ Zero-downtime client onboarding
 - ✅ Flexible traffic management
 - ✅ Built-in TLS support
 - ✅ Cost-effective (single LoadBalancer)
 
-**Deployment:** 
+**Deployment:**
+
 - NGINX Gateway Fabric operator: `charts/argocd-infrastructure/templates/nginx-gateway.yaml` (sync wave 0)
 - Gateway + TLS resources: `charts/argocd-infrastructure/templates/nginx-gateway-resources.yaml` (sync wave 1)
 - Configuration: `values/infrastructure/main.yaml` (`nginxGateway` / `nginxGatewayResources` keys, GitOps-managed)

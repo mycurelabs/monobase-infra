@@ -7,6 +7,7 @@ Helm chart for deploying the Monobase Account frontend application.
 The Monobase Account chart deploys the frontend web application that users interact with.
 
 **Key features:**
+
 - Static frontend (Next.js, React, or similar)
 - Gateway API HTTPRoute for routing
 - No dependencies (calls API backend)
@@ -37,11 +38,13 @@ helm install myclient-account ./charts/account -f deployments/myclient-prod/valu
 ## Parameters
 
 ### account.enabled
+
 - **Type:** boolean
 - **Default:** `true`
 - **Description:** Enable or disable Account frontend deployment
 
 ### account.replicaCount
+
 - **Type:** integer
 - **Default:** `2`
 - **Staging:** `1`
@@ -49,17 +52,20 @@ helm install myclient-account ./charts/account -f deployments/myclient-prod/valu
 - **Description:** Number of frontend pod replicas
 
 ### account.image.repository
+
 - **Type:** string
 - **Default:** `ghcr.io/monobaselabs/accountapp`
 - **Description:** Container image repository
 
 ### account.image.tag
+
 - **Type:** string
 - **Default:** `1.0.0`
 - **Production:** Pin specific version
 - **Description:** Container image tag
 
 ### account.image.pullPolicy
+
 - **Type:** string
 - **Default:** `IfNotPresent`
 - **Options:** `Always`, `IfNotPresent`, `Never`
@@ -67,24 +73,28 @@ helm install myclient-account ./charts/account -f deployments/myclient-prod/valu
 ## Resource Configuration
 
 ### account.resources.requests.cpu
+
 - **Type:** string
 - **Default:** `200m`
 - **Production:** `200m-500m`
 - **Description:** Guaranteed CPU allocation (frontend is lightweight)
 
 ### account.resources.requests.memory
+
 - **Type:** string
 - **Default:** `512Mi`
 - **Production:** `512Mi-1Gi`
 - **Description:** Guaranteed memory allocation
 
 ### account.resources.limits.cpu
+
 - **Type:** string
 - **Default:** `500m`
 - **Production:** `500m-1`
 - **Description:** Maximum CPU allowed
 
 ### account.resources.limits.memory
+
 - **Type:** string
 - **Default:** `1Gi`
 - **Production:** `1-2Gi`
@@ -93,6 +103,7 @@ helm install myclient-account ./charts/account -f deployments/myclient-prod/valu
 ## Gateway Configuration
 
 ### account.gateway.hostname
+
 - **Type:** string
 - **Default:** Empty (uses `app.{global.domain}`)
 - **Example:** `app.myclient.com` or `portal.custom-domain.com`
@@ -101,11 +112,13 @@ helm install myclient-account ./charts/account -f deployments/myclient-prod/valu
 ## High Availability
 
 ### account.podDisruptionBudget.enabled
+
 - **Type:** boolean
 - **Default:** `true`
 - **Production:** `true` (recommended for HA)
 
 ### account.podDisruptionBudget.minAvailable
+
 - **Type:** integer
 - **Default:** `1`
 - **Description:** Minimum pods that must remain available during disruptions

@@ -33,6 +33,7 @@ deployments/
 ```
 
 Each namespace:
+
 - Deploys its own External DNS instances
 - Manages its own DNS credentials (External Secrets Operator)
 - Only watches resources in its namespace
@@ -70,6 +71,7 @@ externalDNS:
 ```
 
 Each instance:
+
 - Runs as separate Deployment
 - Has its own ServiceAccount
 - Uses different credentials
@@ -295,6 +297,7 @@ instances:
 ```
 
 **Required secret:**
+
 ```yaml
 apiVersion: v1
 kind: Secret
@@ -320,6 +323,7 @@ instances:
 ```
 
 **IAM Policy required:**
+
 ```json
 {
   "Version": "2012-10-17",
@@ -360,6 +364,7 @@ instances:
 ```
 
 **GCP IAM binding:**
+
 ```bash
 gcloud projects add-iam-policy-binding my-project \
   --member=serviceAccount:external-dns@my-project.iam.gserviceaccount.com \
@@ -509,14 +514,18 @@ spec:
 ```
 
 External DNS automatically:
+
 1. Watches the HTTPRoute resource
 2. Extracts hostname: `api.stg.example.com`
 3. Gets LoadBalancer IP from Gateway Service: `188.166.196.111`
 4. Creates DNS A record in Cloudflare:
+
    ```
    api.stg.example.com → 188.166.196.111
    ```
+
 5. Creates TXT record for ownership tracking:
+
    ```
    TXT external-dns-api.stg.example.com → "heritage=external-dns,owner=example-staging-primary"
    ```
@@ -538,6 +547,7 @@ spec:
 ```
 
 External DNS creates:
+
 ```
 service.stg.example.com → 203.0.113.42
 ```
@@ -551,6 +561,7 @@ Each External DNS instance uses TXT records to track ownership:
 - **Example**: `example-staging-primary`
 
 This prevents conflicts when:
+
 - Multiple instances manage overlapping domains
 - Manually created DNS records exist
 - Migration from manual to automated DNS
@@ -582,26 +593,32 @@ dig TXT external-dns-api.stg.example.com
 ### Common Log Messages
 
 **Successful sync:**
+
 ```
 level=info msg="All records are already up to date"
 ```
 
 **Creating new record:**
+
 ```
 level=info msg="Desired change: CREATE api.stg.example.com A"
 level=info msg="2 record(s) were successfully updated"
 ```
 
 **Permission denied:**
+
 ```
 level=error msg="failed to list records: HTTP 403: Forbidden"
 ```
+
 → Check API token permissions
 
 **Domain filter blocked:**
+
 ```
 level=info msg="Skipping endpoint api.other-domain.com because it doesn't match domain filter [example.com]"
 ```
+
 → Expected - domain filters working correctly
 
 ## Troubleshooting
@@ -609,21 +626,25 @@ level=info msg="Skipping endpoint api.other-domain.com because it doesn't match 
 ### DNS Records Not Created
 
 1. **Check External DNS is running:**
+
    ```bash
    kubectl get pods -n example-staging | grep external-dns
    ```
 
 2. **Check logs for errors:**
+
    ```bash
    kubectl logs -n example-staging deployment/external-dns-primary
    ```
 
 3. **Verify HTTPRoute has correct hostname:**
+
    ```bash
    kubectl get httproute -n example-staging -o yaml
    ```
 
 4. **Check domain filters:**
+
    ```bash
    # Ensure hostname matches domain filter
    # If filter is "example.com", then "api.stg.example.com" will NOT match
@@ -631,6 +652,7 @@ level=info msg="Skipping endpoint api.other-domain.com because it doesn't match 
    ```
 
 5. **Verify credentials:**
+
    ```bash
    # Check secret exists
    kubectl get secret cloudflare-api-token -n example-staging
@@ -645,12 +667,14 @@ level=info msg="Skipping endpoint api.other-domain.com because it doesn't match 
 **Error:** `failed to list zones: HTTP 403: Forbidden`
 
 **Solution:** Check Cloudflare API token permissions:
+
 - Token needs **Zone:DNS:Edit** permission
 - Token must include the specific zone (domain)
 
 **Error:** `error listing hosted zones: AccessDenied`
 
 **Solution:** Check AWS IAM role/policy:
+
 - ServiceAccount annotation has correct role ARN
 - Role has Route53 permissions
 - Trust policy allows OIDC provider
@@ -660,6 +684,7 @@ level=info msg="Skipping endpoint api.other-domain.com because it doesn't match 
 **Issue:** External DNS logs show updates but DNS not changing
 
 **Possible causes:**
+
 1. **Cloudflare proxy enabled** - Disable with `proxied: false`
 2. **TTL too long** - External DNS sets 300s TTL by default
 3. **Multiple owners conflict** - Check TXT records for ownership
@@ -670,10 +695,12 @@ level=info msg="Skipping endpoint api.other-domain.com because it doesn't match 
 **Error:** `skipping endpoint because it's not owned by this instance`
 
 **This is expected behavior** when:
+
 - Multiple instances have overlapping domain filters
 - One instance created the record first
 
 **Solution:**
+
 - Use non-overlapping domain filters
 - Each instance should manage distinct domains/subdomains
 
@@ -693,6 +720,7 @@ metadata:
 ```
 
 Benefits:
+
 - Cannot access resources in other namespaces
 - Limits blast radius of compromised credentials
 - Perfect for multi-tenant clusters
@@ -809,16 +837,19 @@ See [docs/operations/EXTERNAL-DNS.md](../../docs/operations/EXTERNAL-DNS.md) for
 ### API Token Least Privilege
 
 **Cloudflare:**
+
 - Use API **tokens** (not API keys)
 - Limit to specific zone
 - Only grant DNS:Edit permission
 
 **AWS Route53:**
+
 - Use IRSA (no static credentials)
 - Limit to specific hosted zone ARNs
 - Use `route53:ChangeResourceRecordSets` not `route53:*`
 
 **Google Cloud DNS:**
+
 - Use Workload Identity (no service account keys)
 - Grant `roles/dns.admin` only on specific DNS zones
 
@@ -861,6 +892,7 @@ See [docs/operations/EXTERNAL-DNS.md](../../docs/operations/EXTERNAL-DNS.md) for
 ### Provider-Specific
 
 **Cloudflare:**
+
 | Key | Type | Required | Description |
 |-----|------|----------|-------------|
 | `cloudflare.proxied` | bool | ❌ | Enable Cloudflare proxy (default: false) |
@@ -869,12 +901,14 @@ See [docs/operations/EXTERNAL-DNS.md](../../docs/operations/EXTERNAL-DNS.md) for
 | `cloudflare.apiTokenSecretRef.key` | string | ❌ | Secret key (default: api-token) |
 
 **AWS:**
+
 | Key | Type | Required | Description |
 |-----|------|----------|-------------|
 | `aws.region` | string | ❌ | AWS region |
 | `aws.zoneType` | string | ❌ | Zone type: public/private (default: public) |
 
 **Google:**
+
 | Key | Type | Required | Description |
 |-----|------|----------|-------------|
 | `google.project` | string | ❌ | GCP project ID |
@@ -884,6 +918,7 @@ See [docs/operations/EXTERNAL-DNS.md](../../docs/operations/EXTERNAL-DNS.md) for
 ### v1.0.0 (2025-01-15)
 
 Initial release with:
+
 - Multi-instance architecture
 - Namespace-scoped RBAC
 - Support for Cloudflare, AWS, Google, Azure

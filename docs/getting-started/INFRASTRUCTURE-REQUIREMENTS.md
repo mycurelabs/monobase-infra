@@ -12,12 +12,14 @@ Cluster specifications and sizing guide for Monobase Infrastructure.
 **Storage:** 100GB per node (for system + Longhorn)
 
 **Workload:**
+
 - Monobase API (2 replicas)
 - Monobase Account (2 replicas)
 - PostgreSQL (3 replicas)
 - Longhorn, Gateway, ArgoCD, External Secrets
 
 **Total Resource Usage:**
+
 - ~7 CPU cores
 - ~23Gi memory
 - ~100Gi storage (PostgreSQL PVC)
@@ -32,6 +34,7 @@ Cluster specifications and sizing guide for Monobase Infrastructure.
 **Storage:** 500GB per node (for Longhorn pool)
 
 **Workload:**
+
 - All core components
 - API Worker (2 replicas)
 - MinIO (6 replicas)
@@ -39,6 +42,7 @@ Cluster specifications and sizing guide for Monobase Infrastructure.
 - Monitoring stack
 
 **Total Resource Usage:**
+
 - ~22 CPU cores
 - ~53Gi memory
 - ~1.15TB storage
@@ -48,11 +52,13 @@ Cluster specifications and sizing guide for Monobase Infrastructure.
 **For multiple clients on same cluster:**
 
 **Formula:**
+
 - Base infrastructure: 3 CPU, 7Gi memory (shared)
 - Per client (core): +7 CPU, +23Gi memory, +100Gi storage
 - Per client (full): +22 CPU, +53Gi memory, +1.15TB storage
 
 **Example (5 clients, core stack):**
+
 - Infrastructure: 3 CPU, 7Gi
 - 5 × clients: 35 CPU, 115Gi, 500Gi
 - **Total: 38 CPU, 122Gi, 500Gi**
@@ -63,6 +69,7 @@ Cluster specifications and sizing guide for Monobase Infrastructure.
 **Minimum:** 1.25+
 **Recommended:** 1.27+
 **Features required:**
+
 - Gateway API support (1.25+)
 - Pod Security Standards (1.25+)
 - CSI volume expansion (1.24+)
@@ -70,6 +77,7 @@ Cluster specifications and sizing guide for Monobase Infrastructure.
 ## Cloud Provider Recommendations
 
 ### AWS EKS
+
 - **Node Type:** m6i.xlarge (4 vCPU, 16GB)
 - **Storage:** gp3 EBS volumes
 - **Networking:** VPC with 3 AZs
@@ -77,6 +85,7 @@ Cluster specifications and sizing guide for Monobase Infrastructure.
 - **Addons:** EBS CSI driver, VPC CNI
 
 ### Azure AKS
+
 - **Node Type:** Standard_D4s_v3 (4 vCPU, 16GB)
 - **Storage:** Premium SSD
 - **Networking:** Azure CNI
@@ -84,6 +93,7 @@ Cluster specifications and sizing guide for Monobase Infrastructure.
 - **Features:** Azure Monitor integration
 
 ### GCP GKE
+
 - **Node Type:** n2-standard-4 (4 vCPU, 16GB)
 - **Storage:** pd-ssd
 - **Networking:** VPC-native
@@ -93,18 +103,21 @@ Cluster specifications and sizing guide for Monobase Infrastructure.
 ## Storage Requirements
 
 ### Longhorn Pool
+
 - **Minimum:** 100GB per node
 - **Recommended:** 500GB per node
 - **Type:** SSD preferred
 - **Replicas:** 3x replication (3 nodes minimum)
 
 ### Database Storage (PostgreSQL)
+
 - **Small:** 20-50Gi (<10k records)
 - **Medium:** 50-200Gi (10k-100k records)
 - **Large:** 200Gi-1Ti (100k+ records)
 - **Growth:** Plan for 2x per year
 
 ### Object Storage (MinIO)
+
 - **1TB usable:** 6 nodes × 250Gi = 1.5TB raw (EC:2)
 - **2TB usable:** 6 nodes × 500Gi = 3TB raw (EC:2)
 - **Or use external S3** for >1TB
@@ -112,15 +125,18 @@ Cluster specifications and sizing guide for Monobase Infrastructure.
 ## Network Requirements
 
 **Bandwidth:**
+
 - Minimum: 1 Gbps between nodes
 - Recommended: 10 Gbps for production
 - Internet: 100 Mbps minimum
 
 **Latency:**
+
 - Between nodes: <10ms (same AZ preferred)
 - To internet: <100ms
 
 **Ports:**
+
 - 443 (HTTPS) - LoadBalancer
 - 6443 (K8s API) - Control plane
 - Internal cluster networking
@@ -128,6 +144,7 @@ Cluster specifications and sizing guide for Monobase Infrastructure.
 ## Compliance Requirements
 
 ### Infrastructure
+
 - [ ] Dedicated VPC/VNet (isolated network)
 - [ ] Encryption at rest (EBS/disk encryption)
 - [ ] Encryption in transit (TLS)
@@ -136,6 +153,7 @@ Cluster specifications and sizing guide for Monobase Infrastructure.
 - [ ] Access controls (IAM/RBAC)
 
 ### Cluster Configuration
+
 - [ ] Private nodes (no public IPs)
 - [ ] Bastion host for access
 - [ ] Network policies enabled

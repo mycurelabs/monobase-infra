@@ -41,6 +41,7 @@ issuers:
 ```
 
 **Limitations:**
+
 - Cannot issue wildcard certificates
 - Requires port 80 accessible from internet
 - Domain must resolve to Gateway LoadBalancer IP

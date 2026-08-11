@@ -81,6 +81,7 @@ graph TB
 ### Technology Stack
 
 **Core (Always Deployed):**
+
 - Kubernetes 1.27+ (EKS, AKS, GKE, DOKS, or self-hosted)
 - NGINX Gateway Fabric (Gateway API)
 - Cloud block storage CSI (`do-block-storage` on DOKS; Longhorn is an optional profile for the on-prem-k3s provider only)
@@ -89,11 +90,13 @@ graph TB
 - cert-manager (TLS automation)
 
 **Applications:**
+
 - Monobase API (API backend)
 - Monobase Account (Vue.js frontend)
 - PostgreSQL (primary database; primary + streaming read replica)
 
 **Optional:**
+
 - API Worker (real-time sync)
 - MinIO (self-hosted S3)
 - Valkey (Redis-compatible cache)
@@ -101,6 +104,7 @@ graph TB
 - Prometheus + Grafana (monitoring)
 
 **NOT Included (Deliberately):**
+
 - ❌ Service Mesh (Istio/Linkerd) - Overkill for 3 services
 - ❌ Self-hosted Vault - Use cloud KMS instead
 - ❌ Rook-Ceph - Cloud block storage + MinIO simpler
@@ -243,6 +247,7 @@ graph TB
 ### Data Flow
 
 **1. User Request → Monobase API:**
+
 ```
 Browser → DNS → LoadBalancer → Gateway (443) 
   → HTTPRoute (api.myclient.com) → Monobase API Service (7500) 
@@ -250,6 +255,7 @@ Browser → DNS → LoadBalancer → Gateway (443)
 ```
 
 **2. User Request → Frontend:**
+
 ```
 Browser → DNS → LoadBalancer → Gateway (443)
   → HTTPRoute (app.myclient.com) → Monobase Account Service (80)
@@ -257,12 +263,14 @@ Browser → DNS → LoadBalancer → Gateway (443)
 ```
 
 **3. File Upload Flow:**
+
 ```
 Client → Monobase API → MinIO S3 API (9000)
   → Block-storage PVC (do-block-storage)
 ```
 
 **4. File Download Flow:**
+
 ```
 Client → Monobase API (generates presigned URL)
   → Client downloads directly from MinIO via Gateway
@@ -300,12 +308,14 @@ Client → Monobase API (generates presigned URL)
 ```
 
 **Benefits:**
+
 - ✅ **Zero-downtime client onboarding** - HTTPRoutes added dynamically
 - ✅ **Single LoadBalancer IP** - Cost-effective
 - ✅ **Independent routing** - Each client controls their routes
 - ✅ **Flexible hostnames** - Any domain per service
 
 **HTTPRoute Pattern:**
+
 ```yaml
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
@@ -376,12 +386,14 @@ clusters (see [STORAGE.md](../operations/STORAGE.md)).
 ```
 
 **Why MinIO:**
+
 - S3-compatible API
 - No egress fees (self-hosted)
 - <1TB data (cost-effective)
 - Full control
 
 **Why External S3:**
+>
 - >1TB data (scale better)
 - Global CDN integration
 - Managed service
@@ -415,12 +427,14 @@ Explicit ALLOW rules:
 ### Defense in Depth
 
 **Layer 1: Network (NetworkPolicies)**
+
 - Default deny all traffic
 - Explicit allow rules only
 - Cross-namespace isolation
 - DNS and K8s API allowed
 
 **Layer 2: Pod (Pod Security Standards)**
+
 - Non-root containers
 - No privilege escalation
 - Drop ALL capabilities
@@ -428,17 +442,20 @@ Explicit ALLOW rules:
 - seccomp profile enforced
 
 **Layer 3: Application (RBAC)**
+
 - Dedicated service accounts
 - Least-privilege roles
 - No default SA usage
 - Namespace-scoped permissions
 
 **Layer 4: Data (Encryption)**
+
 - At rest: provider block-storage encryption + PostgreSQL
 - In transit: TLS everywhere (cert-manager)
 - Backups: S3 + KMS encryption
 
 **Layer 5: Access (External Secrets)**
+
 - Secrets never in Git
 - KMS integration (AWS/Azure/GCP)
 - Automatic rotation
@@ -483,11 +500,13 @@ Explicit ALLOW rules:
 3. **PostgreSQL dumps** - Application-level (optional)
 
 **Recovery Time Objectives (RTO):**
+
 - Tier 1: 5 minutes
 - Tier 2: 1 hour
 - Tier 3: 4 hours
 
 **Recovery Point Objectives (RPO):**
+
 - Tier 1: 1 hour (max data loss)
 - Tier 2: 24 hours
 - Tier 3: 1 week
@@ -519,12 +538,14 @@ Explicit ALLOW rules:
 ```
 
 **When to Enable:**
+
 - Production environments
 - >100 active users
 - After baseline established
 - Business-critical services
 
 **Resource Overhead:**
+
 - ~3-5% additional CPU/memory
 - ~60Gi additional storage
 - Worth it for production visibility
@@ -547,12 +568,14 @@ Explicit ALLOW rules:
 ### Update Strategy
 
 **Zero-Downtime Updates:**
+
 1. Rolling update with `maxSurge: 1`, `maxUnavailable: 0`
 2. PodDisruptionBudget ensures `minAvailable: 1`
 3. Health checks prevent unhealthy pod traffic
 4. Gateway routes to healthy pods only
 
 **Example Update:**
+
 ```
 Before: Pod A (v1), Pod B (v1)
 Step 1: Pod A (v1), Pod B (v1), Pod C (v2) ← new pod
@@ -608,6 +631,7 @@ and `nonprod` (preprod, monitoring, velero). See the authoritative table in
 [SCALING-GUIDE.md — Node Pools](../operations/SCALING-GUIDE.md#node-pools-doks).
 
 **Benefits:**
+
 - **Isolation** - Each client in separate namespace
 - **Security** - NetworkPolicies prevent cross-namespace traffic
 - **Resource Control** - ResourceQuotas per namespace
@@ -663,12 +687,14 @@ and `nonprod` (preprod, monitoring, velero). See the authoritative table in
 ### Failure Scenarios
 
 **1. Single Pod Failure:**
+
 - **Detection:** Health check fails
 - **Action:** Kubernetes restarts pod automatically
 - **Impact:** None (other replicas serve traffic)
 - **RTO:** <30s
 
 **2. Node Failure:**
+
 - **Detection:** Node goes NotReady
 - **Action:** Pods rescheduled to healthy nodes
 - **Impact:** Brief degradation if node had replicas
@@ -676,12 +702,14 @@ and `nonprod` (preprod, monitoring, velero). See the authoritative table in
 - **Storage:** Block-storage volumes reattach to the replacement node
 
 **3. PostgreSQL Node Failure:**
+
 - **Detection:** Pod/node health monitoring
 - **Action:** Primary pod reschedules; reads keep serving from the read replica
 - **Impact:** Writes pause until the primary is back (see the `prod-db` runbook in [SCALING-GUIDE.md](../operations/SCALING-GUIDE.md))
 - **RTO:** Minutes (pod reschedule + volume reattach)
 
 **4. Complete Cluster Failure:**
+
 - **Detection:** All nodes down
 - **Action:** Restore to new cluster from Velero backup
 - **Impact:** Full outage during restore
@@ -695,12 +723,14 @@ and `nonprod` (preprod, monitoring, velero). See the authoritative table in
 ### Horizontal Scaling
 
 **Application Pods (via HPA):**
+
 ```
 Traffic increases → CPU >70% → HPA adds pods
   → More replicas → CPU normalizes → Stable
 ```
 
 **Storage (via Volume Expansion):**
+
 ```
 Storage fills → Expand PVC → CSI expands volume
   → No downtime → More space available
@@ -717,6 +747,7 @@ Storage fills → Expand PVC → CSI expands volume
 | MinIO | 16 | Erasure coding limit |
 
 **For >500 users:**
+
 - Add PostgreSQL sharding
 - Add read replicas
 - Consider external S3
@@ -739,6 +770,7 @@ The Monobase Infrastructure template provides:
 **Architecture:** Simple, proven, production-ready
 
 For detailed operational procedures, see:
+
 - [DEPLOYMENT.md](../getting-started/DEPLOYMENT.md) - Deployment steps
 - [STORAGE.md](../operations/STORAGE.md) - Storage operations
 - [BACKUP_DR.md](../operations/BACKUP_DR.md) - DR procedures

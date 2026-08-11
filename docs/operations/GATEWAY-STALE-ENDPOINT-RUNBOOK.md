@@ -7,6 +7,7 @@ Diagnosing and fixing **intermittent ~50% `504`/timeouts through the shared ngin
 Requests through the shared gateway (`nginx-gateway-system/nginx-shared-gateway`, LB `104.248.98.161`) to one backend intermittently **hang → `000`/`504`** at a roughly **50% rate**. The pattern is binary and interleaved per request (a fast `200` or a full timeout, alternating), not time-clustered.
 
 Tell-tale scoping:
+
 - The backend is **100% healthy when hit directly** (`port-forward` to the pod, or `wget` from an nginx pod to the pod IP).
 - **Other hostnames on the same gateway are 100% fine** — e.g. a static frontend, or the same service in a *different namespace whose pods have not restarted*.
 - The affected backend recently **restarted** (new pod IP), or was redeployed.
@@ -22,6 +23,7 @@ A backend in a namespace whose pods have **not** changed IP is immune even with 
 ## Diagnose
 
 **Step 1 — Confirm it is stale endpoints, not the gateway/LB (do this first).**
+
 ```bash
 # Same LB, compare an unaffected env/host vs the failing one. If the unaffected host is
 # 100% while the failing one is ~50%, it is stale endpoints for the restarted backend —
@@ -37,6 +39,7 @@ done
 ```
 
 **Step 2 — Find the wedged data-plane pod.** Diff each pod's rendered upstream IP against the live endpoint.
+
 ```bash
 NS=mycure-preprod SVC=hapihub PORT=7500
 LIVE=$(kubectl -n "$NS" get endpointslices -l kubernetes.io/service-name="$SVC" \
@@ -53,17 +56,20 @@ for p in $(kubectl -n nginx-gateway-system get pods \
   echo "$p  upstream=[$ip]  cfg_mtime=$ts"
 done
 ```
+
 A pod whose `upstream` IP `!=` `$LIVE`, or whose `cfg_mtime` is frozen well in the past, is the wedged pod.
 
 ## Fix
 
 Delete the wedged data-plane pod. The deployment recreates it; the fresh pod reconnects and pulls current config. The other pod keeps serving throughout.
+
 ```bash
 kubectl -n nginx-gateway-system delete pod <wedged-pod>
 # verify both pods now agree with $LIVE, then re-measure — should be 0% failures
 ```
 
 For durability, restart the controller to re-establish clean agent streams. **This does not interrupt serving** — the data-plane pods keep serving their current config while the controller is down; only new config pushes pause for ~30-60s.
+
 ```bash
 kubectl -n nginx-gateway-system rollout restart deploy/nginx-gateway-fabric
 ```

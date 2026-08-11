@@ -31,7 +31,7 @@ The recommendation is **Lite-2** — for an extra ₱500–1,000 over Lite-1 you
 | Usable capacity | 4 TB primary, 2 TB mirror (vs ~300 GB used today → multi-year runway) |
 | Recurring cost | ₱0 |
 
-This is **not equivalent** to the full RAID proposal. The gaps are deliberate and listed in [What this proposal does *not* fix](#what-this-proposal-does-not-fix).
+This is **not equivalent** to the full RAID proposal. The gaps are deliberate and listed in [What this proposal does _not_ fix](#what-this-proposal-does-not-fix).
 
 ---
 
@@ -121,13 +121,13 @@ In Full-A and Full-C, the mirror is updated synchronously by ZFS / mdadm — the
 
 ---
 
-## What this proposal does *not* fix
+## What this proposal does _not_ fix
 
 Honest disclosure for the decision-maker — relative to the full proposal:
 
 | Gap | Practical impact | Mitigation if budget reaches the full proposal later |
 |---|---|---|
-| **No bit-rot detection** | Silent corruption on the primary drive over months/years could go undetected until a restore test fails. The existing weekly `rclone check` against the cloud bucket detects *most* of these but not all. | Full proposal uses ZFS, which scrubs and detects bit-rot automatically. |
+| **No bit-rot detection** | Silent corruption on the primary drive over months/years could go undetected until a restore test fails. The existing weekly `rclone check` against the cloud bucket detects _most_ of these but not all. | Full proposal uses ZFS, which scrubs and detects bit-rot automatically. |
 | **24 h RPO between copies (not synchronous)** | If primary fails between mirror runs, mirror is up to one day stale. Acceptable for a tier-4 backup; not acceptable as a primary store. | Full proposal uses atomic RAID — both copies are always identical. |
 | **Old SMR drive remains in service** | The mirror role is less write-intensive (rsync diffs) so SMR is acceptable here, but the drive itself is still aging consumer hardware. | Full proposal retires it entirely from the backup path. |
 | **Survives only 1 drive failure, not 2** | Two simultaneous failures = total data loss on host (cloud copy still exists upstream). | Full proposal (Option C) survives 2 simultaneous failures via RAIDZ2. |
@@ -182,16 +182,20 @@ The existing setup script ([`scripts/onprem-backup-setup.sh`](../../scripts/onpr
 3. Install the new drive, format as ext4 / XFS, mount at `/mnt/storage` (primary).
 4. Remount the existing SMR drive at `/mnt/storage-mirror` (mirror).
 5. Re-run the existing setup script pointed at the new primary:
+
    ```sh
    sudo SPACES_ACCESS_KEY=… SPACES_SECRET_KEY=… KOPIA_PASSWORD=… \
      scripts/onprem-backup-setup.sh \
      --encryption=luks-partition --luks-device=/dev/disk/by-id/ata-WDC_WD40EFPX-... \
      --yes-wipe-device
    ```
+
 6. Drop a small `/etc/systemd/system/mycure-backup-mirror-local.{service,timer}` pair that runs:
+
    ```sh
    rsync -aAX --delete /mnt/storage/ /mnt/storage-mirror/
    ```
+
    on a nightly schedule (after the cloud sync completes — chained off `mycure-backup-mirror.service`).
 7. Run the first sync manually; verify the mirror is populated.
 8. Optional but recommended: add a weekly Discord alert if the mirror's last successful run is more than 36 h old.

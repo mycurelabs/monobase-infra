@@ -37,6 +37,7 @@ It lands on the **same DOKS cluster** as `mycure-preprod`/`mycure-production`, r
 Cloned from `mycure-preprod.yaml`, then trimmed. Key contents:
 
 **Globals**
+
 ```yaml
 global:
   domain: demo.localfirsthealth.com
@@ -73,6 +74,7 @@ global:
 | `podSecurityStandards` | ✅ (`restricted`) | Keep platform security baseline. |
 
 **Per-app config**
+
 - `hapihub.gateway.hostnames: [hapihub.demo.localfirsthealth.com]`, `sectionName: https-demo-lfh`, `snippetsPolicy.enabled: false`.
 - `hapihub.betterAuth.passkey`: `rpName: "Mycure (demo)"`, `rpId: "demo.localfirsthealth.com"`.
 - `hapihub.config.CORS_ORIGINS`: `https://hapihub.demo.localfirsthealth.com,https://mycure-dashboard.demo.localfirsthealth.com,https://mycure.demo.localfirsthealth.com` (+ `CORS_STRICT: "true"`).
@@ -88,6 +90,7 @@ global:
 ### 4.2 EDIT `values/infrastructure/main.yaml` (cluster-wide — additive)
 
 Under `nginxGatewayResources.gateway.listeners`, add (mirroring the preprod pair):
+
 ```yaml
 - name: https-demo-lfh
   port: 443
@@ -99,13 +102,16 @@ Under `nginxGatewayResources.gateway.listeners`, add (mirroring the preprod pair
   protocol: HTTP
   hostname: "*.demo.localfirsthealth.com"
 ```
+
 Under `nginxGatewayResources.tls.certificates`, add:
+
 ```yaml
 - secretName: nginx-gateway-tls-demo
   clusterIssuer: letsencrypt-mycure-cloudflare-prod   # DNS-01 wildcard
   dnsNames:
     - "*.demo.localfirsthealth.com"
 ```
+
 The `letsencrypt-mycure-cloudflare-prod` issuer already lists the `localfirsthealth.com` Cloudflare zone, so the wildcard cert is issuable exactly as preprod's is. **externalDNS** (Cloudflare, enabled) auto-creates the per-host DNS records from the HTTPRoutes.
 
 ## 5. Resource sizing (≤5 users)
@@ -131,17 +137,20 @@ Autoscaling **off**, PodDisruptionBudgets **off** for all. (hapihub keeps headro
 ## 7. Seed plan
 
 **Prerequisites (in order):**
+
 1. `mycure-demo` deployed and **healthy** (hapihub `Running`/ready, external-secrets synced, Postgres up).
 2. `https://hapihub.demo.localfirsthealth.com` resolving with a valid cert (DNS + cert-manager done).
 3. Local toolchain: `mise install` (provides `bun`); run from repo root.
 4. hapihub pod has `ACCOUNTS_SERVICE_ACCOUNT_EMAILS` set (from §4.1) — verify: `kubectl -n mycure-demo exec deploy/hapihub -- printenv ACCOUNTS_SERVICE_ACCOUNT_EMAILS`.
 
 **Command (local, against the public endpoint):**
+
 ```bash
 bun scripts/seed.ts --api-url https://hapihub.demo.localfirsthealth.com
 # re-run / wipe-and-reseed:
 bun scripts/seed.ts --api-url https://hapihub.demo.localfirsthealth.com --reset
 ```
+
 Defaults seed 7 role users (password `Mycure123!`), 3 demo facilities, system fixtures, LIS/RIS/EMR/PME templates, inventory, partners, ~25 patients + a fixed demo patient, and 5 patient accounts. Flags `--patients N` / `--patient-accounts N` tune volume.
 
 > Note: with `--api-url`, the script's "Login at:" line prints `(custom)` — cosmetic only; the real UI is `https://mycure.demo.localfirsthealth.com` (mycureapp) / `https://mycure-dashboard.demo.localfirsthealth.com`.
@@ -151,12 +160,14 @@ Defaults seed 7 role users (password `Mycure123!`), 3 demo facilities, system fi
 **Production data: never touched.** Separate namespace, separate Postgres pod + PVC, hapihub connects to the in-namespace `postgresql` service (`external: false`). The seed writes only to the demo DB. Prod's DB is never read, written, or deleted.
 
 **Prod services: not touched under Approach C.**
+
 - **Storage → in-cluster MinIO.** `minio.enabled: true` makes the chart point `STORAGE_*` at `minio.mycure-demo.svc:9000`; the GCP-bucket env block is skipped. **No writes to the prod bucket.** (This also corrects an earlier assumption — preprod has `minio.enabled: true` too, so preprod likewise uses in-cluster MinIO, not the prod bucket.)
 - **Stripe: disabled.** `STRIPE_*` keys omitted; the chart's refs are `optional: true`, so no Stripe client is configured → no prod Stripe calls.
 - **Google OAuth: omitted** (email+password login). No handshake against the prod OAuth app unless re-added.
 - **Email → mailpit.** No real outbound mail.
 
 **Residual prod linkage (the cost of reuse, accept or mitigate):**
+
 - **Shared signing/encryption keys.** The demo reuses prod `PRIVATE_KEY`/`PUBLIC_KEY`/`AUTH_SECRET`/`BETTER_AUTH_SECRET` and `ENC_*`. These are **read-only** copies that live in the demo namespace and only ever encrypt/sign the demo's own data — they grant **no access to prod data**. The real risk is **trust-domain**: a token signed with these keys is cryptographically valid in prod, so a compromise of the demo namespace could be leveraged to forge prod sessions. For a ≤5-user internal demo this is usually acceptable; **the clean fix is Approach A (fresh `mycure-demo-*` keys)**. **Decision (2026-05-31): key reuse accepted** for this small internal demo; revisit if it gains untrusted users or a longer lifespan.
 - **Fresh Postgres with reused password secret** is internally consistent (the new PVC initialises with the password from the `postgresql` secret; hapihub reads the same secret). No access to prod data — separate pod/PVC/namespace.
 - **Shared cluster + ArgoCD.** Demo pods run on the same DOKS cluster (the `staging` node pool), with small limits.

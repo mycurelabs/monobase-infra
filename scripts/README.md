@@ -39,6 +39,7 @@ bun install
 Provider-agnostic secrets management with centralized `secrets.yaml` configuration and full infrastructure bootstrapping.
 
 **Files:**
+
 - `scripts/secrets.ts` - Main CLI ✅
 - `scripts/secrets/` - Secrets-specific modules
   - `types.ts` - Provider-agnostic schema ✅
@@ -53,17 +54,20 @@ Provider-agnostic secrets management with centralized `secrets.yaml` configurati
   - `validate-cluster.ts` - Cluster state validation ✅
 
 **Configuration:**
+
 - `values/infrastructure/secrets.yaml` - Infrastructure-level secrets ✅
 - `deployments/example-staging/secrets.yaml` - Staging secrets ✅
 - `deployments/example-production/secrets.yaml` - Production secrets ✅
 
 **Auto-Detection Features:**
+
 - **GCP Project**: Detects from existing `gcp-secretstore.yaml` → `gcloud config` → prompts
 - **Provider**: Detects from existing `*-secretstore.yaml` files → defaults to `gcp`
 - **Kubeconfig**: Discovers all files in `~/.kube/` → shows interactive selection menu
 - **Context Display**: Shows current `kubectl context` when kubeconfig is configured
 
 **Priority Order:**
+
 ```
 Project ID:   CLI flag > env var > gcp-secretstore.yaml > gcloud config > prompt
 Provider:     CLI flag > existing *-secretstore.yaml > default (gcp)
@@ -71,6 +75,7 @@ Kubeconfig:   CLI flag > env var > ~/.kube/ discovery + selection > prompt
 ```
 
 **Usage:**
+
 ```bash
 # Auto-detect everything (idempotent, no flags needed!)
 bun scripts/secrets.ts generate
@@ -107,6 +112,7 @@ mise run secrets:validate
 ```
 
 **Full Setup (`--full` flag) includes:**
+
 1. **GCP Infrastructure:**
    - Enable Secret Manager API
    - Create `external-secrets` service account
@@ -126,6 +132,7 @@ mise run secrets:validate
    - Generate ExternalSecret manifests
 
 **Schema Example:**
+
 ```yaml
 secrets:
   - name: postgresql              # K8s secret name
@@ -140,6 +147,7 @@ secrets:
 **Implementation Complete:**
 
 **Phase 1 & 2:**
+
 - ✅ package.json, tsconfig.json setup
 - ✅ mise.toml updated (bun added)
 - ✅ Provider-agnostic secrets.yaml files created
@@ -151,6 +159,7 @@ secrets:
 - ✅ Bash scripts removed
 
 **Phase 3 (Infrastructure Bootstrapping):**
+
 - ✅ GCP service account creation with idempotency
 - ✅ IAM permission granting with retry logic
 - ✅ Service account key generation
@@ -163,6 +172,7 @@ secrets:
 - ✅ Full infrastructure setup mode (--full flag)
 
 **Phase 4 (Auto-Detection & Idempotency):**
+
 - ✅ GCP project auto-detection from existing gcp-secretstore.yaml
 - ✅ GCP project fallback to gcloud config
 - ✅ Provider auto-detection from existing *-secretstore.yaml files
@@ -215,6 +225,7 @@ import { parseSecretsFile } from "@/secrets/parser";
 ```
 
 Configured in `tsconfig.json`:
+
 ```json
 {
   "paths": {

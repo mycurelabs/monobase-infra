@@ -64,6 +64,7 @@ To add a new client deployment:
 4. Commit and push - ArgoCD will auto-discover
 
 Example:
+
 ```bash
 cp values/deployments/acme-staging.yaml values/deployments/newclient-staging.yaml
 # Edit values/deployments/newclient-staging.yaml
@@ -82,6 +83,7 @@ git push
 ### Secrets
 
 **Never commit secrets to this directory.** Use External Secrets Operator (ESO) to sync secrets from:
+
 - GCP Secret Manager
 - AWS Secrets Manager
 - Azure Key Vault
@@ -109,6 +111,7 @@ postgresql:
 ## Migration from Old Structure
 
 This directory was created to consolidate configurations previously scattered across:
+
 - `charts/argocd-infrastructure/values.yaml` → `values/infrastructure/main.yaml`
 - `infrastructure/*/values.yaml` → `values/infrastructure/{component}.yaml`
 - `deployments/{client}-{env}/values.yaml` → `values/deployments/{client}-{env}.yaml`

@@ -31,7 +31,7 @@ Three alternative budget tiers from ₱19,000 to ₱72,000 are presented in §[D
 Two structural weaknesses exist today:
 
 1. **Single point of failure (SPOF)**: all backup data lives on `/dev/sda` — one 2 TB Seagate Barracuda drive. No redundancy. A single mechanical or controller failure wipes the entire tier-4 backup until someone notices days later via Discord alerts.
-2. **Wrong drive class for the job**: the existing drive is a Seagate Barracuda *ST2000DM008*, which is publicly documented as **SMR (Shingled Magnetic Recording)** — a consumer technology not designed for sustained writes or RAID rebuild workloads. It is unsuitable for inclusion in any future RAID array.
+2. **Wrong drive class for the job**: the existing drive is a Seagate Barracuda _ST2000DM008_, which is publicly documented as **SMR (Shingled Magnetic Recording)** — a consumer technology not designed for sustained writes or RAID rebuild workloads. It is unsuitable for inclusion in any future RAID array.
 
 RAID protects against (1). Choosing the right new drives addresses (2). ZFS (the recommended software RAID stack) additionally catches **silent bit-rot** — the one failure mode our weekly `rclone check` cannot detect, as documented in [`ONPREM_BACKUP_SETUP.md` §Weekly Integrity Verification](ONPREM_BACKUP_SETUP.md#weekly-integrity-verification).
 
@@ -47,7 +47,7 @@ RAID protects against (1). Choosing the right new drives addresses (2). ZFS (the
 | SATA ports | 6 onboard, 2 occupied, **4 free** |
 | OS drive | 120 GB Kingston A400 SSD |
 | Data drive (the problem) | 2 TB Seagate Barracuda ST2000DM008 — **SMR, single point of failure** |
-| Network | 1 GbE wired NIC currently *down*; running over USB Wi-Fi |
+| Network | 1 GbE wired NIC currently _down_; running over USB Wi-Fi |
 | UPS | None |
 | Current backup size | 291 GB (vs 1.8 TB available) |
 
@@ -84,7 +84,7 @@ Option C delivers the same ₱/TB as the bare-minimum mirror **while also giving
 
 ### Why not the alternatives?
 
-- **Option A** is the lowest sticker price but only survives one drive dying. The entire premise of having `hel.niflheim` is "what if the cloud fails *and* something else fails?" — accepting 1-drive tolerance on the last line of defense partly defeats that.
+- **Option A** is the lowest sticker price but only survives one drive dying. The entire premise of having `hel.niflheim` is "what if the cloud fails _and_ something else fails?" — accepting 1-drive tolerance on the last line of defense partly defeats that.
 - **Option B** uses RAIDZ2 (good) but on small drives where the parity overhead makes capacity worse and ₱/TB worst-in-class. Only attractive if budget can't reach C.
 - **Option D** is over-provisioned for current needs but would be the right answer if management wants this host to also hold Mongo / Postgres logical dumps, support additional clients (DentaLemon, etc.), or extend retention to 60–90 days.
 - **Option E (RAIDZ1)** saves ~₱4,800 over B for the same capacity but halves failure tolerance. Modern ≥2 TB drive rebuilds carry a real risk of a second failure (URE / second-drive death during the long resync) — not worth the savings on a backup system.
@@ -154,7 +154,7 @@ Detailed commands and runbook live in [Appendix A](#appendix-a-technical-migrati
 
 ## Open follow-ups (separate decisions, not bundled here)
 
-These are worth flagging to management but are *not* part of this proposal:
+These are worth flagging to management but are _not_ part of this proposal:
 
 | Risk | Mitigation (cost) | Recommended next step |
 |---|---|---|
@@ -174,6 +174,7 @@ For the engineer executing the change:
 2. Reboot into BIOS, change SATA mode from "RAID" → "AHCI", verify existing OS still boots cleanly.
 3. Burn-in every new drive: `badblocks -wsv -b 4096 /dev/sdX` (8 passes; 24–72 h per drive).
 4. Build the encrypted pool:
+
    ```
    zpool create -o ashift=12 -O compression=lz4 -O atime=off \
      -O encryption=aes-256-gcm -O keyformat=passphrase \
@@ -181,14 +182,17 @@ For the engineer executing the change:
    zfs create niflheim/mycure-backup
    zfs set mountpoint=/mnt/niflheim/mycure-backup niflheim/mycure-backup
    ```
+
    **Use `/dev/disk/by-id/` paths**, not `/dev/sdX`, so the pool survives drive re-enumeration on reboot.
 5. Re-run the existing tier-4 setup script:
+
    ```
    sudo SPACES_ACCESS_KEY=… SPACES_SECRET_KEY=… KOPIA_PASSWORD=… \
      scripts/onprem-backup-setup.sh \
      --encryption=none \
      --backup-dir=/mnt/niflheim/mycure-backup
    ```
+
    `--encryption=none` because ZFS native encryption (set in step 4) already covers data-at-rest. The script is idempotent.
 6. Trigger first full sync: `sudo systemctl start mycure-backup-mirror.service` and monitor via `journalctl --namespace=mycure-backup -u mycure-backup-mirror.service -f`.
 7. Retire `/dev/sda` from the backup role. Existing `/mnt/storage/{Backup,dump,dump-mo,dump-pg,mycure-v4}` content can remain on it or be moved into the pool — orthogonal decision.

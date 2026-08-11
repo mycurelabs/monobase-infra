@@ -5,6 +5,7 @@ Helm chart for deploying the Monobase API backend service with PostgreSQL, Valke
 ## Overview
 
 The Monobase API chart deploys:
+
 - **API backend** - Node.js/Express REST API
 - **PostgreSQL** - Primary database (with HA replication)
 - **Valkey** - Redis-compatible cache
@@ -40,11 +41,13 @@ helm install myclient-api ./charts/api -f deployments/myclient-prod/values.yaml
 ## API Parameters
 
 ### api.enabled
+
 - **Type:** boolean
 - **Default:** `true`
 - **Description:** Enable or disable API deployment
 
 ### api.replicaCount
+
 - **Type:** integer
 - **Default:** `2`
 - **Minimum:** `1`
@@ -52,11 +55,13 @@ helm install myclient-api ./charts/api -f deployments/myclient-prod/values.yaml
 - **Description:** Number of API pod replicas
 
 ### api.image.repository
+
 - **Type:** string
 - **Default:** `ghcr.io/monobaselabs/api`
 - **Description:** Container image repository
 
 ### api.image.tag
+
 - **Type:** string
 - **Default:** `5.215.2`
 - **Production:** Pin specific version (e.g., `5.215.2`)
@@ -64,6 +69,7 @@ helm install myclient-api ./charts/api -f deployments/myclient-prod/values.yaml
 - **Description:** Container image tag
 
 ### api.image.pullPolicy
+
 - **Type:** string
 - **Default:** `IfNotPresent`
 - **Options:** `Always`, `IfNotPresent`, `Never`
@@ -71,6 +77,7 @@ helm install myclient-api ./charts/api -f deployments/myclient-prod/values.yaml
 ## Resource Configuration
 
 ### api.resources.requests.cpu
+
 - **Type:** string
 - **Default:** `500m`
 - **Staging:** `250m`
@@ -78,6 +85,7 @@ helm install myclient-api ./charts/api -f deployments/myclient-prod/values.yaml
 - **Description:** Guaranteed CPU allocation
 
 ### api.resources.requests.memory
+
 - **Type:** string
 - **Default:** `1Gi`
 - **Staging:** `512Mi`
@@ -85,12 +93,14 @@ helm install myclient-api ./charts/api -f deployments/myclient-prod/values.yaml
 - **Description:** Guaranteed memory allocation
 
 ### api.resources.limits.cpu
+
 - **Type:** string
 - **Default:** `2`
 - **Production:** `2-4`
 - **Description:** Maximum CPU allowed
 
 ### api.resources.limits.memory
+
 - **Type:** string
 - **Default:** `4Gi`
 - **Production:** `4-8Gi`
@@ -99,6 +109,7 @@ helm install myclient-api ./charts/api -f deployments/myclient-prod/values.yaml
 ## Gateway Configuration
 
 ### api.gateway.hostname
+
 - **Type:** string
 - **Default:** Empty (uses `api.{global.domain}`)
 - **Example:** `api.myclient.com` or `api.custom-domain.com`
@@ -107,22 +118,26 @@ helm install myclient-api ./charts/api -f deployments/myclient-prod/values.yaml
 ## Autoscaling
 
 ### api.autoscaling.enabled
+
 - **Type:** boolean
 - **Default:** `false`
 - **Production:** `true`
 - **Description:** Enable Horizontal Pod Autoscaler
 
 ### api.autoscaling.minReplicas
+
 - **Type:** integer
 - **Default:** `2`
 - **Production:** `3`
 
 ### api.autoscaling.maxReplicas
+
 - **Type:** integer
 - **Default:** `10`
 - **Production:** `5-10`
 
 ### api.autoscaling.targetCPUUtilizationPercentage
+
 - **Type:** integer
 - **Default:** `70`
 - **Range:** 1-100
@@ -130,11 +145,13 @@ helm install myclient-api ./charts/api -f deployments/myclient-prod/values.yaml
 ## High Availability
 
 ### api.podDisruptionBudget.enabled
+
 - **Type:** boolean
 - **Default:** `true`
 - **Production:** `true` (required for HA)
 
 ### api.podDisruptionBudget.minAvailable
+
 - **Type:** integer
 - **Default:** `1`
 - **Description:** Minimum pods that must remain available during disruptions
@@ -142,11 +159,13 @@ helm install myclient-api ./charts/api -f deployments/myclient-prod/values.yaml
 ## Security
 
 ### api.networkPolicy.enabled
+
 - **Type:** boolean
 - **Default:** `true`
 - **Production:** `true` (required for security)
 
 ### api.externalSecrets.enabled
+
 - **Type:** boolean
 - **Default:** `true`
 - **Description:** Sync secrets from KMS via External Secrets Operator
@@ -158,57 +177,68 @@ helm install myclient-api ./charts/api -f deployments/myclient-prod/values.yaml
 The API chart includes PostgreSQL as a dependency for data persistence.
 
 ### postgresql.enabled
+
 - **Type:** boolean
 - **Default:** `true`
 - **Description:** Deploy PostgreSQL (required for Monobase API)
 
 ### postgresql.architecture
+
 - **Type:** string
 - **Default:** `replicaset`
 - **Options:** `standalone`, `replicaset`
 - **Production:** `replicaset` (required for HA)
 
 ### postgresql.replicaCount
+
 - **Type:** integer
 - **Default:** `3`
 - **Staging:** `1`
 - **Production:** `3` (minimum for HA)
 
 ### postgresql.auth.enabled
+
 - **Type:** boolean
 - **Default:** `true`
 - **Production:** `true` (required)
 
 ### postgresql.auth.existingSecret
+
 - **Type:** string
 - **Default:** `postgresql-credentials`
 - **Description:** Secret name containing PostgreSQL passwords (managed by External Secrets)
 
 ### postgresql.persistence.enabled
+
 - **Type:** boolean
 - **Default:** `true`
 
 ### postgresql.persistence.storageClass
+
 - **Type:** string
 - **Default:** `longhorn`
 
 ### postgresql.persistence.size
+
 - **Type:** string
 - **Default:** `100Gi`
 - **Staging:** `20Gi`
 - **Production:** `50Gi-500Gi` (based on data volume)
 
 ### postgresql.resources.requests.cpu
+
 - **Type:** string
 - **Default:** `1.5`
 - **Production:** `1.5-3`
 
 ### postgresql.resources.requests.memory
+
 - **Type:** string
 - **Default:** `6Gi`
 - **Production:** `6-8Gi`
 
 ### postgresql.tls.enabled
+
 - **Type:** boolean
 - **Default:** `true`
 - **Production:** `true` (recommended for security and compliance)
@@ -220,16 +250,19 @@ The API chart includes PostgreSQL as a dependency for data persistence.
 Valkey provides caching and session storage.
 
 ### valkey.enabled
+
 - **Type:** boolean
 - **Default:** `false`
 - **Description:** Deploy Valkey search engine
 
 ### valkey.replicas
+
 - **Type:** integer
 - **Default:** `3`
 - **Production:** `3` (for HA)
 
 ### valkey.persistence.size
+
 - **Type:** string
 - **Default:** `50Gi`
 - **Description:** Search index storage
@@ -241,6 +274,7 @@ Valkey provides caching and session storage.
 Self-hosted S3-compatible object storage. Use for <1TB data or when cost-sensitive.
 
 ### minio.enabled
+
 - **Type:** boolean
 - **Default:** `false`
 - **Description:** Deploy self-hosted MinIO or use external S3
@@ -248,6 +282,7 @@ Self-hosted S3-compatible object storage. Use for <1TB data or when cost-sensiti
 - **Disable when:** >1TB data, using AWS S3/GCS/Azure Blob
 
 ### minio.mode
+
 - **Type:** string
 - **Default:** `distributed`
 - **Options:** `standalone`, `distributed`
@@ -255,16 +290,19 @@ Self-hosted S3-compatible object storage. Use for <1TB data or when cost-sensiti
 - **Production:** `distributed` (for HA)
 
 ### minio.statefulset.replicaCount
+
 - **Type:** integer
 - **Default:** `6`
 - **Description:** Number of MinIO nodes (6 for 1TB usable with EC:2)
 
 ### minio.persistence.size
+
 - **Type:** string
 - **Default:** `250Gi`
 - **Description:** Storage per node (6 × 250Gi = 1.5TB raw → ~1TB usable with EC:2)
 
 ### minio.gateway.hostname
+
 - **Type:** string
 - **Default:** Empty (uses `storage.{global.domain}`)
 

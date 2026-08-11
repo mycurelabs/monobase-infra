@@ -137,6 +137,7 @@ Other PVCs follow the same pattern — e.g. `--pvc=data-postgresql-primary-0` ex
 ### 2. Long-form (what the script does)
 
 Notable gotchas not obvious from the upstream docs:
+
 - **`kopia connect filesystem` does NOT work** on Velero's mirrored repos — they're written via the S3 backend (flat blob layout) which kopia's filesystem backend refuses to open ([kopia/kopia#2065](https://github.com/kopia/kopia/issues/2065)). Workaround: serve the local mirror via `rclone serve s3` and connect kopia to localhost via its S3 backend.
 - **The data PVC contains only `PG_VERSION` and `pg_ident.conf`**, not the `postgresql.conf` / `pg_hba.conf` that stock Postgres expects in `PGDATA`. Bitnami keeps these in `/opt/bitnami/postgresql/conf/` on the running cluster. We have to write minimal versions before booting Postgres.
 - **Use stock `postgres:16` image, not `bitnamilegacy/postgresql`**. Bitnami's entrypoint tries to chown `/opt/bitnami/postgresql/conf` which fails when the container is run with `--user 1001` against a pre-existing data dir.

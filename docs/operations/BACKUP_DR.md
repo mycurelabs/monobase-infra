@@ -306,6 +306,7 @@ kubectl delete namespace myclient-restore-test
 ```
 
 **Test Checklist:**
+
 - [ ] Backup completes successfully
 - [ ] Restore completes without errors
 - [ ] All pods start correctly
@@ -321,6 +322,7 @@ kubectl delete namespace myclient-restore-test
 ### Compliance Requirements
 
 **General:**
+
 - Audit logs: Retain as per compliance needs
 - Data: Retain as per compliance needs
 - Backups: 90 days minimum (Tier 3)
@@ -400,6 +402,7 @@ velero backup delete --selector backup-schedule=daily-full \\
 ## Summary
 
 **Backup Strategy:**
+
 - ✅ 3-tier protection (hourly, daily, weekly)
 - ✅ Automated schedules
 - ✅ Encrypted backups
@@ -407,6 +410,7 @@ velero backup delete --selector backup-schedule=daily-full \\
 - ✅ Configurable retention (90 days+)
 
 **Disaster Recovery:**
+
 - ✅ Tested procedures
 - ✅ RTO: 5min - 8h depending on scenario
 - ✅ RPO: 1h - 1w depending on tier
@@ -414,6 +418,7 @@ velero backup delete --selector backup-schedule=daily-full \\
 - ✅ Ransomware recovery plan
 
 **Best Practices:**
+
 - ✅ Monthly restore testing
 - ✅ Automated backup monitoring
 - ✅ Failure alerting

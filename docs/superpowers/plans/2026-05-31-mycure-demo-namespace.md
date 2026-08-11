@@ -19,6 +19,7 @@
 ### Task 1: Create the deployment values file
 
 **Files:**
+
 - Create: `values/deployments/mycure-demo.yaml`
 
 - [ ] **Step 1: Write `values/deployments/mycure-demo.yaml`**
@@ -359,6 +360,7 @@ Expected: PASS — the new deployment file renders without template errors. If i
 - [ ] **Step 4: Dry-render the app-of-apps and confirm only the intended components are enabled**
 
 Run:
+
 ```bash
 helm template mycure-demo argocd/applications \
   -f values/deployments/mycure-demo.yaml \
@@ -366,6 +368,7 @@ helm template mycure-demo argocd/applications \
   --set argocd.targetRevision=main \
   | grep -E '^kind:|name: mycure-demo|app.kubernetes.io/name:' | sort -u
 ```
+
 Expected: ArgoCD `Application` resources render for **hapihub, mycure-dashboard, mycure, postgresql, valkey, minio, mailpit** (plus the namespace and the secrets/externalsecret wave), and **none** for mongodb / cadence / syncd / hapihubMigrator / mycure-pxp / api / account / dentalemon* / mycurev8. If a disabled component still renders, set its `enabled: false` explicitly.
 
 - [ ] **Step 5: Commit**
@@ -386,6 +389,7 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 ### Task 2: Add the gateway listener + wildcard TLS cert
 
 **Files:**
+
 - Modify: `values/infrastructure/main.yaml` (under `nginxGatewayResources.gateway.listeners` and `nginxGatewayResources.tls.certificates`)
 
 - [ ] **Step 1: Add the `*.demo.localfirsthealth.com` listeners**
@@ -393,6 +397,7 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 Find this block (the preprod listener pair) and append the demo pair after it.
 
 Old:
+
 ```yaml
       # Preprod localfirsthealth.com (ephemeral prod-mirror env)
       - name: https-preprod-lfh
@@ -405,7 +410,9 @@ Old:
         protocol: HTTP
         hostname: "*.preprod.localfirsthealth.com"
 ```
+
 New:
+
 ```yaml
       # Preprod localfirsthealth.com (ephemeral prod-mirror env)
       - name: https-preprod-lfh
@@ -434,13 +441,16 @@ New:
 Find the preprod certificate entry and append the demo cert after it.
 
 Old:
+
 ```yaml
       - secretName: nginx-gateway-tls-preprod
         clusterIssuer: letsencrypt-mycure-cloudflare-prod  # DNS-01, wildcard
         dnsNames:
           - "*.preprod.localfirsthealth.com"
 ```
+
 New:
+
 ```yaml
       - secretName: nginx-gateway-tls-preprod
         clusterIssuer: letsencrypt-mycure-cloudflare-prod  # DNS-01, wildcard
@@ -460,11 +470,13 @@ Expected: PASS — no hardcoded-value violations, infra chart renders.
 - [ ] **Step 4: Dry-render the gateway + cert and confirm the demo entries appear**
 
 Run:
+
 ```bash
 helm template monobase-infra argocd/infrastructure \
   -f values/infrastructure/main.yaml \
   | grep -nE 'https-demo-lfh|http-demo-lfh|nginx-gateway-tls-demo|\*\.demo\.localfirsthealth\.com'
 ```
+
 Expected: matches for both listeners (`https-demo-lfh`, `http-demo-lfh`), the `Certificate`/secret `nginx-gateway-tls-demo`, and the `*.demo.localfirsthealth.com` hostname/dnsName. Existing preprod/prod listeners must still be present (run without the grep to eyeball).
 
 - [ ] **Step 5: Commit**
@@ -499,10 +511,12 @@ gh pr create --fill --title "feat: mycure-demo namespace + seed" \
 - [ ] **Step 2: Confirm which revision the ApplicationSet tracks**
 
 Run:
+
 ```bash
 kubectl -n argocd get applicationset monobase-auto-discover \
   -o jsonpath='{.spec.generators[*].git.revision}{"\n"}'
 ```
+
 Expected: a branch (likely `main` / `HEAD`). The `mycure-demo-root` Application will only be created **after the PR is merged** to that revision. Merge the PR before continuing.
 
 - [ ] **Step 3: After merge, confirm the root Application was auto-created**
@@ -523,10 +537,12 @@ Expected: `Running`/`Ready` pods for hapihub, mycure-dashboard, mycure, postgres
 - [ ] **Step 6: Verify secrets synced and the cert is ready**
 
 Run:
+
 ```bash
 kubectl -n mycure-demo get externalsecret,secret | grep -E 'hapihub|postgresql|valkey|minio'
 kubectl get certificate -A | grep nginx-gateway-tls-demo
 ```
+
 Expected: the hapihub external secret is `SecretSynced`; the `postgresql`/`valkey`/`minio` secrets exist; the `nginx-gateway-tls-demo` certificate is `Ready=True`.
 
 - [ ] **Step 7: Verify hapihub has the service-account env (needed by the seed)**
@@ -537,11 +553,13 @@ Expected: `service@mycure.md`.
 - [ ] **Step 8: Verify external reachability over HTTPS**
 
 Run:
+
 ```bash
 curl -sS -o /dev/null -w '%{http_code}\n' https://hapihub.demo.localfirsthealth.com/health || true
 curl -sS -o /dev/null -w '%{http_code}\n' https://mycure-dashboard.demo.localfirsthealth.com/
 curl -sS -o /dev/null -w '%{http_code}\n' https://mycure.demo.localfirsthealth.com/
 ```
+
 Expected: TLS handshake succeeds (valid cert) and each host returns a non-5xx status (hapihub health 200; frontends 200). If DNS doesn't resolve yet, wait for external-dns to publish the records (created from the HTTPRoutes), then retry.
 
 ---
@@ -565,9 +583,11 @@ Expected: usage shows `--api-url` (Override API URL, skips env lookup), `--reset
 - [ ] **Step 3: Run the seed against the demo API**
 
 Run:
+
 ```bash
 mise run seed -- --api-url https://hapihub.demo.localfirsthealth.com
 ```
+
 Expected: progress through the seed steps (7 users, 3 facilities, fixtures, LIS/RIS/EMR/PME templates, inventory, partners, ~25 patients + fixed demo patient, 5 patient accounts) and a final summary line `Login at: (custom)` (cosmetic — the real UI is `https://mycure.demo.localfirsthealth.com` / `https://mycure-dashboard.demo.localfirsthealth.com`). Re-running is safe; add `--reset` to wipe and re-seed.
 
 - [ ] **Step 4: Verify the seed landed (log in)**
@@ -580,6 +600,7 @@ Expected: login succeeds and the demo org "MyCure Demo Clinic" with seeded data 
 ## Self-Review
 
 **1. Spec coverage:**
+
 - §3/§4.1 new values file → Task 1 ✅
 - §4.2 gateway listener + cert → Task 2 ✅
 - §4.1 component matrix (3 apps + pg/valkey/minio/mailpit on, rest off) → Task 1 file + Step 4 dry-render ✅
