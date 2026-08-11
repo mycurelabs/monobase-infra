@@ -518,6 +518,16 @@ cadence:
   # 2026-08-11) cut baseline mint throughput ~3x — hashing and PG execution compete for the
   # same cores. Required (not preferred): on a small pool a silent re-co-location would just
   # re-break measurements; an unschedulable pod is the visible failure we want.
+  # 512Mi request (chart default 1Gi): the non-PG-primary nonprod node runs at ~88% requested
+  # memory, so the anti-affinity below can't schedule a 1Gi request. Burstable — the 3Gi limit
+  # stands. If the nonprod pool grows, restore the default. ponytail: thin 245Mi headroom.
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: "2"
+      memory: 3Gi
   affinity:
     podAntiAffinity:
       requiredDuringSchedulingIgnoredDuringExecution:
