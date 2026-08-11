@@ -113,26 +113,21 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Install OSV-Scanner
+        run: |
+          curl -sSL -o /tmp/osv-scanner \
+            https://github.com/google/osv-scanner/releases/download/v2.5.0/osv-scanner_linux_amd64
+          sudo install -m 0755 /tmp/osv-scanner /usr/local/bin/osv-scanner
+          osv-scanner --version
+
       - name: OSV-Scanner (SARIF)
         continue-on-error: true
-        uses: google/osv-scanner-action@v2.5.0
-        with:
-          scan-args: |-
-            --recursive
-            --skip-git
-            --format=sarif
-            --output=osv-results.sarif
-            ./
+        run: osv-scanner --recursive --format=sarif --output-file=osv-results.sarif ./
 
       - name: OSV-Scanner (table to job log)
         if: always()
         continue-on-error: true
-        uses: google/osv-scanner-action@v2.5.0
-        with:
-          scan-args: |-
-            --recursive
-            --skip-git
-            ./
+        run: osv-scanner --recursive ./
 
       - name: Upload SARIF to code scanning
         if: always()
