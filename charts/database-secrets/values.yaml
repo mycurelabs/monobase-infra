@@ -17,3 +17,27 @@ global:
 # synced where MinIO is actually enabled (preprod/demo); prod uses GCS.
 minio:
   enabled: false
+
+# DB/cache credential ExternalSecrets, rendered by templates/externalsecret.yaml.
+# secretName + k8sKey are the CONTRACT the Bitnami charts + app consumers read by
+# name (e.g. postgresql.auth.existingSecret: postgresql, key postgres-password) —
+# keep them in lockstep with those references. var is the intermediate ESO
+# secretKey; the GCP key resolves to {secretPrefix|namespace}-{remoteSuffix}.
+# enabledFrom gates an entry on a forwarded toggle (see minio above).
+databases:
+  - secretName: postgresql
+    fields:
+      - {var: postgresPassword, k8sKey: postgres-password, remoteSuffix: postgresql-password}
+      - {var: postgresReplicationPassword, k8sKey: postgres-replication-password, remoteSuffix: postgresql-replication-password}
+  - secretName: mongodb
+    fields:
+      - {var: mongodbRootPassword, k8sKey: mongodb-root-password, remoteSuffix: mongodb-password}
+      - {var: mongodbReplicaSetKey, k8sKey: mongodb-replica-set-key, remoteSuffix: mongodb-replica-set-key}
+  - secretName: valkey
+    fields:
+      - {var: valkeyPassword, k8sKey: valkey-password, remoteSuffix: valkey-password}
+  - secretName: minio
+    enabledFrom: minio   # gated on .Values.minio.enabled (prod uses GCS)
+    fields:
+      - {var: minioRootUser, k8sKey: root-user, remoteSuffix: minio-root-user}
+      - {var: minioRootPassword, k8sKey: root-password, remoteSuffix: minio-root-password}

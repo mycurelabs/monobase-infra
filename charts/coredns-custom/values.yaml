@@ -1,0 +1,21 @@
+# Cluster-wide CoreDNS override (kube-system/coredns-custom). The rewrites are
+# DATA, not template logic — a new environment adds an entry here, nothing else.
+# DOKS's managed CoreDNS imports the rendered *.override into its server block.
+
+# Exact in-cluster hairpin: a public hostname that in-cluster clients can't reach
+# (it resolves to a DO LoadBalancer IP with no hairpin) -> the backing Service.
+# One per env that runs cadence-relay; targets Services, so LB changes never touch this.
+exactRewrites:
+  - from: cadence-relay.preprod.localfirsthealth.com
+    to: cadence-relay.mycure-preprod.svc.cluster.local
+  - from: cadence-relay.localfirsthealth.com
+    to: cadence-relay.mycure-production.svc.cluster.local
+
+# Wildcard hairpin: an env whose public DNS points somewhere pods can't reach
+# (tailnet-only preprod -> the internal gateway's 100.x tailnet IP) -> the
+# gateway's in-cluster ClusterIP Service, which serves the same listeners/certs
+# so https URLs (cadence -> hapihub auth/JWKS) keep working. Rendered AFTER the
+# exact rewrites above, which must win first.
+regexRewrites:
+  - pattern: (.*)\.preprod\.localfirsthealth\.com
+    to: nginx-internal-gateway-nginx.nginx-gateway-system.svc.cluster.local
