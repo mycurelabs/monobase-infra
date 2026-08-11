@@ -65,48 +65,13 @@ nginxGatewayResources:
   gatewayClass:
     enabled: false  # GatewayClass created by operator chart
 
+  # PUBLIC gateway — prod only, internet-exposed BY INTENT. Nonprod/internal
+  # listeners live on nginx-tailnet-gateway below (deny-first default).
   gateway:
     name: nginx-shared-gateway
     namespace: nginx-gateway-system
     gatewayClassName: nginx
     listeners:
-      # Exact-hostname listeners for the preprod app<->api pair. Purpose: serve
-      # EXACT-name certs on these SNIs so browsers can't HTTP/2-coalesce the
-      # frontend connection onto the API host (wildcard cert + shared LB IP
-      # made connections reusable across hosts; NGF's strict
-      # `$ssl_server_name != $host -> 421` check then failed sign-in POSTs,
-      # which browsers don't auto-retry). Preprod is the guinea pig; roll the
-      # same pattern to prod hosts once soaked. See mono#2540 thread / 421s.
-      - name: https-preprod-mycure
-        port: 443
-        protocol: HTTPS
-        hostname: "mycure.preprod.localfirsthealth.com"
-        tlsSecretName: nginx-gateway-tls-preprod-mycure
-      - name: https-preprod-hapihub
-        port: 443
-        protocol: HTTPS
-        hostname: "hapihub.preprod.localfirsthealth.com"
-        tlsSecretName: nginx-gateway-tls-preprod-hapihub
-      # Preprod localfirsthealth.com (ephemeral prod-mirror env)
-      - name: https-preprod-lfh
-        port: 443
-        protocol: HTTPS
-        hostname: "*.preprod.localfirsthealth.com"
-        tlsSecretName: nginx-gateway-tls-preprod
-      - name: http-preprod-lfh
-        port: 80
-        protocol: HTTP
-        hostname: "*.preprod.localfirsthealth.com"
-      # Demo localfirsthealth.com (low-traffic demo env, sibling of preprod)
-      - name: https-demo-lfh
-        port: 443
-        protocol: HTTPS
-        hostname: "*.demo.localfirsthealth.com"
-        tlsSecretName: nginx-gateway-tls-demo
-      - name: http-demo-lfh
-        port: 80
-        protocol: HTTP
-        hostname: "*.demo.localfirsthealth.com"
       # Production localfirsthealth.com
       - name: https-lfh
         port: 443
@@ -118,8 +83,8 @@ nginxGatewayResources:
         protocol: HTTP
         hostname: "*.localfirsthealth.com"
       # Cadence QUIC (UDPRoute; cadence LB consolidation). UDP has no SNI, so
-      # envs are demuxed by port on the shared LB IP: prod keeps the canonical
-      # 6472, preprod takes 6473. Each env's cadence chart attaches a UDPRoute
+      # envs are demuxed by port: prod keeps the canonical 6472 here; preprod's
+      # 6473 lives on the tailnet gateway. The cadence chart attaches a UDPRoute
       # via sectionName; publicAddr in the deployment values advertises
       # <shared-LB-IP>:<port>. NGF adds these ports to its LB Service (DO LB is
       # REGIONAL_NETWORK — updates in place, IP stable). Never add a TCP
@@ -127,17 +92,9 @@ nginxGatewayResources:
       - name: cadence-quic-prod
         port: 6472
         protocol: UDP
-      - name: cadence-quic-preprod
-        port: 6473
-        protocol: UDP
-      # Cadence RELAY QUIC (UDPRoute) — retires the per-env cadence-relay LB. Preprod is the first
-      # relay on the shared LB so it keeps iroh's default 7842 (no fleet relay_quic_port needed);
-      # prod joins later on a distinct port once the fleet carries mono#3166.
-      - name: relay-quic-preprod
-        port: 7842
-        protocol: UDP
-      # Prod relay QUIC — second relay on the shared IP, so port 7843 (preprod owns 7842). Anchor
-      # advertises relay_quic_port=7843 in its doc so #3166-release boxes probe here.
+      # Prod relay QUIC — port 7843 (7842 is iroh's default, kept by the preprod
+      # relay on the tailnet gateway). Anchor advertises relay_quic_port=7843 in
+      # its doc so #3166-release boxes probe here.
       - name: relay-quic-prod
         port: 7843
         protocol: UDP
@@ -221,10 +178,6 @@ nginxGatewayResources:
         clusterIssuer: letsencrypt-mycure-cloudflare-prod  # DNS-01, wildcard
         dnsNames:
           - "*.preprod.localfirsthealth.com"
-      - secretName: nginx-gateway-tls-demo
-        clusterIssuer: letsencrypt-mycure-cloudflare-prod  # DNS-01, wildcard
-        dnsNames:
-          - "*.demo.localfirsthealth.com"
       - secretName: nginx-gateway-tls-prod
         clusterIssuer: letsencrypt-mycure-cloudflare-prod  # DNS-01
         dnsNames:
@@ -475,7 +428,9 @@ signoz:
   enabled: false
 
   gateway:
-    enabled: true
+    # Deny-first: ops tooling stays off the public internet. Reached via
+    # kubectl port-forward (or a tailnet-gateway route later) when enabled.
+    enabled: false
     hostname: ""  # Uses signoz.{domain}
 
   # Upstream signoz/signoz chart values (nested under 'signoz:' for the subchart).
