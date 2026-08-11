@@ -7,6 +7,7 @@
 If your Kubernetes cluster goes down, your status page goes down with it → users have no way to know what's happening.
 
 **Best Practice:**
+
 - Different cloud provider (or at minimum, different region)
 - Different DNS provider
 - Separate domain (optional but recommended)
@@ -26,6 +27,7 @@ If your Kubernetes cluster goes down, your status page goes down with it → use
 | **Incident Management** | GitHub Issues | Built-in |
 
 **Recommendation:**
+
 - **Staging:** Upptime (free, zero maintenance, 5min checks OK)
 - **Production:** Uptime Kuma on Fly.io (faster checks, better UI, <$5/month)
 
@@ -36,6 +38,7 @@ If your Kubernetes cluster goes down, your status page goes down with it → use
 ### Setup
 
 1. **Fork the template:**
+
    ```bash
    # Visit https://github.com/upptime/upptime
    # Click "Use this template" → Create new repository
@@ -43,6 +46,7 @@ If your Kubernetes cluster goes down, your status page goes down with it → use
    ```
 
 2. **Configure `.upptimerc.yml`:**
+
    ```yaml
    owner: your-org
    repo: platform-status
@@ -87,12 +91,14 @@ If your Kubernetes cluster goes down, your status page goes down with it → use
 ### Setup
 
 1. **Install Fly CLI:**
+
    ```bash
    curl -L https://fly.io/install.sh | sh
    fly auth signup  # or: fly auth login
    ```
 
 2. **Create app:**
+
    ```bash
    mkdir uptime-kuma && cd uptime-kuma
    
@@ -132,6 +138,7 @@ If your Kubernetes cluster goes down, your status page goes down with it → use
    ```
 
 3. **Custom domain:**
+
    ```bash
    fly certs add status.stg.example.com
    # Add DNS CNAME: status.stg.example.com → example-status.fly.dev
@@ -167,6 +174,7 @@ fly ssh console
 ### Endpoints to Monitor
 
 **Staging:**
+
 - `https://account.stg.example.com` - Account App
 - `https://api.stg.example.com/health` - API Health
 - `https://backend.stg.example.com/health` - Backend Health  
@@ -175,6 +183,7 @@ fly ssh console
 - `https://storage.stg.example.com/minio/health/live` - MinIO
 
 **Production** (when ready):
+
 - `https://account.example.com`
 - `https://api.example.com/health`
 - etc.
@@ -182,11 +191,13 @@ fly ssh console
 ### Check Configuration
 
 **Upptime:**
+
 - Interval: 5 minutes (fixed)
 - Timeout: 30s
 - Expected: 200 status code
 
 **Uptime Kuma:**
+
 - Interval: 60s (configurable)
 - Timeout: 10s
 - Retries: 3
@@ -198,17 +209,21 @@ fly ssh console
 ## Operational Notes
 
 ### Adding a New Monitor
+
 - **Upptime:** Edit `.upptimerc.yml`, commit, push
 - **Uptime Kuma:** UI → Add New Monitor
 
 ### Posting an Incident
+
 - **Upptime:** Manual GitHub Issue
 - **Uptime Kuma:** UI → Incidents → Post New
 
 ### Maintenance Windows
+
 - **Upptime:** Not supported (manual Issue)
 - **Uptime Kuma:** UI → Maintenance → Schedule
 
 ### Cost Estimate
+
 - **Upptime:** $0
 - **Uptime Kuma (Fly.io):** $0-5/month (1GB volume + minimal compute)

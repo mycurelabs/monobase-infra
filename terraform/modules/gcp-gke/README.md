@@ -54,16 +54,19 @@ module "gke_cluster" {
 ## Outputs
 
 ### Cluster Outputs
+
 - `cluster_name` - GKE cluster name
 - `cluster_endpoint` - API server endpoint
 - `cluster_ca_certificate` - Cluster CA certificate
 - `kubeconfig` - Complete kubectl configuration
 
 ### Workload Identity Outputs (for Monobase components)
+
 - `external_secrets_sa_email` - Service account for External Secrets Operator
 - `velero_sa_email` - Service account for Velero backups
 
 ### Network Outputs
+
 - `network_name` - VPC network name
 - `subnet_name` - GKE subnet name
 
@@ -72,6 +75,7 @@ module "gke_cluster" {
 ### Multi-Tenant Sizing
 
 **Small (5-10 clients):**
+
 ```hcl
 node_pools = {
   general = {
@@ -84,6 +88,7 @@ node_pools = {
 ```
 
 **Medium (10-20 clients):**
+
 ```hcl
 node_pools = {
   general = {
@@ -96,6 +101,7 @@ node_pools = {
 ```
 
 **Large (20+ clients):**
+
 ```hcl
 node_pools = {
   general = {
@@ -220,6 +226,7 @@ helm install api charts/api -f config/client-a/values-production.yaml
 ## Cost Estimate
 
 **Medium cluster (5 nodes, n2-standard-8):**
+
 - GKE control plane: ~$73/month (regional cluster)
 - VM nodes: ~$1,000/month (5 × $200)
 - Persistent disks: ~$50/month
@@ -231,21 +238,25 @@ helm install api charts/api -f config/client-a/values-production.yaml
 ## Troubleshooting
 
 ### Check cluster status
+
 ```bash
 gcloud container clusters describe monobase-prod --region us-central1 --project my-project
 ```
 
 ### View cluster events
+
 ```bash
 kubectl get events --all-namespaces --sort-by='.lastTimestamp'
 ```
 
 ### Scale node pool manually
+
 ```bash
 gcloud container clusters resize monobase-prod --region us-central1 --node-pool general --num-nodes 7
 ```
 
 ### Upgrade Kubernetes version
+
 ```bash
 # List available upgrades
 gcloud container get-server-config --region us-central1

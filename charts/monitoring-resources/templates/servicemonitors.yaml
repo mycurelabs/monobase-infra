@@ -1,29 +1,11 @@
-# ServiceMonitors for Metrics Collection
-# Deployed automatically by ArgoCD when monitoring.enabled=true
+# ServiceMonitors for wrapper-less Bitnami subcharts (postgresql, valkey) whose
+# metrics exporters have no chart of their own to ship a ServiceMonitor.
 #
-# These ServiceMonitors tell Prometheus which services to scrape for metrics
-
----
-# Monobase API ServiceMonitor
-apiVersion: monitoring.coreos.com/v1
-kind: ServiceMonitor
-metadata:
-  name: monobase-api
-  namespace: monitoring
-  labels:
-    app.kubernetes.io/name: monobase-api-monitor
-    app.kubernetes.io/component: monitoring
-spec:
-  selector:
-    matchLabels:
-      app.kubernetes.io/name: api
-  namespaceSelector:
-    any: true  # Monitor API in all namespaces
-  endpoints:
-    - port: metrics
-      interval: 30s
-      path: /metrics
-      scheme: http
+# App ServiceMonitors live WITH each app chart (charts/<app>/templates/servicemonitor.yaml
+# — hapihub, cadence, app, medley, openmed, medgemma-worker), matching the repo's
+# per-app convention. Prometheus selects ServiceMonitors cluster-wide
+# (serviceMonitorSelector={}), so those per-app monitors are scraped without any
+# special release label.
 
 ---
 # PostgreSQL ServiceMonitor
@@ -66,25 +48,3 @@ spec:
     - port: metrics
       interval: 30s
       path: /metrics
-
----
-# Cadence /prometheus exposition (0.7.0+). JSON /metrics is untouched;
-# the text-format endpoint is a separate route.
-apiVersion: monitoring.coreos.com/v1
-kind: ServiceMonitor
-metadata:
-  name: cadence
-  namespace: monitoring
-  labels:
-    prometheus: kube-prometheus
-    release: monitoring
-spec:
-  namespaceSelector:
-    matchNames: [mycure-preprod, mycure-production]
-  selector:
-    matchLabels:
-      app.kubernetes.io/name: cadence
-  endpoints:
-    - port: http
-      path: /prometheus
-      interval: 60s

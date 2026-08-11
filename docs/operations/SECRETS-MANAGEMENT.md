@@ -46,11 +46,13 @@ bash scripts/secrets.sh
 ### Manual vs GitOps Steps
 
 **Manual (One-time setup):**
+
 - Create secrets in cloud KMS
 - Configure Workload Identity/IRSA
 - Deploy ClusterSecretStore
 
 **GitOps (Automatic):**
+
 - ExternalSecret manifests in Git
 - ArgoCD applies manifests
 - ESO syncs secrets to Kubernetes
@@ -216,6 +218,7 @@ kubectl get secret cloudflare-api-token-secret -n cert-manager
 **Status:** Not yet implemented
 
 To add AWS support:
+
 1. Implement `scripts/secrets-aws.sh` (use `scripts/secrets-gcp.sh` as template)
 2. Add an AWS `ClusterSecretStore` to `values/infrastructure/main.yaml` (chart `charts/external-secrets-stores`)
 3. Update deployment values to use `provider: aws`
@@ -227,6 +230,7 @@ For now, use GCP Secret Manager as the default provider.
 **Status:** Not yet implemented
 
 To add Azure support:
+
 1. Implement `scripts/secrets-azure.sh` (use `scripts/secrets-gcp.sh` as template)
 2. Add an Azure `ClusterSecretStore` to `values/infrastructure/main.yaml` (chart `charts/external-secrets-stores`)
 3. Update deployment values to use `provider: azure`
@@ -449,22 +453,27 @@ kubectl get secret -n mycure-preprod cloudflare-api-token
 ### Common Patterns
 
 **External-DNS Credentials:**
+
 - ExternalSecret in namespace → References infrastructure Cloudflare token → DNS automation works
 
 **Application Secrets:**
+
 - ExternalSecret in namespace → References app-specific secrets → Pods consume via env/volume
 
 **Database Passwords:**
+
 - ExternalSecret in namespace → References DB password from KMS → StatefulSet uses secret
 
 ### Troubleshooting
 
 **ExternalSecret shows `Ready: False`:**
+
 - Secret doesn't exist in cloud KMS
 - ClusterSecretStore not configured
 - Workload Identity permissions missing
 
 **Secret not updating:**
+
 - Check `refreshInterval` (default: 1h)
 - Force refresh: `kubectl annotate externalsecret NAME force-sync=$(date +%s)`
 

@@ -13,11 +13,13 @@
 ## Reference paths
 
 **hapihub repo:** `/Users/centipede/Documents/workspace/work/mycure-prm-v1/`
+
 - Modify: `services/hapihub/src/services/clock/clock.ts`
 - Test: `services/hapihub/tests/e2e/clock/service.test.ts`
 - Version: `services/hapihub/package.json`
 
 **mycure-infra repo:** `/Users/centipede/Documents/workspace/work/infra-ai/mycure-infra/`
+
 - Modify: `scripts/seed.ts`
 - Values: `values/deployments/mycure-preprod.yaml`
 
@@ -679,6 +681,7 @@ Expected: completes without throwing, post-flight prints non-zero hours and find
 ## Self-Review (writing-plans skill)
 
 **Spec coverage:**
+
 - §1 hapihub change → Task A1 (extended scope: also bypass auto-derivation, not just timestamp clobber — captured in plan).
 - §2 chat flag + announcements → C1, C2.
 - §3 schedules → C3.

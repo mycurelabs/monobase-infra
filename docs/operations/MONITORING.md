@@ -5,6 +5,7 @@ Complete guide for optional Prometheus + Grafana monitoring stack.
 ## When to Enable Monitoring
 
 **Enable monitoring when:**
+
 - ✅ Production environment
 - ✅ >100 active users
 - ✅ Business-critical service
@@ -12,6 +13,7 @@ Complete guide for optional Prometheus + Grafana monitoring stack.
 - ✅ Want proactive alerting
 
 **Skip monitoring when:**
+
 - ❌ Dev/staging environment
 - ❌ <100 users (overhead not justified)
 - ❌ Resource-constrained cluster
@@ -20,6 +22,7 @@ Complete guide for optional Prometheus + Grafana monitoring stack.
 ## Resource Overhead
 
 **Monitoring Stack Footprint:**
+
 - CPU: ~850m (Prometheus 500m, Grafana 100m, others 250m)
 - Memory: ~1.5Gi (Prometheus 1Gi, Grafana 150Mi, others 350Mi)
 - Storage: ~62Gi (Prometheus 50Gi, Grafana 10Gi, Alertmanager 2Gi)
@@ -76,6 +79,7 @@ Password: (from External Secrets or initial secret)
 ## Pre-Configured Dashboards
 
 **Automatically provisioned:**
+
 1. Kubernetes Cluster (ID: 7249)
 2. Kubernetes Pods (ID: 6417)
 3. PostgreSQL (ID: 2583)
@@ -85,6 +89,7 @@ Password: (from External Secrets or initial secret)
 ## Custom Alerts
 
 **Configured in prometheus-rules.yaml:**
+
 - Monobase API down
 - High error rate
 - High latency
@@ -113,6 +118,7 @@ alertmanager:
 ## Scaling Monitoring
 
 **For >1000 users or >10TB data:**
+
 - Add Thanos for long-term storage
 - Add Loki for log aggregation
 - Consider managed Prometheus (AWS AMP, GCP Cloud Monitoring)

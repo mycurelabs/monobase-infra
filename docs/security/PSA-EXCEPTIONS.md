@@ -22,30 +22,30 @@ kubectl labels — see charts/argocd-infrastructure/templates/{velero,monitoring
 
 All client namespaces (mycure-production, mycure-preprod): restricted ✅
 
-
 When to Use Exceptions
 
 ✅ System Components:
+
 - CSI drivers
 - Network plugins (Cilium)
 - Monitoring agents (node exporters)
 - Backup agents (velero node-agent)
 
 ❌ Application Workloads:
+
 - Never relax PSS for applications
 - Fix the application to comply with restricted profile
 - No exceptions allowed for PHI-handling workloads
 
-
 Exception Documentation
 
 If you create an exception, document:
+
 1. Why the exception is needed
 2. What specific requirement cannot be met
 3. Compensating controls (if any)
 4. Plan to remove exception (if possible)
 5. Risk assessment
-
 
 Audit Exception Usage
 
@@ -53,10 +53,10 @@ List all namespaces with non-restricted PSS
 kubectl get namespaces -o json | \
   jq -r '.items[] | select(.metadata.labels."pod-security.kubernetes.io/enforce" != "restricted") | .metadata.name'
 
-
 HIPAA Compliance Note
 
 For HIPAA compliance:
+
 - Document all PSS exceptions in System Security Plan
 - Justify why restricted profile cannot be used
 - Implement compensating controls

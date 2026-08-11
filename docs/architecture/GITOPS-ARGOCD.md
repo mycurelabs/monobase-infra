@@ -100,6 +100,7 @@ git push
 **Configuration:** Edit `charts/argocd-infrastructure/values.yaml` to enable/disable components.
 
 **GitOps Benefits:**
+
 - ✅ Drift detection and auto-correction
 - ✅ Updates via git push
 - ✅ Full visibility in ArgoCD UI
@@ -125,6 +126,7 @@ git push
 **Configuration:** Each client has `deployments/{client-env}/values.yaml`
 
 **GitOps Workflow:**
+
 ```bash
 # Add new client
 mkdir deployments/newclient-prod
@@ -144,16 +146,19 @@ git commit -am "Update existingclient: enable minio" && git push
 Sync waves control deployment order. ArgoCD waits for each wave to be healthy before proceeding.
 
 **Infrastructure (Cluster-Wide):**
+
 - Wave 0: Core infrastructure (cert-manager, gateways, storage, secrets, backups)
 - Wave 1: Dependent components (policies, custom rules)
 
 **Applications (Per-Client):**
+
 - Wave -1: Namespace creation (Pod Security Standards labels)
 - Wave 0: Security baseline (NetworkPolicies, RBAC)
 - Wave 2: Data services (PostgreSQL, Valkey, MinIO, Mailpit)
 - Wave 3: Applications (API, Account frontend)
 
 **Example Flow for New Client:**
+
 ```
 1. Wave -1: Create namespace "myclient-prod" with PSS labels
 2. Wave 0: Deploy NetworkPolicies and RBAC to "myclient-prod"

@@ -82,6 +82,7 @@ Example cluster configurations are provided (at root level):
 - **`../clusters/example-k3d/`** - Local k3d development cluster
 
 Each contains:
+
 - main.tf - Module usage (references modules from this directory)
 - variables.tf - All parameters
 - terraform.tfvars - Example values
@@ -92,6 +93,7 @@ Each contains:
 **✅ 100% COMPLETE - All 6 Modules Implemented**
 
 **Modules:**
+
 - ✅ **AWS EKS** - Production multi-tenant EKS with IRSA, autoscaling
 - ✅ **Azure AKS** - Production AKS with Workload Identity
 - ✅ **GCP GKE** - Production GKE with Workload Identity
@@ -100,6 +102,7 @@ Each contains:
 - ✅ **local-k3d** - Local testing and CI/CD automation
 
 **Example Clusters:**
+
 - ✅ **example-aws-eks** - AWS EKS reference configuration
 - ✅ **example-do-doks** - DigitalOcean DOKS reference configuration
 - ✅ **example-k3d** - Local k3d reference configuration
@@ -137,6 +140,7 @@ Comprehensive cluster provisioning documentation is available in the main docs:
 - **[Cluster Sizing Guide](../docs/operations/CLUSTER-SIZING.md)** - Multi-tenant capacity planning and cost analysis
 
 **For Module Contributors:**
+
 - **[CONTRIBUTING.md](CONTRIBUTING.md)** - Complete guide for creating new OpenTofu modules
 
 ## Next Steps

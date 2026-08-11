@@ -117,6 +117,7 @@ via `global.nodePool` (per-component override: `postgresql.primary.nodePool`).
 | nonprod | s-4vcpu-8gb | 2–4 | **no** (default landing zone; CoreDNS/konnectivity can't tolerate custom taints) | mycure-preprod, monitoring, velero |
 
 Notes:
+
 - Taints are **placement/blast-radius** controls. Tenant isolation is
   NetworkPolicy + PodSecurity + RBAC at the namespace layer — never cite
   taints as the security boundary.
@@ -152,6 +153,7 @@ replays). Reads keep serving from `postgresql-read-0` on prod-apps.
 ## Summary
 
 **Scaling Options:**
+
 - ✅ HPA for pod autoscaling
 - ✅ PVC expansion for storage
 - ✅ Node addition for capacity

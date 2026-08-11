@@ -54,16 +54,19 @@ module "aks_cluster" {
 ## Outputs
 
 ### Cluster Outputs
+
 - `cluster_name` - AKS cluster name
 - `cluster_endpoint` - API server endpoint
 - `cluster_arn` - Cluster resource ID
 - `kubeconfig` - Complete kubectl configuration
 
 ### Workload Identity Outputs (for Monobase components)
+
 - `external_secrets_identity_client_id` - For External Secrets Operator
 - `velero_identity_client_id` - For Velero backups
 
 ### Network Outputs
+
 - `vnet_id` - Virtual Network ID
 - `subnet_id` - AKS subnet ID
 
@@ -72,6 +75,7 @@ module "aks_cluster" {
 ### Multi-Tenant Sizing
 
 **Small (5-10 clients):**
+
 ```hcl
 node_pools = {
   general = {
@@ -84,6 +88,7 @@ node_pools = {
 ```
 
 **Medium (10-20 clients):**
+
 ```hcl
 node_pools = {
   general = {
@@ -96,6 +101,7 @@ node_pools = {
 ```
 
 **Large (20+ clients):**
+
 ```hcl
 node_pools = {
   general = {
@@ -211,6 +217,7 @@ helm install api charts/api -f config/client-a/values-production.yaml
 ## Cost Estimate
 
 **Medium cluster (5 nodes, Standard_D8s_v3):**
+
 - AKS control plane: Free (included)
 - VM nodes: ~$1,400/month (5 × $280)
 - Managed disks: ~$50/month
@@ -222,21 +229,25 @@ helm install api charts/api -f config/client-a/values-production.yaml
 ## Troubleshooting
 
 ### Check cluster status
+
 ```bash
 az aks show --resource-group monobase-prod-rg --name monobase-prod
 ```
 
 ### View cluster events
+
 ```bash
 kubectl get events --all-namespaces --sort-by='.lastTimestamp'
 ```
 
 ### Scale node pool manually
+
 ```bash
 az aks nodepool scale --resource-group monobase-prod-rg --cluster-name monobase-prod --name general --node-count 7
 ```
 
 ### Upgrade Kubernetes version
+
 ```bash
 # List available upgrades
 az aks get-upgrades --resource-group monobase-prod-rg --name monobase-prod

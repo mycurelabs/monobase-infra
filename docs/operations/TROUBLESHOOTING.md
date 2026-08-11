@@ -15,19 +15,21 @@ kubectl get events -n myclient-prod --sort-by='.lastTimestamp' | tail -20
 kubectl logs -n myclient-prod deployment/api --tail=100
 ```
 
-##Common Issues
+## Common Issues
 
 ### Pods Not Starting
 
 **Issue:** Pods stuck in Pending, ImagePullBackOff, or CrashLoopBackOff
 
 **Diagnostics:**
+
 ```bash
 kubectl describe pod <pod-name> -n myclient-prod
 kubectl logs <pod-name> -n myclient-prod
 ```
 
 **Solutions:**
+
 - **Pending:** Check resources, PVC binding, node selector
 - **ImagePullBackOff:** Check image name, registry credentials
 - **CrashLoopBackOff:** Check logs, environment variables, secrets
@@ -120,4 +122,4 @@ argocd app rollback myclient-prod-api
 
 - **Documentation:** docs/ directory
 - **Issues:** GitHub Issues
-- **Support:** support@example.com
+- **Support:** <support@example.com>

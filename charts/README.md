@@ -48,6 +48,7 @@ helm install myclient-api ./charts/api -f deployments/myclient-prod/values.yaml
 Global parameters are shared across all charts and must be configured in your deployment values file.
 
 ### global.domain
+
 - **Type:** string
 - **Required:** Yes
 - **Example:** `myclient.com`
@@ -55,6 +56,7 @@ Global parameters are shared across all charts and must be configured in your de
 - **Pattern:** Valid domain name
 
 ### global.namespace
+
 - **Type:** string
 - **Required:** Yes
 - **Example:** `myclient-prod`
@@ -62,28 +64,33 @@ Global parameters are shared across all charts and must be configured in your de
 - **Pattern:** `{client}-{env}` (lowercase alphanumeric with hyphens)
 
 ### global.environment
+
 - **Type:** string
 - **Required:** Yes
 - **Options:** `development`, `staging`, `production`
 - **Description:** Environment identifier
 
 ### global.gateway.name
+
 - **Type:** string
 - **Default:** `shared-gateway`
 - **Description:** Name of shared Gateway resource
 
 ### global.gateway.namespace
+
 - **Type:** string
 - **Default:** `gateway-system`
 - **Description:** Namespace where shared Gateway is deployed
 
 ### global.storage.provider
+
 - **Type:** string
 - **Options:** `cloud-default`, `longhorn`, `local-path`
 - **Default:** `cloud-default`
 - **Description:** Storage provider (see `../docs/operations/STORAGE.md`)
 
 ### global.storage.className
+
 - **Type:** string
 - **Default:** `""` (auto-detect)
 - **Description:** StorageClass name (empty = use provider default)

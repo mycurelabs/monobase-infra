@@ -26,6 +26,7 @@ global:
 **1. cloud-default (Recommended for Cloud)**
 
 Uses cluster's default StorageClass:
+
 - DigitalOcean DOKS → `do-block-storage` CSI (production/preprod)
 - AWS EKS → EBS CSI (gp2/gp3)
 - Azure AKS → Azure Disk CSI  
@@ -94,6 +95,7 @@ kubectl get pv <pv-name> -o jsonpath='{.spec.csi.volumeHandle}'
 ```
 
 **Key operations:**
+
 - **Expansion:** edit the PVC size — the CSI driver expands online (see [Volume Expansion](#volume-expansion))
 - **Snapshots/Backups:** handled by Velero (see [BACKUP_DR.md](BACKUP_DR.md))
 - **Encryption at rest:** provided by DigitalOcean block storage
@@ -461,16 +463,19 @@ kubectl exec -it minio-0 -n myclient-prod -- \\
 ### 1. Regular Maintenance
 
 **Weekly:**
+
 - Review storage usage
 - Check for degraded volumes
 - Verify backups completing
 
 **Monthly:**
+
 - Test backup restore
 - Clean up old snapshots
 - Review storage capacity planning
 
 **Quarterly:**
+
 - Audit storage access
 - Review encryption keys
 - Performance tuning
@@ -491,6 +496,7 @@ kubectl exec -it minio-0 -n myclient-prod -- \\
 ```
 
 **Expansion Triggers:**
+>
 - >70% used: Plan expansion
 - >80% used: Execute expansion
 - >90% used: Emergency expansion
@@ -498,11 +504,13 @@ kubectl exec -it minio-0 -n myclient-prod -- \\
 ### 3. Performance Optimization
 
 **Longhorn (on-prem profile only):**
+
 - Use `dataLocality: best-effort` for performance
 - Use SSD disks for production
 - Increase `storageOverProvisioningPercentage` for burst
 
 **MinIO:**
+
 - More nodes = better performance
 - Use SSD for cache
 - Enable compression (reduces storage)
@@ -515,6 +523,7 @@ kubectl exec -it minio-0 -n myclient-prod -- \\
 ### Cloud Block Storage
 
 **Reduce Costs:**
+
 - Right-size PVCs — expansion is online, so start small and grow
 - Delete PVCs of retired workloads (they keep billing until removed)
 - Archive old data to S3/Spaces instead of growing volumes
@@ -522,6 +531,7 @@ kubectl exec -it minio-0 -n myclient-prod -- \\
 ### MinIO
 
 **Reduce Costs:**
+
 - **Consider external S3 if:**
   - >1TB data (economies of scale)
   - Global distribution needed
@@ -548,17 +558,20 @@ mc ilm add --expiry-days 365 myminio/temporary-files
 ## Summary
 
 **Cloud Block Storage (do-block-storage on DOKS):**
+
 - Provider-managed CSI volumes
 - Provider replication + encryption at rest
 - Online expansion
 - Off-cluster backups via Velero
 
 **Longhorn (on-prem k3s profile only):**
+
 - Distributed block storage
 - 3x replication for HA
 - Snapshots + S3 backups
 
 **MinIO:**
+
 - S3-compatible object storage
 - Erasure coding (EC:2)
 - 6 nodes for 1TB usable
@@ -566,6 +579,7 @@ mc ilm add --expiry-days 365 myminio/temporary-files
 - Presigned URLs via Gateway
 
 **Operations:**
+
 - Regular monitoring
 - Capacity planning
 - Backup verification

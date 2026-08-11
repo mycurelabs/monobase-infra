@@ -35,6 +35,7 @@ vim terraform.tfvars
 ```
 
 **Required changes:**
+
 - `cluster_name` - Your cluster identifier
 - `region` - Your AWS/Azure/GCP region
 - `deployment_profile` - small/medium/large (or custom node_groups)
@@ -48,6 +49,7 @@ mise run provision -- --merge-kubeconfig
 ```
 
 The script automatically:
+
 - ✅ Initializes Terraform
 - ✅ Creates cluster infrastructure
 - ✅ Saves kubeconfig to `~/.kube/<cluster-name>`
@@ -107,6 +109,7 @@ node_groups = {
 **Module:** [terraform/modules/aws-eks](../../terraform/modules/aws-eks/README.md)
 
 **Features:**
+
 - Automatic VPC creation with public/private subnets
 - IRSA (IAM Roles for Service Accounts) enabled
 - Node groups with auto-scaling
@@ -114,6 +117,7 @@ node_groups = {
 - Add-ons: vpc-cni, kube-proxy, coredns
 
 **Authentication:**
+
 ```bash
 aws configure
 # OR
@@ -122,6 +126,7 @@ export AWS_SECRET_ACCESS_KEY=xxx
 ```
 
 **Outputs:**
+
 - `cluster_endpoint` - EKS API server endpoint
 - `kubeconfig_command` - Command to configure kubectl
 - `oidc_provider_arn` - For IRSA integration
@@ -131,12 +136,14 @@ export AWS_SECRET_ACCESS_KEY=xxx
 **Module:** [terraform/modules/do-doks](../../terraform/modules/do-doks/README.md)
 
 **Features:**
+
 - Managed Kubernetes (simpler than EKS/AKS/GKE)
 - Cost-effective ($12/node/month for basic droplets)
 - Automatic LoadBalancer integration
 - Built-in monitoring and logging
 
 **Authentication:**
+
 ```bash
 export DIGITALOCEAN_TOKEN=your-token
 ```
@@ -148,12 +155,14 @@ export DIGITALOCEAN_TOKEN=your-token
 **Module:** [terraform/modules/local-k3d](../../terraform/modules/local-k3d/README.md)
 
 **Features:**
+
 - Runs in Docker containers (no VMs needed)
 - Fast cluster creation (~30 seconds)
 - Port forwarding for LoadBalancer services
 - Ideal for local development and testing
 
 **Prerequisites:**
+
 - Docker Desktop or Docker Engine running
 - k3d installed: `brew install k3d` or `curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | bash`
 
@@ -164,6 +173,7 @@ export DIGITALOCEAN_TOKEN=your-token
 **Module:** [terraform/modules/azure-aks](../../terraform/modules/azure-aks/README.md)
 
 **Authentication:**
+
 ```bash
 az login
 ```
@@ -173,6 +183,7 @@ az login
 **Module:** [terraform/modules/gcp-gke](../../terraform/modules/gcp-gke/README.md)
 
 **Authentication:**
+
 ```bash
 gcloud auth application-default login
 ```
@@ -201,6 +212,7 @@ mise run bootstrap
 ```
 
 This installs:
+
 - ArgoCD (GitOps engine)
 - Infrastructure ApplicationSet (cluster-wide components)
 - Auto-discovery ApplicationSet (per-client deployments)
@@ -232,6 +244,7 @@ mise run teardown -- --dry-run
 ```
 
 **⚠️ Warning:** This destroys ALL cluster resources. Ensure you have:
+
 - ✅ Velero backups configured and tested
 - ✅ Database dumps if needed
 - ✅ Important data backed up externally
@@ -249,6 +262,7 @@ terraform init
 ### Cluster Creation Times Out
 
 Check cloud provider quotas:
+
 - **AWS**: VPC limits, EIP limits, instance quotas
 - **Azure**: Core quotas per region
 - **GCP**: Compute Engine API quota

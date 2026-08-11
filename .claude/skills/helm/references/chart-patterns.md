@@ -7,6 +7,7 @@ Reference: `charts/hapihub/templates/_helpers.tpl` (most complete implementation
 Every chart should define these helpers (replace `hapihub` with chart name):
 
 ### Name & Labels
+
 ```yaml
 {{- define "{chart}.name" -}}
 {{- default .Chart.Name .Values.nameOverride | trunc 63 | trimSuffix "-" }}
@@ -31,6 +32,7 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 ```
 
 ### Gateway Helpers
+
 ```yaml
 {{/* Gateway hostname - defaults to {chart}.{global.domain} */}}
 {{- define "{chart}.gateway.hostname" -}}
@@ -58,6 +60,7 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 ```
 
 ### Storage Helper
+
 ```yaml
 {{/* StorageClass - auto-detects based on provider */}}
 {{- define "{chart}.storageClass" -}}
@@ -73,6 +76,7 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 ```
 
 ### Node Pool Helper
+
 ```yaml
 {{/* Node Pool - returns effective pool name (component-level or global) */}}
 {{- define "{chart}.nodePool" -}}
@@ -126,6 +130,7 @@ spec:
 ```
 
 **sectionName values:**
+
 - `https-lfh` — Production `*.localfirsthealth.com` listener
 - `https-lfh-stg` — Staging `*.stg.localfirsthealth.com` listener
 - (omit) — Default `*.mycureapp.com` listener

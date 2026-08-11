@@ -55,17 +55,20 @@ module "eks_cluster" {
 ## Outputs
 
 ### Cluster Outputs
+
 - `cluster_name` - EKS cluster name
 - `cluster_endpoint` - API server endpoint
 - `cluster_arn` - Cluster ARN
 - `kubeconfig` - Complete kubectl configuration
 
 ### IRSA Role ARNs (for Monobase components)
+
 - `external_secrets_role_arn` - For External Secrets Operator
 - `velero_role_arn` - For Velero backups
 - `cluster_autoscaler_role_arn` - For cluster autoscaler
 
 ### Network Outputs
+
 - `vpc_id` - VPC ID
 - `private_subnet_ids` - Private subnet IDs
 - `public_subnet_ids` - Public subnet IDs
@@ -75,6 +78,7 @@ module "eks_cluster" {
 ### Multi-Tenant Sizing
 
 **Small (5-10 clients):**
+
 ```hcl
 node_groups = {
   general = {
@@ -87,6 +91,7 @@ node_groups = {
 ```
 
 **Medium (10-20 clients):**
+
 ```hcl
 node_groups = {
   general = {
@@ -99,6 +104,7 @@ node_groups = {
 ```
 
 **Large (20+ clients):**
+
 ```hcl
 node_groups = {
   general = {
@@ -208,6 +214,7 @@ helm install api charts/api -f config/client-a/values-production.yaml
 ## Cost Estimate
 
 **Medium cluster (5 nodes, m6i.2xlarge):**
+
 - EKS control plane: ~$73/month
 - EC2 nodes: ~$700/month (5 × $140)
 - NAT Gateways: ~$100/month (3 × $33)

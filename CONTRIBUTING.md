@@ -31,12 +31,14 @@ All other tools are automatically installed by mise (see `mise.toml` for complet
 ### Local Development Setup
 
 1. **Fork and clone the repository**
+
    ```bash
    git clone https://github.com/YOUR-USERNAME/monobase-infra.git
    cd monobase-infra
    ```
 
 2. **Install mise** (one-time setup)
+
    ```bash
    # macOS/Linux
    curl https://mise.run | sh
@@ -54,16 +56,19 @@ All other tools are automatically installed by mise (see `mise.toml` for complet
    ```
 
 3. **Install all development tools** (one command!)
+
    ```bash
    mise install  # Reads mise.toml and installs everything
    ```
 
 4. **Create a k3d cluster for testing** (optional)
+
    ```bash
    k3d cluster create monobase-dev --agents 2
    ```
 
 5. **Start developing!**
+
    ```bash
    mise run check  # Run all linters and validation
    mise run fmt    # Format code
@@ -81,6 +86,7 @@ All other tools are automatically installed by mise (see `mise.toml` for complet
 ### Making Changes
 
 1. **Create a feature branch**
+
    ```bash
    git checkout -b feature/my-new-feature
    ```
@@ -91,12 +97,14 @@ All other tools are automatically installed by mise (see `mise.toml` for complet
    - Update documentation
 
 3. **Format and validate**
+
    ```bash
    mise run fmt      # Format all code
    mise run check    # Run all linters and validation
    ```
 
 4. **Commit your changes**
+
    ```bash
    git add .
    git commit -m "feat: add new feature"
@@ -115,6 +123,7 @@ Follow [Conventional Commits](https://www.conventionalcommits.org/):
 ```
 
 **Types:**
+
 - `feat`: New feature
 - `fix`: Bug fix
 - `docs`: Documentation changes
@@ -124,6 +133,7 @@ Follow [Conventional Commits](https://www.conventionalcommits.org/):
 - `chore`: Maintenance tasks
 
 **Examples:**
+
 ```
 feat(helm): add Valkey caching support
 
@@ -145,6 +155,7 @@ Closes #123
 - Add outputs for important values
 
 **Example:**
+
 ```hcl
 variable "cluster_name" {
   description = "Name of the EKS cluster"
@@ -187,12 +198,14 @@ as `mise run <task>` in `mise.toml`, e.g. `bootstrap.ts`, `provision.ts`,
 ### Before Submitting PR
 
 1. **Run all checks**
+
    ```bash
    mise run check        # Run all linters and validation
    mise run test-helm    # Run Helm unit tests
    ```
 
 2. **Individual validation** (optional)
+
    ```bash
    mise run validate-tf    # Validate Terraform modules
    mise run validate-helm  # Validate Helm charts
@@ -201,6 +214,7 @@ as `mise run <task>` in `mise.toml`, e.g. `bootstrap.ts`, `provision.ts`,
    ```
 
 3. **Available mise tasks**
+
    ```bash
    mise tasks        # Show all available tasks
    mise run fmt      # Format all code
@@ -211,6 +225,7 @@ as `mise run <task>` in `mise.toml`, e.g. `bootstrap.ts`, `provision.ts`,
    ```
 
 4. **Render the app-of-apps trees** (validates every chart against real values)
+
    ```bash
    mise run lint-helm
    ```
@@ -225,6 +240,7 @@ as `mise run <task>` in `mise.toml`, e.g. `bootstrap.ts`, `provision.ts`,
 ### Creating a PR
 
 1. **Push your branch**
+
    ```bash
    git push origin feature/my-feature
    ```

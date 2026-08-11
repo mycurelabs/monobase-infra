@@ -62,6 +62,7 @@ kubectl get pods -n nginx-gateway-system
 ```
 
 Common issues:
+
 - **Route not matching**: `sectionName` vs listener name; hostname vs listener
   hostname; internal vs public gateway parentRef.
 - **Listener removal not taking effect**: ArgoCD needs a hard refresh
@@ -178,34 +179,41 @@ mise run lint-helm
 ## Runbooks
 
 ### 1. Pod Not Starting
+
 `kubectl describe pod` → Pending: resources/PVC/taints (check node-pool
 tolerations); ImagePullBackOff: image/registry; CrashLoopBackOff:
 `logs --previous`; OOMKilled: raise limits in deployment values.
 
 ### 2. App Unreachable
+
 Outside-in: gateway (`kubectl get gateway -n nginx-gateway-system`) → route
 (`kubectl describe httproute {r} -n {ns}` — Accepted? correct parentRef
 public vs internal?) → Service/EndpointSlices → pods → NetworkPolicy (strict
 gateway ingress allow present?) → certificate.
 
 ### 3. Secrets Not Syncing
+
 ExternalSecret status → ClusterSecretStore health → ESO logs → GCP key exists?
 
 ### 4. ArgoCD Sync Failure
+
 App conditions → repo-server logs → `mise run lint-helm` locally → for
 valuesObject changes, refresh the root app.
 
 ### 5. Backup & Restore
+
 `velero backup get` → restore with `--include-namespaces`. Verify a recent
 `production-daily` before any risky change. DR runbooks:
 docs/operations/DISASTER_RECOVERY_RUNBOOKS.md.
 
 ### 6. Certificate Renewal
+
 `kubectl get certificates -n nginx-gateway-system` → challenges/orders →
 issuer (HTTP-01 needs the gateway listener; DNS-01 needs the Cloudflare
 token) → delete the Certificate to force re-issue.
 
 ### 7. Complete Outage
+
 `kubectl cluster-info` → nodes → `nginx-gateway-system`, `argocd`,
 `external-secrets-system`, `cert-manager` pods →
 `kubectl get pods -A | grep -v Running | grep -v Completed` → events.
@@ -213,6 +221,7 @@ Database: `kubectl logs -n {ns} statefulset/postgresql` (preprod:
 `postgresql-primary-0` / `postgresql-read-0`).
 
 ### 8. Storage/PVC
+
 `kubectl get pvc -n {ns}` → `df -h` in the pod → resize via
 `kubectl patch pvc` (do-block-storage supports expansion). Prod PG disk
 growth is a known watch item (dual-write; resized 200→300Gi 2026-06).

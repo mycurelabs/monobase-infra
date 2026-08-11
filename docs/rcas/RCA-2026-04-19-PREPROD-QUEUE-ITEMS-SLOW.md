@@ -67,11 +67,13 @@ CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_queue_items_queue_created_at
 ```
 
 Why `CONCURRENTLY`:
+
 - Does **not** take an `ACCESS EXCLUSIVE` lock on the table — reads and writes continue uninterrupted during the build.
 - Build took well under 30 s on 578 MB of data.
 - If it had failed mid-build, it would have left an `indisvalid = false` index that is safely ignored by the planner and could be dropped without impact.
 
 Why composite `(queue, created_at DESC)` rather than just `(queue)`:
+
 - `listQueueItems` filters by `queue` and sorts by `created_at DESC`. The composite index serves both the `WHERE` and the `ORDER BY` in a single scan, so `LIMIT 20`-style queries never read the heap beyond the 20 rows they need.
 
 ### Measured improvement

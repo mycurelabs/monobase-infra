@@ -124,6 +124,7 @@ Kubernetes resources (Deployments, Services, HTTPRoutes, etc.)
 ## Environment-Specific Patterns
 
 ### Production
+
 - `global.environment: production`
 - `global.nodePool: "production"`
 - HPA enabled for hapihub
@@ -132,6 +133,7 @@ Kubernetes resources (Deployments, Services, HTTPRoutes, etc.)
 - `gateway.sectionName: https-lfh`
 
 ### Staging
+
 - `global.environment: staging`
 - `global.nodePool: "staging"`
 - HPA disabled (save resources)
@@ -144,6 +146,7 @@ Kubernetes resources (Deployments, Services, HTTPRoutes, etc.)
 ## Common Operations
 
 ### Bump Image Version
+
 ```yaml
 # Edit the specific app's image.tag
 hapihub:
@@ -152,6 +155,7 @@ hapihub:
 ```
 
 ### Enable/Disable Component
+
 ```yaml
 # Toggle the .enabled flag
 dentalemon:
@@ -159,6 +163,7 @@ dentalemon:
 ```
 
 ### Add External Secret
+
 ```yaml
 externalSecrets:
   secrets:
@@ -167,6 +172,7 @@ externalSecrets:
 ```
 
 ### Change Resources
+
 ```yaml
 hapihub:
   resources:

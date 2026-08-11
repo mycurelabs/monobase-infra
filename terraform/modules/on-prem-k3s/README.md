@@ -16,6 +16,7 @@ Provisions K3s cluster on bare metal servers for healthcare on-prem deployments.
 ## Requirements
 
 **Hardware:**
+
 - 3+ servers for HA (or 1 for dev)
 - 4 CPU cores per server (minimum)
 - 8GB RAM per server (minimum)
@@ -23,6 +24,7 @@ Provisions K3s cluster on bare metal servers for healthcare on-prem deployments.
 - Network connectivity between servers
 
 **Access:**
+
 - SSH access to all servers
 - sudo privileges
 - Ubuntu 20.04/22.04 or RHEL 8/9
@@ -98,11 +100,13 @@ helm install api charts/api -f config/clinic-a/values-production.yaml
 ## HA Configuration
 
 **3 servers (recommended):**
+
 - Embedded etcd (no external dependency)
 - Can lose 1 server
 - VIP recommended for API endpoint
 
 **5+ servers (large deployments):**
+
 - Better availability
 - Can lose 2 servers
 - More capacity
@@ -110,12 +114,14 @@ helm install api charts/api -f config/clinic-a/values-production.yaml
 ## Network Requirements
 
 **Between servers:**
+
 - Port 6443: Kubernetes API
 - Port 2379-2380: etcd (if HA)
 - Port 10250: Kubelet metrics
 - Port 8472: Flannel VXLAN (or 51820/51821 for WireGuard)
 
 **Internet (for installation):**
+
 - get.k3s.io (K3s installer)
 - github.com (Longhorn, MetalLB manifests)
 - Or use air-gapped installation
@@ -127,14 +133,17 @@ See: [Air-Gapped Guide](https://docs.k3s.io/installation/airgap) for offline bun
 ## Troubleshooting
 
 **Nodes not joining:**
+
 - Check K3s token matches
 - Verify network connectivity (port 6443)
 - Check firewall rules
 
 **Storage issues:**
+
 - Ensure disks available for Longhorn
 - Check disk permissions
 
 **LoadBalancer pending:**
+
 - Verify MetalLB IP range available
 - Check no IP conflicts

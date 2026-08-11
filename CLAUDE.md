@@ -26,6 +26,7 @@ docs/                 # Architecture, operations, security documentation
 ## Tool Management
 
 This project uses **mise exclusively** for tool versions and task running.
+
 - Install tools: `mise install`
 - Run tasks: `mise run <task>` (e.g., `mise run lint`, `mise run bootstrap`)
 - See all tasks: `mise tasks`

@@ -7,17 +7,20 @@ Practical guide for managing TLS certificates in the multi-domain gateway archit
 ## Quick Reference
 
 **Add Client Domain:**
+
 1. Edit `values/infrastructure/main.yaml` (under `nginxGatewayResources.tls.certificates`)
 2. Commit and push
 3. Wait 2-5 minutes for certificate provisioning
 4. Verify with `kubectl get certificate -n nginx-gateway-system`
 
 **Check Certificate Status:**
+
 ```bash
 kubectl get certificate -n nginx-gateway-system
 ```
 
 **Troubleshoot Issues:**
+
 ```bash
 kubectl describe certificate <name> -n nginx-gateway-system
 kubectl logs -n cert-manager -l app=cert-manager
@@ -32,6 +35,7 @@ kubectl logs -n cert-manager -l app=cert-manager
 All certificates are declared under `nginxGatewayResources.tls.certificates` for centralized management. The `charts/nginx-gateway` chart renders these into cert-manager `Certificate` resources.
 
 **Schema:**
+
 ```yaml
 nginxGatewayResources:
   tls:
@@ -51,6 +55,7 @@ nginxGatewayResources:
 **Purpose:** Automatically provision certificates for client-owned domains
 
 **Example:**
+
 ```yaml
 nginxGatewayResources:
   tls:
@@ -62,21 +67,25 @@ nginxGatewayResources:
 ```
 
 **Requirements:**
+
 - Client creates DNS A record: `app.client.com` → LoadBalancer IP
 - Domain publicly accessible on port 80
 - Let's Encrypt can reach domain via HTTP
 
 **Use Cases:**
+
 - Client-owned domains
 - Client has DNS access but no API access
 - Most common scenario
 
 **Limitations:**
+
 - ❌ No wildcard support (HTTP-01 limitation)
 - ❌ Domain must be publicly accessible
 - ⚠️ Rate limits: 50 certificates/week per registered domain
 
 **Process:**
+
 1. Client creates DNS record
 2. Platform adds certificate declaration
 3. cert-manager creates temporary HTTPRoute for ACME challenge
@@ -96,24 +105,29 @@ nginxGatewayResources:
 Client-provided certificates are synced from GCP Secret Manager into a TLS Secret in `nginx-gateway-system` via an ExternalSecret, then referenced by the gateway listener. The TLS Secret follows the `nginx-gateway-tls-*` naming scheme (e.g. `nginx-gateway-tls-client2`).
 
 **Requirements:**
+
 - Client uploads certificate and private key to GCP Secret Manager
 - External Secrets Operator configured
 - Certificate must be valid for the domain
 
 **Use Cases:**
+
 - Client has existing certificate
 - Client wants to manage certificate lifecycle
 - Client uses internal Certificate Authority
 - Regulatory requirements for specific CA
 
 **Certificate Format:**
+
 - PEM-encoded X.509 certificate
 - Include full chain (intermediate CAs)
 - PEM-encoded private key (RSA 2048+ or ECDSA P-256+)
 - No password-protected keys
 
 **Process:**
+
 1. Client uploads cert to GCP Secret Manager:
+
    ```bash
    gcloud secrets create client2-domain-cert \
      --data-file=certificate.pem \
@@ -154,6 +168,7 @@ app.client.com    A    203.0.113.42
 ```
 
 **Verify DNS propagation:**
+
 ```bash
 dig app.client.com +short
 # Should return LoadBalancer IP
@@ -177,6 +192,7 @@ nginxGatewayResources:
 ```
 
 **Naming Convention:**
+
 - Use lowercase, hyphens for spaces
 - Format: `nginx-gateway-tls-{name}`
 - Examples: `nginx-gateway-tls-acme`, `nginx-gateway-tls-globex`
@@ -206,6 +222,7 @@ kubectl describe certificate nginx-gateway-tls-client1 -n nginx-gateway-system
 ```
 
 **Common statuses during provisioning:**
+
 - `Issuing`: cert-manager creating ACME order
 - `Ready=False, Reason=Pending`: Waiting for challenge validation
 - `Ready=True`: Certificate successfully issued
@@ -305,6 +322,7 @@ certmanager_acme_orders_total{namespace="nginx-gateway-system", status="invalid"
 ```
 
 **Recommended Alerts:**
+
 - Certificate expires in < 14 days
 - Certificate Ready=False for > 10 minutes
 - ACME challenge failures
@@ -318,7 +336,7 @@ certmanager_acme_orders_total{namespace="nginx-gateway-system", status="invalid"
 cert-manager automatically renews certificates:
 
 - **When:** 30 days before expiry
-- **Process:** 
+- **Process:**
   1. cert-manager creates new Certificate order
   2. ACME challenge completed
   3. New certificate issued
@@ -339,6 +357,7 @@ kubectl get certificate nginx-gateway-tls-client1 -n nginx-gateway-system -w
 ```
 
 **When to force renewal:**
+
 - Certificate compromised
 - Testing renewal process
 - Troubleshooting renewal issues
@@ -359,6 +378,7 @@ gcloud secrets versions add client2-domain-key \
 External Secrets Operator syncs automatically (default: 1 hour refresh interval).
 
 **Force immediate sync:**
+
 ```bash
 # Delete Secret to trigger ESO re-sync
 kubectl delete secret nginx-gateway-tls-client2 -n nginx-gateway-system
@@ -412,6 +432,7 @@ kubectl get secret nginx-gateway-tls-client1 -n nginx-gateway-system
 ### Certificate Not Issuing
 
 **Symptoms:**
+
 ```bash
 kubectl get certificate nginx-gateway-tls-client1 -n nginx-gateway-system
 # STATUS: Ready=False
@@ -420,6 +441,7 @@ kubectl get certificate nginx-gateway-tls-client1 -n nginx-gateway-system
 **Debug Steps:**
 
 1. **Check Certificate status:**
+
    ```bash
    kubectl describe certificate nginx-gateway-tls-client1 -n nginx-gateway-system
    
@@ -430,6 +452,7 @@ kubectl get certificate nginx-gateway-tls-client1 -n nginx-gateway-system
    ```
 
 2. **Check Order status:**
+
    ```bash
    kubectl get order -n nginx-gateway-system
    kubectl describe order <order-name> -n nginx-gateway-system
@@ -440,6 +463,7 @@ kubectl get certificate nginx-gateway-tls-client1 -n nginx-gateway-system
    ```
 
 3. **Check Challenge status:**
+
    ```bash
    kubectl get challenge -n nginx-gateway-system
    kubectl describe challenge <challenge-name> -n nginx-gateway-system
@@ -451,6 +475,7 @@ kubectl get certificate nginx-gateway-tls-client1 -n nginx-gateway-system
    ```
 
 4. **Check cert-manager logs:**
+
    ```bash
    kubectl logs -n cert-manager -l app=cert-manager --tail=100
    
@@ -487,6 +512,7 @@ kubectl describe challenge <name> -n nginx-gateway-system
 ```
 
 **Debug:**
+
 ```bash
 # Verify HTTPRoute created by cert-manager
 kubectl get httproute -n nginx-gateway-system | grep acme
@@ -505,17 +531,20 @@ curl -v http://app.client.com/.well-known/acme-challenge/test
 ### Gateway Not Routing to Domain
 
 **Symptoms:**
+
 - TLS handshake succeeds
 - But 404/503 errors returned
 
 **Debug:**
 
 1. **Check HTTPRoute exists:**
+
    ```bash
    kubectl get httproute -n <client-namespace>
    ```
 
 2. **Check HTTPRoute attached to Gateway:**
+
    ```bash
    kubectl describe httproute <name> -n <client-namespace>
    
@@ -526,6 +555,7 @@ curl -v http://app.client.com/.well-known/acme-challenge/test
    ```
 
 3. **Check Gateway certificate list:**
+
    ```bash
    kubectl get gateway nginx-shared-gateway -n nginx-gateway-system -o yaml | \
      grep -A 10 certificateRefs
@@ -534,6 +564,7 @@ curl -v http://app.client.com/.well-known/acme-challenge/test
    ```
 
 4. **Test TLS SNI:**
+
    ```bash
    openssl s_client -connect <LoadBalancer-IP>:443 \
      -servername app.client.com
@@ -546,6 +577,7 @@ curl -v http://app.client.com/.well-known/acme-challenge/test
 ### Certificate Expired or Expiring Soon
 
 **Check expiry:**
+
 ```bash
 # Check specific certificate
 kubectl get secret nginx-gateway-tls-client1 -n nginx-gateway-system -o json | \
@@ -560,6 +592,7 @@ kubectl get secret nginx-gateway-tls-client1 -n nginx-gateway-system -o json | \
 **If expired or expiring soon:**
 
 1. **Check cert-manager renewing:**
+
    ```bash
    kubectl get certificate nginx-gateway-tls-client1 -n nginx-gateway-system -o yaml
    
@@ -569,6 +602,7 @@ kubectl get secret nginx-gateway-tls-client1 -n nginx-gateway-system -o json | \
    ```
 
 2. **Force renewal:**
+
    ```bash
    # Delete certificate secret
    kubectl delete secret nginx-gateway-tls-client1 -n nginx-gateway-system
@@ -577,6 +611,7 @@ kubectl get secret nginx-gateway-tls-client1 -n nginx-gateway-system -o json | \
    ```
 
 3. **Check for renewal failures:**
+
    ```bash
    kubectl logs -n cert-manager -l app=cert-manager | grep renewal
    ```
@@ -586,11 +621,13 @@ kubectl get secret nginx-gateway-tls-client1 -n nginx-gateway-system -o json | \
 ### Let's Encrypt Rate Limits
 
 **Rate Limits:**
+
 - 50 certificates per registered domain per week
 - 5 duplicate certificates per week
 - 300 pending authorizations per account
 
 **Check if hit:**
+
 ```bash
 # Look for rate limit errors in cert-manager logs
 kubectl logs -n cert-manager -l app=cert-manager | grep -i "rate limit"
@@ -638,6 +675,7 @@ nginxGatewayResources:
 ```
 
 **Verify:**
+
 1. Certificate issues successfully
 2. TLS handshake works
 3. HTTP routing works
@@ -646,6 +684,7 @@ nginxGatewayResources:
 ### 2. Certificate Naming
 
 **Consistent naming convention:**
+
 - Format: `nginx-gateway-tls-{name}`
 - Examples:
   - `nginx-gateway-tls-acme`
@@ -654,6 +693,7 @@ nginxGatewayResources:
   - `nginx-gateway-tls-prod`
 
 **Benefits:**
+
 - Easy to identify certificate purpose
 - Consistent sorting in listings
 - Clear ownership
@@ -661,11 +701,13 @@ nginxGatewayResources:
 ### 3. Documentation
 
 **For each client certificate:**
+
 - Add comment in `values/infrastructure/main.yaml`
 - Document client contact information
 - Note special requirements (renewal process, etc.)
 
 **Example:**
+
 ```yaml
 nginxGatewayResources:
   tls:
@@ -682,12 +724,14 @@ nginxGatewayResources:
 ### 4. Monitoring and Alerts
 
 **Set up alerts for:**
+
 - Certificate expiring in < 14 days
 - Certificate Ready=False for > 10 minutes
 - ACME challenge failures
 - cert-manager pod failures
 
 **Example Prometheus alert:**
+
 ```yaml
 - alert: CertificateExpiringSoon
   expr: |
@@ -701,11 +745,13 @@ nginxGatewayResources:
 ### 5. Security
 
 **Certificate Storage:**
+
 - Enable Kubernetes Secret encryption at rest
 - Limit RBAC access to nginx-gateway-system namespace
 - Audit certificate access regularly
 
 **Client-Provided Certificates:**
+
 - Validate certificate format before accepting
 - Verify certificate matches domain
 - Check certificate chain completeness
@@ -726,6 +772,7 @@ nginxGatewayResources:
 ## Support
 
 For issues or questions:
+
 1. Check troubleshooting section above
 2. Check cert-manager logs
 3. Review [Multi-Domain Gateway Architecture](../architecture/MULTI-DOMAIN-GATEWAY.md)

@@ -26,9 +26,11 @@ If `.kube/.claude-choice.json` exists:
 1. Parse it.
 2. Verify the file at `.kubeconfig` path still exists.
 3. Verify the context still exists:
+
    ```bash
    kubectl --kubeconfig <path> config get-contexts -o name
    ```
+
 4. If both checks pass, **use this choice silently — ask nothing**.
 5. If either check fails, delete the stale `.kube/.claude-choice.json` and fall through to Step 2.
 
@@ -44,11 +46,13 @@ Look in this order. The first non-empty result wins.
 ### Step 3 — Pick a kubeconfig
 
 - **0 candidates:** Tell the user no kubeconfig is available and stop. Suggest one of:
+
   ```bash
   mise run provision -- --merge-kubeconfig
   # or
   terraform output -raw kubeconfig > .kube/config
   ```
+
   Do not proceed.
 
 - **1 candidate:** Use it. Do not ask.

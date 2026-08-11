@@ -597,6 +597,7 @@ kubectl get httproute -n NAMESPACE APP-NAME -o yaml | grep -A5 hostnames
 ### ExternalSecret Not Ready
 
 **Symptom:**
+
 ```bash
 kubectl get externalsecret -n NAMESPACE
 NAME                    STATUS           READY
@@ -679,6 +680,7 @@ dig txt app.stg.example.com
 ### Permission Denied Errors
 
 **Cloudflare:**
+
 ```bash
 # Error: "Unauthorized"
 # Solution: Regenerate API token with correct permissions
@@ -686,6 +688,7 @@ dig txt app.stg.example.com
 ```
 
 **AWS Route53:**
+
 ```bash
 # Error: "AccessDenied"
 # Solution: Verify IRSA role has route53:ChangeResourceRecordSets
@@ -696,6 +699,7 @@ aws iam get-role-policy \
 ```
 
 **Google Cloud DNS:**
+
 ```bash
 # Error: "Permission denied"
 # Solution: Verify Workload Identity binding
@@ -705,6 +709,7 @@ gcloud iam service-accounts get-iam-policy \
 ```
 
 **Azure DNS:**
+
 ```bash
 # Error: "Authorization failed"
 # Solution: Verify managed identity has DNS Zone Contributor role
@@ -759,6 +764,7 @@ example-production namespace:
 ```
 
 **Benefits:**
+
 - Credential isolation per namespace
 - Different DNS providers per environment
 - No cross-namespace access

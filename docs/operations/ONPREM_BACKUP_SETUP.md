@@ -23,11 +23,13 @@ The script does everything except create the read-only DO Spaces key and store i
 A separate, narrow-scope access key. Do NOT reuse the cluster's `velero-credentials` (which is read-write). Two ways to create it:
 
 **Via `doctl` (preferred, scriptable):**
+
 ```sh
 # doctl is already authenticated on workstations that have it.
 doctl spaces keys create mycure-onprem-mirror-readonly \
   --grants "bucket=mycure-doks-velero-backups;permission=read"
 ```
+
 Capture both halves from the output, save to your password manager under
 `mycure / velero / onprem-mirror-readonly-spaces-key`.
 
@@ -72,12 +74,14 @@ The secrets only exist in the shell environment of this one invocation. The scri
 ### Common invocations
 
 **This device (operator workstation):**
+
 ```sh
 sudo SPACES_ACCESS_KEY=… SPACES_SECRET_KEY=… KOPIA_PASSWORD=… \
   scripts/onprem-backup-setup.sh --encryption=none
 ```
 
 **A new dedicated server, identifying the spare drive first:**
+
 ```sh
 lsblk -o NAME,SIZE,FSTYPE,MOUNTPOINT,TYPE     # find an unmounted, no-FSTYPE disk
 sudo SPACES_ACCESS_KEY=… SPACES_SECRET_KEY=… KOPIA_PASSWORD=… \
@@ -88,6 +92,7 @@ sudo SPACES_ACCESS_KEY=… SPACES_SECRET_KEY=… KOPIA_PASSWORD=… \
 ```
 
 **A VM with no spare block device:**
+
 ```sh
 sudo SPACES_ACCESS_KEY=… SPACES_SECRET_KEY=… KOPIA_PASSWORD=… \
   scripts/onprem-backup-setup.sh \

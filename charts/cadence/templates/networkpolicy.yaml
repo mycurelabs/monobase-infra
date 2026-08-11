@@ -25,4 +25,29 @@ spec:
   egress:
     # Allow all egress (DNS + relay fallback + QUIC return paths).
     - {}
+---
+# Cadence's dependency on Valkey (its LWW/metadata backend): valkey has
+# default-deny ingress and is a wrapper-less Bitnami subchart, so the allow
+# lives here with the consumer that needs it. (Gateway->cadence ingress and
+# cadence egress are already covered by the policy above — ingress on the real
+# ports 9464/6472 from any source, and blanket egress.)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-cadence-to-valkey
+  namespace: {{ .Values.global.namespace }}
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: valkey
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: cadence
+      ports:
+        - protocol: TCP
+          port: 6379
 {{- end }}

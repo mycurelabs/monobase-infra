@@ -54,6 +54,7 @@ Single Kubernetes Cluster
 ### Why Multi-Tenancy?
 
 ✅ **Benefits:**
+
 - **Cost Efficient** - Shared infrastructure (control plane, networking, storage)
 - **Easier Management** - One cluster to maintain vs. many
 - **Better Utilization** - Resources shared across clients
@@ -61,6 +62,7 @@ Single Kubernetes Cluster
 - **Simplified Monitoring** - Single pane of glass
 
 ⚠️ **Trade-offs:**
+
 - Requires proper isolation (NetworkPolicies, ResourceQuotas)
 - Noisy neighbor potential (need resource limits)
 - Blast radius (one cluster failure affects all clients)
@@ -69,12 +71,14 @@ Single Kubernetes Cluster
 ### When to Use Multi-Tenancy
 
 ✅ **Good Fit:**
+
 - 5-30 small to medium clients
 - Similar resource requirements
 - Clients in same region
 - Cost optimization priority
 
 ❌ **Not Recommended:**
+
 - Very large clients (dedicated cluster better)
 - Strict compliance isolation required
 - Clients in different regions
@@ -188,22 +192,24 @@ spec:
 - **OS overhead**: ~0.5 vCPU, 1Gi per node
 - **Buffer**: 20% for spikes
 
-
 ### Step 4: Calculate Total Cluster Size
 
 **Formula:**
+
 ```
 Total CPU = (Clients × Per-Client CPU) + Shared CPU + System Overhead
 Total Memory = (Clients × Per-Client Memory) + Shared Memory + System Overhead
 ```
 
 **Example for 10 clients:**
+
 ```
 CPU = (10 × 2) + 2.1 + 5 (system) = ~27 vCPU
 Memory = (10 × 7.5Gi) + 3.5Gi + 10Gi (system) = ~88Gi
 ```
 
 **With 20% buffer:**
+
 ```
 CPU = 27 × 1.2 = ~33 vCPU
 Memory = 88 × 1.2 = ~106Gi
@@ -212,6 +218,7 @@ Memory = 88 × 1.2 = ~106Gi
 ### Step 5: Choose Node Sizes
 
 **AWS Example (m6i.2xlarge = 8 vCPU, 32Gi):**
+
 ```
 Nodes needed: 
   CPU: 33 / 8 = 4.1 → 5 nodes
@@ -226,16 +233,19 @@ Nodes needed:
 ### Per-Client Baseline
 
 **Small Client (< 1000 users):**
+
 - CPU: 1.5 vCPU (requests), 6 vCPU (limits)
 - Memory: 5Gi (requests), 12Gi (limits)
 - Pods: ~5-7
 
 **Medium Client (1000-5000 users):**
+
 - CPU: 2 vCPU (requests), 8 vCPU (limits)
 - Memory: 7.5Gi (requests), 15Gi (limits)
 - Pods: ~7-10
 
 **Large Client (5000+ users):**
+
 - CPU: 4 vCPU (requests), 12 vCPU (limits)
 - Memory: 12Gi (requests), 24Gi (limits)
 - Pods: ~10-15
@@ -251,7 +261,6 @@ Nodes needed:
 | 10-15 | m6i.2xlarge | 8 | 32Gi | 4-6 | 32-48 | 128-192Gi |
 | 15-25 | m6i.2xlarge | 8 | 32Gi | 6-10 | 48-80 | 192-320Gi |
 | 25-30 | m6i.4xlarge | 16 | 64Gi | 5-8 | 80-128 | 320-512Gi |
-
 
 #### Azure (AKS)
 
@@ -274,12 +283,14 @@ Nodes needed:
 ### Why These Instance Types?
 
 ✅ **m6i/Standard_D/n2-standard (General Purpose)**
+
 - Balanced CPU:Memory ratio (1:4)
 - Good for mixed workloads
 - Cost-effective
 - Healthcare application fit
 
 ❌ **Avoid:**
+
 - Compute-optimized (c-series): Low memory
 - Memory-optimized (r-series): Expensive
 - Burstable (t-series): Unreliable performance
@@ -291,11 +302,13 @@ Nodes needed:
 ### Example 1: Small Deployment (5 Clients)
 
 **Requirements:**
+
 - 5 clients
 - Small usage per client
 - Cost-conscious
 
 **Configuration (AWS EKS):**
+
 ```hcl
 # terraform.tfvars
 
@@ -310,6 +323,7 @@ node_groups = {
 ```
 
 **Capacity:**
+
 - Total: 12 vCPU, 48Gi (3 nodes)
 - Per-client: ~2 vCPU, 7.5Gi
 - Supports: 5 clients comfortably
@@ -320,11 +334,13 @@ node_groups = {
 ### Example 2: Medium Deployment (15 Clients)
 
 **Requirements:**
+
 - 15 clients
 - Medium usage
 - Production reliability
 
 **Configuration (AWS EKS):**
+
 ```hcl
 node_groups = {
   general = {
@@ -337,6 +353,7 @@ node_groups = {
 ```
 
 **Capacity:**
+
 - Total: 40 vCPU, 160Gi (5 nodes)
 - Per-client: ~2 vCPU, 7.5Gi
 - Supports: 15 clients comfortably
@@ -347,11 +364,13 @@ node_groups = {
 ### Example 3: Large Deployment (25 Clients)
 
 **Requirements:**
+
 - 25 clients
 - High availability
 - Room for growth
 
 **Configuration (AWS EKS):**
+
 ```hcl
 node_groups = {
   general = {
@@ -364,6 +383,7 @@ node_groups = {
 ```
 
 **Capacity:**
+
 - Total: 64 vCPU, 256Gi (8 nodes)
 - Per-client: ~2 vCPU, 7.5Gi
 - Supports: 25 clients comfortably
@@ -374,11 +394,13 @@ node_groups = {
 ### Example 4: Mixed Workload (10 small + 3 large clients)
 
 **Requirements:**
+
 - 10 small clients (1.5 vCPU each)
 - 3 large clients (4 vCPU each)
 - Resource isolation
 
 **Configuration (AWS EKS):**
+
 ```hcl
 node_groups = {
   # General purpose pool
@@ -405,6 +427,7 @@ node_groups = {
 ```
 
 **Capacity:**
+
 - General: 32 vCPU, 128Gi (4 nodes) → 10 small clients
 - Large: 32 vCPU, 128Gi (2 nodes) → 3 large clients
 - Total: 64 vCPU, 256Gi
@@ -452,12 +475,14 @@ spec:
 Automatically add/remove nodes:
 
 **How it works:**
+
 1. Pod can't be scheduled (insufficient resources)
 2. Cluster Autoscaler detects unschedulable pods
 3. New node added to cluster
 4. Pod scheduled on new node
 
 **Configuration (already in modules):**
+
 ```hcl
 # Already enabled in aws-eks, azure-aks, gcp-gke modules
 enable_cluster_autoscaler = true
@@ -492,6 +517,7 @@ spec:
 ### Scaling Best Practices
 
 ✅ **DO:**
+
 - Start with conservative sizing (can scale up)
 - Use HPA for application scaling
 - Use Cluster Autoscaler for infrastructure
@@ -500,6 +526,7 @@ spec:
 - Right-size after initial deployment
 
 ❌ **DON'T:**
+
 - Over-provision initially (waste money)
 - Set max too low (can't handle growth)
 - Set min too high (waste money)
@@ -512,19 +539,24 @@ spec:
 ### AWS EKS Cost Breakdown
 
 **Control Plane:**
+
 - $0.10/hour = ~$73/month (per cluster)
 
 **Worker Nodes (m6i.2xlarge, us-east-1):**
+
 - On-Demand: $0.384/hour = ~$280/month per node
 - Spot: $0.115/hour = ~$84/month per node (70% savings!)
 
 **Storage (gp3):**
+
 - $0.08/GB-month
 
 **Data Transfer:**
+
 - Egress: $0.09/GB (first 10TB)
 
 **Example Total (5 nodes on-demand):**
+
 ```
 Control Plane: $73
 Nodes: 5 × $280 = $1,400
@@ -534,6 +566,7 @@ Total: ~$1,563/month
 ```
 
 **With Spot instances (5 nodes):**
+
 ```
 Control Plane: $73
 Nodes: 5 × $84 = $420
@@ -554,6 +587,7 @@ Total: ~$583/month (63% savings!)
 | 30 | 10 | m6i.2xlarge | $1,750 | $58 |
 
 **Economies of Scale:**
+
 - Cost per client decreases with more clients
 - Shared infrastructure amortized
 - Better resource utilization
@@ -561,6 +595,7 @@ Total: ~$583/month (63% savings!)
 ### Cost Optimization Tips
 
 ✅ **Immediate Savings:**
+
 1. **Use Spot Instances** (60-70% savings)
    - For non-production
    - Or mix: 50% spot, 50% on-demand
@@ -570,6 +605,7 @@ Total: ~$583/month (63% savings!)
    - Avoid over-provisioning
 
 3. **Use gp3 volumes** (cheaper than gp2)
+
    ```hcl
    disk_size = 100  # Default in modules
    disk_type = "gp3"
@@ -584,6 +620,7 @@ Total: ~$583/month (63% savings!)
    - Already configured in aws-eks module
 
 ✅ **Long-term Savings:**
+
 1. **Reserved Instances** (1-3 year commit)
    - 30-60% discount
    - Once cluster size stabilizes
@@ -612,6 +649,7 @@ kubectl get pods -A -o wide | awk '{print $7}' | sort | uniq -c
 ```
 
 **Target Utilization:**
+
 - CPU: 50-70% average (allows burst headroom)
 - Memory: 60-80% average
 - Pods per node: <100
@@ -642,6 +680,7 @@ kubectl top pods -A >> pod-usage.log
 #### Step 2: Analyze Usage
 
 **Questions to answer:**
+
 - What's average CPU utilization? (target: 50-70%)
 - What's average memory utilization? (target: 60-80%)
 - Are there consistent under-utilized nodes?
@@ -651,6 +690,7 @@ kubectl top pods -A >> pod-usage.log
 #### Step 3: Adjust
 
 **If under-utilized (< 50% CPU):**
+
 ```hcl
 # Reduce node count or downsize instances
 node_groups = {
@@ -662,6 +702,7 @@ node_groups = {
 ```
 
 **If over-utilized (> 80% CPU):**
+
 ```hcl
 # Increase node count or upsize instances
 node_groups = {
@@ -673,6 +714,7 @@ node_groups = {
 ```
 
 **If memory-constrained:**
+
 ```hcl
 # Switch to memory-optimized
 node_groups = {
@@ -685,10 +727,12 @@ node_groups = {
 ### Monitoring Tools
 
 **Built-in:**
+
 - `kubectl top` - Basic metrics
 - Cloud provider metrics (CloudWatch, Azure Monitor)
 
 **Advanced:**
+
 - **Prometheus + Grafana** - Industry standard
 - **Datadog** - Commercial APM
 - **New Relic** - Commercial APM
@@ -790,6 +834,7 @@ spec:
 **Problem:** Adding 5 new clients per month
 
 **Solution:**
+
 ```hcl
 # Start with headroom
 node_groups = {
@@ -812,6 +857,7 @@ enable_cluster_autoscaler = true
 **Problem:** 20 small clients + 3 large clients
 
 **Solution:** Multiple node pools
+
 ```hcl
 node_groups = {
   # Small clients (default)
@@ -845,7 +891,9 @@ node_groups = {
 **Problem:** Need to cut costs by 30%
 
 **Solutions:**
+
 1. **Use Spot Instances** (60-70% savings)
+
    ```hcl
    capacity_type = "SPOT"  # AWS
    ```
@@ -855,6 +903,7 @@ node_groups = {
    - Downsize if < 50% utilized
 
 3. **Reduce minimum node count**
+
    ```hcl
    min_size = 2  # Down from 3 (accept brief unavailability)
    ```
@@ -867,17 +916,21 @@ node_groups = {
 **Problem:** Users complaining about slow response
 
 **Solutions:**
+
 1. **Increase node sizes**
+
    ```hcl
    instance_types = ["m6i.4xlarge"]  # Up from 2xlarge
    ```
 
 2. **Increase minimum nodes**
+
    ```hcl
    min_size = 8  # Higher floor, always capacity
    ```
 
 3. **Use performance-optimized instances**
+
    ```hcl
    instance_types = ["c6i.2xlarge"]  # Compute-optimized
    ```
@@ -893,6 +946,7 @@ node_groups = {
 Before finalizing cluster size:
 
 ### Capacity Planning
+
 - [ ] Calculated per-client resources (CPU, memory)
 - [ ] Added shared infrastructure overhead
 - [ ] Included 20% buffer for spikes
@@ -900,6 +954,7 @@ Before finalizing cluster size:
 - [ ] Planned for growth (max_size > current need)
 
 ### Cost Optimization
+
 - [ ] Compared instance type options
 - [ ] Considered spot instances
 - [ ] Enabled cluster autoscaler
@@ -907,19 +962,21 @@ Before finalizing cluster size:
 - [ ] Planned for reserved instances (long-term)
 
 ### High Availability
+
 - [ ] Minimum 3 nodes configured
 - [ ] Multiple availability zones
 - [ ] Node anti-affinity for critical pods
 - [ ] Appropriate resource quotas per namespace
 
 ### Security & Isolation
+
 - [ ] ResourceQuotas defined per namespace
 - [ ] NetworkPolicies configured
 - [ ] PodSecurityPolicies/Standards applied
 - [ ] Separate node pools for workload isolation (if needed)
 
-
 ### Monitoring Setup
+
 - [ ] Metrics server installed
 - [ ] CloudWatch/Azure Monitor/Cloud Monitoring configured
 - [ ] Alerts configured for high utilization
@@ -937,10 +994,10 @@ Before finalizing cluster size:
 
 ### External Resources
 
-- **Kubernetes Resource Management**: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
-- **AWS EKS Best Practices**: https://aws.github.io/aws-eks-best-practices/
-- **Azure AKS Best Practices**: https://learn.microsoft.com/en-us/azure/aks/best-practices
-- **GCP GKE Best Practices**: https://cloud.google.com/kubernetes-engine/docs/best-practices
+- **Kubernetes Resource Management**: <https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/>
+- **AWS EKS Best Practices**: <https://aws.github.io/aws-eks-best-practices/>
+- **Azure AKS Best Practices**: <https://learn.microsoft.com/en-us/azure/aks/best-practices>
+- **GCP GKE Best Practices**: <https://cloud.google.com/kubernetes-engine/docs/best-practices>
 
 ---
 
@@ -955,6 +1012,7 @@ Before finalizing cluster size:
 5. **Monitor & Adjust**: Review monthly, right-size quarterly
 
 **Formula to Remember:**
+
 ```
 Total CPU = (Clients × 2 vCPU) + 5 vCPU (overhead) × 1.2 (buffer)
 Total Memory = (Clients × 7.5Gi) + 10Gi (overhead) × 1.2 (buffer)
@@ -963,6 +1021,7 @@ Nodes = Total CPU / Instance vCPU (round up)
 ```
 
 **Example for 10 clients:**
+
 ```
 CPU = (10 × 2) + 5 = 25 × 1.2 = 30 vCPU
 Memory = (10 × 7.5) + 10 = 85 × 1.2 = 102Gi
