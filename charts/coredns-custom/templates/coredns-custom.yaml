@@ -15,3 +15,12 @@ data:
   cadence-relay-hairpin.override: |
     rewrite name exact cadence-relay.preprod.localfirsthealth.com cadence-relay.mycure-preprod.svc.cluster.local
     rewrite name exact cadence-relay.localfirsthealth.com cadence-relay.mycure-production.svc.cluster.local
+    # Preprod is tailnet-only: public DNS resolves *.preprod to the tailnet
+    # gateway's 100.x IP, which pods (not tailnet members) can't reach. Resolve
+    # in-cluster to the tailnet gateway's ClusterIP Service instead — it serves
+    # the same listeners/certs, so https URLs (cadence -> hapihub auth/JWKS)
+    # keep working. Exact relay rewrite above must stay first.
+    rewrite stop {
+      name regex (.*)\.preprod\.localfirsthealth\.com nginx-tailnet-gateway-nginx.nginx-gateway-system.svc.cluster.local
+      answer auto
+    }
