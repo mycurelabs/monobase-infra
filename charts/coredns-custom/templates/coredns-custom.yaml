@@ -1,11 +1,7 @@
 # DOKS CoreDNS override hook (kube-system/coredns-custom): DigitalOcean's managed
 # CoreDNS imports *.override files from this ConfigMap into the server block.
-#
-# Hairpin rewrites for the cadence-relay hostnames: in-cluster clients (the cadence
-# anchor's relay_url, hapihub) cannot reach a DO LoadBalancer IP from inside the
-# cluster (no hairpin), so the public relay hostnames resolve in-cluster to the
-# relay Services directly. Keep one rewrite per env that runs cadence-relay; they
-# target Services (not LB IPs), so LB changes never touch this.
+# Rewrites are values-driven (charts/coredns-custom/values.yaml) — see the
+# exactRewrites / regexRewrites comments there for the hairpin rationale.
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -13,14 +9,12 @@ metadata:
   namespace: kube-system
 data:
   cadence-relay-hairpin.override: |
-    rewrite name exact cadence-relay.preprod.localfirsthealth.com cadence-relay.mycure-preprod.svc.cluster.local
-    rewrite name exact cadence-relay.localfirsthealth.com cadence-relay.mycure-production.svc.cluster.local
-    # Preprod is tailnet-only: public DNS resolves *.preprod to the tailnet
-    # gateway's 100.x IP, which pods (not tailnet members) can't reach. Resolve
-    # in-cluster to the tailnet gateway's ClusterIP Service instead — it serves
-    # the same listeners/certs, so https URLs (cadence -> hapihub auth/JWKS)
-    # keep working. Exact relay rewrite above must stay first.
+    {{- range .Values.exactRewrites }}
+    rewrite name exact {{ .from }} {{ .to }}
+    {{- end }}
+    {{- range .Values.regexRewrites }}
     rewrite stop {
-      name regex (.*)\.preprod\.localfirsthealth\.com nginx-internal-gateway-nginx.nginx-gateway-system.svc.cluster.local
+      name regex {{ .pattern }} {{ .to }}
       answer auto
     }
+    {{- end }}
