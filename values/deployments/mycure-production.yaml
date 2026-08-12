@@ -52,7 +52,11 @@ hapihub:
   image:
     tag: "11.20.97" # NEVER deploy 11.20.62 (mid-response abort/502 storm) or 11.20.44 (stale binary)
   cache:
-    enabled: false
+    # Re-enabled after the durable serve-stale fix (mono #2866, in 11.20.97):
+    # bentocache grace:30m + graceBackoff:10s + soft timeout:1s flips the
+    # single-hot-key stampede that wedged prod twice (#2839, #2617) into
+    # serve-stale-fast. Was disabled as the interim mitigation in #179.
+    enabled: true
 
   # Daily cleanup of expired Better Auth sessions (they never self-delete).
   replicaCount: 3
