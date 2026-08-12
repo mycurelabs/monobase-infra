@@ -13,10 +13,13 @@ name: security-cspm
 # nor Prowler (cloud) supports SARIF — it's a local-files-only mode in both. To
 # surface findings in the Security tab later, add a JSON/OCSF→SARIF conversion.
 #
+# Scanners: Kubescape (DOKS cluster) + Prowler (GCP). ScoutSuite/DigitalOcean was
+# removed — its `do` provider isn't actually shipped upstream (see the note below).
+#
 # Required secrets (add per scanner to activate it; all READ-ONLY):
 #   CSPM_KUBECONFIG        base64 of a read-only kubeconfig for the DOKS cluster
-#   DIGITALOCEAN_TOKEN     read-only DigitalOcean personal access token
 #   GCP_SA_KEY             JSON key of a read-only GCP SA (viewer + securityReviewer)
+#   DIGITALOCEAN_TOKEN     kept for a future DO scan (currently unused — see note)
 # AWS/Azure Prowler not wired — no live accounts (modules only).
 
 on:
@@ -83,54 +86,14 @@ jobs:
           name: kubescape-report
           path: kubescape.json
 
-  scoutsuite-do:
-    name: scoutsuite (DigitalOcean account)
-    runs-on: ubuntu-latest
-    env:
-      DIGITALOCEAN_TOKEN: ${{ secrets.DIGITALOCEAN_TOKEN }}
-    steps:
-      - name: Preflight — skip if no DO token
-        id: pre
-        run: |
-          if [ -z "$DIGITALOCEAN_TOKEN" ]; then
-            echo "::notice::DIGITALOCEAN_TOKEN not set — skipping ScoutSuite DO scan"
-            echo "run=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "run=true" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Setup Python
-        if: steps.pre.outputs.run == 'true'
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-
-      - name: Install ScoutSuite (from git — PyPI 5.14.0 ships the `do` CLI
-          choice but not the providers.do module; the code only exists upstream)
-        if: steps.pre.outputs.run == 'true'
-        run: pip install "git+https://github.com/nccgroup/ScoutSuite.git@master"
-          # ponytail: tracks master. If upstream breaks the DO provider, pin a
-          # known-good commit here instead of @master.
-
-      - name: Scan DigitalOcean (provider `do`, token flag is `--token`)
-        if: steps.pre.outputs.run == 'true'
-        run: scout do --token "$DIGITALOCEAN_TOKEN" --no-browser --report-dir ./scout-report || true
-
-      - name: Assert output produced (loud on silent failure)
-        if: steps.pre.outputs.run == 'true'
-        run: |
-          if [ -z "$(ls -A scout-report 2>/dev/null)" ]; then
-            echo "::error::ScoutSuite produced no report — invocation/auth failure, see the scan log"
-            exit 1
-          fi
-          echo "::notice::ScoutSuite DigitalOcean report written"
-
-      - name: Upload report
-        if: steps.pre.outputs.run == 'true'
-        uses: actions/upload-artifact@v4
-        with:
-          name: scoutsuite-digitalocean-report
-          path: scout-report
+  # ScoutSuite DigitalOcean scan REMOVED — not viable upstream. The `do` provider
+  # is advertised in the ScoutSuite CLI (choices include `do`) and the 5.14.0
+  # release notes, but `ScoutSuite.providers.do` is absent from BOTH the PyPI
+  # 5.14.0 wheel AND nccgroup/ScoutSuite@master (ModuleNotFoundError at auth). The
+  # code only lives in a personal fork (asifwani/ScoutSuite-DigitalOcean), which
+  # isn't acceptable as a prod CI dependency. DO account posture is deferred;
+  # revisit if the provider lands upstream, or use DO's native CSPM (paid, GA
+  # 2026-03). The DIGITALOCEAN_TOKEN secret is left in place for that day.
 
   prowler-gcp:
     name: prowler (GCP posture)
