@@ -388,7 +388,7 @@ cadence:
   rustLog: "cadence=info,cadence_routing=debug,warn"
   image:
     repository: ghcr.io/mycurelabs/cadence
-    tag: "2.1.82" # 2.1.75-82: baseline-fast (bulk stamp/ANALYZE/reltuples-probe/busy-defer/reserve-before-sign/payload-waves) + baseline-lane no-broadcast + #3282 sparse-leaf window + serve-stream generous read plane on single-PG boxes (the fat-history serve-timeout stall fix, mono#3298). Preprod-verified fleet-wide incl. bidirectional nueve sync. Wire-compatible with ≥2.1.68 boxes (phase-4 ack) — fleet latest.json moves to 2.1.82 in the same window
+    tag: "2.1.83" # #3318: hub binary on jemalloc (background purge) — the prod hub 2.1.82 OOM-crashlooped (137@6Gi, 26-min linear RSS ramp) because the default glibc malloc hoards freed per-round reconcile working sets in per-thread arenas under the fleet-wide heavy catch-up #3282 unlocked. Not a leak; jemalloc returns freed pages to the OS so RSS tracks the live set. Hub-only (binary #[global_allocator]); no wire change, wire-compatible with the 2.1.82 fleet. Preprod smoke-verified (mono#3319, infra#335). 2.1.75-82 lineage: baseline-fast + baseline-lane no-broadcast + #3282 sparse-leaf window + serve-stream generous read plane (mono#3298)
     pullPolicy: Always # relay cutover; also avoids stale node cache from any reused tag
   udpPort: 6472
   # Shared-gateway LB IP (nginx-public-gateway, UDPRoute path — prod keeps canonical port
