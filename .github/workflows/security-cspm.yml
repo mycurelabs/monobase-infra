@@ -4,19 +4,20 @@ name: security-cspm
 # Complements, does not duplicate: Falco owns runtime, Trivy config (security.yml)
 # owns static IaC. This scans LIVE posture — the running cluster + cloud accounts.
 #
-# Report-only: every scanner is `continue-on-error` and each job SKIPS cleanly if
-# its credential secret is absent, so the workflow is green until creds are added.
+# Report-only on FINDINGS (a scanner's findings never fail the build), but LOUD on
+# INVOCATION failure: each scan is `|| true` then an assert step `::error::`s and
+# fails if the scanner produced no output — so a broken/mis-authed scanner can't
+# masquerade as a clean green run (the trap the first cut fell into, #334).
 #
-# Required secrets (add per scanner to activate it; all should be READ-ONLY):
+# Output is ARTIFACTS, not code-scanning SARIF: neither Kubescape (live cluster)
+# nor Prowler (cloud) supports SARIF — it's a local-files-only mode in both. To
+# surface findings in the Security tab later, add a JSON/OCSF→SARIF conversion.
+#
+# Required secrets (add per scanner to activate it; all READ-ONLY):
 #   CSPM_KUBECONFIG        base64 of a read-only kubeconfig for the DOKS cluster
-#                          (scoped SA, e.g. `view` ClusterRole) — Kubescape
-#   DIGITALOCEAN_TOKEN     read-only DigitalOcean personal access token — ScoutSuite
-#   GCP_SA_KEY             JSON key of a read-only GCP SA (roles/viewer +
-#                          securityReviewer) — Prowler (GCP project holds our
-#                          Secret Manager + GCS buckets)
-#
-# Not wired: Prowler AWS/Azure — no live accounts (modules only). Add a job when
-# one goes live.
+#   DIGITALOCEAN_TOKEN     read-only DigitalOcean personal access token
+#   GCP_SA_KEY             JSON key of a read-only GCP SA (viewer + securityReviewer)
+# AWS/Azure Prowler not wired — no live accounts (modules only).
 
 on:
   schedule:
@@ -25,7 +26,6 @@ on:
 
 permissions:
   contents: read
-  security-events: write # SARIF upload to code scanning
 
 concurrency:
   group: cspm
@@ -59,28 +59,28 @@ jobs:
         if: steps.pre.outputs.run == 'true'
         run: curl -sSL https://raw.githubusercontent.com/kubescape/kubescape/master/install.sh | /bin/bash
 
-      - name: Scan cluster (SARIF)
+      - name: Scan cluster (JSON — sarif is local-files-only)
         if: steps.pre.outputs.run == 'true'
-        continue-on-error: true
         run: |
           export PATH="$PATH:$HOME/.kubescape/bin:/usr/local/bin"
           kubescape scan framework nsa,cis-v1.10,mitre \
-            --format sarif --output kubescape.sarif --format-version v2 || true
+            --format json --output kubescape.json || true
 
-      - name: Upload SARIF to code scanning
-        if: steps.pre.outputs.run == 'true' && hashFiles('kubescape.sarif') != ''
-        continue-on-error: true
-        uses: github/codeql-action/upload-sarif@v3
-        with:
-          sarif_file: kubescape.sarif
-          category: kubescape
+      - name: Assert output produced (loud on silent failure)
+        if: steps.pre.outputs.run == 'true'
+        run: |
+          if [ ! -s kubescape.json ]; then
+            echo "::error::Kubescape produced no output — invocation/auth failure, see the scan log"
+            exit 1
+          fi
+          echo "::notice::Kubescape report written ($(wc -c < kubescape.json) bytes)"
 
-      - name: Artifact backup
-        if: steps.pre.outputs.run == 'true' && hashFiles('kubescape.sarif') != ''
+      - name: Upload report
+        if: steps.pre.outputs.run == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: kubescape-sarif
-          path: kubescape.sarif
+          name: kubescape-report
+          path: kubescape.json
 
   scoutsuite-do:
     name: scoutsuite (DigitalOcean account)
@@ -108,13 +108,21 @@ jobs:
         if: steps.pre.outputs.run == 'true'
         run: pip install scoutsuite # DigitalOcean provider since 5.14.0
 
-      - name: Scan DigitalOcean (HTML/JSON report)
+      - name: Scan DigitalOcean (provider is `do`, not `digitalocean`)
         if: steps.pre.outputs.run == 'true'
-        continue-on-error: true
-        run: scout digitalocean --access-token "$DIGITALOCEAN_TOKEN" --no-browser --report-dir ./scout-report || true
+        run: scout do --access-token "$DIGITALOCEAN_TOKEN" --no-browser --report-dir ./scout-report || true
 
-      - name: Artifact (ScoutSuite has no SARIF — HTML report)
-        if: steps.pre.outputs.run == 'true' && hashFiles('scout-report/**') != ''
+      - name: Assert output produced (loud on silent failure)
+        if: steps.pre.outputs.run == 'true'
+        run: |
+          if [ -z "$(ls -A scout-report 2>/dev/null)" ]; then
+            echo "::error::ScoutSuite produced no report — invocation/auth failure, see the scan log"
+            exit 1
+          fi
+          echo "::notice::ScoutSuite DigitalOcean report written"
+
+      - name: Upload report
+        if: steps.pre.outputs.run == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: scoutsuite-digitalocean-report
@@ -153,21 +161,21 @@ jobs:
         if: steps.pre.outputs.run == 'true'
         run: pip install prowler
 
-      - name: Scan GCP (SARIF)
+      - name: Scan GCP (sarif is iac-provider-only → csv/json-ocsf/html)
         if: steps.pre.outputs.run == 'true'
-        continue-on-error: true
-        run: prowler gcp --credentials-file "$GCP_CREDS" -M sarif html -o prowler-out || true
+        run: prowler gcp --credentials-file "$GCP_CREDS" -M csv json-ocsf html -o prowler-out || true
 
-      - name: Upload SARIF to code scanning
-        if: steps.pre.outputs.run == 'true' && hashFiles('prowler-out/*.sarif') != ''
-        continue-on-error: true
-        uses: github/codeql-action/upload-sarif@v3
-        with:
-          sarif_file: prowler-out
-          category: prowler-gcp
+      - name: Assert output produced (loud on silent failure)
+        if: steps.pre.outputs.run == 'true'
+        run: |
+          if [ -z "$(ls -A prowler-out 2>/dev/null)" ]; then
+            echo "::error::Prowler produced no output — invocation/auth failure, see the scan log"
+            exit 1
+          fi
+          echo "::notice::Prowler GCP report written"
 
-      - name: Artifact backup
-        if: steps.pre.outputs.run == 'true' && hashFiles('prowler-out/**') != ''
+      - name: Upload report
+        if: steps.pre.outputs.run == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: prowler-gcp-report
