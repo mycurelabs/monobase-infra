@@ -460,7 +460,7 @@ minio-artifacts:
     tag: "2025.7.23-debian-12-r3"
 
   persistence:
-    size: 10Gi
+    size: 20Gi  # was 10Gi — hit 90% (fills in ~4d); do-block-storage expands online
 
   resources:
     requests:
@@ -510,6 +510,16 @@ cadence:
   # Home on the self-hosted relay + advertise it so boxes (maestroapp 2.0.28, our-relay-only) adopt it.
   relayUrl: "https://cadence-relay.localfirsthealth.com"
   nodePool: "prod-apps"
+  # Prod-only bump: the 3Gi chart default OOMKills (exit 137) during prod-scale baseline/reconcile
+  # scans — idle working set is only ~570Mi but full-fleet scans spike past 3Gi. Preprod (1 box) stays
+  # on the 3Gi default. Not a leak; prod scale > preprod scale.
+  resources:
+    requests:
+      cpu: 250m
+      memory: 1Gi
+    limits:
+      cpu: "2"
+      memory: 6Gi
   postgresql:
     serviceName: postgresql-primary
     # Read-plane split: the hub's reconcile/serve scan queries go to the (previously idle)
