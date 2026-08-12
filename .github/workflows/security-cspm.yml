@@ -1,0 +1,174 @@
+name: security-cspm
+
+# Cloud Security Posture Management (CSPM) — SCHEDULED, not PR CI (#320 item 6).
+# Complements, does not duplicate: Falco owns runtime, Trivy config (security.yml)
+# owns static IaC. This scans LIVE posture — the running cluster + cloud accounts.
+#
+# Report-only: every scanner is `continue-on-error` and each job SKIPS cleanly if
+# its credential secret is absent, so the workflow is green until creds are added.
+#
+# Required secrets (add per scanner to activate it; all should be READ-ONLY):
+#   CSPM_KUBECONFIG        base64 of a read-only kubeconfig for the DOKS cluster
+#                          (scoped SA, e.g. `view` ClusterRole) — Kubescape
+#   DIGITALOCEAN_TOKEN     read-only DigitalOcean personal access token — ScoutSuite
+#   GCP_SA_KEY             JSON key of a read-only GCP SA (roles/viewer +
+#                          securityReviewer) — Prowler (GCP project holds our
+#                          Secret Manager + GCS buckets)
+#
+# Not wired: Prowler AWS/Azure — no live accounts (modules only). Add a job when
+# one goes live.
+
+on:
+  schedule:
+    - cron: '0 3 * * 1' # Mondays 03:00 UTC
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  security-events: write # SARIF upload to code scanning
+
+concurrency:
+  group: cspm
+  cancel-in-progress: false
+
+jobs:
+  kubescape:
+    name: kubescape (cluster CIS/NSA/MITRE)
+    runs-on: ubuntu-latest
+    env:
+      KUBECONFIG_B64: ${{ secrets.CSPM_KUBECONFIG }}
+    steps:
+      - name: Preflight — skip if no kubeconfig secret
+        id: pre
+        run: |
+          if [ -z "$KUBECONFIG_B64" ]; then
+            echo "::notice::CSPM_KUBECONFIG not set — skipping Kubescape cluster scan"
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Materialize kubeconfig
+        if: steps.pre.outputs.run == 'true'
+        run: |
+          umask 077
+          echo "$KUBECONFIG_B64" | base64 -d > kubeconfig
+          echo "KUBECONFIG=$PWD/kubeconfig" >> "$GITHUB_ENV"
+
+      - name: Install Kubescape
+        if: steps.pre.outputs.run == 'true'
+        run: curl -sSL https://raw.githubusercontent.com/kubescape/kubescape/master/install.sh | /bin/bash
+
+      - name: Scan cluster (SARIF)
+        if: steps.pre.outputs.run == 'true'
+        continue-on-error: true
+        run: |
+          export PATH="$PATH:$HOME/.kubescape/bin:/usr/local/bin"
+          kubescape scan framework nsa,cis-v1.10,mitre \
+            --format sarif --output kubescape.sarif --format-version v2 || true
+
+      - name: Upload SARIF to code scanning
+        if: steps.pre.outputs.run == 'true' && hashFiles('kubescape.sarif') != ''
+        continue-on-error: true
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: kubescape.sarif
+          category: kubescape
+
+      - name: Artifact backup
+        if: steps.pre.outputs.run == 'true' && hashFiles('kubescape.sarif') != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: kubescape-sarif
+          path: kubescape.sarif
+
+  scoutsuite-do:
+    name: scoutsuite (DigitalOcean account)
+    runs-on: ubuntu-latest
+    env:
+      DIGITALOCEAN_TOKEN: ${{ secrets.DIGITALOCEAN_TOKEN }}
+    steps:
+      - name: Preflight — skip if no DO token
+        id: pre
+        run: |
+          if [ -z "$DIGITALOCEAN_TOKEN" ]; then
+            echo "::notice::DIGITALOCEAN_TOKEN not set — skipping ScoutSuite DO scan"
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Setup Python
+        if: steps.pre.outputs.run == 'true'
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install ScoutSuite
+        if: steps.pre.outputs.run == 'true'
+        run: pip install scoutsuite # DigitalOcean provider since 5.14.0
+
+      - name: Scan DigitalOcean (HTML/JSON report)
+        if: steps.pre.outputs.run == 'true'
+        continue-on-error: true
+        run: scout digitalocean --access-token "$DIGITALOCEAN_TOKEN" --no-browser --report-dir ./scout-report || true
+
+      - name: Artifact (ScoutSuite has no SARIF — HTML report)
+        if: steps.pre.outputs.run == 'true' && hashFiles('scout-report/**') != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: scoutsuite-digitalocean-report
+          path: scout-report
+
+  prowler-gcp:
+    name: prowler (GCP posture)
+    runs-on: ubuntu-latest
+    env:
+      GCP_SA_KEY: ${{ secrets.GCP_SA_KEY }}
+    steps:
+      - name: Preflight — skip if no GCP SA key
+        id: pre
+        run: |
+          if [ -z "$GCP_SA_KEY" ]; then
+            echo "::notice::GCP_SA_KEY not set — skipping Prowler GCP scan"
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Materialize SA key
+        if: steps.pre.outputs.run == 'true'
+        run: |
+          umask 077
+          printf '%s' "$GCP_SA_KEY" > gcp-sa.json
+          echo "GCP_CREDS=$PWD/gcp-sa.json" >> "$GITHUB_ENV"
+
+      - name: Setup Python
+        if: steps.pre.outputs.run == 'true'
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Prowler
+        if: steps.pre.outputs.run == 'true'
+        run: pip install prowler
+
+      - name: Scan GCP (SARIF)
+        if: steps.pre.outputs.run == 'true'
+        continue-on-error: true
+        run: prowler gcp --credentials-file "$GCP_CREDS" -M sarif html -o prowler-out || true
+
+      - name: Upload SARIF to code scanning
+        if: steps.pre.outputs.run == 'true' && hashFiles('prowler-out/*.sarif') != ''
+        continue-on-error: true
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: prowler-out
+          category: prowler-gcp
+
+      - name: Artifact backup
+        if: steps.pre.outputs.run == 'true' && hashFiles('prowler-out/**') != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: prowler-gcp-report
+          path: prowler-out
