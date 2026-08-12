@@ -353,6 +353,16 @@ postgresql:
       max_connections = 300
       # Log statements >=1s (also set via ALTER SYSTEM in postgresql.auto.conf).
       log_min_duration_statement = 1000
+      # Autovacuum throughput: 3 workers @ cost_limit 200 (PG defaults) can't
+      # keep up on this 157GB write-heavy DB — large tables
+      # (medical_records_history ~45GB, cadence_meta ~23GB) were vacuumed once
+      # in 5 days. More workers + 10x cost budget lets autovacuum keep pace;
+      # per-table scale_factor overrides on the worst offenders ship in hapihub
+      # migration 0087. max_workers needs a restart (applied with this block);
+      # cost_limit and naptime are reload-only.
+      autovacuum_max_workers = 6
+      autovacuum_vacuum_cost_limit = 2000
+      autovacuum_naptime = 30s
   readReplicas:
     replicaCount: 1
     # NOTE: the read replica PVC (data-postgresql-read-0) is excluded from Velero
@@ -397,6 +407,12 @@ postgresql:
       # Restart PG to apply.
       max_connections = 300
       log_min_duration_statement = 1000
+      # Autovacuum GUCs kept in lockstep with the primary (inert on a hot
+      # standby — autovacuum doesn't run in recovery — but consistent on
+      # promotion). See primary block for rationale.
+      autovacuum_max_workers = 6
+      autovacuum_vacuum_cost_limit = 2000
+      autovacuum_naptime = 30s
       primary_slot_name = 'pg_read_replica'
       # The replica serves the cadence read plane: long reconcile scans were being
       # canceled by WAL-replay conflicts ("conflict with recovery", 2026-08-07 —
