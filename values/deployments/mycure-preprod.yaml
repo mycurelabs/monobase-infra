@@ -406,6 +406,12 @@ postgresql:
       shared_preload_libraries = 'pgaudit, pg_stat_statements'
       max_connections = 300
       max_slot_wal_keep_size = 20GB
+      # Autovacuum throughput (see prod): default 3 workers @ cost_limit 200
+      # can't keep up with write/purge churn; per-table overrides ship in
+      # hapihub migration 0087. max_workers needs a restart (applied here).
+      autovacuum_max_workers = 6
+      autovacuum_vacuum_cost_limit = 2000
+      autovacuum_naptime = 30s
     persistence:
       size: 215Gi
     resources:
@@ -440,6 +446,11 @@ postgresql:
     extendedConfiguration: |
       shared_preload_libraries = 'pgaudit, pg_stat_statements'
       max_connections = 300
+      # Autovacuum GUCs in lockstep with the primary (inert on a hot standby,
+      # consistent on promotion). See primary block for rationale.
+      autovacuum_max_workers = 6
+      autovacuum_vacuum_cost_limit = 2000
+      autovacuum_naptime = 30s
       primary_slot_name = 'pg_read_replica'
       # Standby-conflict tuning (see prod): reconcile scans must not be canceled
       # by WAL replay; lag is over-reconcile-safe for the sync plane.
