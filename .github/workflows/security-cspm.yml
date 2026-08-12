@@ -105,9 +105,12 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Install ScoutSuite
+      - name: Install ScoutSuite (from git — PyPI 5.14.0 ships the `do` CLI
+          choice but not the providers.do module; the code only exists upstream)
         if: steps.pre.outputs.run == 'true'
-        run: pip install scoutsuite # DigitalOcean provider since 5.14.0
+        run: pip install "git+https://github.com/nccgroup/ScoutSuite.git@master"
+          # ponytail: tracks master. If upstream breaks the DO provider, pin a
+          # known-good commit here instead of @master.
 
       - name: Scan DigitalOcean (provider `do`, token flag is `--token`)
         if: steps.pre.outputs.run == 'true'
