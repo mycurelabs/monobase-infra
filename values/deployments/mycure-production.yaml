@@ -460,7 +460,10 @@ minio-artifacts:
     tag: "2025.7.23-debian-12-r3"
 
   persistence:
-    size: 20Gi  # was 10Gi — hit 90% (fills in ~4d); do-block-storage expands online
+    # 20Gi (was 10Gi): pre-keep-5 backlog hit 90%. Publisher keep-5 now bounds this
+    # to ~2.5Gi (mono #3316), so 20Gi is generous headroom. Kept at 20Gi — a PVC
+    # can't be shrunk in-place, and reclaiming isn't worth a delete+recreate.
+    size: 20Gi
 
   resources:
     requests:

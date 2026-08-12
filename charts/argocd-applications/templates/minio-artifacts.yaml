@@ -72,6 +72,11 @@ spec:
           # flips it to anonymous-download (Tauri updater + browser downloads are
           # unauthenticated GETs — no CORS needed, the Rust updater isn't a browser).
           defaultBuckets: artifacts
+          # Retention is PUBLISHER-SIDE, not bucket ILM: maestroapp publish.ts prunes
+          # to the newest ARTIFACTS_KEEP_RELEASES (=5) version dirs per platform on
+          # every release, protecting latest.json + the pinned live build (mono #3316).
+          # Do NOT add an `mc ilm` lifecycle rule here — it would double-prune and can
+          # delete the very build the publisher deliberately keeps. Steady state ~2.5Gi.
           provisioning:
             enabled: true
             extraCommands:
