@@ -107,6 +107,13 @@ spec:
                     actions:
                       - "s3:PutObject"
                       - "s3:GetObject"
+                      # DeleteObject enables the publisher's keep-last-N prune
+                      # (monobase-mycure#3316) to reclaim old release dirs — the
+                      # store has no versioning/lifecycle so nothing else trims
+                      # them. Marginal blast-radius: PutObject already lets a
+                      # leaked key destroy artifacts by overwrite; delete only
+                      # removes vs clobbers. Still prefix-scoped to maestroapp/.
+                      - "s3:DeleteObject"
             usersExistingSecrets:
               - minio-artifacts-ci
           persistence:
