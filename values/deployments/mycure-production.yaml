@@ -20,6 +20,15 @@ global:
   # The PG primary overrides to prod-db below.
   nodePool: "prod-apps"
 
+# Strict gateway ingress (promoted from the preprod canary, infra#313): drops
+# the baseline's blanket nginx-gateway-system → all-pods allow; every prod
+# workload relies on its own port-scoped gateway rule. Verified pre-flight that
+# all HTTPRoute backends already carry a matching NetworkPolicy (hapihub:7500,
+# app clones:8080, hapihub-docs:8080, minio:9000; cadence/relay own any-source
+# NPs), so this only removes the redundant blanket fallback.
+securityBaseline:
+  strictGatewayIngress: true
+
 mycure-dashboard:
   resources:
     requests:
