@@ -91,9 +91,19 @@ spec:
                     actions:
                       - "s3:ListBucket"
                       - "s3:GetBucketLocation"
+                  # Writes prefix-scoped to maestroapp/ — the only publisher today
+                  # (verified: every object lives under maestroapp/desktop/<target>/…).
+                  # Contains a leaked artifacts-ci key to the app's own prefix so it
+                  # can't host arbitrary content under the trusted artifacts.<domain>.
+                  # Broaden (or add a statement) when a second app publishes here.
+                  # Does NOT stop overwrite-within-maestroapp/ (downgrade/tamper):
+                  # MinIO PutObject can't distinguish create-vs-overwrite, and
+                  # versioning/WORM needs an erasure-coded backend this standalone
+                  # single-drive instance lacks. Install integrity is owned app-side
+                  # by the Tauri Ed25519 artifact signature.
                   - effect: "Allow"
                     resources:
-                      - "arn:aws:s3:::artifacts/*"
+                      - "arn:aws:s3:::artifacts/maestroapp/*"
                     actions:
                       - "s3:PutObject"
                       - "s3:GetObject"
