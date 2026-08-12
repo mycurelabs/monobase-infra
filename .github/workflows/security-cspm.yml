@@ -59,12 +59,13 @@ jobs:
         if: steps.pre.outputs.run == 'true'
         run: curl -sSL https://raw.githubusercontent.com/kubescape/kubescape/master/install.sh | /bin/bash
 
-      - name: Scan cluster (JSON — sarif is local-files-only)
+      - name: Scan cluster (all frameworks; JSON — sarif is local-files-only)
         if: steps.pre.outputs.run == 'true'
         run: |
           export PATH="$PATH:$HOME/.kubescape/bin:/usr/local/bin"
-          kubescape scan framework nsa,cis-v1.10,mitre \
-            --format json --output kubescape.json || true
+          # No `framework <name>` pin — names are version-specific (cis-v1.10
+          # doesn't exist in v4.x). Plain `scan` covers all available frameworks.
+          kubescape scan --format json --output kubescape.json || true
 
       - name: Assert output produced (loud on silent failure)
         if: steps.pre.outputs.run == 'true'
@@ -108,9 +109,9 @@ jobs:
         if: steps.pre.outputs.run == 'true'
         run: pip install scoutsuite # DigitalOcean provider since 5.14.0
 
-      - name: Scan DigitalOcean (provider is `do`, not `digitalocean`)
+      - name: Scan DigitalOcean (provider `do`, token flag is `--token`)
         if: steps.pre.outputs.run == 'true'
-        run: scout do --access-token "$DIGITALOCEAN_TOKEN" --no-browser --report-dir ./scout-report || true
+        run: scout do --token "$DIGITALOCEAN_TOKEN" --no-browser --report-dir ./scout-report || true
 
       - name: Assert output produced (loud on silent failure)
         if: steps.pre.outputs.run == 'true'
