@@ -530,7 +530,7 @@ cadence:
   # on no-progress, tagset-keyed baseline gates, per-scope GC horizon + apply_below_gc_horizon
   # resurrection telemetry, gc/dlq/reroute maintenance-error counters).
   image:
-    tag: "2.1.86" # #3252: keepalive-cover the phase-4 push exact-key fetch (stream.rs changes_for). A fat medical_records_history push chunk exceeded the peer's 90s read_idle before the first frame flushed → round tore down before the dense cursor banked → the live nueve 13.2M push livelock (hub 3.05M vs box 13.2M, applied:0/pushed:2274 repeating). Wrap mirrors the adjacent range fetch. Verify: nueve rounds bank (applied>0 / pushed drops), no "no frame within 90s". Stacked on 2.1.85 (#3369 read-your-writes read-cap fix) — 2.1.86 = #3369 + #3252. (2.1.84 = #3318 responder LeafIds row budget.)
+    tag: "2.1.87" # #3252: keepalive-cover BOTH the phase-4 push fetch (changes_for, 2.1.86) AND the initiator phase-3 recv_apply (mod.rs:608, 2.1.87). Live on 2.1.86 the box SERVE still died "no frame within 90s" mid-round: while the hub applies the box's dense fat-history phase-3 stream (>90s on shared PG) it sent nothing, so the box's phase-4 read tripped read_idle → livelock persisted. 2.1.87 wraps the initiator apply (mirrors serve_scope:966) so all 4 round phases are keepalive-covered. Verify: nueve rounds bank (applied>0 / hub scope climbs 3.15M→13.2M), no "no frame within 90s". Stacked on 2.1.85 (#3369). (2.1.84 = #3318 responder LeafIds row budget.)
   # Never share a node with the PG primary: co-location (both on one 4-core nonprod node,
   # 2026-08-11) cut baseline mint throughput ~3x — hashing and PG execution compete for the
   # same cores. Required (not preferred): on a small pool a silent re-co-location would just
