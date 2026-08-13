@@ -55,6 +55,12 @@ Key tasks: `lint`, `validate`, `check`, `fmt`, `bootstrap`, `provision`, `secret
 - Conventional commits: `feat:`, `fix:`, `chore:`, `docs:`, `refactor:`
 - Never commit secrets, credentials, or `.env` files
 - Fork-based workflow for external contributors
+- **Worktrees live under `.claude/worktrees/<branch>`** (gitignored) — NOT a sibling
+  `../infra-worktrees/`. Branch development never happens in the main checkout (it's
+  shared across concurrent sessions); create the worktree with the `EnterWorktree` tool,
+  or `git worktree add .claude/worktrees/<branch> origin/main`. The main dir stays on
+  `main`. Deploy/values/docs commits straight to `main` from the main dir are fine — the
+  rule is about branch work.
 
 ## Safety Rules
 
