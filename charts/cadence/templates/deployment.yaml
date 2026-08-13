@@ -160,18 +160,26 @@ spec:
           protocol: TCP
         # No startupProbe needed: cadence 2.0.12+ installs triggers (fast DDL) + binds the API BEFORE running
         # the baseline in the background, so /healthz answers immediately even against a large primary DB.
+        # timeoutSeconds/failureThreshold widened: under a fleet-wide cold-reconcile storm the
+        # negotiate work can stall /healthz past the 1s default → 3 strikes → SIGKILL → another
+        # cold storm, and each kill tears down every box's in-flight baseline round (2026-08-13
+        # #3406/#3404 restart loop). 5s×6 tolerates ~90s of stall before killing a truly dead pod.
         livenessProbe:
           httpGet:
             path: /healthz
             port: api
           initialDelaySeconds: 10
           periodSeconds: 15
+          timeoutSeconds: 5
+          failureThreshold: 6
         readinessProbe:
           httpGet:
             path: /readyz
             port: api
           initialDelaySeconds: 5
           periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 6
         volumeMounts:
         - name: config
           mountPath: /etc/cadence
