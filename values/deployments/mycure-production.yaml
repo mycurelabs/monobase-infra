@@ -529,6 +529,13 @@ cadence:
   # Home on the self-hosted relay + advertise it so boxes (maestroapp 2.0.28, our-relay-only) adopt it.
   relayUrl: "https://cadence-relay.localfirsthealth.com"
   nodePool: "prod-apps"
+  # Prod override 2.1.85 → 2.1.86 (#3252 phase-4 keepalive fix, mono#3387): the phase-4 push exact-key
+  # fetch (stream.rs changes_for) was a bare await — a fat medical_records_history chunk blew the peer's
+  # 90s read_idle before the first frame flushed → dense-window livelock. Hardens the exact serve path
+  # the #3339 *_history prune will stress. Not an OOM regression vs 2.1.85 (both carry the 2.1.84 LeafIds
+  # row budget); #3318 (LeafIds live-spike) still open — watch RSS during the prune.
+  image:
+    tag: "2.1.86"
   # Prod-only bump: the 3Gi chart default OOMKills (exit 137) during prod-scale baseline/reconcile
   # scans — idle working set is only ~570Mi but full-fleet scans spike past 3Gi. Preprod (1 box) stays
   # on the 3Gi default. Not a leak; prod scale > preprod scale.
