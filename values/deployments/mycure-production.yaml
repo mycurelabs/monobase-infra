@@ -541,15 +541,20 @@ cadence:
   # frame body incomplete within 90s", transport_close=None). Raise the hub's read-idle to 600s.
   readIdleMs: 600000
   # Prod-only bump: the 3Gi chart default OOMKills (exit 137) during prod-scale baseline/reconcile
-  # scans — idle working set is only ~570Mi but full-fleet scans spike past 3Gi. Preprod (1 box) stays
-  # on the 3Gi default. Not a leak; prod scale > preprod scale.
+  # scans — idle working set is only ~570Mi but full-fleet scans spike far past it. Preprod (1 box)
+  # stays on the 3Gi default. Not a leak; prod scale > preprod scale.
+  # 10Gi (was 6Gi): a mid-drain OOM RESETS all in-flight box reconciles and sets back the fleet-wide
+  # *_history tombstone drain, so headroom is preemptive, not reactive. Pressure peaks as the box-side
+  # CADENCE_SPARSE_STREAM_MAX raise rolls (larger frames → bigger hub read buffers) and read-idle=600s
+  # holds serve connections open longer. Burst ceiling only — requests stay 1Gi; prod-apps nodes are
+  # 16Gi so the burst fits with headroom.
   resources:
     requests:
       cpu: 250m
       memory: 1Gi
     limits:
       cpu: "2"
-      memory: 6Gi
+      memory: 10Gi
   postgresql:
     serviceName: postgresql-primary
     # Read-plane split: the hub's reconcile/serve scan queries go to the (previously idle)
