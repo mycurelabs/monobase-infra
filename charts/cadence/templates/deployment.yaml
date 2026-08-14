@@ -163,6 +163,14 @@ spec:
         - name: CADENCE_SERVE_LEAFIDS_GLOBAL_BUDGET
           value: {{ . | quote }}
         {{- end }}
+        {{- with .Values.maxConcurrentServes }}
+        # Cap on concurrent catch-up serves. The row-COUNT budget above bounds LeafIds per serve but NOT
+        # the summed live payload BYTES across many simultaneous serves — ~100 concurrent fat *_history
+        # to_jsonb serves spike the live-set past 10Gi and OOM. Capping concurrency bounds the concurrent
+        # payload deterministically (boxes queue instead of OOM-resetting the fleet).
+        - name: CADENCE_MAX_CONCURRENT_SERVES
+          value: {{ . | quote }}
+        {{- end }}
         ports:
         - name: quic
           containerPort: {{ .Values.udpPort }}

@@ -26,6 +26,11 @@ readIdleMs: ""
 # and OOM the hub. Set (e.g. "150000") to downgrade the uncapped delta to windowed Leaf = bounded.
 leafidsGlobalBudget: ""
 
+# Cap on concurrent catch-up serves. Empty ⇒ engine default (high). The LeafIds budget bounds rows per
+# serve but not summed live payload BYTES across simultaneous serves; set low (e.g. "8") to bound the
+# concurrent fat-*_history payload and prevent a live-set OOM (boxes queue instead of OOM-resetting).
+maxConcurrentServes: ""
+
 # Override the MAIN container's args. Default (empty) = the stock sync engine
 # (`run --config /etc/cadence/cadence.yaml`). Setting this ALSO skips the `enroll` initContainer --
 # custom args mean the pod is not running the stock engine (e.g. the cadence-net `-net` pressure

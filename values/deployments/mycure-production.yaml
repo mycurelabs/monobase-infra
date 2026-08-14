@@ -545,21 +545,26 @@ cadence:
   # rolls back to a pre-2.1.96 tag whose default is 1M (which OOMed the hub at 10Gi on 2026-08-14). 150k
   # downgrades the uncapped LeafIds-delta to windowed Leaf = bounded materialization regardless of box push.
   leafidsGlobalBudget: 150000
+  # Concurrency cap: the 150k LeafIds budget bounds rows PER serve but NOT summed live payload BYTES across
+  # simultaneous serves — ~100 concurrent fat-mrh to_jsonb serves spiked the live-set to 8.4GB and OOMed
+  # 2.1.96 at 10Gi (13:09Z; jemalloc showed allocated≈resident, i.e. live-set not arena-retention). Cap
+  # to 8 → ~12x less concurrent payload (~700MB) = deterministically under 10Gi (boxes queue, not OOM).
+  # Interim until cadence-coder's global payload-BYTE budget + backpressure ships.
+  maxConcurrentServes: 8
   # Prod-only bump: the 3Gi chart default OOMKills (exit 137) during prod-scale baseline/reconcile
   # scans — idle working set is only ~570Mi but full-fleet scans spike far past it. Preprod (1 box)
   # stays on the 3Gi default. Not a leak; prod scale > preprod scale.
-  # 10Gi (was 6Gi): a mid-drain OOM RESETS all in-flight box reconciles and sets back the fleet-wide
-  # *_history tombstone drain, so headroom is preemptive, not reactive. Pressure peaks as the box-side
-  # CADENCE_SPARSE_STREAM_MAX raise rolls (larger frames → bigger hub read buffers) and read-idle=600s
-  # holds serve connections open longer. Burst ceiling only — requests stay 1Gi; prod-apps nodes are
-  # 16Gi so the burst fits with headroom.
+  # 13Gi (was 10Gi): safety headroom while the concurrency cap takes effect — 10Gi OOMed once under the
+  # ~100-concurrent live-set spike (the cap is the real bound; this is belt-and-suspenders). Burst ceiling
+  # only, requests stay 1Gi; prod-apps nodes are 16Gi so 13Gi fits (tight — do not raise further without
+  # a node right-size).
   resources:
     requests:
       cpu: 250m
       memory: 1Gi
     limits:
       cpu: "2"
-      memory: 10Gi
+      memory: 13Gi
   postgresql:
     serviceName: postgresql-primary
     # Read-plane split: the hub's reconcile/serve scan queries go to the (previously idle)
