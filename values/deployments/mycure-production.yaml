@@ -529,22 +529,21 @@ cadence:
   # Home on the self-hosted relay + advertise it so boxes (maestroapp 2.0.28, our-relay-only) adopt it.
   relayUrl: "https://cadence-relay.localfirsthealth.com"
   nodePool: "prod-apps"
-  # Prod cadence 2.1.96 = 2.1.95 (jemalloc-stats logger) + the durable #3318 payload-OOM fix: promotes the
-  # 150k GLOBAL cross-serve LeafIds resident budget (proven under load) to the in-code DEFAULT and adds a
-  # compile-guard against re-raise. Behavior-preserving vs the 2.1.95+env-150k state (same effective
-  # budget). Also carries the #3252 phase-4 keepalive + the 2.1.84 per-batch budget. Closes the payload-OOM
-  # class. sha256:1a5dd86e8cb473d77bbda9f5efa7e05a1bfaf40ce48451ff2953314545ffb296
+  # Prod cadence 2.1.97: adds the global payload-BYTE budget (#3468) — bounds summed live serve payload to
+  # 2GB regardless of stream count or lifetime. This is the durable close of the payload-OOM class: 2.1.96's
+  # 150k LeafIds budget bounds row COUNT (#3467) but NOT the summed BYTES across ~100 concurrent keepalive-
+  # wrapped sparse serves, which ramped the live-set to 8.4GB and OOMed 2.1.96 at 10Gi (13:09Z). With the
+  # BYTE budget, allocated/resident PLATEAU ≤~2GB under that same load. Carries the 150k COUNT default +
+  # #3252 phase-4 keepalive. sha256:0b8d2da9fd28b7dbfc4bd50f5c6dcc0e7ab247c6c185adb4781683a4144298f6
   image:
-    tag: "2.1.96"
-  # Read-idle governs how long a catch-up serve stream stays alive on an idle read. 600s let ~100
-  # UNBOUNDED sparse phase-4 streams live 9.2min and pile up, each holding fat mrh to_jsonb chunks →
-  # 8.4GB live-set → OOM (13:09Z). Back to the 90s default so idle sparse streams die ~6.7x faster → far
-  # fewer concurrent → payload bounded (~1.4GB). (MAX_CONCURRENT_SERVES gates DENSE serves only — the
-  # permit releases the instant a verdict comes back SPARSE, so it does NOT bound these sparse streams;
-  # read-idle lifetime is the real lever.) The 600s throughput benefit is not realized while boxes are
-  # livelocked on the 2-level fp tree (can't converge until the #3404/#3406 deeper-tree fix), so the drop
-  # costs nothing now. Restore toward 600s once that ships.
-  readIdleMs: 90000
+    tag: "2.1.97"
+  # Read-idle: how long a catch-up serve stream stays alive on an idle read. 600s keeps the hub from
+  # killing serves on slow single large frame bodies (keepalives bridge inter-frame idle, not intra-frame).
+  # Safe at 600s as of 2.1.97: the payload-BYTE budget bounds concurrent live payload to 2GB regardless of
+  # stream lifetime, so long-lived streams no longer pile up into a live-set OOM (the reason it was briefly
+  # dropped to 90s during the 2.1.96 OOM-loop). 600s is wanted for the drain + the #3404/#3406 deeper-tree
+  # convergence.
+  readIdleMs: 600000
   # LeafIds resident budget. As of 2.1.96 this 150k IS the in-code default (+ compile-guard vs re-raise),
   # so this env is now REDUNDANT — kept explicit to document the value and stay pinned if the image ever
   # rolls back to a pre-2.1.96 tag whose default is 1M (which OOMed the hub at 10Gi on 2026-08-14). 150k
