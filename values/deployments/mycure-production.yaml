@@ -529,23 +529,21 @@ cadence:
   # Home on the self-hosted relay + advertise it so boxes (maestroapp 2.0.28, our-relay-only) adopt it.
   relayUrl: "https://cadence-relay.localfirsthealth.com"
   nodePool: "prod-apps"
-  # Prod cadence 2.1.95 = 2.1.94 (knob-split, behavior-preserving defaults) + a read-only jemalloc-stats
-  # logger (emits allocated/resident/retained/active/mapped every 15s). The diagnostic drives the DURABLE
-  # #3318 OOM fix: reading retained-vs-allocated at a fat-mrh serve crest decides arena-retention vs
-  # live-set. Carries the mono#3438 GLOBAL cross-serve LeafIds resident budget (bounds simultaneous
-  # resident rows; default 1M, overridden to 150k via CADENCE_SERVE_LEAFIDS_GLOBAL_BUDGET below) + the
-  # #3252 phase-4 keepalive + the 2.1.84 per-batch budget. No behavior change beyond the diagnostic.
-  # sha256:c29f382c611a26ff22920904e20c8da562dbdc228ef3ccca1adb82e5a32949d5
+  # Prod cadence 2.1.96 = 2.1.95 (jemalloc-stats logger) + the durable #3318 payload-OOM fix: promotes the
+  # 150k GLOBAL cross-serve LeafIds resident budget (proven under load) to the in-code DEFAULT and adds a
+  # compile-guard against re-raise. Behavior-preserving vs the 2.1.95+env-150k state (same effective
+  # budget). Also carries the #3252 phase-4 keepalive + the 2.1.84 per-batch budget. Closes the payload-OOM
+  # class. sha256:1a5dd86e8cb473d77bbda9f5efa7e05a1bfaf40ce48451ff2953314545ffb296
   image:
-    tag: "2.1.95"
+    tag: "2.1.96"
   # The hub reads boxes' push frames too, but the 2.1.91 read-idle lever was set on BOXES only — the hub
   # still defaulted to 90s and killed serves on slow single large frame bodies ("catch-up read stalled:
   # frame body incomplete within 90s", transport_close=None). Raise the hub's read-idle to 600s.
   readIdleMs: 600000
-  # Interim OOM bound: the default 1M budget caps LeafIds row COUNT not payload BYTES, so an uncapped
-  # LeafIds-delta fetch materialized 433k fat-mrh to_jsonb rows concurrently and OOMKilled the hub at
-  # 10Gi (11:53Z). 150k downgrades the uncapped delta to windowed Leaf = bounded materialization
-  # regardless of box push size. (cadence-coder is building the proper global payload-BYTE budget.)
+  # LeafIds resident budget. As of 2.1.96 this 150k IS the in-code default (+ compile-guard vs re-raise),
+  # so this env is now REDUNDANT — kept explicit to document the value and stay pinned if the image ever
+  # rolls back to a pre-2.1.96 tag whose default is 1M (which OOMed the hub at 10Gi on 2026-08-14). 150k
+  # downgrades the uncapped LeafIds-delta to windowed Leaf = bounded materialization regardless of box push.
   leafidsGlobalBudget: 150000
   # Prod-only bump: the 3Gi chart default OOMKills (exit 137) during prod-scale baseline/reconcile
   # scans — idle working set is only ~570Mi but full-fleet scans spike far past it. Preprod (1 box)
