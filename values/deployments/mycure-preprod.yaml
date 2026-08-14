@@ -53,7 +53,10 @@ mycure-pxp:
 
 hapihub:
   image:
-    tag: "11.20.99" # pin to 11.20.85 if the box↔hub reconcile test needs the box's bundled hapihub schema (cadence schema_hash guard)
+    tag: "11.20.100" # PREPROD-ONLY branch build (feat/2992-device-grant @ b09566bb7, unreleased): RFC 8628
+    # device authorization grant for cadence onboarding (#2992). Version-bumped off main solely so the branch
+    # build does not overwrite prod's 11.20.99 tag in place. Revert to a released tag once #3426 merges.
+    # pin to 11.20.85 if the box↔hub reconcile test needs the box's bundled hapihub schema (cadence schema_hash guard)
   cache:
     enabled: true
 
@@ -109,6 +112,14 @@ hapihub:
     # configured api URL (no separate hub/fleet onboarding field). Re-domained hub (#2727).
   - name: CADENCE_ISSUER_SEED_URL
     value: "https://cadence.preprod.localfirsthealth.com"
+    # RFC 8628 device grant (#2992). FAIL-CLOSED and silent: with this unset the AS treats the device grant
+    # as disabled — it omits `device_authorization_endpoint` from the AS metadata and 404s the device
+    # endpoints, so a deploy looks perfectly clean while the feature never turns on. Points at the mycure SPA
+    # approval page (mycure >= 10.25.118). Verify after rollout:
+    #   curl -s https://hapihub.preprod.localfirsthealth.com/.well-known/oauth-authorization-server | jq
+    # CADENCE_ISSUER_DEVICE_CODE_TTL (900s) and _POLL_INTERVAL (5s) are left at their schema defaults.
+  - name: CADENCE_ISSUER_DEVICE_VERIFICATION_URI
+    value: "https://mycure.preprod.localfirsthealth.com/oauth/device"
 
   autoscaling:
     enabled: false
@@ -178,7 +189,11 @@ hapihub:
     serviceName: postgresql-primary
 mycure:
   image:
-    tag: "10.25.112" # feat/cadence: /oauth/authorize consent page for cadence box onboarding (#2727)
+    tag: "10.25.118" # PREPROD-ONLY branch build (feat/2992-device-grant @ b09566bb7, unreleased): adds the
+    # /oauth/device approval page the AS points users at (#2992). Version-bumped off main solely so the branch
+    # build does not overwrite prod's 10.25.117 tag in place. Revert to a released tag once #3426 merges.
+    # NOTE: also carries 10.25.113-.117 (preprod was behind prod, which already runs .117).
+    # (was 10.25.112 — feat/cadence: /oauth/authorize consent page for cadence box onboarding (#2727))
   resources:
     requests:
       cpu: 50m
