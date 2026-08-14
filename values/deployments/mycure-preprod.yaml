@@ -53,9 +53,10 @@ mycure-pxp:
 
 hapihub:
   image:
-    tag: "11.20.100" # PREPROD-ONLY branch build (feat/2992-device-grant @ b09566bb7, unreleased): RFC 8628
-    # device authorization grant for cadence onboarding (#2992). Version-bumped off main solely so the branch
-    # build does not overwrite prod's 11.20.99 tag in place. Revert to a released tag once #3426 merges.
+    tag: "11.20.101" # released off main @ 4e1104544: RFC 8628 device authorization grant for cadence
+    # onboarding (#2992, PR #3426 merged as d7d535fcf). Supersedes the pre-merge branch build 11.20.100,
+    # which predated three on-device fixes (onboarding copy, user_code format vs the anti-phishing check,
+    # SW serving a stale bundle to /oauth/*) and the rebase onto main (#3403 read-authz sweep).
     # pin to 11.20.85 if the box↔hub reconcile test needs the box's bundled hapihub schema (cadence schema_hash guard)
   cache:
     enabled: true
@@ -189,11 +190,11 @@ hapihub:
     serviceName: postgresql-primary
 mycure:
   image:
-    tag: "10.25.118" # PREPROD-ONLY branch build (feat/2992-device-grant @ b09566bb7, unreleased): adds the
-    # /oauth/device approval page the AS points users at (#2992). Version-bumped off main solely so the branch
-    # build does not overwrite prod's 10.25.117 tag in place. Revert to a released tag once #3426 merges.
-    # NOTE: also carries 10.25.113-.117 (preprod was behind prod, which already runs .117).
-    # (was 10.25.112 — feat/cadence: /oauth/authorize consent page for cadence box onboarding (#2727))
+    tag: "10.25.119" # released off main @ 4e1104544: the /oauth/device approval page the AS points users at
+    # (#2992, PR #3426 merged as d7d535fcf). Supersedes the pre-merge branch build 10.25.118 — carries the
+    # on-device fixes to the onboarding copy, the user_code format the anti-phishing check depends on, and
+    # the PWA service worker that was serving a stale bundle to /oauth/*.
+    # NOTE: preprod was behind prod (10.25.112 vs .117) before #2992, so this also carries 10.25.113-.117.
   resources:
     requests:
       cpu: 50m
