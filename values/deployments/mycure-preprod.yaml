@@ -53,7 +53,7 @@ mycure-pxp:
 
 hapihub:
   image:
-    tag: "11.20.99-3403.1" # TEMP: #3403 read-authz branch for preprod e2e validation (revert to 11.20.99 after)
+    tag: "11.20.99" # pin to 11.20.85 if the box↔hub reconcile test needs the box's bundled hapihub schema (cadence schema_hash guard)
   cache:
     enabled: true
 
@@ -87,7 +87,7 @@ hapihub:
     EMBED_MODEL: "bge-m3"  # bge-m3 is what Ollama serves for embeddings (NOT nomic-embed-text)
   env:
   - name: BETTER_AUTH_RATE_LIMIT_ENABLED
-    value: "false"
+    value: "true"
   - name: BETTER_AUTH_RATE_LIMIT_WINDOW
     value: "60"
   - name: BETTER_AUTH_RATE_LIMIT_MAX
