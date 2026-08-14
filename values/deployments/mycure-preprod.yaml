@@ -547,6 +547,16 @@ cadence:
   # resurrection telemetry, gc/dlq/reroute maintenance-error counters).
   image:
     tag: "2.1.90" # DIAGNOSTIC on the fix: 2.1.89 (bounded dense push + keepalive) + per-phase BEGIN/END markers, to pin the RESIDUAL nueve stall (schema now prod-aligned, gate passing, yet frozen). Revert to 2.1.89 once pinned.
+    # DO NOT read #3252 as the tracking issue for this stall — it is CLOSED/COMPLETED (2026-08-12, "Validated
+    # NOT-NEEDED on 2.1.82" via PR #3298), yet every preprod build above (2.1.85-2.1.90, all 2026-08-13) is
+    # fix work that POSTDATES the closure, and the stall still reproduces on 2.1.90. Evidence as of 2026-08-14
+    # (iPad onboarding test, mono#2992): the payload transfers COMPLETELY and matches the anchor row-for-row
+    # (org 80,532 / fam 30,948 on both device SQLite and anchor PG), cadence_dirty=0, cadence_dlq=0, yet
+    # cadence_catchup_cursor stays parked mid-collection on medical_records_history and buckets stay 0/64.
+    # So it is the completion/fingerprint phase, NOT "reads time out under PG load" (the original #3252
+    # framing) — either a regression of #3298 or a distinct bug with the same signature. Transport is ruled
+    # out: relay, shared gateway, 6473/UDP path and iPad->anchor gossip/reconcile were all verified working.
+    # Evidence handed to the cadence session; a fresh issue is expected. Update this once it exists.
   # Never share a node with the PG primary: co-location (both on one 4-core nonprod node,
   # 2026-08-11) cut baseline mint throughput ~3x — hashing and PG execution compete for the
   # same cores. Required (not preferred): on a small pool a silent re-co-location would just
