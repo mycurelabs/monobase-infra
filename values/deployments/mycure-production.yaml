@@ -529,13 +529,15 @@ cadence:
   # Home on the self-hosted relay + advertise it so boxes (maestroapp 2.0.28, our-relay-only) adopt it.
   relayUrl: "https://cadence-relay.localfirsthealth.com"
   nodePool: "prod-apps"
-  # Prod cadence 2.1.92 (mono#3438): GLOBAL cross-serve LeafIds resident budget — caps simultaneous
-  # resident rows across the concurrent serves so long (env-tunable READ_IDLE, box-side #3406/#3404)
-  # rounds can no longer stack past 6Gi (closes the #3318 LeafIds live-spike OOM that the raised
-  # read-idle exposed). Carries the #3252 phase-4 keepalive + the 2.1.84 per-batch budget. Default
-  # global budget 1M rows; override via CADENCE_SERVE_LEAFIDS_GLOBAL_BUDGET if RSS still climbs.
+  # Prod cadence 2.1.95 = 2.1.94 (knob-split, behavior-preserving defaults) + a read-only jemalloc-stats
+  # logger (emits allocated/resident/retained/active/mapped every 15s). The diagnostic drives the DURABLE
+  # #3318 OOM fix: reading retained-vs-allocated at a fat-mrh serve crest decides arena-retention vs
+  # live-set. Carries the mono#3438 GLOBAL cross-serve LeafIds resident budget (bounds simultaneous
+  # resident rows; default 1M, overridden to 150k via CADENCE_SERVE_LEAFIDS_GLOBAL_BUDGET below) + the
+  # #3252 phase-4 keepalive + the 2.1.84 per-batch budget. No behavior change beyond the diagnostic.
+  # sha256:c29f382c611a26ff22920904e20c8da562dbdc228ef3ccca1adb82e5a32949d5
   image:
-    tag: "2.1.92"
+    tag: "2.1.95"
   # The hub reads boxes' push frames too, but the 2.1.91 read-idle lever was set on BOXES only — the hub
   # still defaulted to 90s and killed serves on slow single large frame bodies ("catch-up read stalled:
   # frame body incomplete within 90s", transport_close=None). Raise the hub's read-idle to 600s.
