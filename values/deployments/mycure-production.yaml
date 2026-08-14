@@ -538,11 +538,13 @@ cadence:
     tag: "2.1.96"
   # Read-idle governs how long a catch-up serve stream stays alive on an idle read. 600s let ~100
   # UNBOUNDED sparse phase-4 streams live 9.2min and pile up, each holding fat mrh to_jsonb chunks →
-  # 8.4GB live-set → OOM (13:09Z). Lowered to 120s (a hair over the 90s default) so idle sparse streams
-  # die ~5x faster → far fewer concurrent → payload bounded (~1.9GB). The 600s throughput benefit is not
-  # realized while boxes are livelocked on the 2-level fp tree (can't converge until the #3404/#3406
-  # deeper-tree fix), so this costs nothing now. Restore toward 600s once that ships.
-  readIdleMs: 120000
+  # 8.4GB live-set → OOM (13:09Z). Back to the 90s default so idle sparse streams die ~6.7x faster → far
+  # fewer concurrent → payload bounded (~1.4GB). (MAX_CONCURRENT_SERVES gates DENSE serves only — the
+  # permit releases the instant a verdict comes back SPARSE, so it does NOT bound these sparse streams;
+  # read-idle lifetime is the real lever.) The 600s throughput benefit is not realized while boxes are
+  # livelocked on the 2-level fp tree (can't converge until the #3404/#3406 deeper-tree fix), so the drop
+  # costs nothing now. Restore toward 600s once that ships.
+  readIdleMs: 90000
   # LeafIds resident budget. As of 2.1.96 this 150k IS the in-code default (+ compile-guard vs re-raise),
   # so this env is now REDUNDANT — kept explicit to document the value and stay pinned if the image ever
   # rolls back to a pre-2.1.96 tag whose default is 1M (which OOMed the hub at 10Gi on 2026-08-14). 150k
