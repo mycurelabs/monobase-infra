@@ -540,6 +540,11 @@ cadence:
   # still defaulted to 90s and killed serves on slow single large frame bodies ("catch-up read stalled:
   # frame body incomplete within 90s", transport_close=None). Raise the hub's read-idle to 600s.
   readIdleMs: 600000
+  # Interim OOM bound: the default 1M budget caps LeafIds row COUNT not payload BYTES, so an uncapped
+  # LeafIds-delta fetch materialized 433k fat-mrh to_jsonb rows concurrently and OOMKilled the hub at
+  # 10Gi (11:53Z). 150k downgrades the uncapped delta to windowed Leaf = bounded materialization
+  # regardless of box push size. (cadence-coder is building the proper global payload-BYTE budget.)
+  leafidsGlobalBudget: 150000
   # Prod-only bump: the 3Gi chart default OOMKills (exit 137) during prod-scale baseline/reconcile
   # scans — idle working set is only ~570Mi but full-fleet scans spike far past it. Preprod (1 box)
   # stays on the 3Gi default. Not a leak; prod scale > preprod scale.

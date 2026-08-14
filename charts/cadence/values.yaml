@@ -21,6 +21,11 @@ rustLog: "cadence=info,warn"
 # Raise where slow single large frame bodies (fat *_history serves) blow the 90s and get killed.
 readIdleMs: ""
 
+# LeafIds serve budget. Empty ⇒ engine default (1M), which bounds row COUNT not payload BYTES — an
+# uncapped LeafIds-delta fetch can materialize hundreds of thousands of fat *_history to_jsonb rows
+# and OOM the hub. Set (e.g. "150000") to downgrade the uncapped delta to windowed Leaf = bounded.
+leafidsGlobalBudget: ""
+
 # Override the MAIN container's args. Default (empty) = the stock sync engine
 # (`run --config /etc/cadence/cadence.yaml`). Setting this ALSO skips the `enroll` initContainer --
 # custom args mean the pod is not running the stock engine (e.g. the cadence-net `-net` pressure

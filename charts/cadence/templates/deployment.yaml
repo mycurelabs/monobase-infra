@@ -155,6 +155,14 @@ spec:
         - name: CADENCE_READ_IDLE_MS
           value: {{ . | quote }}
         {{- end }}
+        {{- with .Values.leafidsGlobalBudget }}
+        # LeafIds serve budget. The default (1M) bounds row COUNT, not payload BYTES: an uncapped
+        # LeafIds-delta fetch can materialize hundreds of thousands of fat *_history to_jsonb rows
+        # concurrently and OOM the hub. Setting this downgrades the uncapped delta to windowed Leaf
+        # = bounded payload materialization regardless of box push size.
+        - name: CADENCE_SERVE_LEAFIDS_GLOBAL_BUDGET
+          value: {{ . | quote }}
+        {{- end }}
         ports:
         - name: quic
           containerPort: {{ .Values.udpPort }}
