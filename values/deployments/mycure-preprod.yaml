@@ -87,7 +87,7 @@ hapihub:
     EMBED_MODEL: "bge-m3"  # bge-m3 is what Ollama serves for embeddings (NOT nomic-embed-text)
   env:
   - name: BETTER_AUTH_RATE_LIMIT_ENABLED
-    value: "true"
+    value: "false"
   - name: BETTER_AUTH_RATE_LIMIT_WINDOW
     value: "60"
   - name: BETTER_AUTH_RATE_LIMIT_MAX
