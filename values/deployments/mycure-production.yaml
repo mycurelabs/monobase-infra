@@ -536,10 +536,13 @@ cadence:
   # class. sha256:1a5dd86e8cb473d77bbda9f5efa7e05a1bfaf40ce48451ff2953314545ffb296
   image:
     tag: "2.1.96"
-  # The hub reads boxes' push frames too, but the 2.1.91 read-idle lever was set on BOXES only — the hub
-  # still defaulted to 90s and killed serves on slow single large frame bodies ("catch-up read stalled:
-  # frame body incomplete within 90s", transport_close=None). Raise the hub's read-idle to 600s.
-  readIdleMs: 600000
+  # Read-idle governs how long a catch-up serve stream stays alive on an idle read. 600s let ~100
+  # UNBOUNDED sparse phase-4 streams live 9.2min and pile up, each holding fat mrh to_jsonb chunks →
+  # 8.4GB live-set → OOM (13:09Z). Lowered to 120s (a hair over the 90s default) so idle sparse streams
+  # die ~5x faster → far fewer concurrent → payload bounded (~1.9GB). The 600s throughput benefit is not
+  # realized while boxes are livelocked on the 2-level fp tree (can't converge until the #3404/#3406
+  # deeper-tree fix), so this costs nothing now. Restore toward 600s once that ships.
+  readIdleMs: 120000
   # LeafIds resident budget. As of 2.1.96 this 150k IS the in-code default (+ compile-guard vs re-raise),
   # so this env is now REDUNDANT — kept explicit to document the value and stay pinned if the image ever
   # rolls back to a pre-2.1.96 tag whose default is 1M (which OOMed the hub at 10Gi on 2026-08-14). 150k
