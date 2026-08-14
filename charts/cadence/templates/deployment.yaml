@@ -148,6 +148,13 @@ spec:
         - name: CADENCE_API_ADDR
           value: {{ .Values.apiAddr | quote }}
         {{- end }}
+        {{- with .Values.readIdleMs }}
+        # Per-connection read-idle timeout. The hub is also a READER of boxes' push frames; the 90s
+        # default kills serves when a slow single large frame body doesn't complete in time
+        # (keepalives bridge inter-frame idle, not intra-frame). Raise to swallow fat *_history frames.
+        - name: CADENCE_READ_IDLE_MS
+          value: {{ . | quote }}
+        {{- end }}
         ports:
         - name: quic
           containerPort: {{ .Values.udpPort }}

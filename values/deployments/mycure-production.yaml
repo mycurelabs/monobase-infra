@@ -536,6 +536,10 @@ cadence:
   # global budget 1M rows; override via CADENCE_SERVE_LEAFIDS_GLOBAL_BUDGET if RSS still climbs.
   image:
     tag: "2.1.92"
+  # The hub reads boxes' push frames too, but the 2.1.91 read-idle lever was set on BOXES only — the hub
+  # still defaulted to 90s and killed serves on slow single large frame bodies ("catch-up read stalled:
+  # frame body incomplete within 90s", transport_close=None). Raise the hub's read-idle to 600s.
+  readIdleMs: 600000
   # Prod-only bump: the 3Gi chart default OOMKills (exit 137) during prod-scale baseline/reconcile
   # scans — idle working set is only ~570Mi but full-fleet scans spike past 3Gi. Preprod (1 box) stays
   # on the 3Gi default. Not a leak; prod scale > preprod scale.

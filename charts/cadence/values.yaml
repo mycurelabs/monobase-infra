@@ -17,6 +17,10 @@ apiAddr: ""
 # "cadence=info,cadence::routing=debug,warn").
 rustLog: "cadence=info,warn"
 
+# Per-connection read-idle timeout (ms) for the hub's reader side. Empty ⇒ engine default (90s).
+# Raise where slow single large frame bodies (fat *_history serves) blow the 90s and get killed.
+readIdleMs: ""
+
 # Override the MAIN container's args. Default (empty) = the stock sync engine
 # (`run --config /etc/cadence/cadence.yaml`). Setting this ALSO skips the `enroll` initContainer --
 # custom args mean the pod is not running the stock engine (e.g. the cadence-net `-net` pressure
