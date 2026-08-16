@@ -59,7 +59,7 @@ mycure-pxp:
 
 hapihub:
   image:
-    tag: "11.20.99" # NEVER deploy 11.20.62 (mid-response abort/502 storm) or 11.20.44 (stale binary)
+    tag: "11.20.102" # NEVER deploy 11.20.62 (mid-response abort/502 storm) or 11.20.44 (stale binary)
   cache:
     # Response cache OFF in prod — interim mitigation for the single-hot-key
     # bentocache stampede that wedged prod (#179, #2839, #2617). The serve-stale
@@ -251,7 +251,7 @@ hapihubWorker:
 # ===== HEALTHCARE: Frontend Application =====
 mycure:
   image:
-    tag: "10.25.117"
+    tag: "10.25.120"
   resources:
     requests:
       cpu: 10m
