@@ -529,14 +529,17 @@ cadence:
   # Home on the self-hosted relay + advertise it so boxes (maestroapp 2.0.28, our-relay-only) adopt it.
   relayUrl: "https://cadence-relay.localfirsthealth.com"
   nodePool: "prod-apps"
-  # Prod cadence 2.1.97: adds the global payload-BYTE budget (#3468) — bounds summed live serve payload to
-  # 2GB regardless of stream count or lifetime. This is the durable close of the payload-OOM class: 2.1.96's
-  # 150k LeafIds budget bounds row COUNT (#3467) but NOT the summed BYTES across ~100 concurrent keepalive-
-  # wrapped sparse serves, which ramped the live-set to 8.4GB and OOMed 2.1.96 at 10Gi (13:09Z). With the
-  # BYTE budget, allocated/resident PLATEAU ≤~2GB under that same load. Carries the 150k COUNT default +
-  # #3252 phase-4 keepalive. sha256:0b8d2da9fd28b7dbfc4bd50f5c6dcc0e7ab247c6c185adb4781683a4144298f6
+  # Prod cadence 2.1.98 (#3474): 2.1.97 + a baked jemalloc heap profiler to NAME the OOM the byte-budget
+  # does NOT bound. The #3468 payload-BYTE budget (2GB) caps serve payload, but the hub still OOMs by
+  # ramping the LIVE-set to ~19GB with only ~15 concurrent serves (Aug-16 crests) — a non-serve allocation,
+  # hypothesis transport-layer (quinn/iroh/noq buffers under connection churn + a livelock round). MALLOC_CONF
+  # is baked static (prof:true,prof_active:true,lg_prof_sample:19,lg_prof_interval:31 → auto-dump every ~2GB
+  # of alloc growth; background_thread:true,dirty/muzzy_decay_ms:5000 trims the retained floor). Dumps land at
+  # /var/cadence/prof/cadence-heap.* (the disk-backed emptyDir below, survives the OOM restart) → jeprof names
+  # the allocating stack. The ~6.95G/30s plateau dumps well below the 13Gi kill. Diagnostic build; the fam-mrh
+  # convergence fix follows as 2.1.99. sha256:2f803047387791d9b5292d2952915791e951fbe5d9b8ae2350d6367be24caa11
   image:
-    tag: "2.1.97"
+    tag: "2.1.98"
   # Read-idle: how long a catch-up serve stream stays alive on an idle read. 600s keeps the hub from
   # killing serves on slow single large frame bodies (keepalives bridge inter-frame idle, not intra-frame).
   # Safe at 600s as of 2.1.97: the payload-BYTE budget bounds concurrent live payload to 2GB regardless of
