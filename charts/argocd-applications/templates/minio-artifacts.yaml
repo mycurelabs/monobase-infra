@@ -96,12 +96,11 @@ spec:
                     actions:
                       - "s3:ListBucket"
                       - "s3:GetBucketLocation"
-                  # Writes prefix-scoped to maestroapp/ — the only publisher today
-                  # (verified: every object lives under maestroapp/desktop/<target>/…).
-                  # Contains a leaked artifacts-ci key to the app's own prefix so it
-                  # can't host arbitrary content under the trusted artifacts.<domain>.
-                  # Broaden (or add a statement) when a second app publishes here.
-                  # Does NOT stop overwrite-within-maestroapp/ (downgrade/tamper):
+                  # Writes are prefix-scoped per publishing app, one statement
+                  # each — a leaked artifacts-ci key can't host arbitrary content
+                  # under the trusted artifacts.<domain>, nor reach another app's
+                  # prefix. Add a statement when a new app starts publishing.
+                  # Does NOT stop overwrite-within-a-prefix (downgrade/tamper):
                   # MinIO PutObject can't distinguish create-vs-overwrite, and
                   # versioning/WORM needs an erasure-coded backend this standalone
                   # single-drive instance lacks. Install integrity is owned app-side
@@ -119,6 +118,18 @@ spec:
                       # leaked key destroy artifacts by overwrite; delete only
                       # removes vs clobbers. Still prefix-scoped to maestroapp/.
                       - "s3:DeleteObject"
+                  # mycureapp/ — the MYCURE desktop release workflow
+                  # (monobase-mycure .github/workflows/mycure-desktop-release.yml)
+                  # publishes here, and apps/mycure/src-tauri/tauri.conf.json points
+                  # its updater endpoint at mycureapp/desktop/<target>_<arch>/latest.json.
+                  # No DeleteObject: apps/mycure/scripts/publish.ts has no keep-last-N
+                  # prune, so the publisher never needs to remove objects.
+                  - effect: "Allow"
+                    resources:
+                      - "arn:aws:s3:::artifacts/mycureapp/*"
+                    actions:
+                      - "s3:PutObject"
+                      - "s3:GetObject"
             usersExistingSecrets:
               - minio-artifacts-ci
           persistence:
