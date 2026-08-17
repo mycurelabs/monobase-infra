@@ -207,12 +207,22 @@ spec:
         - name: config
           mountPath: /etc/cadence
           readOnly: true
+        # Writable scratch for the jemalloc heap-profile dump (readOnlyRootFilesystem is true, so the
+        # profiler needs a mounted writable path). Only the prof-guarded image writes here; harmless otherwise.
+        - name: prof
+          mountPath: /var/cadence/prof
         resources:
           {{- toYaml .Values.resources | nindent 10 }}
       volumes:
       - name: config
         configMap:
           name: cadence-config
+      # Disk-backed (medium="" = node disk, NOT Memory — a Memory emptyDir would count against the
+      # container mem limit we are protecting). Survives the OOM CONTAINER-restart (the hub OOMs are
+      # same-pod container restarts, not reschedules), so the heap dump persists for kubectl-cp post-crest.
+      - name: prof
+        emptyDir:
+          sizeLimit: 1Gi
       {{- with .Values.affinity }}
       affinity:
         {{- toYaml . | nindent 8 }}
