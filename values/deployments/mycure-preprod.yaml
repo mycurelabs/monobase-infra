@@ -580,9 +580,14 @@ cadence:
             app.kubernetes.io/component: primary
         topologyKey: kubernetes.io/hostname
   publicAddr: "100.74.26.73:6473"
-  # CUTOVER: anchor homes on our relay (QUIC-addr-disc lets netcheck rank it) + advertises it in the doc.
-  # All boxes are being moved to maestroapp 2.0.28 (our-relay-only) in the same window.
-  relayUrl: "https://cadence-relay.preprod.localfirsthealth.com"
+  # INTERIM (relay disabled → n0 public): the self-hosted relay's HTTP-upgrade handshake is 100% broken
+  # through the shared gateway (TLS-terminate + re-encrypt mangles the long-lived iroh upgrade → the relay
+  # log is a solid flood of "did not reach established within timeout"). A broken relay path makes the hub
+  # tight-loop open_path_on_all_conns → create_sender per retry → senders pile on the hub → OOM. Unsetting
+  # relayUrl reverts RelayMode to n0's public relay (default, functional) — the hub stops retrying the dead
+  # path AND hard-NAT boxes get a working relay again. Re-set once the gateway route is repaired (TLSRoute
+  # passthrough or a SnippetsFilter for the upgrade). Empty ⇒ n0 relays (chart default).
+  relayUrl: ""
   nodePool: "nonprod"
   postgresql:
     serviceName: postgresql-primary
