@@ -526,8 +526,15 @@ cadenceRelay:
 # the live tables at startup and baselines existing rows (ships the #2823 baseline fix + #2817 re-baseline).
 cadence:
   publicAddr: "104.248.98.161:6472"
-  # Home on the self-hosted relay + advertise it so boxes (maestroapp 2.0.28, our-relay-only) adopt it.
-  relayUrl: "https://cadence-relay.localfirsthealth.com"
+  # INTERIM (relay disabled → n0 public, operator-approved): the self-hosted relay's HTTP-upgrade handshake
+  # is 100% broken through the shared gateway (TLS-terminate + re-encrypt mangles the long-lived iroh
+  # upgrade → relay log is a solid flood of "did not reach established within timeout"). A dead relay path
+  # makes the hub tight-loop open_path_on_all_conns → create_sender per retry → senders pile on the hub →
+  # OOM (every ~50min). Unset relayUrl → RelayMode reverts to n0's public relay (functional): hub stops
+  # retrying the dead path (OOM should stop) AND hard-NAT boxes get a working relay. Preprod-proven: relay
+  # flood stopped ~2min after cutover, box reached the hub via n0. Re-set once the gateway route is repaired
+  # (SnippetsFilter for the upgrade, in preprod). Empty ⇒ n0 relays (chart default).
+  relayUrl: ""
   nodePool: "prod-apps"
   # Prod cadence 2.1.98 (#3474): 2.1.97 + a baked jemalloc heap profiler to NAME the OOM the byte-budget
   # does NOT bound. The #3468 payload-BYTE budget (2GB) caps serve payload, but the hub still OOMs by
