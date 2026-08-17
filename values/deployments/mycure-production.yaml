@@ -536,17 +536,14 @@ cadence:
   # (SnippetsFilter for the upgrade, in preprod). Empty ⇒ n0 relays (chart default).
   relayUrl: ""
   nodePool: "prod-apps"
-  # Prod cadence 2.1.98 (#3474): 2.1.97 + a baked jemalloc heap profiler to NAME the OOM the byte-budget
-  # does NOT bound. The #3468 payload-BYTE budget (2GB) caps serve payload, but the hub still OOMs by
-  # ramping the LIVE-set to ~19GB with only ~15 concurrent serves (Aug-16 crests) — a non-serve allocation,
-  # hypothesis transport-layer (quinn/iroh/noq buffers under connection churn + a livelock round). MALLOC_CONF
-  # is baked static (prof:true,prof_active:true,lg_prof_sample:19,lg_prof_interval:31 → auto-dump every ~2GB
-  # of alloc growth; background_thread:true,dirty/muzzy_decay_ms:5000 trims the retained floor). Dumps land at
-  # /var/cadence/prof/cadence-heap.* (the disk-backed emptyDir below, survives the OOM restart) → jeprof names
-  # the allocating stack. The ~6.95G/30s plateau dumps well below the 13Gi kill. Diagnostic build; the fam-mrh
-  # convergence fix follows as 2.1.99. sha256:2f803047387791d9b5292d2952915791e951fbe5d9b8ae2350d6367be24caa11
+  # Prod cadence 2.1.99 (#3404/#3455): the deeper fp-tree convergence fix (fam-mrh mrh pfx 6→8, cursor banks,
+  # personal_details reached, #3404 members land). OOM-INDEPENDENT — does not touch the iroh create_sender
+  # leak (that is the 2.1.100 PathSelector cap, separate). On deploy it does a heavy ONE-TIME fat-scope
+  # rebuild (e.g. vldmc's 5.27M mrh scope scan on the cache-wall table) — bounded ~68k hashmaps, gated
+  # once/scope/process = a handful of heavy PG reads, not a storm; deployed off-peak to minimize contention.
+  # Hub still OOMs on clinic-churn peaks until 2.1.100. publish ref sha4490bf90 (coder); tag verified pullable.
   image:
-    tag: "2.1.98"
+    tag: "2.1.99"
   # Read-idle: how long a catch-up serve stream stays alive on an idle read. 600s keeps the hub from
   # killing serves on slow single large frame bodies (keepalives bridge inter-frame idle, not intra-frame).
   # Safe at 600s as of 2.1.97: the payload-BYTE budget bounds concurrent live payload to 2GB regardless of
