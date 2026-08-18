@@ -141,6 +141,15 @@ spec:
         {{- end }}
         - name: RUST_LOG
           value: {{ .Values.rustLog | default "cadence=info,warn" | quote }}
+        {{- with .Values.rustBacktrace }}
+        # Diagnostic: full symbolicated panic backtraces (RUST_BACKTRACE + lib variant). Off by default
+        # (perf cost on panic paths); set "full"/"1" per-env to capture the primary-panic stack of a
+        # recurring crash. Unset ⇒ Rust default (message only, no frames).
+        - name: RUST_BACKTRACE
+          value: {{ . | quote }}
+        - name: RUST_LIB_BACKTRACE
+          value: {{ . | quote }}
+        {{- end }}
         - name: CADENCE_LOG_FORMAT
           value: "json"
         {{- if .Values.apiAddr }}

@@ -17,6 +17,11 @@ apiAddr: ""
 # "cadence=info,cadence::routing=debug,warn").
 rustLog: "cadence=info,warn"
 
+# RUST_BACKTRACE (+ RUST_LIB_BACKTRACE). Empty ⇒ Rust default (panic message only, no frames). Set
+# "full" to capture full symbolicated panic backtraces — diagnostic for a recurring crash; the primary
+# panic then prints the caller frames (not just the message). Perf cost on panic paths only.
+rustBacktrace: ""
+
 # Per-connection read-idle timeout (ms) for the hub's reader side. Empty ⇒ engine default (90s).
 # Raise where slow single large frame bodies (fat *_history serves) blow the 90s and get killed.
 readIdleMs: ""

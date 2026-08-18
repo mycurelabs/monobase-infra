@@ -552,6 +552,11 @@ cadence:
   # dropped to 90s during the 2.1.96 OOM-loop). 600s is wanted for the drain + the #3404/#3406 deeper-tree
   # convergence.
   readIdleMs: 600000
+  # DIAGNOSTIC (temporary): full panic backtraces to capture the recurring noq-proto PathId::ZERO panic's
+  # primary stack (mod.rs:4150 "PathId::ZERO is alive while Initial/Handshake spaces exist" → poisoned-mutex
+  # abort, exit 139, ~every 1.5h — the OOM is fixed but this crash branch remains). The message alone lacks
+  # the discard_space caller frame coder needs for the guard fix (2.1.102). Remove once captured.
+  rustBacktrace: "full"
   # LeafIds resident budget. As of 2.1.96 this 150k IS the in-code default (+ compile-guard vs re-raise),
   # so this env is now REDUNDANT — kept explicit to document the value and stay pinned if the image ever
   # rolls back to a pre-2.1.96 tag whose default is 1M (which OOMed the hub at 10Gi on 2026-08-14). 150k
