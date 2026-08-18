@@ -53,7 +53,7 @@ mycure-pxp:
 
 hapihub:
   image:
-    tag: "11.20.103"
+    tag: "11.20.104"
     # onboarding (#2992, PR #3426 merged as d7d535fcf). Supersedes the pre-merge branch build 11.20.100,
     # which predated three on-device fixes (onboarding copy, user_code format vs the anti-phishing check,
     # SW serving a stale bundle to /oauth/*) and the rebase onto main (#3403 read-authz sweep).
