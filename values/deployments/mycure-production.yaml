@@ -536,15 +536,15 @@ cadence:
   # (SnippetsFilter for the upgrade, in preprod). Empty ⇒ n0 relays (chart default).
   relayUrl: ""
   nodePool: "prod-apps"
-  # Prod cadence 2.1.100 (#3543): the PathSelector cap — the durable OOM fix. Bounds path/sender per remote
-  # so the iroh RemoteStateActor::open_path_on_all_conns → create_sender leak (senders never freed on path
-  # re-open when hard-NAT remotes flap their address set) can no longer accumulate unbounded. Named via the
-  # 2.1.98 jeprof (byte-for-byte stack match across the 03:06Z + 05:54Z crests); the broken-relay theory was
-  # A/B-refuted (OOM recurred on n0 with the relay flood at 0), so this cap — not the relay, mem, read-idle,
-  # or LeafIds levers — is THE fix. Carries the 2.1.99 convergence fix. Expect create_sender to PLATEAU under
-  # 13Gi instead of ramping to ~19G. sha256:9c744b59...4115ab. relay stays n0 (unset); 13Gi held for the soak.
+  # Prod cadence 2.1.101 (#3554): pending_open_paths dedup — completes the OOM fix. 2.1.100's PathSelector cap
+  # (#3543) bounded create_sender per remote but the hub STILL OOMed (rst=2 on 2.1.100): pending_open_paths
+  # still accumulated duplicate path-open requests for flapping hard-NAT remotes. This dedups them, so both
+  # create_sender AND pending_open_paths stay flat and RSS plateaus under 13Gi through a churn peak (closes
+  # #3505). Carries the 2.1.100 cap + 2.1.99 convergence. Named via the 2.1.98 jeprof; broken-relay theory
+  # A/B-refuted (OOM recurred on n0 with relay flood at 0). relay stays n0 (unset); 13Gi held for the soak.
+  # sha256:bbcfb5e536fa9126f22064a5a2dd5fee0e9b22e5101ab8c1dbadfeb5c7128917
   image:
-    tag: "2.1.100"
+    tag: "2.1.101"
   # Read-idle: how long a catch-up serve stream stays alive on an idle read. 600s keeps the hub from
   # killing serves on slow single large frame bodies (keepalives bridge inter-frame idle, not intra-frame).
   # Safe at 600s as of 2.1.97: the payload-BYTE budget bounds concurrent live payload to 2GB regardless of
