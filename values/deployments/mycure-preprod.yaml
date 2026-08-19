@@ -52,14 +52,14 @@ mycure-pxp:
     API_URL: "https://hapihub.preprod.localfirsthealth.com"
 
 hapihub:
+    # Release 11.20.106 (PR #3592, main). Built from main so it carries the #3403 R4 authnz refactor
+    # (ALWAYS-ENFORCE external api-key tenant-scoping) that landed in 11.20.105 — preprod stays R4-enforcing;
+    # api_key rows are pre-backfilled + R4-safe. Back to a bare version tag (fresh version, no floating-tag
+    # collision like the clobbered 11.20.102, so the digest pin from the 105 validation is no longer needed).
+    # Prod is still HELD at 11.20.102@cbfc4323 pending the operator R4 promotion. pin 11.20.85 if a box↔hub
+    # reconcile test needs the bundled hapihub schema (cadence schema_hash guard).
   image:
-    # #3403 R4 authnz refactor (ALWAYS-ENFORCE external api-key tenant-scoping, CASL reads, ~86 x-authz
-    # gates). Clean re-cut 11.20.105 (PR #3563, main @ 4cd829c2b) after the R4 build clobbered 11.20.102.
-    # PINNED BY DIGEST (immutable — the re-cut avoids the floating-tag collision; prod stays on cbfc4323).
-    # Preprod api_key rows are pre-backfilled + R4-safe (still_unbound_ENABLED_in_use=0, MCP keys disabled).
-    # PREPROD-VALIDATION-FIRST: prod is HELD until this passes. pin 11.20.85 if a box↔hub reconcile test
-    # needs the bundled hapihub schema (cadence schema_hash guard).
-    tag: "11.20.105@sha256:349de03eb7aa9965d789d8cfa6b9e586281fca2813df319cb724e5aa463d40e3"
+    tag: "11.20.106"
   cache:
     enabled: true
 
@@ -192,7 +192,7 @@ hapihub:
     serviceName: postgresql-primary
 mycure:
   image:
-    tag: "10.25.120"
+    tag: "10.25.121"
     # (#2992, PR #3426 merged as d7d535fcf). Supersedes the pre-merge branch build 10.25.118 — carries the
     # on-device fixes to the onboarding copy, the user_code format the anti-phishing check depends on, and
     # the PWA service worker that was serving a stale bundle to /oauth/*.
