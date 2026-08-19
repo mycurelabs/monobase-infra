@@ -541,15 +541,14 @@ cadence:
   # (SnippetsFilter for the upgrade, in preprod). Empty ⇒ n0 relays (chart default).
   relayUrl: ""
   nodePool: "prod-apps"
-  # Prod cadence 2.1.101 (#3554): pending_open_paths dedup — completes the OOM fix. 2.1.100's PathSelector cap
-  # (#3543) bounded create_sender per remote but the hub STILL OOMed (rst=2 on 2.1.100): pending_open_paths
-  # still accumulated duplicate path-open requests for flapping hard-NAT remotes. This dedups them, so both
-  # create_sender AND pending_open_paths stay flat and RSS plateaus under 13Gi through a churn peak (closes
-  # #3505). Carries the 2.1.100 cap + 2.1.99 convergence. Named via the 2.1.98 jeprof; broken-relay theory
-  # A/B-refuted (OOM recurred on n0 with relay flood at 0). relay stays n0 (unset); 13Gi held for the soak.
-  # sha256:bbcfb5e536fa9126f22064a5a2dd5fee0e9b22e5101ab8c1dbadfeb5c7128917
+  # Prod cadence 2.1.102: the PathId::ZERO guard for the noq-proto QUIC path panic (exit 139). 2.1.101 fixed
+  # the OOM (create_sender cap + pending_open_paths dedup) but a SEPARATE panic recurred ~1.5h — noq-proto
+  # connection/mod.rs:4150 "PathId::ZERO is alive while Initial/Handshake spaces exist" → poisoned-mutex
+  # abort (surfaced during iroh remote_state teardown). This guards that invariant. Carries the full OOM fix
+  # (2.1.99 convergence + 2.1.100 cap + 2.1.101 dedup). relay stays n0; 13Gi held; RUST_BACKTRACE=full kept
+  # as a safety net until no-more-139 is confirmed. sha256:ace2be198dbd8cd40d2b8c36c12dfd62016ff316291c60be2842e8b50f3416f4
   image:
-    tag: "2.1.101"
+    tag: "2.1.102"
   # Read-idle: how long a catch-up serve stream stays alive on an idle read. 600s keeps the hub from
   # killing serves on slow single large frame bodies (keepalives bridge inter-frame idle, not intra-frame).
   # Safe at 600s as of 2.1.97: the payload-BYTE budget bounds concurrent live payload to 2GB regardless of
