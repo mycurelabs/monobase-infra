@@ -541,14 +541,15 @@ cadence:
   # (SnippetsFilter for the upgrade, in preprod). Empty ⇒ n0 relays (chart default).
   relayUrl: ""
   nodePool: "prod-apps"
-  # Prod cadence 2.1.102: the PathId::ZERO guard for the noq-proto QUIC path panic (exit 139). 2.1.101 fixed
-  # the OOM (create_sender cap + pending_open_paths dedup) but a SEPARATE panic recurred ~1.5h — noq-proto
-  # connection/mod.rs:4150 "PathId::ZERO is alive while Initial/Handshake spaces exist" → poisoned-mutex
-  # abort (surfaced during iroh remote_state teardown). This guards that invariant. Carries the full OOM fix
-  # (2.1.99 convergence + 2.1.100 cap + 2.1.101 dedup). relay stays n0; 13Gi held; RUST_BACKTRACE=full kept
-  # as a safety net until no-more-139 is confirmed. sha256:ace2be198dbd8cd40d2b8c36c12dfd62016ff316291c60be2842e8b50f3416f4
+  # Prod cadence 2.1.103: /healthz + /readyz on a DEDICATED OS thread. Root of the exit-137 probe-kills was
+  # RUNTIME POLL-STARVATION, not a slow probe query: a 112s cache-wall scan pinned all tokio workers so the
+  # trivial healthz future never got polled within the 90s liveness tolerance → SIGKILL. Serving health off
+  # its own thread makes it always-prompt regardless of sync-runtime saturation → the probe-kill class is now
+  # IMPOSSIBLE (the meta_reconcile REINDEX 14→5.8GB was the acute fix; this is the durable one). Carries the
+  # OOM fix (2.1.99+2.1.100+2.1.101) + the 2.1.102 PathId::ZERO guard. relay n0; 13Gi; RUST_BACKTRACE=full
+  # kept until no-more-139 confirmed. sha256:582b10a6ef7db764af2d24bbcdd84d5def8b1014427c408b1145a643e9dad231
   image:
-    tag: "2.1.102"
+    tag: "2.1.103"
   # Read-idle: how long a catch-up serve stream stays alive on an idle read. 600s keeps the hub from
   # killing serves on slow single large frame bodies (keepalives bridge inter-frame idle, not intra-frame).
   # Safe at 600s as of 2.1.97: the payload-BYTE budget bounds concurrent live payload to 2GB regardless of
