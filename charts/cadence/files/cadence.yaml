@@ -166,9 +166,11 @@ sync:
     - name: diagnostic_tests
       tags:
         - { ty: org, field: facility }
+{{- if not .Values.dropUnusedTables }}
     - name: file_links
       tags:
         - { ty: org, field: organization }
+{{- end }}
     - name: fixtures
       tags:
         - { ty: org, field: organization }
@@ -260,9 +262,11 @@ sync:
     - name: organization_members_archived
       tags:
         - { ty: org, field: organization }
+{{- if not .Values.dropUnusedTables }}
     - name: organization_partners
       tags:
         - { ty: org, field: organization }
+{{- end }}
     - name: organizations
       tags:
         - { ty: org, field: id }
