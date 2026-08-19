@@ -547,13 +547,14 @@ cadence:
   # + L2 durable state + L3 transport (gossip re-subscribe escalation heals the pod-roll zombie-join; evict/GC digest integrity incl. count-blind acc-drift heal via rebuild_fp
   # on no-progress, tagset-keyed baseline gates, per-scope GC horizon + apply_below_gc_horizon
   # resurrection telemetry, gc/dlq/reroute maintenance-error counters).
+  # REVERTED to 2.1.90 (2026-08-19): the 2.1.103 bump CRASH-LOOPED here — cadence 2.1.103 requires an app
+  # table `file_links` (installs its capture triggers on it) that PREPROD's hapihub DB LACKS ("collection
+  # 'file_links' has no table in schema 'public' — create the app tables before cadence connects"). Prod
+  # hapihub DB HAS file_links (so prod 2.1.103 is fine); preprod is a clone from an older snapshot predating
+  # the table. BLOCKED until preprod's hapihub DB gets file_links (a hapihub migration / fresh restore — NOT
+  # a manual table create). Re-attempt 2.1.103 once preprod hapihub schema has file_links.
   image:
-    # Prod-proven 2.1.103 (pure image deploy, no build): makes preprod representative of prod after the
-    # 2026-08-14→19 OOM/panic/probe-kill saga — carries 2.1.99 (#3404/#3455 convergence) + 2.1.100 PathSelector
-    # cap + 2.1.101 pending_open_paths dedup (OOM #3505) + 2.1.102 PathId::ZERO guard + 2.1.103 /healthz on a
-    # dedicated thread (probe-kill #3406). Supersedes the old 2.1.90 nueve-stall diagnostic pin. relay stays
-    # unset (n0) below. For box↔hub reconcile testing at preprod scale.
-    tag: "2.1.103"
+    tag: "2.1.90"
   # Never share a node with the PG primary: co-location (both on one 4-core nonprod node,
   # 2026-08-11) cut baseline mint throughput ~3x — hashing and PG execution compete for the
   # same cores. Required (not preferred): on a small pool a silent re-co-location would just
