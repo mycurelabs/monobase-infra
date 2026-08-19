@@ -53,11 +53,13 @@ mycure-pxp:
 
 hapihub:
   image:
-    tag: "11.20.104"
-    # onboarding (#2992, PR #3426 merged as d7d535fcf). Supersedes the pre-merge branch build 11.20.100,
-    # which predated three on-device fixes (onboarding copy, user_code format vs the anti-phishing check,
-    # SW serving a stale bundle to /oauth/*) and the rebase onto main (#3403 read-authz sweep).
-    # pin to 11.20.85 if the box↔hub reconcile test needs the box's bundled hapihub schema (cadence schema_hash guard)
+    # #3403 R4 authnz refactor (ALWAYS-ENFORCE external api-key tenant-scoping, CASL reads, ~86 x-authz
+    # gates). Clean re-cut 11.20.105 (PR #3563, main @ 4cd829c2b) after the R4 build clobbered 11.20.102.
+    # PINNED BY DIGEST (immutable — the re-cut avoids the floating-tag collision; prod stays on cbfc4323).
+    # Preprod api_key rows are pre-backfilled + R4-safe (still_unbound_ENABLED_in_use=0, MCP keys disabled).
+    # PREPROD-VALIDATION-FIRST: prod is HELD until this passes. pin 11.20.85 if a box↔hub reconcile test
+    # needs the bundled hapihub schema (cadence schema_hash guard).
+    tag: "11.20.105@sha256:349de03eb7aa9965d789d8cfa6b9e586281fca2813df319cb724e5aa463d40e3"
   cache:
     enabled: true
 
