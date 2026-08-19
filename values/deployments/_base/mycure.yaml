@@ -24,7 +24,7 @@ mycure-dashboard:
 
   image:
     repository: ghcr.io/mycurelabs/dashboard
-    tag: "0.14.16"
+    tag: "0.14.17"
     pullPolicy: IfNotPresent
 
   replicaCount: 1
