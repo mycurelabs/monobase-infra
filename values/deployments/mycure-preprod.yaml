@@ -59,7 +59,7 @@ hapihub:
     # Prod is still HELD at 11.20.102@cbfc4323 pending the operator R4 promotion. pin 11.20.85 if a box↔hub
     # reconcile test needs the bundled hapihub schema (cadence schema_hash guard).
   image:
-    tag: "11.20.106"
+    tag: "11.20.107"
   cache:
     enabled: true
 
@@ -553,7 +553,7 @@ cadence:
   # organization_partners here, and the shared files/cadence.yaml still lists them → cadence crash-loops
   # ("collection 'file_links' has no table") on any version until those two collection entries are gated off.
   image:
-    tag: "2.1.103"
+    tag: "2.1.104"
   # Skip the file_links + organization_partners collection entries in files/cadence.yaml — hapihub 11.20.106
   # (#3335) dropped those tables in preprod. Prod stays false (11.20.102 still has + syncs them); flip prod
   # → true on the R4 11.20.106 promotion. (Same .Values-gated per-env pattern as publicAddr, #204.)
