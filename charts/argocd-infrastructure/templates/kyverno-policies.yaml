@@ -21,10 +21,21 @@ spec:
     path: charts/kyverno-resources
     helm:
       releaseName: kyverno-resources
+      values: |
+        policies:
+          podSecurity:
+            enabled: {{ .Values.kyverno.policies.podSecurity.enabled | default true }}
+            validationFailureAction: {{ .Values.kyverno.policies.podSecurity.action | default "enforce" }}
+          requireLabels:
+            enabled: {{ .Values.kyverno.policies.requireLabels.enabled | default true }}
+            validationFailureAction: {{ .Values.kyverno.policies.requireLabels.action | default "enforce" }}
+          restrictRegistries:
+            enabled: {{ .Values.kyverno.policies.restrictRegistries.enabled | default true }}
+            validationFailureAction: {{ .Values.kyverno.policies.restrictRegistries.action | default "audit" }}
 
   destination:
     server: https://kubernetes.default.svc
-    namespace: kyverno
+    namespace: {{ .Values.kyverno.namespace | default "kyverno" }}
 
   syncPolicy:
     automated:

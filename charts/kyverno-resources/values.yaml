@@ -1,0 +1,82 @@
+# Kyverno Resources Configuration
+# Policy enforcement rules for security and compliance
+
+# Policies are deployed cluster-wide (no namespace needed)
+
+# Enable/disable specific policies
+policies:
+  # Pod Security Standards (Restricted Profile)
+  podSecurity:
+    enabled: true
+    validationFailureAction: enforce  # or "audit" for testing
+
+  # Require Standard Labels
+  requireLabels:
+    enabled: true
+    validationFailureAction: enforce  # or "audit"
+
+  # Restrict Image Registries
+  restrictRegistries:
+    enabled: true
+    validationFailureAction: audit  # Start with audit, move to enforce later
+
+    # Approved container registries
+    # Add new registries here as needed
+    allowedRegistries:
+      # Organization
+      - "ghcr.io/mycurelabs/*"
+      - "ghcr.io/monobaselabs/*"
+
+      # Trusted third-party registries
+      - "bitnami/*"
+      - "docker.io/bitnamilegacy/*"
+      - "registry.k8s.io/*"
+      - "k8s.gcr.io/*"
+
+      # Monitoring / logging
+      - "docker.io/grafana/*"
+      - "docker.io/prom/*"
+      - "quay.io/prometheus/*"
+      - "quay.io/prometheus-operator/*"
+      - "kiwigrid/*"
+
+      # Cert-manager
+      - "quay.io/jetstack/*"
+
+      # Security tools
+      - "docker.io/falcosecurity/*"
+      - "ghcr.io/kyverno/*"
+
+      # External Secrets + Dex
+      - "ghcr.io/external-secrets/*"
+      - "ghcr.io/dexidp/*"
+
+      # NGINX Gateway Fabric
+      - "ghcr.io/nginx/*"
+      - "ghcr.io/nginxinc/*"
+
+      # PostgreSQL
+      - "docker.io/bitnami/postgresql*"
+
+      # Velero
+      - "docker.io/velero/*"
+      - "velero/*"
+      - "gcr.io/velero-gcp/*"
+
+      # Valkey (Redis)
+      - "docker.io/valkey/*"
+      - "docker.io/bitnami/valkey*"
+
+      # MinIO
+      - "quay.io/minio/*"
+      - "docker.io/minio/*"
+
+      # ArgoCD
+      - "quay.io/argoproj/*"
+
+      # Tailscale
+      - "ghcr.io/tailscale/*"
+
+      # MYCURE-specific workloads
+      - "docker.io/axllent/mailpit"  # dev/preprod mail catcher
+      - "n0computer/*"               # iroh-relay (cadence)

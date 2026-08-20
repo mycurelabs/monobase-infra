@@ -1,3 +1,4 @@
+{{- if .Values.policies.requireLabels.enabled }}
 # Kyverno Policy: Require Standard Labels
 # Enforces standard labels on all workload resources for tracking and governance
 
@@ -14,7 +15,7 @@ metadata:
       All workload resources must have standard labels for tracking ownership,
       environment, and cost allocation.
 spec:
-  validationFailureAction: enforce  # Change to "audit" for testing
+  validationFailureAction: {{ .Values.policies.requireLabels.validationFailureAction | default "enforce" }}
   background: true
 
   rules:
@@ -25,6 +26,8 @@ spec:
       - resources:
           kinds:
           - Deployment
+    exclude:
+      {{- include "kyverno-resources.excludeSystemNs" . | nindent 6 }}
     validate:
       message: >-
         Deployments must have labels: app, environment, client.
@@ -33,7 +36,7 @@ spec:
         metadata:
           labels:
             app: "?*"
-            environment: "production | staging | development"
+            environment: "production | preprod | staging | development"
             client: "?*"
 
   # Require labels on StatefulSets
@@ -43,6 +46,8 @@ spec:
       - resources:
           kinds:
           - StatefulSet
+    exclude:
+      {{- include "kyverno-resources.excludeSystemNs" . | nindent 6 }}
     validate:
       message: >-
         StatefulSets must have labels: app, environment, client.
@@ -50,7 +55,7 @@ spec:
         metadata:
           labels:
             app: "?*"
-            environment: "production | staging | development"
+            environment: "production | preprod | staging | development"
             client: "?*"
 
   # Require labels on DaemonSets
@@ -60,6 +65,8 @@ spec:
       - resources:
           kinds:
           - DaemonSet
+    exclude:
+      {{- include "kyverno-resources.excludeSystemNs" . | nindent 6 }}
     validate:
       message: >-
         DaemonSets must have labels: app, environment, client.
@@ -67,7 +74,7 @@ spec:
         metadata:
           labels:
             app: "?*"
-            environment: "production | staging | development"
+            environment: "production | preprod | staging | development"
             client: "?*"
 
   # Require labels on Pod templates (via Deployments/StatefulSets)
@@ -79,6 +86,8 @@ spec:
           - Deployment
           - StatefulSet
           - DaemonSet
+    exclude:
+      {{- include "kyverno-resources.excludeSystemNs" . | nindent 6 }}
     validate:
       message: >-
         Pod templates must have labels: app, environment, client.
@@ -89,47 +98,6 @@ spec:
             metadata:
               labels:
                 app: "?*"
-                environment: "production | staging | development"
+                environment: "production | preprod | staging | development"
                 client: "?*"
-
----
-# Label Description Documentation
-#
-# Required Labels:
-#
-# 1. app: <string>
-#    - Application or service name
-#    - Examples: "monobase-api", "postgresql", "nginx"
-#    - Used for: Service discovery, monitoring dashboards, debugging
-#
-# 2. environment: "production" | "staging" | "development"
-#    - Deployment environment
-#    - Must be one of: production, staging, development
-#    - Used for: Cost allocation, access controls, alerting severity
-#
-# 3. client: <string>
-#    - Client identifier (typically namespace prefix)
-#    - Examples: "myclient", "example-com", "acme"
-#    - Used for: Multi-tenancy, cost tracking per client, billing
-#
-# Example Deployment:
-#
-# apiVersion: apps/v1
-# kind: Deployment
-# metadata:
-#   name: api
-#   labels:
-#     app: monobase-api
-#     environment: production
-#     client: myclient
-# spec:
-#   template:
-#     metadata:
-#       labels:
-#         app: monobase-api
-#         environment: production
-#         client: myclient
-#     spec:
-#       containers:
-#       - name: api
-#         image: ghcr.io/monobaselabse/api:5.215.2
+{{- end }}

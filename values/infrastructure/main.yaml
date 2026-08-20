@@ -265,10 +265,30 @@ externalDNS:
 
 # Kyverno - Policy engine
 kyverno:
-  enabled: false  # Optional, enable for policy enforcement
-  version: 3.2.0
+  enabled: true
+  version: "3.2.0"
+  namespace: kyverno
+  # HA: 2 replicas per controller. Admission webhooks are stateless;
+  # background/reports/cleanup controllers use leader-election.
+  replicas: 2
   policies:
-    enabled: false  # Only if kyverno.enabled=true
+    enabled: true
+    # All three ship in `audit` to start: policies are cluster-wide but
+    # audit blocks nothing anywhere — it only writes PolicyReports. This
+    # is the prod-safe rollout: validate against mycure-preprod reports
+    # first, then consider `enforce`. Flipping to enforce requires tenant
+    # charts to set securityContext.runAsNonRoot (pod-security) and the
+    # app/environment/client label taxonomy (require-labels) — until that
+    # chart-side compliance lands, enforce would admission-deny rollouts.
+    podSecurity:
+      enabled: true
+      action: audit
+    requireLabels:
+      enabled: true
+      action: audit
+    restrictRegistries:
+      enabled: true
+      action: audit
 
 # Velero - Backup and disaster recovery
 velero:
@@ -349,12 +369,25 @@ velero:
         namespaces:
           - mycure-production
 
-# Falco - Runtime security monitoring
+# Falco - Runtime security monitoring.
+# Operator + custom rulesets from charts/falco-resources (api, database).
+# Passive — Falco alerts, never blocks. Emits to stdout (route to SigNoz/
+# Discord separately).
 falco:
-  enabled: false  # Optional, enable for runtime threat detection
-  version: 4.6.1
+  enabled: true
+  # Chart 4.6.1 (Falco 0.38.1) hits a libscap/modern-BPF scap_init bug on
+  # recent kernels (fixed upstream in 0.39.0). Chart 9.1.0 ships Falco
+  # 0.44.1 with driver.kind=modern_ebpf (CO-RE, no kernel-module build) —
+  # verified against DOKS nodes on kernel 6.1 (Debian 12). Matches the
+  # medicard fleet's pinned version.
+  version: "9.1.0"
+  namespace: falco
   rules:
-    enabled: false  # Only if falco.enabled=true
+    enabled: true
+    api:
+      enabled: true
+    database:
+      enabled: true
 
 # Monitoring - Prometheus + Grafana stack
 monitoring:

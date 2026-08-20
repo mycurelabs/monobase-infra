@@ -25,13 +25,13 @@ spec:
         namespace: {{ .Values.falco.namespace | default "falco" }}
         rules:
           api:
-            enabled: true
+            enabled: {{ .Values.falco.rules.api.enabled | default true }}
           database:
-            enabled: true
+            enabled: {{ .Values.falco.rules.database.enabled | default true }}
 
   destination:
     server: https://kubernetes.default.svc
-    namespace: falco
+    namespace: {{ .Values.falco.namespace | default "falco" }}
 
   syncPolicy:
     automated:
