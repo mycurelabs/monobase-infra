@@ -62,6 +62,26 @@ spec:
               cpu: {{ .Values.minio.resources.limits.cpu | default "500m" }}
               memory: {{ .Values.minio.resources.limits.memory | default "512Mi" }}
           defaultBuckets: {{ .Values.minio.defaultBuckets | default "monobase-files" }}
+          {{- with .Values.minio.auditArchive }}
+          {{- if .enabled }}
+          # #3484 cold-archive bucket for pruned audit_events rows. Created WITH
+          # object-lock (WORM) + versioning at creation and a default COMPLIANCE
+          # retention — pruned audit history stays immutable for the HIPAA window
+          # even after it leaves the live table. Object-lock CANNOT be added after
+          # creation, hence provisioning (not defaultBuckets).
+          # FLAG for human review: this per-client MinIO runs `mode: standalone`
+          # (single drive). Verify object-lock + versioning actually hold on this
+          # topology before relying on it for compliance — the artifacts-store note
+          # (charts/argocd-applications/templates/minio-artifacts.yaml) claims WORM
+          # needs an erasure-coded backend. If it doesn't hold, move this bucket to a
+          # distributed MinIO pool or an external object-lock store.
+          provisioning:
+            enabled: true
+            extraCommands:
+              - mc mb --with-lock --ignore-existing provisioning/{{ .bucket | default "audit-archive" }}
+              - mc retention set --default COMPLIANCE {{ .retention | default "6y" | quote }} provisioning/{{ .bucket | default "audit-archive" }}
+          {{- end }}
+          {{- end }}
           podSecurityContext:
             enabled: true
             fsGroup: 1001

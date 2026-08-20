@@ -63,6 +63,17 @@ hapihub:
   cache:
     enabled: true
 
+  # #3484 (PREPROD-ONLY prep, held for human review — prod stays default-off).
+  # Scrape hapihub /metrics so the audit-event burst alerts (audit-event-bursts
+  # PrometheusRule) can see the app-side audit_events_total counter once it ships.
+  serviceMonitor:
+    enabled: true
+  # Weekly HIPAA-retention prune of the append-only audit_events trail (superuser
+  # + session_replication_role=replica to bypass the guard trigger). Verify
+  # table/timestampColumn against #3623 before this runs for real.
+  pruneAuditEvents:
+    enabled: true
+
   # Daily cleanup of expired Better Auth sessions (they never self-delete).
   replicaCount: 1
 
@@ -513,6 +524,15 @@ minio:
 
   gateway:
     sectionName: https-preprod-lfh
+
+  # #3484 (PREPROD-ONLY prep, held for human review). Cold-archive bucket for
+  # pruned audit_events rows, created WITH object-lock (WORM) + versioning +
+  # default COMPLIANCE retention. See the FLAG in the minio.yaml template re:
+  # object-lock on this standalone (single-drive) instance — verify before relying.
+  auditArchive:
+    enabled: true
+    bucket: audit-archive
+    retention: "6y"
 mailpit:
   enabled: true
 

@@ -216,3 +216,25 @@ pruneExpiredSessions:
     limits:
       cpu: 100m
       memory: 128Mi
+
+# Weekly HIPAA-retention prune of the #3484 append-only audit_events trail.
+# Connects as the PG SUPERUSER and runs `SET session_replication_role = replica`
+# to bypass the append-only guard trigger for the DELETE (see the CronJob
+# template). Opt in PER-ENVIRONMENT — prod stays false until a separate human go,
+# same coupling caution as the R4 promotion. Verify table/timestampColumn against
+# the #3623 migration before enabling.
+pruneAuditEvents:
+  enabled: false
+  schedule: "30 3 * * 0"   # 03:30 Sundays (offset from prune-sessions)
+  timeZone: "Etc/UTC"
+  table: audit_events
+  timestampColumn: created_at
+  retentionInterval: "6 years"
+  # image: override the psql client image (defaults to the in-cluster PG image)
+  resources:
+    requests:
+      cpu: 25m
+      memory: 32Mi
+    limits:
+      cpu: 100m
+      memory: 128Mi

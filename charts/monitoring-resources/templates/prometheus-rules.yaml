@@ -388,3 +388,51 @@ spec:
             summary: "Kyverno metrics absent — reporting funnel may be down"
             description: "No kyverno_policy_results_total series for 15m. The reports controller or its ServiceMonitor is not being scraped; policy alerts are blind."
 {{- end }}
+
+---
+# #3484 audit-event burst alerts. Real-time detection of abusive patterns in the
+# append-only audit trail: cred-stuffing (auth.sign_in_failed floods) and mass
+# PHI export (phi.record_exported floods). The query/search plane is already the
+# audit_events table + GET /audit/security-events; this only adds the missing
+# real-time burst signal.
+#
+# PREPROD-GATED via the namespace="mycure-preprod" selector — prod is a separate
+# later human go (add mycure-production to the regex then).
+#
+# DORMANT until the hapihub app ships the `audit_events_total{action,outcome}`
+# Prometheus counter on /metrics AND the hapihub ServiceMonitor is scraping it
+# (a hapihub follow-up PR, tracked by the #3484 app peer). No `absent()` companion
+# on purpose — the metric legitimately does not exist yet, so absent() would fire
+# immediately. Thresholds are conservative starting points; tune after a baseline.
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: audit-event-bursts
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: prometheus-rules
+    app.kubernetes.io/component: monitoring
+    prometheus: kube-prometheus
+spec:
+  groups:
+    - name: audit-bursts
+      interval: 30s
+      rules:
+        - alert: AuditSignInFailureBurst
+          # >100 failed sign-ins in 5m in preprod = likely credential stuffing.
+          expr: |
+            sum(increase(audit_events_total{namespace="mycure-preprod", action="auth.sign_in_failed"}[5m])) > 100
+          for: 5m
+          labels: {severity: warning}
+          annotations:
+            summary: "Sign-in failure burst in mycure-preprod ({{ "{{" }} $value | humanize }} in 5m)"
+            description: "Possible credential-stuffing. Check source IPs / accounts via GET /audit/security-events; Better Auth rate-limit is the first lever."
+        - alert: AuditPhiExportBurst
+          # >50 PHI record exports in 5m in preprod = likely mass-export / exfil.
+          expr: |
+            sum(increase(audit_events_total{namespace="mycure-preprod", action="phi.record_exported"}[5m])) > 50
+          for: 5m
+          labels: {severity: critical}
+          annotations:
+            summary: "PHI export burst in mycure-preprod ({{ "{{" }} $value | humanize }} in 5m)"
+            description: "Possible mass PHI exfiltration. Identify the actor via GET /audit/security-events and review whether the export scope is authorized."
