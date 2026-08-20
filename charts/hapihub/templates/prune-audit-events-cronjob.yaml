@@ -1,0 +1,108 @@
+{{- if and .Values.enabled .Values.pruneAuditEvents.enabled }}
+# HIPAA retention prune for the #3484 append-only audit trail (audit_events).
+# audit_events carries a BEFORE UPDATE OR DELETE guard trigger, so a plain DELETE
+# is blocked for EVERY role (the app role included) — it silently affects 0 rows.
+# This job connects as the PostgreSQL SUPERUSER and runs
+#   SET session_replication_role = replica;
+# first, which disables ORIGIN-mode triggers for that one session so retention can
+# prune; the guard re-arms the moment the session ends. Only rows OLDER than the
+# retention window are removed, so it never touches in-window audit history.
+# Assumes in-cluster PostgreSQL (postgresql.external: false), like prune-sessions.
+# ponytail: mirrors prune-sessions-cronjob; the only real delta is the superuser
+# session_replication_role bypass + the retention predicate.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "hapihub.fullname" . }}-prune-audit-events
+  namespace: {{ include "hapihub.namespace" . }}
+  labels:
+    {{- include "hapihub.labels" . | nindent 4 }}
+    job-type: prune-audit-events
+spec:
+  schedule: {{ .Values.pruneAuditEvents.schedule | default "30 3 * * 0" | quote }}
+  timeZone: {{ .Values.pruneAuditEvents.timeZone | default "Etc/UTC" | quote }}
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: {{ .Values.pruneAuditEvents.successfulJobsHistoryLimit | default 3 }}
+  failedJobsHistoryLimit: {{ .Values.pruneAuditEvents.failedJobsHistoryLimit | default 3 }}
+  startingDeadlineSeconds: 3600
+  jobTemplate:
+    spec:
+      backoffLimit: {{ .Values.pruneAuditEvents.backoffLimit | default 1 }}
+      ttlSecondsAfterFinished: {{ .Values.pruneAuditEvents.ttlSecondsAfterFinished | default 86400 }}
+      activeDeadlineSeconds: {{ .Values.pruneAuditEvents.activeDeadlineSeconds | default 600 }}
+      template:
+        metadata:
+          {{- with .Values.podAnnotations }}
+          annotations:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          labels:
+            {{- include "hapihub.selectorLabels" . | nindent 12 }}
+            job-type: prune-audit-events
+        spec:
+          {{- with .Values.imagePullSecrets }}
+          imagePullSecrets:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          serviceAccountName: {{ include "hapihub.serviceAccountName" . }}
+          enableServiceLinks: false
+          restartPolicy: Never
+          {{- $nodePool := include "hapihub.nodePool" . -}}
+          {{- if or $nodePool .Values.nodeSelector }}
+          nodeSelector:
+            {{- if $nodePool }}
+            node-pool: {{ $nodePool }}
+            {{- end }}
+            {{- with .Values.nodeSelector }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          {{- end }}
+          {{- if or $nodePool .Values.tolerations }}
+          tolerations:
+            {{- if $nodePool }}
+            - key: "node-pool"
+              operator: "Equal"
+              value: {{ $nodePool | quote }}
+              effect: "NoSchedule"
+            {{- end }}
+            {{- with .Values.tolerations }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          {{- end }}
+          securityContext:
+            {{- toYaml .Values.podSecurityContext | nindent 12 }}
+          containers:
+          - name: {{ .Chart.Name }}-prune-audit-events
+            securityContext:
+              {{- toYaml .Values.securityContext | nindent 14 }}
+            # Same image the in-cluster PG statefulset runs — already on nodes.
+            image: {{ .Values.pruneAuditEvents.image | default "docker.io/bitnamilegacy/postgresql:16.4.0-debian-12-r13" | quote }}
+            imagePullPolicy: IfNotPresent
+            command: ["/bin/sh", "-ec"]
+            args:
+              # SET + DELETE in a single -c run share one session, so the
+              # replica-role trigger bypass is in force for the DELETE. ON_ERROR_STOP
+              # makes a blocked/failed prune a job failure (visible), not a silent skip.
+              - |
+                psql "$DATABASE_URI" -v ON_ERROR_STOP=1 -c \
+                  "SET session_replication_role = replica; \
+                   DELETE FROM {{ .Values.pruneAuditEvents.table | default "audit_events" }} \
+                   WHERE {{ .Values.pruneAuditEvents.timestampColumn | default "occurred_at" }} \
+                         < now() - interval '{{ .Values.pruneAuditEvents.retentionInterval | default "6 years" }}';"
+            resources:
+              {{- toYaml .Values.pruneAuditEvents.resources | nindent 14 }}
+            env:
+            # Mirrors the DATABASE_URI composition in hapihub.containerEnv.
+            # NOTE: hapihub.postgresql.username defaults to "postgres" (the superuser)
+            # — required for session_replication_role. If an env ever runs hapihub as
+            # a non-superuser role, this job needs a dedicated superuser credential.
+            - name: POSTGRESQL_USER
+              value: {{ include "hapihub.postgresql.username" . | quote }}
+            - name: POSTGRESQL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.postgresql.auth.existingSecret | default "postgresql" }}
+                  key: postgres-password
+            - name: DATABASE_URI
+              value: "postgres://$(POSTGRESQL_USER):$(POSTGRESQL_PASSWORD)@{{ include "hapihub.postgresql.host" . }}:5432/{{ include "hapihub.postgresql.database" . }}"
+{{- end }}

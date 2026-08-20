@@ -58,9 +58,26 @@ hapihub:
     # collision like the clobbered 11.20.102, so the digest pin from the 105 validation is no longer needed).
     # Prod is still HELD at 11.20.102@cbfc4323 pending the operator R4 promotion. pin 11.20.85 if a box↔hub
     # reconcile test needs the bundled hapihub schema (cadence schema_hash guard).
+  # 11.20.109 (PR #3627, main, squash aae175b95) carries #3623 / #3484 audit
+  # traceability: append-only audit_events trail + Better Auth hook emitters +
+  # GET /audit/security-events. activity-logs RETAINED FROZEN (no destructive
+  # migration; removal deferred to FE #3624). Bumped here (not on main) so it
+  # merges together with the audit-retention IaC in this PR — the retention
+  # CronJob targets audit_events, which only exists once this image is deployed.
   image:
-    tag: "11.20.108"
+    tag: "11.20.109"
   cache:
+    enabled: true
+
+  # #3484 (PREPROD-ONLY prep, held for human review — prod stays default-off).
+  # Scrape hapihub /metrics so the audit-event burst alerts (audit-event-bursts
+  # PrometheusRule) can see the app-side audit_events_total counter once it ships.
+  serviceMonitor:
+    enabled: true
+  # Weekly HIPAA-retention prune of the append-only audit_events trail (superuser
+  # + session_replication_role=replica to bypass the guard trigger). Prunes on
+  # occurred_at (event time, indexed) — created_at is emitter-unset / nullable.
+  pruneAuditEvents:
     enabled: true
 
   # Daily cleanup of expired Better Auth sessions (they never self-delete).
@@ -513,6 +530,15 @@ minio:
 
   gateway:
     sectionName: https-preprod-lfh
+
+  # #3484 (PREPROD-ONLY prep, held for human review). Cold-archive bucket for
+  # pruned audit_events rows, created WITH object-lock (WORM) + versioning +
+  # default COMPLIANCE retention. See the FLAG in the minio.yaml template re:
+  # object-lock on this standalone (single-drive) instance — verify before relying.
+  auditArchive:
+    enabled: true
+    bucket: audit-archive
+    retention: "6y"
 mailpit:
   enabled: true
 
