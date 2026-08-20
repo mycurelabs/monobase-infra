@@ -58,14 +58,15 @@ hapihub:
     # collision like the clobbered 11.20.102, so the digest pin from the 105 validation is no longer needed).
     # Prod is still HELD at 11.20.102@cbfc4323 pending the operator R4 promotion. pin 11.20.85 if a box↔hub
     # reconcile test needs the bundled hapihub schema (cadence schema_hash guard).
-  # 11.20.109 (PR #3627, main, squash aae175b95) carries #3623 / #3484 audit
-  # traceability: append-only audit_events trail + Better Auth hook emitters +
-  # GET /audit/security-events. activity-logs RETAINED FROZEN (no destructive
-  # migration; removal deferred to FE #3624). Bumped here (not on main) so it
-  # merges together with the audit-retention IaC in this PR — the retention
-  # CronJob targets audit_events, which only exists once this image is deployed.
+  # 11.20.110 (PR #3631, main, squash 310ee242d) = #3623/#3484 audit traceability
+  # (append-only audit_events + Better Auth emitters + GET /audit/security-events;
+  # activity-logs RETAINED FROZEN, removal deferred to FE #3624) PLUS the #3630
+  # metrics counter audit_events_total{action,outcome} on GET /metrics — the metric
+  # the AuditSignInFailureBurst/AuditPhiExportBurst rules scrape. (PR #354 squash-
+  # merged at 11.20.109, which lacks the counter, so the rules were inert; this
+  # completes it to 110 so the serviceMonitor scrape + burst rules go live.)
   image:
-    tag: "11.20.109"
+    tag: "11.20.110"
   cache:
     enabled: true
 
