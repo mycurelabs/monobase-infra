@@ -69,8 +69,8 @@ hapihub:
   serviceMonitor:
     enabled: true
   # Weekly HIPAA-retention prune of the append-only audit_events trail (superuser
-  # + session_replication_role=replica to bypass the guard trigger). Verify
-  # table/timestampColumn against #3623 before this runs for real.
+  # + session_replication_role=replica to bypass the guard trigger). Prunes on
+  # occurred_at (event time, indexed) — created_at is emitter-unset / nullable.
   pruneAuditEvents:
     enabled: true
 

@@ -221,14 +221,16 @@ pruneExpiredSessions:
 # Connects as the PG SUPERUSER and runs `SET session_replication_role = replica`
 # to bypass the append-only guard trigger for the DELETE (see the CronJob
 # template). Opt in PER-ENVIRONMENT — prod stays false until a separate human go,
-# same coupling caution as the R4 promotion. Verify table/timestampColumn against
-# the #3623 migration before enabling.
+# same coupling caution as the R4 promotion. Prune on occurred_at (event time):
+# the emitter sets occurred_at but NOT created_at, so created_at can be NULL and a
+# created_at predicate would silently never prune. occurred_at is also the indexed
+# column (audit_events_occurred_idx).
 pruneAuditEvents:
   enabled: false
   schedule: "30 3 * * 0"   # 03:30 Sundays (offset from prune-sessions)
   timeZone: "Etc/UTC"
   table: audit_events
-  timestampColumn: created_at
+  timestampColumn: occurred_at
   retentionInterval: "6 years"
   # image: override the psql client image (defaults to the in-cluster PG image)
   resources:

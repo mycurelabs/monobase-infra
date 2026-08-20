@@ -87,7 +87,7 @@ spec:
                 psql "$DATABASE_URI" -v ON_ERROR_STOP=1 -c \
                   "SET session_replication_role = replica; \
                    DELETE FROM {{ .Values.pruneAuditEvents.table | default "audit_events" }} \
-                   WHERE {{ .Values.pruneAuditEvents.timestampColumn | default "created_at" }} \
+                   WHERE {{ .Values.pruneAuditEvents.timestampColumn | default "occurred_at" }} \
                          < now() - interval '{{ .Values.pruneAuditEvents.retentionInterval | default "6 years" }}';"
             resources:
               {{- toYaml .Values.pruneAuditEvents.resources | nindent 14 }}
