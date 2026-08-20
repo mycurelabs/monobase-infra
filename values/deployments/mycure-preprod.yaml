@@ -59,7 +59,7 @@ hapihub:
     # Prod is still HELD at 11.20.102@cbfc4323 pending the operator R4 promotion. pin 11.20.85 if a box↔hub
     # reconcile test needs the bundled hapihub schema (cadence schema_hash guard).
   image:
-    tag: "11.20.107"
+    tag: "11.20.108"
   cache:
     enabled: true
 
