@@ -1,0 +1,5 @@
+
+# Set by the argocd-infrastructure monitoring-resources Application (mirrors
+# .Values.kyverno.enabled). Gates the Kyverno policy-report PrometheusRule.
+kyverno:
+  enabled: false

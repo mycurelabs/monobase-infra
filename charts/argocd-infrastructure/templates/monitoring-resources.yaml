@@ -24,6 +24,12 @@ spec:
     path: charts/monitoring-resources
     helm:
       releaseName: monitoring-resources
+      valuesObject:
+        # Gate the Kyverno policy-report PrometheusRule on whether the
+        # Kyverno engine is actually deployed, so its metrics-absent alert
+        # doesn't fire on clusters without Kyverno.
+        kyverno:
+          enabled: {{ .Values.kyverno.enabled | default false }}
   
   destination:
     server: https://kubernetes.default.svc

@@ -26,14 +26,28 @@ spec:
         # evaluation, policy reporting, background scanning, cleanup
         # scheduling) and safe to scale. Two replicas + preferred hostname
         # anti-affinity keeps admission and reporting up during pod churn.
+        #
+        # serviceMonitor on each controller so Prometheus scrapes Kyverno
+        # metrics (kyverno_policy_results_total, admission latency). The
+        # policy-failure PrometheusRule (charts/monitoring-resources) turns
+        # those into Alertmanager alerts. serviceMonitorSelector={} on this
+        # cluster's Prometheus picks them up with no extra release label.
         admissionController:
           replicas: {{ .Values.kyverno.replicas | default 1 }}
+          serviceMonitor:
+            enabled: true
         backgroundController:
           replicas: {{ .Values.kyverno.replicas | default 1 }}
+          serviceMonitor:
+            enabled: true
         reportsController:
           replicas: {{ .Values.kyverno.replicas | default 1 }}
+          serviceMonitor:
+            enabled: true
         cleanupController:
           replicas: {{ .Values.kyverno.replicas | default 1 }}
+          serviceMonitor:
+            enabled: true
         # Bitnami migrated their public Docker Hub images to `bitnamilegacy/*`
         # in mid-2025 and delisted the old `bitnami/kubectl` tags. Kyverno
         # chart 3.2.0 still ships `bitnami/kubectl:1.28.5` as the default for

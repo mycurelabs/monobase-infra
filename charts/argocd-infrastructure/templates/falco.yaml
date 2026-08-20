@@ -23,11 +23,24 @@ spec:
       releaseName: falco
       valuesObject:
         # Pin the driver explicitly (chart 9.x defaults to `auto` which
-        # picks modern_ebpf on 5.8+ kernels — AKS is on 6.8 — but pinning
+        # picks modern_ebpf on 5.8+ kernels — DOKS is on 6.1 — but pinning
         # avoids surprises if the auto-selection heuristic changes).
         # modern_ebpf is CO-RE / no kernel-module build required.
         driver:
           kind: modern_ebpf
+
+        # falcosidekick fans Falco events out to Alertmanager. It POSTs to
+        # the alertmanager v2 alerts API (hostport + /api/v2/alerts), so
+        # runtime detections show up alongside Prometheus alerts and follow
+        # the same receiver routing. minimumpriority=notice drops debug/info
+        # chatter. This is the reporting funnel for Falco.
+        falcosidekick:
+          enabled: true
+          config:
+            alertmanager:
+              hostport: "http://monitoring-kube-prometheus-alertmanager.monitoring:9093"
+              minimumpriority: "notice"
+              expandlabels: true
 
   destination:
     server: https://kubernetes.default.svc

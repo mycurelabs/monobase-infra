@@ -344,3 +344,47 @@ spec:
           annotations:
             summary: "cadence ensure_sync_infra retrying persistently in {{ "{{" }} $labels.namespace }}"
             description: "Some collection cannot complete DDL setup (steady retry at the 15m cap); its data is on the degraded legacy path."
+
+{{- if .Values.kyverno.enabled }}
+---
+# Kyverno policy-report alerts — funnels ClusterPolicy failures (audit or
+# enforce) into Alertmanager via the kyverno_policy_results_total metric
+# scraped from the per-controller ServiceMonitors. Falco runtime events
+# take a separate path (falcosidekick -> Alertmanager v2 API), so they are
+# not covered here.
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: kyverno-policy-reports
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: prometheus-rules
+    app.kubernetes.io/component: monitoring
+    prometheus: kube-prometheus
+spec:
+  groups:
+    - name: kyverno-policies
+      interval: 30s
+      rules:
+        - alert: KyvernoPolicyViolations
+          expr: sum by (policy, rule) (increase(kyverno_policy_results_total{result="fail"}[15m])) > 0
+          for: 15m
+          labels: {severity: warning}
+          annotations:
+            summary: "Kyverno policy {{ "{{" }} $labels.policy }}/{{ "{{" }} $labels.rule }} is failing"
+            description: "Workloads are violating a ClusterPolicy (audit or enforce). Inspect: kubectl get policyreports -A | grep -i fail"
+        - alert: KyvernoPolicyViolationSpike
+          expr: sum(increase(kyverno_policy_results_total{result="fail"}[15m])) > 25
+          for: 10m
+          labels: {severity: critical}
+          annotations:
+            summary: "Kyverno policy-failure spike ({{ "{{" }} $value | humanize }} in 15m)"
+            description: "A large burst of policy violations — likely a bad rollout or an over-broad policy. Check recent deploys and PolicyReports."
+        - alert: KyvernoReportsControllerDown
+          expr: absent(kyverno_policy_results_total) == 1
+          for: 15m
+          labels: {severity: warning}
+          annotations:
+            summary: "Kyverno metrics absent — reporting funnel may be down"
+            description: "No kyverno_policy_results_total series for 15m. The reports controller or its ServiceMonitor is not being scraped; policy alerts are blind."
+{{- end }}
