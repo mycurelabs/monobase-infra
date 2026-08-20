@@ -75,6 +75,18 @@ spec:
           # (charts/argocd-applications/templates/minio-artifacts.yaml) claims WORM
           # needs an erasure-coded backend. If it doesn't hold, move this bucket to a
           # distributed MinIO pool or an external object-lock store.
+          # The provisioning Job's os-shell init container defaults to
+          # docker.io/bitnami/os-shell, which 404s since Bitnami moved images to
+          # bitnamilegacy/ (Aug 2025) — without this it ImagePullBackOffs forever and
+          # the bucket is never created. Same fix as minio-artifacts.yaml; set both
+          # keys so a chart bump within 14.x can't reintroduce the broken image.
+          volumePermissions:
+            image:
+              repository: bitnamilegacy/os-shell
+          defaultInitContainers:
+            volumePermissions:
+              image:
+                repository: bitnamilegacy/os-shell
           provisioning:
             enabled: true
             extraCommands:
