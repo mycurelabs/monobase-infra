@@ -6,11 +6,24 @@
 
 # Cert Manager - TLS certificate automation
 certManager:
-  enabled: false  # disabled on k3d/vanaheim
+  enabled: true
+  version: v1.16.2
 
 # Cert Manager Resources - ClusterIssuers and certificate configuration
 certManagerIssuers:
-  enabled: false  # disabled on k3d/vanaheim
+  enabled: true
+  issuers:
+    # Cloudflare DNS-01 challenge (for wildcard and multi-level subdomains)
+    - name: letsencrypt-mycure-cloudflare-prod
+      email: "caretheextramile@gmail.com"
+      server: production
+      provider: cloudflare
+      cloudflare:
+        apiTokenSecretRef:
+          name: mycure-cloudflare-api-token
+          key: api-token
+        dnsZones:
+          - localfirsthealth.com
 
 # CoreDNS overrides (DOKS coredns-custom hook) — cadence-relay hairpin rewrites.
 corednsCustom:
@@ -39,11 +52,17 @@ nginxGatewayResources:
 
   # INTERNAL gateway — the CLUSTER-DEFAULT ingress (deny-first). ClusterIP data
   # plane (never a DO LB); the Tailscale operator exposes it on the tailnet.
-  # tailnet-only: exposed via tailscale operator. TLS scheme (these tlsSecretName
-  # certs vs tailscale-terminated HTTPS) finalized at Checkpoint 4.
+  # Checkpoint 4: TLS is now real Let's Encrypt via the cloudflare DNS-01 issuer
+  # (letsencrypt-mycure-cloudflare-prod); external-dns publishes attached-route
+  # hostnames as CNAMEs to the gateway's stable tailnet MagicDNS name.
   extraGateways:
     - name: nginx-internal-gateway
       gatewayClassName: nginx
+      annotations:
+        # external-dns publishes attached routes' hostnames with THIS target
+        # (the gateway's stable tailnet MagicDNS name) instead of the Gateway's
+        # status address (a ClusterIP, useless off-cluster).
+        external-dns.alpha.kubernetes.io/target: "nginx-staging-gateway.tail06ec7f.ts.net"
       infrastructure:
         annotations:
           tailscale.com/expose: "true"
@@ -72,12 +91,22 @@ nginxGatewayResources:
           protocol: HTTP
           hostname: "*.staging.localfirsthealth.com"
 
-  # No cert-manager on k3d/vanaheim — the tls.certificates list would create
-  # cert-manager Certificate resources against ClusterIssuers that don't exist
-  # here. The staging TLS secrets are provisioned out-of-band; scheme finalized
-  # at Checkpoint 4 (see gateway comment above).
   tls:
-    certificates: []
+    certificates:
+      # Real Let's Encrypt certs via the cloudflare DNS-01 issuer for the
+      # secretNames the staging listeners above reference.
+      - secretName: nginx-gateway-tls-staging-mycure
+        clusterIssuer: letsencrypt-mycure-cloudflare-prod  # DNS-01
+        dnsNames:
+          - mycure.staging.localfirsthealth.com
+      - secretName: nginx-gateway-tls-staging-hapihub
+        clusterIssuer: letsencrypt-mycure-cloudflare-prod  # DNS-01
+        dnsNames:
+          - hapihub.staging.localfirsthealth.com
+      - secretName: nginx-gateway-tls-staging
+        clusterIssuer: letsencrypt-mycure-cloudflare-prod  # DNS-01, wildcard
+        dnsNames:
+          - "*.staging.localfirsthealth.com"
 
   # Cluster-wide SnippetsPolicies for the shared nginx Gateway.
   snippetsPolicies:
@@ -133,7 +162,7 @@ externalSecrets:
 
 # External DNS - Automatic DNS record management from HTTPRoutes
 externalDNS:
-  enabled: false  # disabled on k3d/vanaheim
+  enabled: true  # Automatic DNS via Cloudflare (full config in external-dns.yaml)
 
 # Kyverno - Policy engine
 kyverno:
