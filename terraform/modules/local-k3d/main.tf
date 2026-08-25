@@ -17,9 +17,19 @@ locals {
     "-p '${var.http_port}:80@loadbalancer'",
     "-p '${var.https_port}:443@loadbalancer'",
     var.disable_traefik ? "--k3s-arg '--disable=traefik@server:*'" : "",
+    # node-pool=infra label so infra components (ESO/tailscale/gateway) that carry
+    # the DOKS node-pool=infra nodeSelector schedule here (k3d has no real pools).
+    "--k3s-node-label 'node-pool=infra@server:*'",
+    "--k3s-node-label 'node-pool=infra@agent:*'",
     "--volume '/tmp/k3d-${var.cluster_name}:/var/lib/rancher/k3s/storage@all'",
     "--wait --timeout ${var.create_timeout}",
   ]))
+
+  # CoreDNS: suppress AAAA so pods use IPv4. This host/Docker has no IPv6 egress,
+  # but public CDNs (e.g. charts.external-secrets.io -> googlehosted) return AAAA,
+  # making pod-side `helm pull` / external fetches hang. Without this, ArgoCD's
+  # repo-server times out rendering charts pulled from external Helm registries.
+  coredns_aaaa = "template IN AAAA {\n  rcode NOERROR\n}"
 }
 
 resource "null_resource" "cluster" {
@@ -47,10 +57,28 @@ resource "null_resource" "cluster" {
   }
 }
 
-# Gateway API CRDs (NGINX Gateway Fabric needs them). Applied against the
-# freshly-created context.
+# Gateway API CRDs — the NGINX Gateway Fabric EXPERIMENTAL bundle pinned to the
+# NGF version (nginxGateway.version). NGF needs GRPCRoute/UDPRoute/TCPRoute/
+# ListenerSet etc.; the plain gateway-api standard bundle omits them and NGF
+# crashloops ("no matches for kind GRPCRoute"). Keep gateway_api_ref in lockstep
+# with scripts/upgrade-gateway-api-crds.sh.
 resource "null_resource" "install_gateway_api" {
   count      = var.install_gateway_api ? 1 : 0
+  depends_on = [null_resource.cluster]
+
+  triggers = {
+    cluster = null_resource.cluster.id
+    ref     = var.gateway_api_ref
+  }
+
+  provisioner "local-exec" {
+    command = "kubectl --context k3d-${var.cluster_name} apply --server-side --force-conflicts -k 'https://github.com/nginx/nginx-gateway-fabric/config/crd/gateway-api/experimental?ref=${var.gateway_api_ref}'"
+  }
+}
+
+# CoreDNS AAAA suppression (see local.coredns_aaaa). Applied via the k3s
+# coredns-custom overlay convention, then CoreDNS is restarted to load it.
+resource "null_resource" "coredns_ipv4" {
   depends_on = [null_resource.cluster]
 
   triggers = {
@@ -58,6 +86,11 @@ resource "null_resource" "install_gateway_api" {
   }
 
   provisioner "local-exec" {
-    command = "kubectl --context k3d-${var.cluster_name} apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.0.0/standard-install.yaml"
+    command = <<-EOT
+      kubectl --context k3d-${var.cluster_name} -n kube-system create configmap coredns-custom \
+        --from-literal='aaaa.override=${local.coredns_aaaa}' \
+        --dry-run=client -o yaml | kubectl --context k3d-${var.cluster_name} apply -f -
+      kubectl --context k3d-${var.cluster_name} -n kube-system rollout restart deploy/coredns
+    EOT
   }
 }
