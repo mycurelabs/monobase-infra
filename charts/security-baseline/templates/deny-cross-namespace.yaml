@@ -54,6 +54,18 @@ spec:
         - protocol: TCP
           port: 443
 
+    # Allow to the security detection pipeline (Tenzir ingest) — a platform-wide
+    # shared service like monitoring. hapihub's audit/sink worker POSTs PHI-free
+    # audit_events here over HTTP (mono#3708). Cross-ns on :8080, so not covered
+    # by the internet-443 rule above.
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: security
+      ports:
+        - protocol: TCP
+          port: 8080
+
 ---
 # Why deny cross-namespace?
 #
