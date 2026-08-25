@@ -91,7 +91,7 @@ run = """
 echo "Rendering app-of-apps trees (validates every chart in use)..."
 helm template lint charts/argocd-applications -f values/deployments/_base/mycure.yaml -f values/deployments/mycure-production.yaml --set argocd.repoURL=lint --set argocd.targetRevision=lint > /dev/null
 helm template lint charts/argocd-applications -f values/deployments/_base/mycure.yaml -f values/deployments/mycure-preprod.yaml --set argocd.repoURL=lint --set argocd.targetRevision=lint > /dev/null
-helm template lint charts/argocd-infrastructure -f values/infrastructure/main.yaml --set argocd.repoURL=lint --set argocd.targetRevision=lint > /dev/null
+helm template lint charts/argocd-infrastructure -f values/clusters/mycure-doks-main/argocd/infrastructure.yaml --set argocd.repoURL=lint --set argocd.targetRevision=lint > /dev/null
 helm template lint charts/argocd-bootstrap > /dev/null
 echo "✓ All trees render"
 """
@@ -228,19 +228,25 @@ run = 'bun scripts/seed.ts "$@"'
 description = "Unbootstrap cluster (destroy ArgoCD/Applications) - REQUIRES CONFIRMATION"
 run = 'bun scripts/bootstrap.ts --destroy "$@"'
 
+# Per-cluster OpenTofu roots live at values/clusters/<name>/terraform.
+# Usage: mise run cluster-plan <name>   (e.g. mycure-doks-main, mycure-onprem-vanaheim)
 [tasks.cluster-init]
-description = "Init OpenTofu for values/cluster (remote state on Spaces)"
-run = "cd values/cluster && tofu init"
+description = "Init OpenTofu for a cluster root. Usage: cluster-init <name>"
+run = "cd values/clusters/{{arg(name='cluster')}}/terraform && tofu init"
 
 [tasks.cluster-plan]
-description = "Plan cluster changes (values/cluster). Exit 2 = changes pending"
-run = "cd values/cluster && tofu plan -detailed-exitcode"
+description = "Plan cluster changes. Exit 2 = changes pending. Usage: cluster-plan <name>"
+run = "cd values/clusters/{{arg(name='cluster')}}/terraform && tofu plan -detailed-exitcode"
 
 [tasks.cluster-apply]
-description = "Apply cluster changes. Backs up remote state first; interactive approval; STOP on any 'forces replacement' plan line"
+description = "Apply cluster changes. Backs up state first; interactive approval; STOP on any 'forces replacement' plan line. Usage: cluster-apply <name>"
 run = """
 mkdir -p backups/terraform-state
-cd values/cluster
-tofu state pull > ../../backups/terraform-state/mycure-doks-main-$(date +%Y%m%dT%H%M%S).tfstate || true
+cd values/clusters/{{arg(name='cluster')}}/terraform
+tofu state pull > ../../../../backups/terraform-state/{{arg(name='cluster')}}-$(date +%Y%m%dT%H%M%S).tfstate || true
 tofu apply
 """
+
+[tasks.cluster-destroy]
+description = "Destroy a cluster root (the nuke). Usage: cluster-destroy <name>"
+run = "cd values/clusters/{{arg(name='cluster')}}/terraform && tofu destroy"

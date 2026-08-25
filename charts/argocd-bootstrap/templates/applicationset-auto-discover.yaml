@@ -19,19 +19,20 @@ spec:
     preserveResourcesOnDeletion: true
 
   generators:
-    # Git files generator: scans values/deployments/*.yaml
+    # Git files generator: scans the deployment overlays this cluster owns.
+    # Driven by argocd.deploymentPaths (values.yaml) so each cluster's ArgoCD
+    # discovers only its own set — DOKS excludes mycure-staging.yaml; the
+    # on-prem cluster overrides this to include ONLY mycure-staging.yaml.
     - git:
         repoURL: {{ .Values.argocd.repoURL | required "argocd.repoURL is required" }}
         revision: {{ .Values.argocd.targetRevision | default "HEAD" }}
         files:
-          - path: "values/deployments/*.yaml"
-          # Reference examples are not deployments
-          - path: "values/deployments/example-*.yaml"
+{{- range .Values.argocd.deploymentPaths }}
+          - path: {{ .path | quote }}
+{{- if .exclude }}
             exclude: true
-          # Shared bases are merged into deployments, not deployed themselves
-          # (the glob doesn't cross directories; this is an explicit guard)
-          - path: "values/deployments/_base/*.yaml"
-            exclude: true
+{{- end }}
+{{- end }}
 
   # Template for the root Applications
   template:

@@ -335,7 +335,7 @@ function displayCurrentContext(kubeconfigPath?: string): void {
  */
 function findSecretsFiles(): string[] {
   const patterns = [
-    "values/infrastructure/secrets.yaml",
+    "values/clusters/*/argocd/secrets.yaml",
     "deployments/*/secrets.yaml",
   ];
 

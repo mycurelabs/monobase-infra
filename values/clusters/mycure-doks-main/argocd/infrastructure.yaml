@@ -1,0 +1,517 @@
+# Default values for monobase-infrastructure Helm chart
+# These control cluster-wide infrastructure components
+# Note: argocd.repoURL is injected from infrastructure-root.yaml bootstrap file
+
+# Cert Manager - TLS certificate automation
+certManager:
+  enabled: true
+  version: v1.16.2
+
+# Cert Manager Resources - ClusterIssuers and certificate configuration
+certManagerIssuers:
+  enabled: true
+  issuers:
+    # HTTP-01 challenge type (no DNS provider needed)
+    - name: letsencrypt-prod
+      email: "admin@example.com"
+      server: production
+      provider: http01
+    
+    - name: letsencrypt-staging
+      email: "admin@example.com"
+      server: staging
+      provider: http01
+
+    # HTTP-01 challenge via NGINX Gateway (for domains routed through NGINX)
+    - name: letsencrypt-nginx-http01
+      email: "caretheextramile@gmail.com"
+      server: production
+      provider: http01
+      http01:
+        gatewayName: nginx-public-gateway
+        gatewayNamespace: nginx-gateway-system
+
+    # Cloudflare DNS-01 challenge (for wildcard and multi-level subdomains)
+    - name: letsencrypt-mycure-cloudflare-prod
+      email: "caretheextramile@gmail.com"
+      server: production
+      provider: cloudflare
+      cloudflare:
+        apiTokenSecretRef:
+          name: mycure-cloudflare-api-token
+          key: api-token
+        dnsZones:
+          - mycureapp.com
+          - stitchtechsolutions.com
+          - localfirsthealth.com
+          - mycure.md
+
+# CoreDNS overrides (DOKS coredns-custom hook) — cadence-relay hairpin rewrites.
+# Manifests: infrastructure/coredns/
+corednsCustom:
+  enabled: true
+
+# NGINX Gateway Fabric - primary Gateway API implementation
+nginxGateway:
+  enabled: true
+  # Keep in lockstep with the Gateway API CRD bundle —
+  # scripts/upgrade-gateway-api-crds.sh (2.6.7 -> Gateway API 1.5.1).
+  # 2.6.x picks up the 2.5 L4 route fixes needed before cadence QUIC
+  # (UDPRoute) rides the shared gateway; 2.4.x shipped the first UDP cut.
+  version: "2.6.7"
+
+# NGINX Gateway Resources
+nginxGatewayResources:
+  gatewayClass:
+    enabled: false  # GatewayClass created by operator chart
+
+  # PUBLIC gateway — prod only, internet-exposed BY INTENT. Named for its role
+  # (public) vs the internal gateway below. Nonprod/internal listeners live on
+  # nginx-internal-gateway (deny-first default).
+  gateway:
+    name: nginx-public-gateway
+    namespace: nginx-gateway-system
+    gatewayClassName: nginx
+    # Adopts the pre-existing DO LB from the old nginx-shared-gateway Service
+    # (which was disowned first, #306) — keeps IP 104.248.98.161, so prod DNS
+    # and cadence publicAddr (…:6472/7843) are untouched. This annotation is the
+    # stable binding; leave it in place.
+    infrastructure:
+      annotations:
+        kubernetes.digitalocean.com/load-balancer-id: 486635e9-511a-45c8-8fda-9f98eed2c358
+    listeners:
+      # Production localfirsthealth.com
+      - name: https-lfh
+        port: 443
+        protocol: HTTPS
+        hostname: "*.localfirsthealth.com"
+        tlsSecretName: nginx-gateway-tls-prod
+      - name: http-lfh
+        port: 80
+        protocol: HTTP
+        hostname: "*.localfirsthealth.com"
+      # Cadence QUIC (UDPRoute; cadence LB consolidation). UDP has no SNI, so
+      # envs are demuxed by port: prod keeps the canonical 6472 here; preprod's
+      # 6473 lives on the tailnet gateway. The cadence chart attaches a UDPRoute
+      # via sectionName; publicAddr in the deployment values advertises
+      # <shared-LB-IP>:<port>. NGF adds these ports to its LB Service (DO LB is
+      # REGIONAL_NETWORK — updates in place, IP stable). Never add a TCP
+      # listener on these port numbers (DO CCM same-port TCP+UDP update bug).
+      - name: cadence-quic-prod
+        port: 6472
+        protocol: UDP
+      # Prod relay QUIC — iroh's DEFAULT 7842. Free on the public gateway now that
+      # the preprod relay lives on the internal (tailnet) gateway, so no port
+      # collision and no relay_quic_port advertisement needed: boxes probe the
+      # default, no dependency on #3166 adoption across the fleet.
+      - name: relay-quic-prod
+        port: 7842
+        protocol: UDP
+      # Production mycure.md
+      - name: https-mycure
+        port: 443
+        protocol: HTTPS
+        hostname: "*.mycure.md"
+        tlsSecretName: nginx-gateway-tls-prod-mycure
+      - name: http-mycure
+        port: 80
+        protocol: HTTP
+        hostname: "*.mycure.md"
+
+  # INTERNAL gateway — the CLUSTER-DEFAULT ingress (deny-first): every
+  # deployment's routes land here unless the deployment explicitly opts into
+  # the public shared gateway above (prod does, tagged PUBLIC). ClusterIP data
+  # plane (never a DO LB). Private access is provider-agnostic — today the
+  # Tailscale operator exposes it on the tailnet (devs + boxes hit the device's
+  # 100.x IP); a VPN/subnet-router could front the same Service later.
+  extraGateways:
+    - name: nginx-internal-gateway
+      gatewayClassName: nginx
+      annotations:
+        # external-dns publishes attached routes' hostnames with THIS target
+        # (the gateway's tailnet device IP) instead of the Gateway's status
+        # address (a ClusterIP, useless off-cluster).
+        external-dns.alpha.kubernetes.io/target: "100.74.26.73"
+      infrastructure:
+        annotations:
+          tailscale.com/expose: "true"
+          tailscale.com/hostname: "nginx-internal-gateway"
+      nginxProxy:
+        serviceType: ClusterIP
+        # Preprod-grade availability; the tailscale proxy pod is single anyway.
+        replicas: 1
+      listeners:
+        # Exact-hostname listeners for the preprod app<->api pair (anti-HTTP/2-
+        # coalescing, see the shared-gateway note above / mono#2540).
+        - name: https-preprod-mycure
+          port: 443
+          protocol: HTTPS
+          hostname: "mycure.preprod.localfirsthealth.com"
+          tlsSecretName: nginx-gateway-tls-preprod-mycure
+        - name: https-preprod-hapihub
+          port: 443
+          protocol: HTTPS
+          hostname: "hapihub.preprod.localfirsthealth.com"
+          tlsSecretName: nginx-gateway-tls-preprod-hapihub
+        - name: https-preprod-lfh
+          port: 443
+          protocol: HTTPS
+          hostname: "*.preprod.localfirsthealth.com"
+          tlsSecretName: nginx-gateway-tls-preprod
+        - name: http-preprod-lfh
+          port: 80
+          protocol: HTTP
+          hostname: "*.preprod.localfirsthealth.com"
+        # Cadence QUIC (UDPRoute): preprod hub port 6473, preprod relay 7842.
+        # No SNI on UDP — port-demuxed. publicAddr in the deployment values
+        # advertises <tailnet-IP>:6473 once the tailscale device exists.
+        - name: cadence-quic-preprod
+          port: 6473
+          protocol: UDP
+        - name: relay-quic-preprod
+          port: 7842
+          protocol: UDP
+
+  tls:
+    certificates:
+      # Exact-name certs for the anti-coalescing listeners above — MUST stay
+      # single-hostname; adding extra dnsNames would re-enable coalescing.
+      - secretName: nginx-gateway-tls-preprod-mycure
+        clusterIssuer: letsencrypt-mycure-cloudflare-prod  # DNS-01
+        dnsNames:
+          - mycure.preprod.localfirsthealth.com
+      - secretName: nginx-gateway-tls-preprod-hapihub
+        clusterIssuer: letsencrypt-mycure-cloudflare-prod  # DNS-01
+        dnsNames:
+          - hapihub.preprod.localfirsthealth.com
+      - secretName: nginx-gateway-tls-preprod
+        clusterIssuer: letsencrypt-mycure-cloudflare-prod  # DNS-01, wildcard
+        dnsNames:
+          - "*.preprod.localfirsthealth.com"
+      - secretName: nginx-gateway-tls-prod
+        clusterIssuer: letsencrypt-mycure-cloudflare-prod  # DNS-01
+        dnsNames:
+          - "*.localfirsthealth.com"
+      - secretName: nginx-gateway-tls-prod-mycure
+        clusterIssuer: letsencrypt-nginx-http01  # HTTP-01 via NGINX Gateway
+        dnsNames:
+          - api.mycure.md
+          - find.mycure.md
+
+  # Cluster-wide SnippetsPolicies for the shared nginx Gateway.
+  # Owned here (not per-app) so two releases can never inject the same
+  # directive into the same nginx context — that triggers
+  # "directive is duplicate" and breaks config reload.
+  snippetsPolicies:
+    - name: hapihub-proxy-timeout
+      snippets:
+        - context: http.server.location
+          value: |
+            proxy_read_timeout 3600s;
+            client_max_body_size 50m;
+    # vapt-2025#10 L-001: OSS NGINX cannot suppress the `Server` response
+    # header via `server_tokens` (only hides the version) and the data-plane
+    # image does not bundle `headers-more`. Use the bundled njs module
+    # (ngx_http_js_module) to delete the header in the response-header phase.
+    # Script: charts/nginx-gateway/files/security-headers.js
+    # Mount:  charts/argocd-infrastructure/templates/nginx-gateway.yaml
+    - name: nginx-strip-server-header
+      snippets:
+        - context: http
+          value: |
+            js_import securityHeaders from /etc/nginx/njs-security/security-headers.js;
+        - context: http.server.location
+          value: |
+            js_header_filter securityHeaders.clearServer;
+
+# Gateway metadata consumed by the grafana/signoz Application templates
+# (route hostname + parentRef derivation only). Both routes are disabled today
+# — grafana is admin port-forward, signoz is off — so these values are inert;
+# if either route is re-enabled it attaches to the nginx public gateway.
+gateway:
+  domain: mycureapp.com
+  gateway:
+    name: nginx-public-gateway
+    namespace: nginx-gateway-system
+
+# External Secrets - Secret management
+externalSecrets:
+  enabled: true
+  version: 0.9.11
+  provider: gcp
+  
+  # AWS Secrets Manager configuration
+  aws:
+    region: us-east-1
+    roleArn: ""
+    serviceAccountName: external-secrets-sa
+  
+  # Azure Key Vault configuration
+  azure:
+    vaultUrl: ""
+    identityId: ""
+    tenantId: ""
+  
+  # GCP Secret Manager configuration
+  gcp:
+    projectId: ""
+    region: us-central1
+    clusterName: ""
+    serviceAccountEmail: ""
+
+# External DNS - Automatic DNS record management from HTTPRoutes
+externalDNS:
+  enabled: true  # Automatic DNS via Cloudflare
+
+# Kyverno - Policy engine
+kyverno:
+  enabled: true
+  version: "3.2.0"
+  namespace: kyverno
+  # HA: 2 replicas per controller. Admission webhooks are stateless;
+  # background/reports/cleanup controllers use leader-election.
+  replicas: 2
+  policies:
+    enabled: true
+    # All three ship in `audit` to start: policies are cluster-wide but
+    # audit blocks nothing anywhere — it only writes PolicyReports. This
+    # is the prod-safe rollout: validate against mycure-preprod reports
+    # first, then consider `enforce`. Flipping to enforce requires tenant
+    # charts to set securityContext.runAsNonRoot (pod-security) and the
+    # app/environment/client label taxonomy (require-labels) — until that
+    # chart-side compliance lands, enforce would admission-deny rollouts.
+    podSecurity:
+      enabled: true
+      action: audit
+    requireLabels:
+      enabled: true
+      action: audit
+    restrictRegistries:
+      enabled: true
+      action: audit
+
+# Velero - Backup and disaster recovery
+velero:
+  enabled: true
+  # Chart 12.0.1 ships Velero 1.18.0. Requires Velero >= 1.14.1 (PR #7899,
+  # issues #7898/#7985): older versions prematurely cancel DataUploads when
+  # the data-mover's expose pod waits on PVC-PV binding — the DO CSI
+  # provisioner is slow enough to trip that window.
+  version: 12.0.1
+  provider: digitalocean
+  
+  # AWS S3 configuration
+  aws:
+    region: us-east-1
+    bucket: ""  # Set to S3 bucket name (e.g., my-cluster-velero-backups)
+    roleArn: ""  # Auto-populated from terraform output (IRSA)
+  
+  # Azure Blob Storage configuration
+  azure:
+    resourceGroup: ""  # Set to Azure resource group
+    storageAccount: ""  # Set to storage account name
+    blobContainer: ""  # Set to blob container name (e.g., velero-backups)
+    subscriptionId: ""  # Optional, auto-detected if not set
+    identityClientId: ""  # Auto-populated from terraform output (Workload Identity)
+  
+  # GCP Cloud Storage configuration
+  gcp:
+    bucket: ""  # Set to GCS bucket name (e.g., my-cluster-velero-backups)
+    projectId: ""  # Set to GCP project ID
+    region: us-central1
+    serviceAccount: ""  # Auto-populated from terraform output (Workload Identity)
+  
+  # DigitalOcean Spaces configuration
+  digitalocean:
+    bucket: mycure-doks-velero-backups
+    region: sgp1
+    accessKey: ""  # Via External Secrets
+    secretKey: ""  # Via External Secrets
+  
+  # MinIO configuration (for K3D/local development)
+  minio:
+    bucket: velero-backups
+    url: http://minio.velero.svc:9000
+    publicUrl: http://localhost:9000
+    accessKey: minio
+    secretKey: minio123
+  
+  # Backup schedules configuration
+  schedules:
+    # Infrastructure namespace backups
+    infrastructure:
+      daily:
+        enabled: true
+        schedule: "0 3 * * *"  # 3 AM daily
+        retention: 720h  # 30 days
+      hourly:
+        enabled: false  # Optional, for critical infrastructure
+        schedule: "0 * * * *"  # Every hour
+        retention: 72h  # 3 days
+    
+    # Cluster-wide resource backups
+    cluster:
+      weekly:
+        enabled: true
+        schedule: "0 4 * * 0"  # 4 AM Sunday
+        retention: 2160h  # 90 days
+
+    # Production workload backups
+    production:
+      daily:
+        enabled: true
+        schedule: "0 2 * * *"  # 2 AM daily
+        # 14d, not 30d: the mycure-production Kopia repo is ~4x the single-snapshot
+        # floor at 30d of daily history. 14d ~halves it on both DO Spaces and the
+        # on-prem mirror (which can't hold 30d on its 1.8T disk). See
+        # docs/operations/ONPREM_BACKUP_SETUP.md.
+        retention: 336h  # 14 days
+        namespaces:
+          - mycure-production
+
+# Falco - Runtime security monitoring.
+# Operator + custom rulesets from charts/falco-resources (api, database).
+# Passive — Falco alerts, never blocks. Emits to stdout (route to SigNoz/
+# Discord separately).
+falco:
+  enabled: true
+  # Chart 4.6.1 (Falco 0.38.1) hits a libscap/modern-BPF scap_init bug on
+  # recent kernels (fixed upstream in 0.39.0). Chart 9.1.0 ships Falco
+  # 0.44.1 with driver.kind=modern_ebpf (CO-RE, no kernel-module build) —
+  # verified against DOKS nodes on kernel 6.1 (Debian 12). Matches the
+  # medicard fleet's pinned version.
+  version: "9.1.0"
+  namespace: falco
+  rules:
+    enabled: true
+    api:
+      enabled: true
+    database:
+      enabled: true
+
+# Monitoring - Prometheus + Grafana stack
+monitoring:
+  enabled: true  # Optional, enable for observability
+  version: 11.x.x  # Bitnami kube-prometheus chart version
+  
+  # Prometheus configuration
+  prometheus:
+    retention: 30d  # How long to keep metrics
+    storageSize: 50Gi  # Prometheus data storage
+    storageClass: ""  # Auto-detect from cluster default
+  
+  # Grafana configuration (deployed as separate wrapper chart)
+  grafana:
+    enabled: true  # Enable Grafana deployment
+
+    # Bitnami grafana subchart values (nested under 'grafana:')
+    grafana:
+      admin:
+        user: admin
+        password: admin  # Override via External Secrets in production
+
+      # Use bitnamilegacy image (consistency with monitoring stack)
+      image:
+        registry: docker.io
+        repository: bitnamilegacy/grafana
+
+      resources:
+        requests:
+          cpu: "50m"
+          memory: "150Mi"
+        limits:
+          cpu: "500m"
+          memory: "512Mi"
+
+      persistence:
+        enabled: true
+        size: 10Gi
+        storageClass: ""  # Auto-detect from cluster default
+
+      # Dashboard provider configuration
+      dashboardsProvider:
+        enabled: true
+
+      # Dashboard ConfigMaps to load
+      dashboardsConfigMaps:
+        - configMapName: grafana-dashboard-global
+          fileName: global.json
+        - configMapName: grafana-dashboard-nodes
+          fileName: nodes.json
+        - configMapName: grafana-dashboard-namespaces
+          fileName: namespaces.json
+        - configMapName: grafana-dashboard-pods
+          fileName: pods.json
+        - configMapName: grafana-dashboard-apiserver
+          fileName: api-server.json
+        - configMapName: grafana-dashboard-prometheus
+          fileName: prometheus.json
+
+    # Wrapper chart gateway configuration (not nested)
+    gateway:
+      # Disabled: Grafana is admin-only, reached via `kubectl port-forward`
+      # (svc/grafana 3000). Dropping the HTTPRoute removes the last consumer of
+      # the envoy shared-gateway — no public grafana.mycureapp.com ingress.
+      enabled: false
+      hostname: ""  # Uses grafana.{domain}
+  
+  # Alertmanager (wired into kube-prometheus via templates/monitoring.yaml).
+  # Config + Postmark token are provided via the alertmanager-config ExternalSecret
+  # (infrastructure/monitoring/alertmanager-config-externalsecret.yaml), NOT here,
+  # because Postmark's SMTP username is the secret API token (no smtp_auth_username_file).
+  alertmanager:
+    enabled: true
+
+# SigNoz - unified observability platform (metrics + traces + logs + alerting).
+# Consolidation target replacing the Prometheus/Grafana/AlertManager stack above —
+# see issue #2064. Deployed via charts/signoz wrapper (argocd templates/signoz.yaml).
+# Kept DISABLED until ClickHouse capacity (general pool) + go-live steps are ready;
+# runs in parallel with monitoring during cutover, which is removed only after parity.
+signoz:
+  enabled: false
+
+  gateway:
+    # Deny-first: ops tooling stays off the public internet. Reached via
+    # kubectl port-forward (or a tailnet-gateway route later) when enabled.
+    enabled: false
+    hostname: ""  # Uses signoz.{domain}
+
+  # Upstream signoz/signoz chart values (nested under 'signoz:' for the subchart).
+  # storageClass omitted on purpose -> cluster default provisioner (do-block-storage).
+  signoz:
+    signoz:
+      persistence:
+        enabled: true
+        size: 2Gi
+      resources:
+        requests:
+          cpu: "100m"
+          memory: "200Mi"
+        limits:
+          cpu: "1"
+          memory: "1Gi"
+    clickhouse:
+      persistence:
+        enabled: true
+        size: 50Gi
+      resources:
+        requests:
+          cpu: "200m"
+          memory: "1Gi"
+        limits:
+          cpu: "2"
+          memory: "4Gi"
+    redpanda:
+      enabled: false
+    postgresql:
+      enabled: false
+
+# Tailscale egress to the vanaheim workstation Ollama (medical-AI preprod inference)
+ollamaEgress:
+  enabled: true
+
+# Tailscale K8s operator — tailnet exposure for cluster services. Backs the
+# nginx-internal-gateway: tailnet-only is the cluster-default gateway (deny-first),
+# public exposure is an explicit prod opt-in on nginx-public-gateway.
+tailscaleOperator:
+  enabled: true

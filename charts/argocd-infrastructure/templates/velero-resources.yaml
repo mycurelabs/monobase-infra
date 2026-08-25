@@ -22,7 +22,7 @@ spec:
     helm:
       releaseName: velero-resources
       valueFiles:
-        - ../../values/infrastructure/main.yaml
+        - ../../values/clusters/{{ .Values.clusterName | default "mycure-doks-main" }}/argocd/infrastructure.yaml
 
   destination:
     server: https://kubernetes.default.svc
