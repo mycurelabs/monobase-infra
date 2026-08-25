@@ -506,6 +506,22 @@ signoz:
     postgresql:
       enabled: false
 
+# Tenzir - self-hosted security detection pipeline ("emit, don't detect").
+# A single Tenzir Node ingests hapihub audit_events over HTTP (push, all orgs),
+# detects the #3483 signals in TQL, and routes OCSF findings to Alertmanager
+# (reuses the Discord + Postmark receivers). Deployed into the `security` ns.
+#
+# DISABLED until: (1) GCP secrets exist — infrastructure-tenzir-ingest-hmac
+# (shared with hapihub's audit sink) and infrastructure-tenzir-maxmind-license;
+# (2) the TQL is validated against staging traffic. hapihub sets AUDIT_SINK_URL=
+# http://tenzir-ingest.security.svc.cluster.local:8080/ingest/audit-events
+tenzir:
+  enabled: false
+  # geoip stays off until the MaxMind license key is provisioned — the two geo
+  # signals (unusual_country, impossible_travel) stay dormant; the other five run.
+  geoip:
+    enabled: false
+
 # Tailscale egress to the vanaheim workstation Ollama (medical-AI preprod inference)
 ollamaEgress:
   enabled: true

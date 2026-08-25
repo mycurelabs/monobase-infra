@@ -1,0 +1,22 @@
+{{- if .Values.enabled }}
+# ClusterIP only — the ingest endpoint is reachable pod→pod (hapihub's audit
+# sink POSTs here). Deliberately NOT attached to any Gateway/HTTPRoute: the
+# telemetry carries user ids + IPs and must not egress (HIPAA posture). The
+# service name `tenzir-ingest` is half of the AUDIT_SINK_URL contract.
+apiVersion: v1
+kind: Service
+metadata:
+  name: tenzir-ingest
+  namespace: {{ include "tenzir.namespace" . }}
+  labels:
+    {{- include "tenzir.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.service.type }}
+  ports:
+    - port: {{ .Values.ingestPort }}
+      targetPort: ingest
+      protocol: TCP
+      name: ingest
+  selector:
+    {{- include "tenzir.selectorLabels" . | nindent 4 }}
+{{- end }}

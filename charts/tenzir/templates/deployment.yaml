@@ -1,0 +1,139 @@
+{{- if .Values.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tenzir
+  namespace: {{ include "tenzir.namespace" . }}
+  labels:
+    {{- include "tenzir.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  # Single node holds the in-memory correlation state (concurrent_sessions,
+  # impossible_travel windows). Roll one-at-a-time — a brief gap loses only the
+  # open windows, not durable data (alert-only, no PVC in phase 1).
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "tenzir.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "tenzir.labels" . | nindent 8 }}
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+    spec:
+      serviceAccountName: {{ include "tenzir.serviceAccountName" . }}
+      securityContext:
+        # Tenzir image runs as uid 1000 (tenzir). fsGroup makes the emptyDir
+        # state/geoip volumes group-writable under readOnlyRootFilesystem.
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      {{- if .Values.geoip.enabled }}
+      # Fetch GeoLite2-City.mmdb once at startup with the MaxMind license key.
+      # Kept out of the image so the DB refreshes on pod restart and the license
+      # never bakes into a layer. If this fails (bad key / no egress) the geo
+      # signals stay dormant; the node still starts.
+      initContainers:
+      - name: geoip-download
+        image: curlimages/curl:8.11.0
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities: { drop: ["ALL"] }
+        command: ["/bin/sh", "-c"]
+        args:
+          - |
+            set -eu
+            url="https://download.maxmind.com/app/geoip_download?edition_id=GeoLite2-City&license_key=${MAXMIND_LICENSE}&suffix=tar.gz"
+            curl -fsSL "$url" -o /tmp/geoip.tar.gz
+            tar -xzf /tmp/geoip.tar.gz -C /tmp
+            cp /tmp/GeoLite2-City_*/GeoLite2-City.mmdb /geoip/GeoLite2-City.mmdb
+            echo "GeoLite2-City.mmdb ready"
+        env:
+        - name: MAXMIND_LICENSE
+          valueFrom:
+            secretKeyRef: { name: tenzir-secrets, key: maxmind-license }
+        volumeMounts:
+        - { name: geoip, mountPath: /geoip }
+      {{- end }}
+      containers:
+      - name: tenzir
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities: { drop: ["ALL"] }
+        # Run a Tenzir node from the mounted config. The `tenzir.pipelines` block
+        # in tenzir.yaml auto-starts the ingest/enrich/detect/route pipelines.
+        # (Image entrypoint is `tenzir` — the pipeline CLI — so run the node binary.)
+        command: ["tenzir-node"]
+        args: ["--config=/etc/tenzir/tenzir.yaml"]
+        env:
+        - name: TENZIR_STATE_DIRECTORY
+          value: /var/lib/tenzir
+        - name: TENZIR_CACHE_DIRECTORY
+          value: /var/cache/tenzir
+        # Shared HMAC key — referenced from TQL as secret("hmac-key") when
+        # verifyHmac=true. Injected regardless so flipping verification on is a
+        # config-only change.
+        - name: TENZIR_HMAC_KEY
+          valueFrom:
+            secretKeyRef: { name: tenzir-secrets, key: hmac-key }
+        ports:
+        - name: ingest
+          containerPort: {{ .Values.ingestPort }}
+          protocol: TCP
+        livenessProbe:
+          # The node's own API/health port (default 5158, localhost).
+          exec:
+            command: ["tenzir", "--connection-timeout=5s", "version"]
+          initialDelaySeconds: 20
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 4
+        readinessProbe:
+          tcpSocket:
+            port: ingest
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          failureThreshold: 6
+        volumeMounts:
+        - { name: config, mountPath: /etc/tenzir, readOnly: true }
+        - { name: state, mountPath: /var/lib/tenzir }
+        - { name: cache, mountPath: /var/cache/tenzir }
+        {{- if .Values.geoip.enabled }}
+        - { name: geoip, mountPath: /geoip, readOnly: true }
+        {{- end }}
+        resources:
+          {{- toYaml .Values.resources | nindent 10 }}
+      volumes:
+      - name: config
+        configMap:
+          name: tenzir-config
+      - name: state
+        emptyDir: { sizeLimit: 1Gi }
+      - name: cache
+        emptyDir: { sizeLimit: 1Gi }
+      {{- if .Values.geoip.enabled }}
+      - name: geoip
+        emptyDir: { sizeLimit: 256Mi }
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- if .Values.nodePool }}
+      nodeSelector:
+        node-pool: {{ .Values.nodePool }}
+      tolerations:
+      - key: "node-pool"
+        operator: "Equal"
+        value: {{ .Values.nodePool | quote }}
+        effect: "NoSchedule"
+      {{- end }}
+{{- end }}

@@ -1,0 +1,237 @@
+{{- if .Values.enabled }}
+{{- $d := .Values.detect -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: tenzir-config
+  namespace: {{ include "tenzir.namespace" . }}
+  labels:
+    {{- include "tenzir.labels" . | nindent 4 }}
+data:
+  # Tenzir node config. The `tenzir.pipelines` block auto-starts every pipeline
+  # on node boot and restarts it on error (detection-as-code, GitOps-managed).
+  #
+  # Topology:
+  #   ingest      : HTTP push from hapihub's audit sink  -> publish "audit"
+  #   detect-*    : subscribe "audit", detect a signal    -> publish "findings"
+  #   route       : subscribe "findings" -> POST to Alertmanager (Discord+email)
+  #
+  # All detections emit a normalized finding:
+  #   {signal, severity, attck, ocsf_class_uid, title, description, entity, time}
+  # which `route` maps uniformly to an Alertmanager v2 alert.
+  tenzir.yaml: |
+    tenzir:
+      # Node API stays on localhost — nothing external talks to it.
+      endpoint: "127.0.0.1:5158"
+      pipelines:
+
+        00-ingest:
+          name: "ingest: hapihub audit_events (HTTP push, all orgs)"
+          # accept_http spins an HTTP/1.1 server; the subpipeline parses each
+          # request body. The endpoint is dedicated to the audit sink (path
+          # {{ .Values.ingestPath }}), so no path filter is needed. HMAC
+          # verification (webhook-signature header) is a phase-2 flip.
+          definition: |
+            accept_http "0.0.0.0:{{ .Values.ingestPort }}" {
+              read_json
+            }
+            where collection == "audit_events" and operation == "INSERT"
+            this = document
+            publish "audit"
+          restart-on-error: 10s
+          unstoppable: true
+
+        10-failed-logins:
+          name: "detect: failed logins burst (T1110)"
+          definition: |
+            subscribe "audit"
+            where action == "auth.sign_in_failed" or action == "auth.mfa_failed"
+            every {{ $d.failedLogins.window }} {
+              summarize ip, n=count(), org=first(organization), emails=distinct(meta.email)
+            }
+            where n >= {{ $d.failedLogins.threshold }}
+            this = {
+              signal: "failed_logins", severity: "warning", attck: "T1110",
+              ocsf_class_uid: 3002,
+              title: f"Failed-login burst from {ip}",
+              description: f"{n} failed sign-ins from {ip} in {{ $d.failedLogins.window }}",
+              entity: {ip: ip, organization: org, emails: emails},
+              time: now(),
+            }
+            publish "findings"
+          restart-on-error: 10s
+
+        11-mass-export:
+          name: "detect: mass PHI export (T1567)"
+          definition: |
+            subscribe "audit"
+            where action == "phi.record_exported"
+            every {{ $d.massExport.window }} {
+              summarize actor, n=count(), org=first(organization), ip=first(ip)
+            }
+            where n >= {{ $d.massExport.threshold }}
+            this = {
+              signal: "mass_export", severity: "critical", attck: "T1567",
+              ocsf_class_uid: 4001,
+              title: f"Mass PHI export by {actor}",
+              description: f"{n} records exported by actor {actor} in {{ $d.massExport.window }}",
+              entity: {actor: actor, organization: org, ip: ip},
+              time: now(),
+            }
+            publish "findings"
+          restart-on-error: 10s
+
+        12-late-night:
+          name: "detect: late-night access (T1078)"
+          definition: |
+            subscribe "audit"
+            where action == "auth.sign_in" and outcome == "success"
+            hr = (from_epoch(occurredAt * 1ms) + {{ $d.lateNight.tzOffsetHours }}h).hour()
+            where hr >= {{ $d.lateNight.startHour }} and hr < {{ $d.lateNight.endHour }}
+            this = {
+              signal: "late_night", severity: "warning", attck: "T1078",
+              ocsf_class_uid: 3002,
+              title: f"Late-night sign-in by {actor}",
+              description: f"Sign-in by {actor} at local hour {hr} from {ip}",
+              entity: {actor: actor, organization: organization, ip: ip, hour: hr},
+              time: from_epoch(occurredAt * 1ms),
+            }
+            publish "findings"
+          restart-on-error: 10s
+
+        13-privilege-change:
+          name: "detect: privilege escalation (T1098)"
+          definition: |
+            subscribe "audit"
+            where action == "org.member_role_changed"
+            where meta.to == "admin" or meta.to == "owner" or meta.to == "superadmin"
+            where not (meta.from == "admin" or meta.from == "owner" or meta.from == "superadmin")
+            this = {
+              signal: "privilege_change", severity: "critical", attck: "T1098",
+              ocsf_class_uid: 3006,
+              title: f"Role escalated to {meta.to}",
+              description: f"Member {meta.userId} role {meta.from} -> {meta.to} in org {organization}",
+              entity: {target: meta.userId, organization: organization, from: meta.from, to: meta.to},
+              time: from_epoch(occurredAt * 1ms),
+            }
+            publish "findings"
+          restart-on-error: 10s
+
+        14-concurrent-sessions:
+          name: "detect: concurrent sessions (heuristic; T1078)"
+          definition: |
+            // Reconstruct live sessions from the audit stream. sign_out fires only
+            // on explicit logout (expiry is NOT audited), so open = sign_ins minus
+            // sign_outs OVERCOUNTS — the window bounds the overcount (a stale
+            // sign_in ages out of the window ~= the TTL heuristic). Tune in staging.
+            subscribe "audit"
+            where action == "auth.sign_in" or action == "auth.sign_out"
+            every {{ $d.concurrentSessions.ttl }} {
+              summarize actor, ins=count_if(action, a => a == "auth.sign_in"), outs=count_if(action, a => a == "auth.sign_out"), org=first(organization)
+            }
+            open = ins - outs
+            where open >= {{ $d.concurrentSessions.threshold }}
+            this = {
+              signal: "concurrent_sessions", severity: "warning", attck: "T1078",
+              ocsf_class_uid: 3002,
+              title: f"{open} concurrent sessions for {actor}",
+              description: f"~{open} open sessions for actor {actor} (heuristic over {{ $d.concurrentSessions.ttl }})",
+              entity: {actor: actor, organization: org, open: open},
+              time: now(),
+            }
+            publish "findings"
+          restart-on-error: 10s
+
+        {{- if .Values.geoip.enabled }}
+        20-unusual-country:
+          name: "detect: sign-in from unusual country (T1078.004)"
+          definition: |
+            subscribe "audit"
+            where action == "auth.sign_in" and outcome == "success" and ip != null
+            geo = ip.enrich("geoip-city")
+            country = geo.country.iso_code
+            where country != null and not (country in [{{ range $i, $c := .Values.geoip.allowedCountries }}{{ if $i }}, {{ end }}"{{ $c }}"{{ end }}])
+            this = {
+              signal: "unusual_country", severity: "warning", attck: "T1078.004",
+              ocsf_class_uid: 3002,
+              title: f"Sign-in from {country}",
+              description: f"Actor {actor} signed in from {country} ({ip})",
+              entity: {actor: actor, organization: organization, ip: ip, country: country},
+              time: from_epoch(occurredAt * 1ms),
+            }
+            publish "findings"
+          restart-on-error: 10s
+
+        21-impossible-travel:
+          name: "detect: impossible travel (geo-velocity; T1078)"
+          definition: |
+            // Consecutive successful sign-ins per actor: if the implied speed
+            // between two geolocated sign-ins exceeds a flight, flag it. Needs
+            // per-actor ordering + previous point — done by collecting each
+            // actor's recent sign-ins in a window and scanning pairs.
+            subscribe "audit"
+            where action == "auth.sign_in" and outcome == "success" and ip != null
+            geo = ip.enrich("geoip-city")
+            point = {t: from_epoch(occurredAt * 1ms), lat: geo.location.latitude, lon: geo.location.longitude, ip: ip}
+            where point.lat != null
+            every 1h {
+              summarize actor, points=collect(point), org=first(organization)
+            }
+            points = points.sort(t)
+            // Compare each point to its predecessor (great-circle km / hours).
+            hops = points.zip(points.drop(1)).map(pair => {
+              km: geo_distance_km(pair.left.lat, pair.left.lon, pair.right.lat, pair.right.lon),
+              hours: (pair.right.t - pair.left.t) / 1h,
+              from_ip: pair.left.ip, to_ip: pair.right.ip,
+            })
+            where hops.any(h => h.hours > 0 and (h.km / h.hours) > {{ $d.impossibleTravel.maxKmh }})
+            this = {
+              signal: "impossible_travel", severity: "critical", attck: "T1078",
+              ocsf_class_uid: 3002,
+              title: f"Impossible travel for {actor}",
+              description: f"Actor {actor} geo-velocity exceeded {{ $d.impossibleTravel.maxKmh }} km/h between sign-ins",
+              entity: {actor: actor, organization: org, hops: hops},
+              time: now(),
+            }
+            publish "findings"
+          restart-on-error: 10s
+        {{- end }}
+
+        90-route:
+          name: "route: findings -> Alertmanager (Discord + email)"
+          # Alertmanager v2 POST /api/v2/alerts wants a JSON *array* of alerts.
+          # Tenzir events are records and write_json emits NDJSON, so build the
+          # array body as a string (print_json + bracket-wrap) and send it raw
+          # via write_lines inside the to_http body subpipeline.
+          definition: |
+            subscribe "findings"
+            alert = {
+              labels: {
+                alertname: f"security_{signal}",
+                severity: severity,
+                signal: signal,
+                attck: attck,
+                source: "tenzir",
+              },
+              annotations: {
+                summary: title,
+                description: description,
+              },
+              startsAt: time,
+            }
+            body = "[" + print_json(alert) + "]"
+            to_http "{{ .Values.alertmanager.url }}", method="POST", headers={"Content-Type": "application/json"} {
+              select body
+              write_lines
+            }
+          restart-on-error: 30s
+
+      {{- if .Values.geoip.enabled }}
+      # GeoIP context loaded from the MaxMind DB the init container fetched.
+      contexts:
+        geoip-city:
+          type: geoip
+          arguments:
+            db-path: /geoip/GeoLite2-City.mmdb
+      {{- end }}
+{{- end }}
