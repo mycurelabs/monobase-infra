@@ -1,0 +1,15 @@
+# argocd-bootstrap override for the on-prem vanaheim cluster.
+#
+# Bootstrap this cluster with:
+#   bun scripts/bootstrap.ts \
+#     --context k3d-mycure-onprem-vanaheim \
+#     --cluster-name mycure-onprem-vanaheim \
+#     --bootstrap-values values/clusters/mycure-onprem-vanaheim/argocd/bootstrap.yaml
+#
+# Effect: this cluster's own ArgoCD uses the lean per-cluster infra config
+# (clusterName) and its auto-discover ApplicationSet deploys ONLY the staging
+# overlay, in-cluster. The DOKS ArgoCD (default deploymentPaths) excludes staging.
+argocd:
+  clusterName: mycure-onprem-vanaheim
+  deploymentPaths:
+    - path: "values/deployments/mycure-staging.yaml"

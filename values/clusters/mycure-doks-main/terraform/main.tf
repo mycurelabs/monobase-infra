@@ -35,7 +35,7 @@ terraform {
 provider "digitalocean" {} # DIGITALOCEAN_TOKEN from env
 
 module "doks_cluster" {
-  source = "../../terraform/modules/do-doks"
+  source = "../../../../terraform/modules/do-doks"
 
   cluster_name          = var.cluster_name
   region                = var.region

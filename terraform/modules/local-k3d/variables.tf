@@ -43,7 +43,19 @@ variable "disable_traefik" {
 }
 
 variable "install_gateway_api" {
-  description = "Install Gateway API CRDs"
+  description = "Install Gateway API CRDs (NGF experimental bundle)"
   type        = bool
   default     = true
+}
+
+variable "gateway_api_ref" {
+  description = "NGINX Gateway Fabric git ref for the experimental Gateway API CRD bundle. Keep in lockstep with nginxGateway.version / scripts/upgrade-gateway-api-crds.sh."
+  type        = string
+  default     = "v2.6.7"
+}
+
+variable "create_timeout" {
+  description = "Timeout k3d waits for the cluster to become ready"
+  type        = string
+  default     = "180s"
 }

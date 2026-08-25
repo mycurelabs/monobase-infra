@@ -11,3 +11,19 @@ argocd:
   targetRevision: HEAD
   namespace: argocd
   clusterServer: https://kubernetes.default.svc
+
+  # Which cluster this bootstrap seeds. Selects the per-cluster infra config
+  # under values/clusters/<clusterName>/argocd/. Override per cluster at bootstrap.
+  clusterName: mycure-doks-main
+
+  # Deployments the auto-discover ApplicationSet picks up (git-generator files).
+  # Default: all env overlays EXCEPT staging (staging is deployed only by its own
+  # on-prem cluster's ArgoCD, which overrides this to include only staging).
+  deploymentPaths:
+    - path: "values/deployments/*.yaml"
+    - path: "values/deployments/example-*.yaml"
+      exclude: true
+    - path: "values/deployments/_base/*.yaml"
+      exclude: true
+    - path: "values/deployments/mycure-staging.yaml"
+      exclude: true

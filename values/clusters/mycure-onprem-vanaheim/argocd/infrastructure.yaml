@@ -1,0 +1,202 @@
+# Infrastructure values for mycure-onprem-vanaheim (local k3d cluster).
+# LEAN, TAILNET-ONLY staging profile: only External Secrets, the Tailscale
+# operator, and the NGINX gateway (exposed to the tailnet) are enabled.
+# Everything DigitalOcean-specific or heavy is disabled below.
+# Note: argocd.repoURL is injected from infrastructure-root.yaml bootstrap file
+
+# Cert Manager - TLS certificate automation
+certManager:
+  enabled: true
+  version: v1.16.2
+
+# Cert Manager Resources - ClusterIssuers and certificate configuration
+certManagerIssuers:
+  enabled: true
+  issuers:
+    # Cloudflare DNS-01 challenge (for wildcard and multi-level subdomains)
+    - name: letsencrypt-mycure-cloudflare-prod
+      email: "caretheextramile@gmail.com"
+      server: production
+      provider: cloudflare
+      cloudflare:
+        apiTokenSecretRef:
+          name: mycure-cloudflare-api-token
+          key: api-token
+        dnsZones:
+          - localfirsthealth.com
+
+# CoreDNS overrides (DOKS coredns-custom hook) — cadence-relay hairpin rewrites.
+corednsCustom:
+  enabled: false  # disabled on k3d/vanaheim
+
+# NGINX Gateway Fabric - primary Gateway API implementation
+nginxGateway:
+  enabled: true
+  # Keep in lockstep with the Gateway API CRD bundle —
+  # scripts/upgrade-gateway-api-crds.sh (2.6.7 -> Gateway API 1.5.1).
+  version: "2.6.7"
+
+# NGINX Gateway Resources
+nginxGatewayResources:
+  gatewayClass:
+    enabled: false  # GatewayClass created by operator chart
+
+  # No public gateway on k3d/vanaheim — this cluster is tailnet-only. The single
+  # staging gateway lives under extraGateways below and is exposed via the
+  # tailscale operator (no DO LB, no internet-facing listeners).
+  gateway:
+    name: nginx-public-gateway
+    namespace: nginx-gateway-system
+    gatewayClassName: nginx
+    listeners: []
+
+  # INTERNAL gateway — the CLUSTER-DEFAULT ingress (deny-first). ClusterIP data
+  # plane (never a DO LB); the Tailscale operator exposes it on the tailnet.
+  # Checkpoint 4: TLS is now real Let's Encrypt via the cloudflare DNS-01 issuer
+  # (letsencrypt-mycure-cloudflare-prod); external-dns publishes attached-route
+  # hostnames as CNAMEs to the gateway's stable tailnet MagicDNS name.
+  extraGateways:
+    - name: nginx-internal-gateway
+      gatewayClassName: nginx
+      annotations:
+        # external-dns publishes attached routes' hostnames as A records -> the
+        # gateway's tailnet IP (like preprod's 100.74.26.73). Direct A resolves
+        # reliably on clients; a CNAME to the *.ts.net MagicDNS name needs a
+        # second (tailnet-resolver) hop that clients resolve flakily with TTL 1.
+        # NOTE: this tailnet IP is assigned by the tailscale operator and CHANGES
+        # on cluster nuke+rebootstrap — update it (get: `tailscale status | grep
+        # nginx-staging-gateway`) or re-point after a rebuild.
+        external-dns.alpha.kubernetes.io/target: "100.67.121.122"
+      infrastructure:
+        annotations:
+          tailscale.com/expose: "true"
+          tailscale.com/hostname: "nginx-staging-gateway"
+      nginxProxy:
+        serviceType: ClusterIP
+        replicas: 1
+      listeners:
+        - name: https-staging-mycure
+          port: 443
+          protocol: HTTPS
+          hostname: "mycure.staging.localfirsthealth.com"
+          tlsSecretName: nginx-gateway-tls-staging-mycure
+        - name: https-staging-hapihub
+          port: 443
+          protocol: HTTPS
+          hostname: "hapihub.staging.localfirsthealth.com"
+          tlsSecretName: nginx-gateway-tls-staging-hapihub
+        - name: https-staging-lfh
+          port: 443
+          protocol: HTTPS
+          hostname: "*.staging.localfirsthealth.com"
+          tlsSecretName: nginx-gateway-tls-staging
+        - name: http-staging-lfh
+          port: 80
+          protocol: HTTP
+          hostname: "*.staging.localfirsthealth.com"
+
+  tls:
+    certificates:
+      # Real Let's Encrypt certs via the cloudflare DNS-01 issuer for the
+      # secretNames the staging listeners above reference.
+      - secretName: nginx-gateway-tls-staging-mycure
+        clusterIssuer: letsencrypt-mycure-cloudflare-prod  # DNS-01
+        dnsNames:
+          - mycure.staging.localfirsthealth.com
+      - secretName: nginx-gateway-tls-staging-hapihub
+        clusterIssuer: letsencrypt-mycure-cloudflare-prod  # DNS-01
+        dnsNames:
+          - hapihub.staging.localfirsthealth.com
+      - secretName: nginx-gateway-tls-staging
+        clusterIssuer: letsencrypt-mycure-cloudflare-prod  # DNS-01, wildcard
+        dnsNames:
+          - "*.staging.localfirsthealth.com"
+
+  # Cluster-wide SnippetsPolicies for the shared nginx Gateway.
+  snippetsPolicies:
+    - name: hapihub-proxy-timeout
+      snippets:
+        - context: http.server.location
+          value: |
+            proxy_read_timeout 3600s;
+            client_max_body_size 50m;
+    # vapt-2025#10 L-001: strip the `Server` response header via the bundled njs
+    # module (ngx_http_js_module). Script: charts/nginx-gateway/files/security-headers.js
+    - name: nginx-strip-server-header
+      snippets:
+        - context: http
+          value: |
+            js_import securityHeaders from /etc/nginx/njs-security/security-headers.js;
+        - context: http.server.location
+          value: |
+            js_header_filter securityHeaders.clearServer;
+
+# Gateway metadata consumed by the grafana/signoz Application templates.
+# Both grafana and signoz are disabled on this cluster — these values are inert.
+gateway:
+  domain: staging.localfirsthealth.com
+  gateway:
+    name: nginx-internal-gateway
+    namespace: nginx-gateway-system
+
+# External Secrets - Secret management (staging pulls secrets from GCP)
+externalSecrets:
+  enabled: true
+  version: 0.9.11
+  provider: gcp
+
+  # AWS Secrets Manager configuration
+  aws:
+    region: us-east-1
+    roleArn: ""
+    serviceAccountName: external-secrets-sa
+
+  # Azure Key Vault configuration
+  azure:
+    vaultUrl: ""
+    identityId: ""
+    tenantId: ""
+
+  # GCP Secret Manager configuration
+  gcp:
+    projectId: ""
+    region: us-central1
+    clusterName: ""
+    serviceAccountEmail: ""
+
+# External DNS - Automatic DNS record management from HTTPRoutes
+externalDNS:
+  enabled: false  # Automatic DNS via Cloudflare (full config in external-dns.yaml)
+
+# Kyverno - Policy engine
+kyverno:
+  enabled: false  # disabled on k3d/vanaheim
+
+# Velero - Backup and disaster recovery
+velero:
+  enabled: false  # disabled on k3d/vanaheim
+
+# Falco - Runtime security monitoring
+falco:
+  enabled: false  # disabled on k3d/vanaheim
+
+# Monitoring - Prometheus + Grafana stack
+monitoring:
+  enabled: false  # disabled on k3d/vanaheim
+  # grafana.enabled kept (=false) because templates/grafana.yaml gates on this
+  # nested key directly, not monitoring.enabled.
+  grafana:
+    enabled: false
+
+# SigNoz - unified observability platform
+signoz:
+  enabled: false  # disabled on k3d/vanaheim
+
+# Tailscale egress to the vanaheim workstation Ollama
+ollamaEgress:
+  enabled: false  # disabled on k3d/vanaheim
+
+# Tailscale K8s operator — tailnet exposure for cluster services. Backs the
+# nginx-internal-gateway (tailnet-only cluster-default gateway).
+tailscaleOperator:
+  enabled: true

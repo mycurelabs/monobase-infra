@@ -25,12 +25,14 @@ spec:
     helm:
       releaseName: infrastructure
       valueFiles:
-        - ../../values/infrastructure/main.yaml
-      # Inject repoURL (single source of truth)
+        - ../../values/clusters/{{ .Values.argocd.clusterName | default "mycure-doks-main" }}/argocd/infrastructure.yaml
+      # Inject repoURL + clusterName (single source of truth). clusterName lets
+      # child Applications resolve their own per-cluster valueFiles paths.
       values: |
         argocd:
           repoURL: {{ .Values.argocd.repoURL }}
           targetRevision: {{ .Values.argocd.targetRevision | default "HEAD" }}
+        clusterName: {{ .Values.argocd.clusterName | default "mycure-doks-main" }}
 
   destination:
     server: {{ .Values.argocd.clusterServer | default "https://kubernetes.default.svc" }}

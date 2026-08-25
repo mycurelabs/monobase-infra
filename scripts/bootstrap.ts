@@ -37,6 +37,8 @@ interface BootstrapConfig {
   wait: boolean;
   dryRun: boolean;
   autoApprove: boolean;
+  bootstrapValues?: string; // extra -f values file for the argocd-bootstrap chart (per-cluster override)
+  clusterName: string;      // selects values/clusters/<name>/argocd/argocd.yaml for the ArgoCD install
   
   githubApp?: {
     appId: string;
@@ -421,12 +423,8 @@ spec:
 
     spinner.start('Installing ArgoCD...');
     try {
-      await $`helm upgrade --install argocd argo/argo-cd \
-        --namespace argocd \
-        --version 9.0.3 \
-        --values values/infrastructure/argocd.yaml \
-        --wait \
-        --timeout 10m`.quiet();
+      const argocdValues = `values/clusters/${this.config.clusterName}/argocd/argocd.yaml`;
+      await $`helm upgrade --install argocd argo/argo-cd --namespace argocd --version 9.0.3 --values ${argocdValues} --wait --timeout 10m`.quiet();
       
       spinner.succeed('ArgoCD installed successfully');
     } catch (error) {
@@ -454,7 +452,9 @@ spec:
 
     try {
       // kubectl, not helm install: the live objects are kubectl-owned.
-      const rendered = await $`helm template argocd-bootstrap charts/argocd-bootstrap`.text();
+      // Per-cluster override (e.g. clusterName + deploymentPaths) via --bootstrap-values.
+      const extraValues = this.config.bootstrapValues ? ['-f', this.config.bootstrapValues] : [];
+      const rendered = await $`helm template argocd-bootstrap charts/argocd-bootstrap ${extraValues}`.text();
       await $`kubectl apply -f - < ${new Response(rendered)}`.quiet();
       spinner.succeed('ArgoCD bootstrap deployed');
     } catch (error) {
@@ -750,6 +750,8 @@ function parseCliArgs(): BootstrapConfig {
       'private-key-path': { type: 'string' },
       destroy: { type: 'boolean', default: false },
       mode: { type: 'string' },
+      'bootstrap-values': { type: 'string' },
+      'cluster-name': { type: 'string' },
     },
     strict: true,
   });
@@ -768,6 +770,8 @@ function parseCliArgs(): BootstrapConfig {
     dryRun: values['dry-run'] || false,
     autoApprove: values.yes || false,
     destroy: values.destroy || false,
+    bootstrapValues: values['bootstrap-values'],
+    clusterName: values['cluster-name'] || 'mycure-doks-main',
   };
 
   if (values['app-id'] && values['installation-id'] && values['private-key-path']) {
