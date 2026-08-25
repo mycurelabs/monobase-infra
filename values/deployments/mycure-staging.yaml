@@ -54,8 +54,9 @@ hapihub:
   cache:
     enabled: true
 
+  # no Prometheus Operator on this lean k3d cluster (monitoring disabled)
   serviceMonitor:
-    enabled: true
+    enabled: false
   pruneAuditEvents:
     enabled: true
 
