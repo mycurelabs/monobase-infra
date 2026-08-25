@@ -59,10 +59,14 @@ nginxGatewayResources:
     - name: nginx-internal-gateway
       gatewayClassName: nginx
       annotations:
-        # external-dns publishes attached routes' hostnames with THIS target
-        # (the gateway's stable tailnet MagicDNS name) instead of the Gateway's
-        # status address (a ClusterIP, useless off-cluster).
-        external-dns.alpha.kubernetes.io/target: "nginx-staging-gateway.tail06ec7f.ts.net"
+        # external-dns publishes attached routes' hostnames as A records -> the
+        # gateway's tailnet IP (like preprod's 100.74.26.73). Direct A resolves
+        # reliably on clients; a CNAME to the *.ts.net MagicDNS name needs a
+        # second (tailnet-resolver) hop that clients resolve flakily with TTL 1.
+        # NOTE: this tailnet IP is assigned by the tailscale operator and CHANGES
+        # on cluster nuke+rebootstrap — update it (get: `tailscale status | grep
+        # nginx-staging-gateway`) or re-point after a rebuild.
+        external-dns.alpha.kubernetes.io/target: "100.67.121.122"
       infrastructure:
         annotations:
           tailscale.com/expose: "true"
