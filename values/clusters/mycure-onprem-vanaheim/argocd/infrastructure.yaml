@@ -166,7 +166,7 @@ externalSecrets:
 
 # External DNS - Automatic DNS record management from HTTPRoutes
 externalDNS:
-  enabled: true  # Automatic DNS via Cloudflare (full config in external-dns.yaml)
+  enabled: false  # Automatic DNS via Cloudflare (full config in external-dns.yaml)
 
 # Kyverno - Policy engine
 kyverno:
