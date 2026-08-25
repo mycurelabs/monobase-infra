@@ -107,6 +107,9 @@ spec:
         - { name: config, mountPath: /etc/tenzir, readOnly: true }
         - { name: state, mountPath: /var/lib/tenzir }
         - { name: cache, mountPath: /var/cache/tenzir }
+        # The node also writes /var/log/tenzir/server.log; readOnlyRootFilesystem
+        # blocks it (logs still go to stdout for `kubectl logs`).
+        - { name: logs, mountPath: /var/log/tenzir }
         {{- if .Values.geoip.enabled }}
         - { name: geoip, mountPath: /geoip, readOnly: true }
         {{- end }}
@@ -120,6 +123,8 @@ spec:
         emptyDir: { sizeLimit: 1Gi }
       - name: cache
         emptyDir: { sizeLimit: 1Gi }
+      - name: logs
+        emptyDir: { sizeLimit: 256Mi }
       {{- if .Values.geoip.enabled }}
       - name: geoip
         emptyDir: { sizeLimit: 256Mi }
