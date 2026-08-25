@@ -25,11 +25,12 @@ spec:
     spec:
       serviceAccountName: {{ include "tenzir.serviceAccountName" . }}
       securityContext:
-        # Tenzir image runs as uid 1000 (tenzir). fsGroup makes the emptyDir
-        # state/geoip volumes group-writable under readOnlyRootFilesystem.
+        # The tenzir image's `tenzir` user is uid/gid 999 — match it so the
+        # emptyDir state/cache/geoip mounts (fsGroup) are writable under
+        # readOnlyRootFilesystem.
         runAsNonRoot: true
-        runAsUser: 1000
-        fsGroup: 1000
+        runAsUser: 999
+        fsGroup: 999
         seccompProfile:
           type: RuntimeDefault
       {{- if .Values.geoip.enabled }}

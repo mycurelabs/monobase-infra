@@ -72,12 +72,12 @@ externalSecrets:
   secretStoreKind: ClusterSecretStore
   refreshInterval: 1h
   # remoteKey = GCP Secret Manager name. secretKey = key in the k8s Secret.
+  # The MaxMind license (infrastructure-tenzir-maxmind-license) is added by the
+  # ExternalSecret template only when geoip.enabled — so phase 1 needs just this
+  # one HMAC secret and a missing MaxMind key can't fail the whole sync.
   secrets:
     - secretKey: hmac-key
       remoteKey: infrastructure-tenzir-ingest-hmac
-    # Provisioned but unused until geoip.enabled=true.
-    - secretKey: maxmind-license
-      remoteKey: infrastructure-tenzir-maxmind-license
 
 serviceAccount:
   create: true

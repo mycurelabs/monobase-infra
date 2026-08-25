@@ -141,6 +141,13 @@ hapihub:
     # CADENCE_ISSUER_DEVICE_CODE_TTL (900s) and _POLL_INTERVAL (5s) are left at their schema defaults.
   - name: CADENCE_ISSUER_DEVICE_VERIFICATION_URI
     value: "https://mycure.preprod.localfirsthealth.com/oauth/device"
+    # Security detection pipeline (mono#3708 audit sink -> monobase-infra Tenzir
+    # node). The audit/sink worker POSTs every audit_events INSERT (all orgs,
+    # HMAC-signed) here. RUN_WORKERS defaults "true" on this single hapihub pod
+    # (no separate hapihubWorker in preprod), so it's the sole deliverer — no
+    # dup POSTs. AUDIT_SINK_SECRET is injected from ESO below.
+  - name: AUDIT_SINK_URL
+    value: "http://tenzir-ingest.security.svc.cluster.local:8080/ingest/audit-events"
 
   autoscaling:
     enabled: false
@@ -153,6 +160,11 @@ hapihub:
   # this env is short-lived and not publicly linked.
   externalSecrets:
     secrets:
+      # Security detection pipeline: HMAC key the audit/sink worker signs POSTs
+      # with (shared with the Tenzir node; standard-webhooks). Same GCP secret
+      # both sides read. mono#3708.
+    - secretKey: AUDIT_SINK_SECRET
+      remoteKey: infrastructure-tenzir-ingest-hmac
       # Google OAuth
     - secretKey: GOOGLE_CLIENT_ID
       remoteKey: mycure-preprod-google-oauth-client-id
