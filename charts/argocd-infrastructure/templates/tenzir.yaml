@@ -43,4 +43,15 @@ spec:
       backoff:
         duration: 10s
         maxDuration: 5m
+
+  # Ignore ExternalSecret fields auto-populated by the ESO operator (else the
+  # app sits permanently OutOfSync). Matches charts/argocd-applications/database-secrets.
+  ignoreDifferences:
+    - group: external-secrets.io
+      kind: ExternalSecret
+      jqPathExpressions:
+        - .spec.target.deletionPolicy
+        - .spec.data[].remoteRef.conversionStrategy
+        - .spec.data[].remoteRef.decodingStrategy
+        - .spec.data[].remoteRef.metadataPolicy
 {{- end }}
