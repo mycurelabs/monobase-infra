@@ -86,7 +86,7 @@ data:
           definition: |
             subscribe "audit"
             where action == "auth.sign_in" and outcome == "success"
-            hr = (from_epoch(occurredAt * 1ms) + {{ $d.lateNight.tzOffsetHours }}h).hour()
+            hr = (occurred_at + {{ $d.lateNight.tzOffsetHours }}h).hour()
             where hr >= {{ $d.lateNight.startHour }} and hr < {{ $d.lateNight.endHour }}
             this = {
               signal: "late_night", severity: "warning", attck: "T1078",
@@ -94,7 +94,7 @@ data:
               title: f"Late-night sign-in by {actor}",
               description: f"Sign-in by {actor} at local hour {hr} from {ip}",
               entity: {actor: actor, organization: organization, ip: ip, hour: hr},
-              time: from_epoch(occurredAt * 1ms),
+              time: occurred_at,
             }
             publish "findings"
           restart-on-error: 10s
@@ -112,7 +112,7 @@ data:
               title: f"Role escalated to {meta.to}",
               description: f"Member {meta.userId} role {meta.from} -> {meta.to} in org {organization}",
               entity: {target: meta.userId, organization: organization, from: meta.from, to: meta.to},
-              time: from_epoch(occurredAt * 1ms),
+              time: occurred_at,
             }
             publish "findings"
           restart-on-error: 10s
@@ -157,7 +157,7 @@ data:
               title: f"Sign-in from {country}",
               description: f"Actor {actor} signed in from {country} ({ip})",
               entity: {actor: actor, organization: organization, ip: ip, country: country},
-              time: from_epoch(occurredAt * 1ms),
+              time: occurred_at,
             }
             publish "findings"
           restart-on-error: 10s
@@ -172,7 +172,7 @@ data:
             subscribe "audit"
             where action == "auth.sign_in" and outcome == "success" and ip != null
             geo = ip.enrich("geoip-city")
-            point = {t: from_epoch(occurredAt * 1ms), lat: geo.location.latitude, lon: geo.location.longitude, ip: ip}
+            point = {t: occurred_at, lat: geo.location.latitude, lon: geo.location.longitude, ip: ip}
             where point.lat != null
             every 1h {
               summarize actor, points=collect(point), org=first(organization)
