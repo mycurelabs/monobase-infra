@@ -200,3 +200,8 @@ ollamaEgress:
 # nginx-internal-gateway (tailnet-only cluster-default gateway).
 tailscaleOperator:
   enabled: true
+
+# Tenzir security detection pipeline — off on this lean staging cluster (the key
+# must exist: templates/tenzir.yaml gates on .Values.tenzir.enabled directly).
+tenzir:
+  enabled: false
