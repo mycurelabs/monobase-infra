@@ -47,3 +47,9 @@ variable "install_gateway_api" {
   type        = bool
   default     = true
 }
+
+variable "create_timeout" {
+  description = "Timeout k3d waits for the cluster to become ready"
+  type        = string
+  default     = "180s"
+}

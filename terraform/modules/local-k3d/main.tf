@@ -1,53 +1,63 @@
-# k3d Cluster for Local Testing
+# k3d cluster for local / on-prem testing.
+#
+# Provisioned via the k3d CLI (local-exec), NOT the pvotal-tech/k3d provider.
+# That provider's readiness detection aborts before k3s finishes booting — it
+# stops tailing the container log at ~20s and fails with "stopped returning log
+# lines ... is running=true", even though the cluster comes up fine. The CLI
+# with `--wait --timeout` is reliable and is what k3d is actually tested with.
 
-resource "k3d_cluster" "main" {
-  name    = var.cluster_name
-  servers = var.servers
-  agents  = var.agents
+locals {
+  context = "k3d-${var.cluster_name}"
 
-  image = "rancher/k3s:${var.k3s_version}"
+  create_cmd = join(" ", compact([
+    "k3d cluster create ${var.cluster_name}",
+    "--servers ${var.servers}",
+    "--agents ${var.agents}",
+    "--image rancher/k3s:${var.k3s_version}",
+    "-p '${var.http_port}:80@loadbalancer'",
+    "-p '${var.https_port}:443@loadbalancer'",
+    var.disable_traefik ? "--k3s-arg '--disable=traefik@server:*'" : "",
+    "--volume '/tmp/k3d-${var.cluster_name}:/var/lib/rancher/k3s/storage@all'",
+    "--wait --timeout ${var.create_timeout}",
+  ]))
+}
 
-  # Port mappings for LoadBalancer services
-  # Use alternative ports to avoid conflicts with production k8s
-  port {
-    host_port      = var.http_port
-    container_port = 80
-    node_filters   = ["loadbalancer"]
+resource "null_resource" "cluster" {
+  # Any change to these recreates the cluster (destroy-then-create).
+  triggers = {
+    cluster_name = var.cluster_name
+    k3s_version  = var.k3s_version
+    servers      = var.servers
+    agents       = var.agents
+    http_port    = var.http_port
+    https_port   = var.https_port
+    traefik      = tostring(var.disable_traefik)
   }
 
-  port {
-    host_port      = var.https_port
-    container_port = 443
-    node_filters   = ["loadbalancer"]
+  # Create. Delete-if-exists first so a partial/failed prior run doesn't wedge
+  # the nuke-and-reprovision loop. k3d updates ~/.kube/config and switches to
+  # the k3d-<name> context by default.
+  provisioner "local-exec" {
+    command = "k3d cluster delete ${var.cluster_name} >/dev/null 2>&1 || true; ${local.create_cmd}"
   }
 
-  # k3s server arguments
-  k3s {
-    extra_args {
-      arg          = var.disable_traefik ? "--disable=traefik" : ""
-      node_filters = ["server:*"]
-    }
-  }
-
-  # Volume mount for persistent data
-  volume {
-    source       = "/tmp/k3d-${var.cluster_name}"
-    destination  = "/var/lib/rancher/k3s/storage"
-    node_filters = ["all"]
+  provisioner "local-exec" {
+    when    = destroy
+    command = "k3d cluster delete ${self.triggers.cluster_name}"
   }
 }
 
-# Install Gateway API CRDs
+# Gateway API CRDs (NGINX Gateway Fabric needs them). Applied against the
+# freshly-created context.
 resource "null_resource" "install_gateway_api" {
-  count = var.install_gateway_api ? 1 : 0
+  count      = var.install_gateway_api ? 1 : 0
+  depends_on = [null_resource.cluster]
 
-  provisioner "local-exec" {
-    command = <<-EOT
-      echo '${k3d_cluster.main.credentials[0].raw}' > /tmp/k3d-kubeconfig-${k3d_cluster.main.name}.yaml
-      export KUBECONFIG="/tmp/k3d-kubeconfig-${k3d_cluster.main.name}.yaml"
-      kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.0.0/standard-install.yaml
-    EOT
+  triggers = {
+    cluster = null_resource.cluster.id
   }
 
-  depends_on = [k3d_cluster.main]
+  provisioner "local-exec" {
+    command = "kubectl --context k3d-${var.cluster_name} apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.0.0/standard-install.yaml"
+  }
 }
