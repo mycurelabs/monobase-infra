@@ -149,7 +149,8 @@ hapihub:
       remoteKey: mycure-staging-better-auth-secret
 
   postgresql:
-    serviceName: postgresql-primary
+    # standalone Bitnami postgres exposes `postgresql` (no `-primary` writer svc)
+    serviceName: postgresql
 mycure:
   image:
     tag: "10.25.130"
