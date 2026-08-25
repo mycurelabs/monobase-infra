@@ -4,9 +4,10 @@
 # LEAN staging env on a LOCAL k3d cluster. Unlike preprod (a cloud DOKS
 # HA prod-rehearsal), staging is a minimal single-node dev/QA target:
 # standalone Postgres, small PVCs, no read-plane split, no medical-AI stack,
-# no cadence. GCP secrets are still REUSED from mycure-production (same as
-# preprod) so any prod-cloned data remains decryptable — the mailpit/host
-# overrides keep it side-effect-free. Tear down with `k3d cluster delete`.
+# no cadence. Staging uses its OWN mycure-staging-* GCP secrets (NOT prod's):
+# internal ones (encryption keys, auth, DB/cache/storage) generated fresh;
+# external integrations (Google OAuth, Stripe, GCS storage) stubbed until real
+# staging values are provisioned. Tear down with `k3d cluster delete`.
 
 global:
   # provisional; tailnet-only exposure + final hostnames resolved at Checkpoint 4
@@ -16,10 +17,9 @@ global:
 
   # no nodePool: k3d nodes are untainted
 
-  # Point the database-secrets chart at the mycure-production-* GCP keys so
-  # Postgres/Minio/Valkey K8s secrets carry prod credentials. Required for
-  # any Velero-restored PVCs (their bitnami init state is keyed to prod passwords).
-  secretPrefix: "mycure-production"
+  # database-secrets chart reads the mycure-staging-* GCP keys (staging's own,
+  # freshly generated) for the Postgres/Minio/Valkey K8s secrets.
+  secretPrefix: "mycure-staging"
 
 # Strict gateway ingress canary (preprod-first): drops the baseline's blanket
 # nginx-gateway-system → all-pods allow; apps rely on their own port-scoped
@@ -94,57 +94,58 @@ hapihub:
   autoscaling:
     enabled: false
 
-  # Secrets REUSE the existing mycure-production-* GCP keys (same rationale as
-  # preprod: prod-cloned data must stay decryptable — ENC_* keys byte-identical).
+  # Staging's own mycure-staging-* GCP keys. ENC_*/PRIVATE_KEY/PUBLIC_KEY/
+  # AUTH_SECRET/BETTER_AUTH_SECRET are generated fresh; GOOGLE_*/STRIPE_*/
+  # STORAGE_* are stubbed placeholders until real staging integrations exist.
   externalSecrets:
     secrets:
       # Google OAuth
     - secretKey: GOOGLE_CLIENT_ID
-      remoteKey: mycure-preprod-google-oauth-client-id
+      remoteKey: mycure-staging-google-oauth-client-id
     - secretKey: GOOGLE_CLIENT_SECRET
-      remoteKey: mycure-preprod-google-oauth-client-secret
+      remoteKey: mycure-staging-google-oauth-client-secret
     - secretKey: STRIPE_SECRET_KEY
-      remoteKey: mycure-preprod-stripe-secret-key
+      remoteKey: mycure-staging-stripe-secret-key
       # Encryption keys
     - secretKey: ENC_BILLING_INVOICES
-      remoteKey: mycure-production-enc-billing-invoices
+      remoteKey: mycure-staging-enc-billing-invoices
     - secretKey: ENC_BILLING_ITEMS
-      remoteKey: mycure-production-enc-billing-items
+      remoteKey: mycure-staging-enc-billing-items
     - secretKey: ENC_BILLING_PAYMENTS
-      remoteKey: mycure-production-enc-billing-payments
+      remoteKey: mycure-staging-enc-billing-payments
     - secretKey: ENC_MEDICAL_RECORDS
-      remoteKey: mycure-production-enc-medical-records
+      remoteKey: mycure-staging-enc-medical-records
     - secretKey: ENC_PERSONAL_DETAILS
-      remoteKey: mycure-production-enc-personal-details
+      remoteKey: mycure-staging-enc-personal-details
       # JWT/Auth keys
     - secretKey: PRIVATE_KEY
-      remoteKey: mycure-production-private-key
+      remoteKey: mycure-staging-private-key
     - secretKey: PUBLIC_KEY
-      remoteKey: mycure-production-public-key
+      remoteKey: mycure-staging-public-key
       # Storage configuration (GCP)
     - secretKey: STORAGE_BUCKET
-      remoteKey: mycure-production-storage-bucket
+      remoteKey: mycure-staging-storage-bucket
     - secretKey: STORAGE_CLIENT_EMAIL
-      remoteKey: mycure-production-storage-client-email
+      remoteKey: mycure-staging-storage-client-email
     - secretKey: STORAGE_DIRECTORY
-      remoteKey: mycure-production-storage-directory
+      remoteKey: mycure-staging-storage-directory
     - secretKey: STORAGE_PRIVATE_KEY
-      remoteKey: mycure-production-storage-private-key
+      remoteKey: mycure-staging-storage-private-key
     - secretKey: STORAGE_PROJECT_ID
-      remoteKey: mycure-production-storage-project-id
+      remoteKey: mycure-staging-storage-project-id
     - secretKey: STORAGE_TYPE
-      remoteKey: mycure-production-storage-type
+      remoteKey: mycure-staging-storage-type
       # Stripe configuration
     - secretKey: STRIPE_KEY
-      remoteKey: mycure-preprod-stripe-key
+      remoteKey: mycure-staging-stripe-key
     - secretKey: STRIPE_CHECKOUT_SUCCESS_URL
-      remoteKey: mycure-production-stripe-checkout-success-url
+      remoteKey: mycure-staging-stripe-checkout-success-url
     - secretKey: STRIPE_CHECKOUT_CANCEL_URL
-      remoteKey: mycure-production-stripe-checkout-cancel-url
+      remoteKey: mycure-staging-stripe-checkout-cancel-url
     - secretKey: AUTH_SECRET
-      remoteKey: mycure-production-auth-secret
+      remoteKey: mycure-staging-auth-secret
     - secretKey: BETTER_AUTH_SECRET
-      remoteKey: mycure-production-better-auth-secret
+      remoteKey: mycure-staging-better-auth-secret
 
   postgresql:
     serviceName: postgresql-primary
