@@ -65,8 +65,11 @@ hapihub:
   # the AuditSignInFailureBurst/AuditPhiExportBurst rules scrape. (PR #354 squash-
   # merged at 11.20.109, which lacks the counter, so the rules were inert; this
   # completes it to 110 so the serviceMonitor scrape + burst rules go live.)
+  # 11.20.116 (clean release tag, #3726) = the audit/sink worker (mono#3708) —
+  # POSTs every audit_events INSERT to the Tenzir detection pipeline. The prior
+  # 11.20.116-1255.1 was a pre-release CI build that PREDATED #3708 (no sink).
   image:
-    tag: "11.20.116-1255.1"
+    tag: "11.20.116"
   cache:
     enabled: true
 
