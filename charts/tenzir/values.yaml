@@ -1,0 +1,89 @@
+enabled: true
+
+image:
+  repository: tenzir/tenzir
+  # v6 required — detection TQL uses accept_http/to_http (absent in v5).
+  tag: "v6.13.0"
+  pullPolicy: IfNotPresent
+
+# Ingest: hapihub's platform audit-sink POSTs every audit_events INSERT here
+# (org-agnostic, HMAC-signed). Cluster-internal ClusterIP — NOT exposed via the
+# gateway. This is the URL hapihub sets as AUDIT_SINK_URL:
+#   http://tenzir-ingest.<namespace>.svc.cluster.local:8080/ingest/audit-events
+ingestPort: 8080
+ingestPath: /ingest/audit-events
+
+# HMAC verification of the standard-webhooks X-Webhook-Signature header. OFF in
+# phase 1 — the endpoint is cluster-internal (network boundary is the control)
+# and the emitter signs from day 1, so flipping this on later needs no emitter
+# change. When true, the ingest pipeline verifies against the shared secret.
+verifyHmac: false
+
+# Alert route: findings POST to the existing Alertmanager (reuses its Discord +
+# Postmark receivers, exactly like falcosidekick). No new alert secret.
+alertmanager:
+  url: "http://monitoring-kube-prometheus-alertmanager.monitoring:9093/api/v2/alerts"
+
+# GeoIP enrichment (unusual_country + impossible_travel). Needs a MaxMind
+# GeoLite2-City.mmdb. When enabled, an init container downloads it with the
+# license key from the ESO secret. Off until the license key is provisioned →
+# the two geo signals stay dormant (fail-open: no geo field, no geo finding);
+# the other six signals run regardless.
+geoip:
+  enabled: false
+  # Countries treated as normal for unusual_country (ISO-3166 alpha-2).
+  allowedCountries: ["PH", "US"]
+
+# Detection tunables (kept here so ops can tune thresholds without touching TQL).
+detect:
+  failedLogins:
+    window: "10min"
+    threshold: 5
+  massExport:
+    window: "10min"
+    threshold: 50
+  bulkView:            # phase 2 (needs access logs OR phi.record_accessed volume)
+    window: "10min"
+    threshold: 100
+  lateNight:           # local-hour bucket flagged as "late night" (UTC+8 clinic tz baked as offset)
+    tzOffsetHours: 8
+    startHour: 0
+    endHour: 5
+  concurrentSessions:
+    ttl: "3600s"       # close a sign_in after this if no explicit sign_out (expiry isn't audited)
+    threshold: 3
+  impossibleTravel:
+    maxKmh: 900        # faster than a commercial flight ⇒ impossible
+
+service:
+  type: ClusterIP
+
+resources:
+  requests:
+    cpu: 250m
+    memory: 512Mi
+  limits:
+    cpu: "1"
+    memory: 2Gi
+
+externalSecrets:
+  enabled: true
+  secretStore: gcp-secretstore
+  secretStoreKind: ClusterSecretStore
+  refreshInterval: 1h
+  # remoteKey = GCP Secret Manager name. secretKey = key in the k8s Secret.
+  secrets:
+    - secretKey: hmac-key
+      remoteKey: infrastructure-tenzir-ingest-hmac
+    # Provisioned but unused until geoip.enabled=true.
+    - secretKey: maxmind-license
+      remoteKey: infrastructure-tenzir-maxmind-license
+
+serviceAccount:
+  create: true
+  name: ""
+
+# Schedule onto the shared infra pool (tainted node-pool=infra on the live DOKS).
+nodePool: "infra"
+
+affinity: {}

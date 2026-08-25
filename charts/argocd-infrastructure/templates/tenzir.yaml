@@ -1,0 +1,46 @@
+{{- if .Values.tenzir.enabled }}
+# ArgoCD Application: Tenzir security detection pipeline
+# Sync Wave 2 - after external-secrets (HMAC/MaxMind) + monitoring (Alertmanager
+# is the alert sink). Deployed into a dedicated `security` namespace so the
+# user/IP-bearing telemetry stays isolated. Only deployed if tenzir.enabled=true.
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: tenzir
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+
+  source:
+    path: charts/tenzir
+    repoURL: {{ .Values.argocd.repoURL }}
+    targetRevision: {{ .Values.argocd.targetRevision }}
+    helm:
+      releaseName: tenzir
+      valuesObject:
+        global:
+          namespace: security
+        {{- toYaml .Values.tenzir | nindent 8 }}
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: security
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 10s
+        maxDuration: 5m
+{{- end }}

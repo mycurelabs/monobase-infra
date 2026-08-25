@@ -1,0 +1,8 @@
+apiVersion: v2
+name: tenzir
+description: tenzir — self-hosted security detection pipeline. A single Tenzir Node (Rust/Arrow, native Sigma + OCSF) that ingests hapihub audit_events over HTTP (push), normalizes to OCSF, detects the #3483 signals, and routes findings to Alertmanager. See docs/security — "emit, don't detect".
+type: application
+version: 0.1.0
+# Pinned to v6 — the detection TQL uses v6 operators (accept_http, to_http)
+# that do not exist in v5. Validated against v6.13.0.
+appVersion: "v6.13.0"
