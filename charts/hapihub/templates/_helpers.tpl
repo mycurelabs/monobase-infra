@@ -396,6 +396,17 @@ so a scheduled `hapihub backfill` boots with the identical environment.
       name: {{ include "hapihub.fullname" . }}-secrets
       key: BETTER_AUTH_SECRET
       optional: true
+# Security detection pipeline: HMAC key the audit/sink worker signs its POSTs
+# with (standard-webhooks; mono#3708). optional:true → envs without the key
+# (e.g. prod) just skip it. Set on preprod via externalSecrets →
+# infrastructure-tenzir-ingest-hmac. The sink worker needs this to init its
+# signer, so it must be a real pod env var (not only in the synced Secret).
+- name: AUDIT_SINK_SECRET
+  valueFrom:
+    secretKeyRef:
+      name: {{ include "hapihub.fullname" . }}-secrets
+      key: AUDIT_SINK_SECRET
+      optional: true
 # v11 database URI (from ExternalSecrets, for external PostgreSQL)
 {{- if not (and .Values.postgresql.enabled (not .Values.postgresql.external)) }}
 - name: DATABASE_URI
