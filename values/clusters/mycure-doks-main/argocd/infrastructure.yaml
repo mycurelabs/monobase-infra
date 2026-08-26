@@ -209,14 +209,6 @@ nginxGatewayResources:
           value: |
             proxy_read_timeout 3600s;
             client_max_body_size 50m;
-            # Stream S3 multipart PUT bodies straight to MinIO. With buffering ON
-            # (nginx default) + http2, large concurrent part uploads from the
-            # GH-hosted linux/macos runners wedge at the first ~25MB batch and hang
-            # (windows/HTTP-1.1 unaffected) — this breaks every desktop release at
-            # the publish step. Off = correct posture for an object-store backend.
-            proxy_request_buffering off;
-            # GH-runner part streams over slow links shouldn't be cut at the 60s default.
-            client_body_timeout 300s;
     # vapt-2025#10 L-001: OSS NGINX cannot suppress the `Server` response
     # header via `server_tokens` (only hides the version) and the data-plane
     # image does not bundle `headers-more`. Use the bundled njs module
