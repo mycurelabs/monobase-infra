@@ -14,140 +14,125 @@ global:
   domain: staging.localfirsthealth.com
   namespace: mycure-staging
   environment: staging
-
   # no nodePool: k3d nodes are untainted
 
   # database-secrets chart reads the mycure-staging-* GCP keys (staging's own,
   # freshly generated) for the Postgres/Minio/Valkey K8s secrets.
   secretPrefix: "mycure-staging"
-
 # Strict gateway ingress canary (preprod-first): drops the baseline's blanket
 # nginx-gateway-system → all-pods allow; apps rely on their own port-scoped
 # gateway rules.
 securityBaseline:
   strictGatewayIngress: true
-
 mycure-dashboard:
   resources:
     requests:
       cpu: 50m
   gateway:
     sectionName: https-staging-lfh
-
   config:
     API_URL: "https://hapihub.staging.localfirsthealth.com"
-
 mycure-pxp:
   resources:
     requests:
       cpu: 50m
   gateway:
     sectionName: https-staging-lfh
-
   config:
     API_URL: "https://hapihub.staging.localfirsthealth.com"
-
 hapihub:
   # Keep the same image tag as the preprod copy.
   image:
-    tag: "11.20.115"
+    tag: "staging-1f0307e"
   cache:
     enabled: true
-
   # no Prometheus Operator on this lean k3d cluster (monitoring disabled)
   serviceMonitor:
     enabled: false
   pruneAuditEvents:
     enabled: true
-
   # single replica, no HPA
   replicaCount: 1
-
   resources:
     requests:
       memory: 768Mi
     limits:
       memory: 2Gi
-
   gateway:
     hostnames:
-    - hapihub.staging.localfirsthealth.com
-    sectionName: https-staging-hapihub  # anti-coalescing exact listener, pairs with mycure block
+      - hapihub.staging.localfirsthealth.com
+    sectionName: https-staging-hapihub # anti-coalescing exact listener, pairs with mycure block
     # No mycure.md hostnames in staging — we only route *.staging.localfirsthealth.com.
   betterAuth:
     passkey:
       rpName: "Mycure (staging)"
       rpId: "staging.localfirsthealth.com"
-
   config:
     CORS_ORIGINS: "https://hapihub.staging.localfirsthealth.com,https://mycure.staging.localfirsthealth.com,https://mycure-dashboard.staging.localfirsthealth.com,https://mycure-pxp.staging.localfirsthealth.com,https://mycure-pr--*.web.app"
     # Medical-AI stack (medgemma-worker + openmed + medley) is DISABLED in staging.
   env:
-  - name: BETTER_AUTH_RATE_LIMIT_ENABLED
-    value: "true"
-  - name: BETTER_AUTH_RATE_LIMIT_WINDOW
-    value: "60"
-  - name: BETTER_AUTH_RATE_LIMIT_MAX
-    value: "300"
-  - name: BETTER_AUTH_SESSION_COOKIE_CACHE_ENABLED
-    value: "false"
-
+    - name: BETTER_AUTH_RATE_LIMIT_ENABLED
+      value: "true"
+    - name: BETTER_AUTH_RATE_LIMIT_WINDOW
+      value: "60"
+    - name: BETTER_AUTH_RATE_LIMIT_MAX
+      value: "300"
+    - name: BETTER_AUTH_SESSION_COOKIE_CACHE_ENABLED
+      value: "false"
   autoscaling:
     enabled: false
-
   # Staging's own mycure-staging-* GCP keys. ENC_*/PRIVATE_KEY/PUBLIC_KEY/
   # AUTH_SECRET/BETTER_AUTH_SECRET are generated fresh; GOOGLE_*/STRIPE_*/
   # STORAGE_* are stubbed placeholders until real staging integrations exist.
   externalSecrets:
     secrets:
       # Google OAuth
-    - secretKey: GOOGLE_CLIENT_ID
-      remoteKey: mycure-staging-google-oauth-client-id
-    - secretKey: GOOGLE_CLIENT_SECRET
-      remoteKey: mycure-staging-google-oauth-client-secret
-    - secretKey: STRIPE_SECRET_KEY
-      remoteKey: mycure-staging-stripe-secret-key
-      # Encryption keys
-    - secretKey: ENC_BILLING_INVOICES
-      remoteKey: mycure-staging-enc-billing-invoices
-    - secretKey: ENC_BILLING_ITEMS
-      remoteKey: mycure-staging-enc-billing-items
-    - secretKey: ENC_BILLING_PAYMENTS
-      remoteKey: mycure-staging-enc-billing-payments
-    - secretKey: ENC_MEDICAL_RECORDS
-      remoteKey: mycure-staging-enc-medical-records
-    - secretKey: ENC_PERSONAL_DETAILS
-      remoteKey: mycure-staging-enc-personal-details
-      # JWT/Auth keys
-    - secretKey: PRIVATE_KEY
-      remoteKey: mycure-staging-private-key
-    - secretKey: PUBLIC_KEY
-      remoteKey: mycure-staging-public-key
-      # Storage configuration (GCP)
-    - secretKey: STORAGE_BUCKET
-      remoteKey: mycure-staging-storage-bucket
-    - secretKey: STORAGE_CLIENT_EMAIL
-      remoteKey: mycure-staging-storage-client-email
-    - secretKey: STORAGE_DIRECTORY
-      remoteKey: mycure-staging-storage-directory
-    - secretKey: STORAGE_PRIVATE_KEY
-      remoteKey: mycure-staging-storage-private-key
-    - secretKey: STORAGE_PROJECT_ID
-      remoteKey: mycure-staging-storage-project-id
-    - secretKey: STORAGE_TYPE
-      remoteKey: mycure-staging-storage-type
-      # Stripe configuration
-    - secretKey: STRIPE_KEY
-      remoteKey: mycure-staging-stripe-key
-    - secretKey: STRIPE_CHECKOUT_SUCCESS_URL
-      remoteKey: mycure-staging-stripe-checkout-success-url
-    - secretKey: STRIPE_CHECKOUT_CANCEL_URL
-      remoteKey: mycure-staging-stripe-checkout-cancel-url
-    - secretKey: AUTH_SECRET
-      remoteKey: mycure-staging-auth-secret
-    - secretKey: BETTER_AUTH_SECRET
-      remoteKey: mycure-staging-better-auth-secret
-
+      - secretKey: GOOGLE_CLIENT_ID
+        remoteKey: mycure-staging-google-oauth-client-id
+      - secretKey: GOOGLE_CLIENT_SECRET
+        remoteKey: mycure-staging-google-oauth-client-secret
+      - secretKey: STRIPE_SECRET_KEY
+        remoteKey: mycure-staging-stripe-secret-key
+        # Encryption keys
+      - secretKey: ENC_BILLING_INVOICES
+        remoteKey: mycure-staging-enc-billing-invoices
+      - secretKey: ENC_BILLING_ITEMS
+        remoteKey: mycure-staging-enc-billing-items
+      - secretKey: ENC_BILLING_PAYMENTS
+        remoteKey: mycure-staging-enc-billing-payments
+      - secretKey: ENC_MEDICAL_RECORDS
+        remoteKey: mycure-staging-enc-medical-records
+      - secretKey: ENC_PERSONAL_DETAILS
+        remoteKey: mycure-staging-enc-personal-details
+        # JWT/Auth keys
+      - secretKey: PRIVATE_KEY
+        remoteKey: mycure-staging-private-key
+      - secretKey: PUBLIC_KEY
+        remoteKey: mycure-staging-public-key
+        # Storage configuration (GCP)
+      - secretKey: STORAGE_BUCKET
+        remoteKey: mycure-staging-storage-bucket
+      - secretKey: STORAGE_CLIENT_EMAIL
+        remoteKey: mycure-staging-storage-client-email
+      - secretKey: STORAGE_DIRECTORY
+        remoteKey: mycure-staging-storage-directory
+      - secretKey: STORAGE_PRIVATE_KEY
+        remoteKey: mycure-staging-storage-private-key
+      - secretKey: STORAGE_PROJECT_ID
+        remoteKey: mycure-staging-storage-project-id
+      - secretKey: STORAGE_TYPE
+        remoteKey: mycure-staging-storage-type
+        # Stripe configuration
+      - secretKey: STRIPE_KEY
+        remoteKey: mycure-staging-stripe-key
+      - secretKey: STRIPE_CHECKOUT_SUCCESS_URL
+        remoteKey: mycure-staging-stripe-checkout-success-url
+      - secretKey: STRIPE_CHECKOUT_CANCEL_URL
+        remoteKey: mycure-staging-stripe-checkout-cancel-url
+      - secretKey: AUTH_SECRET
+        remoteKey: mycure-staging-auth-secret
+      - secretKey: BETTER_AUTH_SECRET
+        remoteKey: mycure-staging-better-auth-secret
   postgresql:
     # standalone Bitnami postgres exposes `postgresql` (no `-primary` writer svc)
     serviceName: postgresql
@@ -158,42 +143,31 @@ mycure:
     requests:
       cpu: 50m
   gateway:
-    sectionName: https-staging-mycure  # anti-coalescing exact listener (exact-name cert kills HTTP/2 cross-host reuse -> 421s)
-
+    sectionName: https-staging-mycure # anti-coalescing exact listener (exact-name cert kills HTTP/2 cross-host reuse -> 421s)
   config:
     API_URL: "https://hapihub.staging.localfirsthealth.com"
     HAPIHUB_URL: "https://hapihub.staging.localfirsthealth.com"
-
 mycurelocal:
   enabled: false
-
 mycure-myaccount:
   enabled: false
-
 hapihub-docs:
   enabled: false
-
 nocodb:
   enabled: false
-
 # ===== MEDICAL AI: disabled wholesale in staging =====
 medley:
-  enabled: false  # no medical-AI stack in lean staging
-
+  enabled: false # no medical-AI stack in lean staging
 medleyapp:
-  enabled: false  # no medical-AI stack in lean staging
-
+  enabled: false # no medical-AI stack in lean staging
 medgemmaWorker:
-  enabled: false  # no medical-AI stack in lean staging
-
+  enabled: false # no medical-AI stack in lean staging
 openmed:
-  enabled: false  # no medical-AI stack in lean staging
-
+  enabled: false # no medical-AI stack in lean staging
 # ===== DATABASE: PostgreSQL =====
 # Standalone (single instance), lean: no read replica, small PVC. k3d local.
 postgresql:
   architecture: standalone
-
   primary:
     # max_connections=100 is enough for hapihub without the cadence watcher fan-out.
     extendedConfiguration: |
@@ -208,10 +182,8 @@ postgresql:
       limits:
         cpu: 2000m
         memory: 8Gi
-
   podDisruptionBudget:
     enabled: false
-
 # ===== CACHE: Valkey (Redis) =====
 valkey:
   master:
@@ -224,27 +196,21 @@ valkey:
       limits:
         cpu: 500m
         memory: 2Gi
-
 # ===== STORAGE: MinIO Object Storage =====
 minio:
   enabled: true
-
   gateway:
     sectionName: https-staging-lfh
-
   # WORM 6-year audit cold-archive is OFF in lean staging.
   auditArchive:
     enabled: false
 mailpit:
   enabled: true
-
   gateway:
     # Public web UI route is intentionally exposed with NO auth (testing convenience).
     hostname: "mail.staging.localfirsthealth.com"
-
 # ===== BACKUP / SYNC: cadence stack disabled in lean staging =====
 cadenceRelay:
   enabled: false
-
 cadence:
   enabled: false
