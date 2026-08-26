@@ -152,6 +152,12 @@ hapihub:
     # dup POSTs. AUDIT_SINK_SECRET is injected from ESO below.
   - name: AUDIT_SINK_URL
     value: "http://tenzir-ingest.security.svc.cluster.local:8080/ingest/audit-events"
+    # Read replica for device-telemetry parity recompute (mono#3747). Mirrors the
+    # helper-composed DATABASE_URI exactly (same $(POSTGRESQL_USER)/$(POSTGRESQL_PASSWORD)
+    # interpolation, same db) — only the host differs postgresql-primary -> postgresql-read.
+    # No-op until #3747's hapihub image ships (nothing reads it before then). Preprod only.
+  - name: DATABASE_READ_URI
+    value: "postgres://$(POSTGRESQL_USER):$(POSTGRESQL_PASSWORD)@postgresql-read.mycure-preprod.svc.cluster.local:5432/hapihub"
 
   autoscaling:
     enabled: false
