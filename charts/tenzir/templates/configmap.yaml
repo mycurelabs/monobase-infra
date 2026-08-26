@@ -148,8 +148,8 @@ data:
           definition: |
             subscribe "audit"
             where action == "auth.sign_in" and outcome == "success" and ip != null
-            geo = ip.enrich("geoip-city")
-            country = geo.country.iso_code
+            context_enrich "geoip-city", key=ip, into=geo
+            country = geo.country?.iso_code
             where country != null and not (country in [{{ range $i, $c := .Values.geoip.allowedCountries }}{{ if $i }}, {{ end }}"{{ $c }}"{{ end }}])
             this = {
               signal: "unusual_country", severity: "warning", attck: "T1078.004",
@@ -163,34 +163,28 @@ data:
           restart-on-error: 10s
 
         21-impossible-travel:
-          name: "detect: impossible travel (geo-velocity; T1078)"
+          name: "detect: impossible travel (multi-country; T1078)"
           definition: |
-            // Consecutive successful sign-ins per actor: if the implied speed
-            // between two geolocated sign-ins exceeds a flight, flag it. Needs
-            // per-actor ordering + previous point — done by collecting each
-            // actor's recent sign-ins in a window and scanning pairs.
+            // Country-based, not city geo-velocity: Tenzir has no trig functions
+            // (no haversine), and country-level geoip is far more reliable than
+            // noisy city coords. If ONE actor signs in from >=2 distinct countries
+            // within the window, they can't physically be in both → impossible
+            // travel. Over-triggers on VPN/country-hopping; tune the window.
             subscribe "audit"
             where action == "auth.sign_in" and outcome == "success" and ip != null
-            geo = ip.enrich("geoip-city")
-            point = {t: occurred_at, lat: geo.location.latitude, lon: geo.location.longitude, ip: ip}
-            where point.lat != null
-            every 1h {
-              summarize actor, points=collect(point), org=first(organization)
+            context_enrich "geoip-city", key=ip, into=geo
+            country = geo.country?.iso_code
+            where country != null
+            every {{ $d.impossibleTravel.window }} {
+              summarize actor, countries=distinct(country), org=first(organization)
             }
-            points = points.sort(t)
-            // Compare each point to its predecessor (great-circle km / hours).
-            hops = points.zip(points.drop(1)).map(pair => {
-              km: geo_distance_km(pair.left.lat, pair.left.lon, pair.right.lat, pair.right.lon),
-              hours: (pair.right.t - pair.left.t) / 1h,
-              from_ip: pair.left.ip, to_ip: pair.right.ip,
-            })
-            where hops.any(h => h.hours > 0 and (h.km / h.hours) > {{ $d.impossibleTravel.maxKmh }})
+            where countries.length() >= 2
             this = {
               signal: "impossible_travel", severity: "critical", attck: "T1078",
               ocsf_class_uid: 3002,
               title: f"Impossible travel for {actor}",
-              description: f"Actor {actor} geo-velocity exceeded {{ $d.impossibleTravel.maxKmh }} km/h between sign-ins",
-              entity: {actor: actor, organization: org, hops: hops},
+              description: f"Actor {actor} signed in from {countries.length()} countries in {{ $d.impossibleTravel.window }}: {countries}",
+              entity: {actor: actor, organization: org, countries: countries},
               time: now(),
             }
             publish "findings"

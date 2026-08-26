@@ -53,7 +53,10 @@ detect:
     ttl: "3600s"       # close a sign_in after this if no explicit sign_out (expiry isn't audited)
     threshold: 3
   impossibleTravel:
-    maxKmh: 900        # faster than a commercial flight ⇒ impossible
+    # Flag an actor signing in from >=2 distinct countries within this window
+    # (can't be in two countries at once). Country-based, not city-distance
+    # (Tenzir has no trig fns for haversine; country geoip is more reliable).
+    window: "1h"
 
 service:
   type: ClusterIP
