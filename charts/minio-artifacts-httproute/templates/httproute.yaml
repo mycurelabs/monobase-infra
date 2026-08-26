@@ -20,15 +20,6 @@ spec:
       # with the path as the object key — public URLs stay clean
       # (/maestroapp/...) AND authenticated S3 writes keep a stable signed path
       # (a gateway rewrite would break SigV4). CI writes path-style to the same host.
-      filters:
-        # Disable HTTP/2 for this vhost's server block — the Bun.S3Client desktop
-        # publisher stalls on large multipart PUT bodies over h2; h1.1 uploads fine.
-        # See h2-off-snippetsfilter.yaml.
-        - type: ExtensionRef
-          extensionRef:
-            group: gateway.nginx.org
-            kind: SnippetsFilter
-            name: minio-artifacts-h2-off
       backendRefs:
         - name: minio-artifacts
           port: 9000
