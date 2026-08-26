@@ -604,7 +604,7 @@ cadence:
   # organization_partners here, and the shared files/cadence.yaml still lists them → cadence crash-loops
   # ("collection 'file_links' has no table") on any version until those two collection entries are gated off.
   image:
-    tag: "2.1.104"
+    tag: "2.1.105"
   # Skip the file_links + organization_partners collection entries in files/cadence.yaml — hapihub 11.20.106
   # (#3335) dropped those tables in preprod. Prod stays false (11.20.102 still has + syncs them); flip prod
   # → true on the R4 11.20.106 promotion. (Same .Values-gated per-env pattern as publicAddr, #204.)
