@@ -2,12 +2,11 @@
 # base first, this file wins per key; arrays replace wholesale).
 # MyCure Pre-Production Configuration
 # Ephemeral pre-prod rehearsal env on DigitalOcean Kubernetes (DOKS).
-# Mirrors mycure-production in component shape (HA Postgres, replicaset Mongo,
-# autoscaling, resource sizing) so major changes can be rehearsed against a
-# real cloned prod dataset. GCP secrets are REUSED from mycure-production so
-# restored data remains decryptable — this means prod Stripe / OAuth / auth
-# credentials resolve in this namespace too, and the only thing keeping the
-# env from producing real side-effects is the safety overrides below
+# Mirrors mycure-production in component shape (HA Postgres, autoscaling,
+# resource sizing) so major changes can be rehearsed. Data is seeded fresh
+# (not cloned from prod); secrets are preprod-own (mycure-preprod-* GCP keys),
+# isolated from production (#3486 reset). Safety overrides below (mailpit, no
+# public linking, short-lived) still apply as defence in depth
 # (mailpit, no public linking, short-lived). Tear down with
 # `kubectl delete ns mycure-preprod` when the rehearsal is done.
 
@@ -20,10 +19,10 @@ global:
   # velero); prod pools are tainted so preprod can't land there.
   nodePool: "nonprod"
 
-  # Point the database-secrets chart at the mycure-production-* GCP keys so
-  # Postgres/Minio/Valkey K8s secrets carry prod credentials. Required for
-  # Velero-restored PVCs (their bitnami init state is keyed to prod passwords).
-  secretPrefix: "mycure-production"
+  # Preprod-own DB/cache credentials, isolated from prod. The database-secrets
+  # chart pulls mycure-preprod-* GCP keys for Postgres/Valkey/Minio; the PVCs
+  # are re-initialized on these fresh passwords (post-reset, #3486).
+  secretPrefix: "mycure-preprod"
 
 # Strict gateway ingress canary (preprod-first): drops the baseline's blanket
 # nginx-gateway-system → all-pods allow; apps rely on their own port-scoped
@@ -114,6 +113,14 @@ hapihub:
     OLLAMA_URL: "http://ollama.tailscale.svc.cluster.local:11434"
     OPENMED_URL: "http://openmed:8920"
     EMBED_MODEL: "bge-m3"  # bge-m3 is what Ollama serves for embeddings (NOT nomic-embed-text)
+    # File storage — preprod-own in-cluster MinIO (S3-compatible), isolated from
+    # prod's GCS bucket. Access creds (STORAGE_S3_ACCESS_KEY_ID/SECRET) come from
+    # the minio secret via the externalSecret below; MinIO auto-creates the bucket.
+    STORAGE_TYPE: "s3"
+    STORAGE_S3_ENDPOINT: "http://minio.mycure-preprod.svc.cluster.local:9000"
+    STORAGE_S3_REGION: "us-east-1"
+    STORAGE_S3_FORCE_PATH_STYLE: "true"
+    STORAGE_BUCKET: "hapihub"
   env:
   - name: BETTER_AUTH_RATE_LIMIT_ENABLED
     value: "true"
@@ -163,12 +170,10 @@ hapihub:
   autoscaling:
     enabled: false
 
-  # Secrets REUSE the existing mycure-production-* GCP keys. This is
-  # required so that data cloned from prod (MongoDB/Postgres) remains
-  # decryptable in preprod — the ENC_* keys must be byte-identical.
-  # Consequence: Stripe/OAuth/auth secrets are also the prod ones.
-  # Isolation relies on the mailpit/host overrides below + the fact that
-  # this env is short-lived and not publicly linked.
+  # Preprod-own secrets (mycure-preprod-* GCP keys), isolated from production
+  # (#3486 reset). Dead keys dropped: ENC_* (field-encryption unused in
+  # 11.20.118), PUBLIC_KEY (derived from PRIVATE_KEY at runtime), STRIPE_SECRET_KEY
+  # / STRIPE_KEY (Stripe creds live in the billing_providers DB row, not env).
   externalSecrets:
     secrets:
       # Security detection pipeline: HMAC key the audit/sink worker signs POSTs
@@ -181,53 +186,28 @@ hapihub:
       remoteKey: mycure-preprod-google-oauth-client-id
     - secretKey: GOOGLE_CLIENT_SECRET
       remoteKey: mycure-preprod-google-oauth-client-secret
-    - secretKey: STRIPE_SECRET_KEY
-      remoteKey: mycure-preprod-stripe-secret-key
-      # Encryption keys
-    - secretKey: ENC_BILLING_INVOICES
-      remoteKey: mycure-production-enc-billing-invoices
-    - secretKey: ENC_BILLING_ITEMS
-      remoteKey: mycure-production-enc-billing-items
-    - secretKey: ENC_BILLING_PAYMENTS
-      remoteKey: mycure-production-enc-billing-payments
-    - secretKey: ENC_MEDICAL_RECORDS
-      remoteKey: mycure-production-enc-medical-records
-    - secretKey: ENC_PERSONAL_DETAILS
-      remoteKey: mycure-production-enc-personal-details
-      # JWT/Auth keys
+      # JWT/Auth keys (preprod-own; PUBLIC_KEY derived from PRIVATE_KEY at runtime)
     - secretKey: PRIVATE_KEY
-      remoteKey: mycure-production-private-key
-    - secretKey: PUBLIC_KEY
-      remoteKey: mycure-production-public-key
+      remoteKey: mycure-preprod-private-key
       # cadence OAuth AS signing key (#2727) — the standalone cadence-issuer's EdDSA key, PEM-encoded
       # (single-line, \n-escaped; hapihub un-escapes). Same key/iss(cadence-preprod-issuer)/kid(k1) as the
       # issuer, so grants hapihub mints verify against the issuer JWKS the hub already trusts.
     - secretKey: CADENCE_ISSUER_KEY
       remoteKey: mycure-preprod-cadence-issuer-key-pem
-      # Storage configuration (GCP)
-    - secretKey: STORAGE_BUCKET
-      remoteKey: mycure-production-storage-bucket
-    - secretKey: STORAGE_CLIENT_EMAIL
-      remoteKey: mycure-production-storage-client-email
-    - secretKey: STORAGE_DIRECTORY
-      remoteKey: mycure-production-storage-directory
-    - secretKey: STORAGE_PRIVATE_KEY
-      remoteKey: mycure-production-storage-private-key
-    - secretKey: STORAGE_PROJECT_ID
-      remoteKey: mycure-production-storage-project-id
-    - secretKey: STORAGE_TYPE
-      remoteKey: mycure-production-storage-type
-      # Stripe configuration
-    - secretKey: STRIPE_KEY
-      remoteKey: mycure-preprod-stripe-key
+      # Storage — in-cluster MinIO (S3) access creds; non-secret S3 config in `config:` above
+    - secretKey: STORAGE_S3_ACCESS_KEY_ID
+      remoteKey: mycure-preprod-minio-root-user
+    - secretKey: STORAGE_S3_SECRET_ACCESS_KEY
+      remoteKey: mycure-preprod-minio-root-password
+      # Stripe checkout redirect URLs
     - secretKey: STRIPE_CHECKOUT_SUCCESS_URL
-      remoteKey: mycure-production-stripe-checkout-success-url
+      remoteKey: mycure-preprod-stripe-checkout-success-url
     - secretKey: STRIPE_CHECKOUT_CANCEL_URL
-      remoteKey: mycure-production-stripe-checkout-cancel-url
+      remoteKey: mycure-preprod-stripe-checkout-cancel-url
     - secretKey: AUTH_SECRET
-      remoteKey: mycure-production-auth-secret
+      remoteKey: mycure-preprod-auth-secret
     - secretKey: BETTER_AUTH_SECRET
-      remoteKey: mycure-production-better-auth-secret
+      remoteKey: mycure-preprod-better-auth-secret
 
   postgresql:
     serviceName: postgresql-primary
