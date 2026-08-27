@@ -138,16 +138,9 @@ kubectl exec -it -n {namespace} postgresql-0 -- psql -U postgres
 # PostgreSQL with specific database
 kubectl exec -it -n {namespace} postgresql-0 -- psql -U postgres -d {database}
 
-# MongoDB shell (mongosh)
-kubectl exec -it -n {namespace} mongodb-0 -- mongosh
-
-# MongoDB with auth (get password from secret)
-MONGO_PASS=$(kubectl get secret -n {namespace} mongodb -o jsonpath='{.data.mongodb-root-password}' | base64 -d)
-kubectl exec -it -n {namespace} mongodb-0 -- mongosh -u root -p "$MONGO_PASS"
 
 # Examples:
 kubectl exec -it -n mycure-staging postgresql-0 -- psql -U postgres
-kubectl exec -it -n mycure-production mongodb-0 -- mongosh
 ```
 
 ---

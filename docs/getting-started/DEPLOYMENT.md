@@ -43,7 +43,7 @@ installs ArgoCD and points it at the repo. After that, Git is the interface.
 | Chart | Purpose |
 |-------|---------|
 | `charts/app` | Generic frontend/service chart — every clinic app, dashboard, myaccount, etc. is an instance of this |
-| `charts/hapihub` | HapiHub API (PostgreSQL-backed; no in-cluster MongoDB) |
+| `charts/hapihub` | HapiHub API (PostgreSQL-backed) |
 | `charts/cadence` | Cadence sync service |
 | `charts/nginx-gateway` | NGINX Gateway Fabric install |
 | `charts/security-baseline` | Namespace-level PSA, NetworkPolicies, RBAC |

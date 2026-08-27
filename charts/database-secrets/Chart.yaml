@@ -1,6 +1,6 @@
 apiVersion: v2
 name: database-secrets
-description: External Secrets for database credentials (PostgreSQL, MongoDB, MinIO)
+description: External Secrets for database credentials (PostgreSQL, MinIO)
 type: application
 version: 1.0.0
 appVersion: "1.0"

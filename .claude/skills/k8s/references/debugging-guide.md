@@ -139,9 +139,6 @@ kubectl get pods -n longhorn-system
 # Check PVC usage
 kubectl exec {pod} -n {namespace} -- df -h
 
-# For MongoDB
-kubectl exec mongodb-0 -n {namespace} -- df -h /bitnami/mongodb
-
 # Resize PVC (use script)
 mise run resize-storage
 ```

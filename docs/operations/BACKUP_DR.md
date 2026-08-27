@@ -154,8 +154,8 @@ velero restore create deleted-data-recovery \\
   --include-resources persistentvolumeclaims,statefulsets
 
 # 3. Verify data restored
-kubectl exec -it postgresql-0 -n myclient-prod -- mongosh
-# Check collections
+kubectl exec -it postgresql-0 -n myclient-prod -- psql -U postgres -c "\dt"
+# Check tables
 
 # 4. Resume operations
 ```
@@ -292,7 +292,7 @@ velero restore create monthly-test-$(date +%Y%m) \\
   --wait
 
 # 3. Verify data integrity
-kubectl exec -it postgresql-0 -n myclient-restore-test -- mongosh
+kubectl exec -it postgresql-0 -n myclient-restore-test -- psql -U postgres -c "\l"
 
 # 4. Test application functionality
 kubectl port-forward -n myclient-restore-test svc/api 7500:7500

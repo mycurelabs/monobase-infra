@@ -6,10 +6,10 @@
 
 - **Purpose**: HapiHub — Healthcare API service (compliance, interoperability)
 - **Runtime**: Bun
-- **Database**: MongoDB (replicaset)
-- **Key values**: `image.tag`, `replicaCount`, `gateway.hostname`, `gateway.sectionName`, `externalSecrets`, `mongodb`, `autoscaling`, `betterAuth`
+- **Database**: PostgreSQL
+- **Key values**: `image.tag`, `replicaCount`, `gateway.hostname`, `gateway.sectionName`, `externalSecrets`, `autoscaling`, `betterAuth`
 - **Templates**: deployment, service, httproute, externalsecret, hpa, pdb, servicemonitor, networkpolicy
-- **Dependencies**: MongoDB (bitnami subchart), optional Valkey, optional MinIO, optional Mailpit
+- **Dependencies**: PostgreSQL (bitnami subchart), optional Valkey, optional MinIO, optional Mailpit
 - **Reference implementation** — most complete chart with all patterns
 
 ### mycure
@@ -103,7 +103,7 @@
 
 - **Purpose**: External Secrets for database credentials
 - **Key values**: Database-specific secret mappings
-- **Templates**: externalsecret for PostgreSQL, MongoDB, MinIO, Valkey credentials
+- **Templates**: externalsecret for PostgreSQL, MinIO, Valkey credentials
 
 ### external-dns
 

@@ -14,7 +14,7 @@ Examples:
 Each tenant namespace contains:
 
 - Application deployments (hapihub, mycure, cadence, etc.)
-- Database StatefulSets (MongoDB, PostgreSQL)
+- Database StatefulSets (PostgreSQL)
 - Cache (Valkey/Redis)
 - Object storage (MinIO)
 - Email testing (Mailpit)
@@ -57,13 +57,13 @@ A typical tenant namespace (`mycure-production`) contains:
 
 **Data stores:**
 
-- StatefulSet: mongodb (replicaset), postgresql (standalone)
+- StatefulSet: postgresql (standalone)
 - StatefulSet: valkey (standalone), minio (standalone)
 
 **Secrets:**
 
 - ExternalSecrets → Kubernetes Secrets (synced from GCP Secret Manager)
-- Database credential secrets (mongodb, postgresql, minio)
+- Database credential secrets (postgresql, minio)
 
 **Networking:**
 

@@ -148,7 +148,7 @@ kubectl logs -n cert-manager deploy/cert-manager --tail=50
 
 - PostgreSQL (Bitnami legacy image; prod primary on the `prod-db` pool,
   preprod runs primary + read replica), Valkey, MinIO. HapiHub is PG-backed
-  (hapihub-migrator handles PG⇄legacy-Mongo sync — no in-cluster MongoDB).
+  (hapihub-migrator handles PG⇄legacy sync).
 - Cadence (box sync hub) + cadence-relay: QUIC over the gateways; prod relay
   has its own LB.
 
