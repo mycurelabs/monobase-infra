@@ -119,7 +119,7 @@ argocd app history mycure-staging-root
 argocd app rollback mycure-staging-root 5
 ```
 
-**Stateful safety:** Rollback only undoes the manifest sync, not data migrations. Before rolling back any app whose name matches `*mongodb*`, `*postgres*`, `*valkey*`, `*minio*`, or `*migrator*`, **stop and confirm with the user** that they understand a schema/data migration may have already run forward and will not be reversed.
+**Stateful safety:** Rollback only undoes the manifest sync, not data migrations. Before rolling back any app whose name matches `*postgres*`, `*valkey*`, `*minio*`, or `*migrator*`, **stop and confirm with the user** that they understand a schema/data migration may have already run forward and will not be reversed.
 
 ### pause — Pause/resume auto-sync for maintenance
 
@@ -172,7 +172,6 @@ ApplicationSet (monobase-auto-discover)
         ├── namespace chart
         ├── hapihub chart
         ├── mycure chart
-        ├── mongodb (bitnami subchart)
         └── ... (all enabled charts)
 
 Application (infrastructure)

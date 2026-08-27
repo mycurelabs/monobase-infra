@@ -181,31 +181,6 @@ containerSecurityContext:
       - ALL
 ```
 
-## MongoDB Connection Helper
-
-```yaml
-{{/* MongoDB host - supports standalone and replicaset */}}
-{{- define "{chart}.mongodb.host" -}}
-{{- $serviceName := .Values.mongodb.serviceName | default "mongodb" -}}
-{{- $namespace := include "{chart}.namespace" . -}}
-{{- $architecture := .Values.mongodb.architecture | default "replicaset" -}}
-{{- if eq $architecture "replicaset" -}}
-{{- printf "%s-headless.%s.svc.cluster.local" $serviceName $namespace -}}
-{{- else -}}
-{{- printf "%s.%s.svc.cluster.local" $serviceName $namespace -}}
-{{- end -}}
-{{- end }}
-
-{{/* Full connection URL (app substitutes password from env var) */}}
-{{- define "{chart}.mongodb.connectionUrl" -}}
-{{- $host := include "{chart}.mongodb.host" . -}}
-{{- $database := .Values.mongodb.database | default "hapihub" -}}
-{{- $username := .Values.mongodb.username | default "root" -}}
-{{- $replicaSet := .Values.mongodb.replicaSet | default "rs0" -}}
-mongodb://{{ $username }}@{{ $host }}:27017/{{ $database }}?replicaSet={{ $replicaSet }}
-{{- end }}
-```
-
 ## Multi-Hostname Support
 
 For charts serving multiple hostnames (e.g., main + API subdomain):

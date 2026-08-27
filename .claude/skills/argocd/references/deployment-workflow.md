@@ -50,36 +50,29 @@ hapihub:
     secretStoreKind: ClusterSecretStore
     refreshInterval: 1h
     secrets: [...]                     # Secret key mappings
-  mongodb:
+  postgresql:
     enabled: true
-    serviceName: mongodb
-    database: hapihub
-    username: root
-    replicaSet: rs0
+    architecture: replication          # standalone | replication
+    auth:
+      existingSecret: postgresql       # Pre-created via database-secrets chart
 ```
 
 ### Database Sections (Bitnami Subcharts)
 
 ```yaml
-mongodb:
+postgresql:
   enabled: true
-  fullnameOverride: "mongodb"
-  architecture: replicaset
-  replicaCount: 1
+  fullnameOverride: "postgresql"
+  architecture: replication
   image:
-    repository: bitnamilegacy/mongodb
-    tag: 7.0.15-debian-12-r0
+    repository: bitnamilegacy/postgresql
+    tag: 16.4.0-debian-12-r13
   auth:
-    rootUser: root
-    existingSecret: mongodb            # Pre-created via database-secrets chart
+    existingSecret: postgresql         # Pre-created via database-secrets chart
   persistence:
     enabled: true
     size: 100Gi
   resources: { ... }
-
-postgresql:
-  enabled: false                       # Disabled unless API is used
-  # Similar structure to mongodb
 ```
 
 ### Optional Sections

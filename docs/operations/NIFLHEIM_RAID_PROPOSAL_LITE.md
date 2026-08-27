@@ -223,7 +223,7 @@ The existing setup script ([`scripts/onprem-backup-setup.sh`](../../scripts/onpr
 
 Pick the full proposal over this one if any of these are true:
 
-- The host will also store **Mongo or Postgres logical dumps** in addition to Velero mirror (capacity question changes).
+- The host will also store **Postgres logical dumps** in addition to Velero mirror (capacity question changes).
 - The host will be expanded to back up **additional clients** (DentaLemon, etc.) on top of mycure.
 - Management wants **two-drive failure tolerance** explicitly (this proposal only survives one).
 - Management wants **bit-rot detection** as a hard requirement.

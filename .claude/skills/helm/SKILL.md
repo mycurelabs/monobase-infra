@@ -122,7 +122,7 @@ helm history hapihub -n mycure-production
 
 ### Healthcare Applications (9)
 
-- `hapihub` — HapiHub API (Bun/MongoDB, healthcare backend)
+- `hapihub` — HapiHub API (Bun/PostgreSQL, healthcare backend)
 - `mycure` — MyCure frontend (Vue.js patient app)
 - `mycurelocal` — MyCure Local (local-first variant)
 - `mycurev8` — MyCure v8 (legacy frontend)
@@ -272,6 +272,6 @@ helm unittest charts/{name}
 ## Reference Implementation
 
 The `hapihub` chart is the most complete reference — it includes all patterns:
-HTTPRoute with sectionName, ExternalSecret, HPA, PDB, MongoDB helpers,
+HTTPRoute with sectionName, ExternalSecret, HPA, PDB, PostgreSQL helpers,
 Valkey/MinIO URL helpers, node pool affinity, and security context.
 See `charts/hapihub/templates/_helpers.tpl` for all template helpers.

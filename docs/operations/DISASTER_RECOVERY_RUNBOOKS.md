@@ -134,7 +134,7 @@ kubectl wait --for=condition=ready pod \
   --timeout=600s
 
 # 7. Verify database integrity
-kubectl exec -it postgresql-0 -n myclient-prod -- mongosh --eval "db.stats()"
+kubectl exec -it postgresql-0 -n myclient-prod -- psql -U postgres -c "\l+"
 
 # 8. Restart applications
 kubectl scale deployment api --replicas=3 -n myclient-prod

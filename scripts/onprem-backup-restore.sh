@@ -60,7 +60,7 @@ Flags (common):
 
 Flags (extract):
   --pvc=NAME                    PVC name in the Velero repo (default: $PVC)
-                                e.g. data-postgresql-primary-0, datadir-mongodb-0
+                                e.g. data-postgresql-primary-0
   --snapshot=ID|latest          Snapshot id, or "latest" (default: latest)
   --target=PATH                 Where to restore (default: $TARGET)
 

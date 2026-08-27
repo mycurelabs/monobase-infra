@@ -86,7 +86,7 @@ Option C delivers the same ₱/TB as the bare-minimum mirror **while also giving
 
 - **Option A** is the lowest sticker price but only survives one drive dying. The entire premise of having `hel.niflheim` is "what if the cloud fails _and_ something else fails?" — accepting 1-drive tolerance on the last line of defense partly defeats that.
 - **Option B** uses RAIDZ2 (good) but on small drives where the parity overhead makes capacity worse and ₱/TB worst-in-class. Only attractive if budget can't reach C.
-- **Option D** is over-provisioned for current needs but would be the right answer if management wants this host to also hold Mongo / Postgres logical dumps, support additional clients (DentaLemon, etc.), or extend retention to 60–90 days.
+- **Option D** is over-provisioned for current needs but would be the right answer if management wants this host to also hold Postgres logical dumps, support additional clients (DentaLemon, etc.), or extend retention to 60–90 days.
 - **Option E (RAIDZ1)** saves ~₱4,800 over B for the same capacity but halves failure tolerance. Modern ≥2 TB drive rebuilds carry a real risk of a second failure (URE / second-drive death during the long resync) — not worth the savings on a backup system.
 
 ---
