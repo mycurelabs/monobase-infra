@@ -29,7 +29,11 @@
       "required": ["repository", "tag"],
       "properties": {
         "repository": {"type": "string"},
-        "tag": {"type": "string", "pattern": "^([0-9]+\\.[0-9]+\\.[0-9]+(-[A-Za-z0-9.-]+)?|latest)(@sha256:[0-9a-f]{64})?$"},
+        "tag": {
+          "type": "string",
+          "description": "MUST be semver (or 'latest'), optionally with a digest. A tag that does not match this pattern makes `helm template` fail, so the ArgoCD Application sits in ComparisonError with sync=Unknown/revision=<none> and KEEPS SERVING THE PREVIOUS IMAGE - the values commit lands, CI stays green, every other app stays Synced, and nothing reports the stall (cost ~1 day on 2026-08-26). Need a per-commit tag? pullPolicy IfNotPresent means a reused tag is a silent no-op deploy, so use a semver PRERELEASE instead of a free-form tag: 11.20.118-staging.306eacc is valid, staging-306eacc is not. Diagnose with: kubectl get applications -n argocd -o custom-columns=NAME:.metadata.name,SYNC:.status.sync.status,REV:.status.sync.revision",
+          "pattern": "^([0-9]+\\.[0-9]+\\.[0-9]+(-[A-Za-z0-9.-]+)?|latest)(@sha256:[0-9a-f]{64})?$"
+        },
         "pullPolicy": {"type": "string", "enum": ["Always", "IfNotPresent", "Never"], "default": "IfNotPresent"}
       }
     },
