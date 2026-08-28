@@ -254,7 +254,7 @@ externalSecrets:
   
   # GCP Secret Manager configuration
   gcp:
-    projectId: ""
+    projectId: "mc-v4-prod"  # holds the mycure-{preprod,production}-* secrets; feeds the gcpsm ClusterSecretStore
     region: us-central1
     clusterName: ""
     serviceAccountEmail: ""
