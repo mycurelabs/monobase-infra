@@ -1,7 +1,7 @@
 # ArgoCD Application: infrastructure root.
 # Deploys all cluster-wide infrastructure (cert-manager, gateway, secrets,
 # monitoring, backups) from charts/argocd-infrastructure, configured by
-# values/infrastructure/main.yaml. One per cluster, seeded at bootstrap;
+# values/clusters/<cluster>/argocd/infrastructure.yaml. One per cluster, seeded at bootstrap;
 # everything after that is Git-driven.
 
 apiVersion: argoproj.io/v1alpha1

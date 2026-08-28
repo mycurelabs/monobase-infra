@@ -120,7 +120,7 @@ gateway:
   hostnames: []
   sectionName: https
   # Shared-gateway UDP listener name for QUIC (e.g. "cadence-quic-preprod", see
-  # values/infrastructure/main.yaml). Empty ⇒ no UDPRoute.
+  # values/clusters/<cluster>/argocd/infrastructure.yaml). Empty ⇒ no UDPRoute.
   udpListener: ""
   snippetsPolicy:
     enabled: false
