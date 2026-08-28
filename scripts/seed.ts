@@ -7630,6 +7630,29 @@ async function provisionCadenceSaKey(): Promise<void> {
     spinner.warn("No SERVICE_ACCOUNT_EMAILS configured; skipping cadence-key provisioning.");
     return;
   }
+  const secretName = `mycure-${args.env}-cadence-sa-api-key`;
+
+  // Preflight the GCP write path BEFORE minting the key. The SDK needs
+  // Application Default Credentials (ADC) — gcloud CLI auth is NOT enough. If
+  // ADC/access is missing we abort here, so we never mint an orphan api_key
+  // row that couldn't be stored. Lazy import so a normal seed never loads the
+  // GCP SDK.
+  const { GCPProvider } = await import("./secrets/providers/gcp");
+  const provider = new GCPProvider(gcpProject);
+  try {
+    await provider.initialize(); // tests auth (ADC) + Secret Manager access
+  } catch (err) {
+    const msg = (err as Error).message ?? String(err);
+    if (/default credentials|could not load/i.test(msg)) {
+      spinner.fail(
+        "GCP Application Default Credentials not found (the SDK needs ADC, not just " +
+          "gcloud CLI auth). Run: gcloud auth application-default login  — then re-run.",
+      );
+    } else {
+      spinner.fail(`GCP preflight failed for project ${gcpProject}: ${msg}`);
+    }
+    throw new Error("cadence-key: GCP preflight failed");
+  }
 
   // Fresh service-account session (the api() wrapper tracks the cookie).
   sessionCookie = "";
@@ -7642,6 +7665,10 @@ async function provisionCadenceSaKey(): Promise<void> {
     );
     throw new Error("cadence-key: service-account sign-in failed");
   }
+  // Session healthcheck (also gives the uid for the audit log). We mint for the
+  // CURRENT session user (the SA) — do NOT pass userId in the body: it's a
+  // server-only field in better-auth's apiKey plugin, and a session POST that
+  // includes it is rejected with UNAUTHORIZED_SESSION.
   const sess = (await api("GET", "/auth/get-session")) as { user?: { id?: string } } | null;
   const svcUid = sess?.user?.id;
   if (!svcUid) {
@@ -7652,7 +7679,6 @@ async function provisionCadenceSaKey(): Promise<void> {
   // Mint a non-expiring key (a service credential must not expire under cadence).
   const minted = (await api("POST", "/auth/api-key/create", {
     name: "cadence-sa-key",
-    userId: svcUid,
     expiresIn: null,
   })) as { key?: string; id?: string } | null;
   if (!minted?.key) {
@@ -7660,19 +7686,13 @@ async function provisionCadenceSaKey(): Promise<void> {
     throw new Error("cadence-key: mint returned no key");
   }
 
-  // Write to GCP Secret Manager (createSecret upserts a new version). Lazy
-  // import so a normal seed never loads the GCP SDK. Surface the exact target
-  // (name + project) before mutating — the name is the isolation boundary in
-  // the shared project.
-  const secretName = `mycure-${args.env}-cadence-sa-api-key`;
+  // Write to GCP Secret Manager (createSecret upserts a new version). Surface
+  // the exact target — the name is the isolation boundary in the shared project.
   spinner.text = `Writing cadence SA key → ${secretName} in GCP project ${gcpProject}...`;
-  const { GCPProvider } = await import("./secrets/providers/gcp");
-  const provider = new GCPProvider(gcpProject);
-  await provider.initialize();
   await provider.createSecret(secretName, minted.key);
 
   spinner.succeed(
-    `Cadence SA API key minted (id ${minted.id}) → GCP SM ${secretName} (${gcpProject}). ` +
+    `Cadence SA API key minted (id ${minted.id}, owner ${svcUid}) → GCP SM ${secretName} (${gcpProject}). ` +
       `The cadence-secrets ExternalSecret will sync it; restart the cadence pod to pick it up now.`,
   );
 }
