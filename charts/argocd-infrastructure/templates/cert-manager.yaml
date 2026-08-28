@@ -43,22 +43,10 @@ spec:
 
         # Ops plane (cert-manager/ESO/external-dns/ArgoCD/gateway) rides the
         # tainted infra pool, separated from preprod.
-        nodeSelector:
-          node-pool: infra
-        tolerations:
-          - key: node-pool
-            operator: Equal
-            value: infra
-            effect: NoSchedule
+        {{- include "argocd-infrastructure.infraPlacement" . | nindent 8 }}
 
         cainjector:
-          nodeSelector:
-            node-pool: infra
-          tolerations:
-            - key: node-pool
-              operator: Equal
-              value: infra
-              effect: NoSchedule
+          {{- include "argocd-infrastructure.infraPlacement" . | nindent 10 }}
           resources:
             requests:
               cpu: 10m
@@ -68,13 +56,7 @@ spec:
               memory: 256Mi
 
         webhook:
-          nodeSelector:
-            node-pool: infra
-          tolerations:
-            - key: node-pool
-              operator: Equal
-              value: infra
-              effect: NoSchedule
+          {{- include "argocd-infrastructure.infraPlacement" . | nindent 10 }}
           resources:
             requests:
               cpu: 10m
@@ -86,13 +68,7 @@ spec:
         # One-shot startupapicheck job: same pool so it isn't blocked if nonprod
         # is ever full during an install/upgrade.
         startupapicheck:
-          nodeSelector:
-            node-pool: infra
-          tolerations:
-            - key: node-pool
-              operator: Equal
-              value: infra
-              effect: NoSchedule
+          {{- include "argocd-infrastructure.infraPlacement" . | nindent 10 }}
   
   destination:
     server: https://kubernetes.default.svc
