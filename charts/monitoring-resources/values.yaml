@@ -1,5 +1,11 @@
+# Default values for monitoring-resources.
+# Alertmanager notification identity — override per-cluster in values (the real
+# addresses + the Postmark API-key secret name live in infrastructure.yaml).
+alertmanager:
+  smtpFrom: no-reply@example.com
+  emailTo: alerts@example.com
+  postmarkKey: infrastructure-postmark-api-key
 
-# Set by the argocd-infrastructure monitoring-resources Application (mirrors
-# .Values.kyverno.enabled). Gates the Kyverno policy-report PrometheusRule.
+# Whether the Kyverno engine is deployed (gates the policy-report alert).
 kyverno:
   enabled: false
