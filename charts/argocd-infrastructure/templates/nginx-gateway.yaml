@@ -37,13 +37,7 @@ spec:
           # The gateway is the prod request path — it rides the tainted infra
           # pool, away from preprod bursts and the noisy ops jobs (prometheus,
           # velero kopia) on nonprod.
-          nodeSelector:
-            node-pool: infra
-          tolerations:
-            - key: node-pool
-              operator: Equal
-              value: infra
-              effect: NoSchedule
+          {{- include "argocd-infrastructure.infraPlacement" . | nindent 10 }}
         # Data-plane (NginxProxy) sizing. A BestEffort single-replica data
         # plane is a standing outage risk: kubelet eviction under node memory
         # pressure takes down every hostname (~7 min of 502s while a
@@ -72,13 +66,7 @@ spec:
                 readOnly: true
           pod:
             # Data plane follows the control plane onto the tainted infra pool.
-            nodeSelector:
-              node-pool: infra
-            tolerations:
-              - key: node-pool
-                operator: Equal
-                value: infra
-                effect: NoSchedule
+            {{- include "argocd-infrastructure.infraPlacement" . | nindent 12 }}
             # Best-effort spread across hosts. Required anti-affinity is too
             # strict for a 2-node pool during a node roll — ScheduleAnyway lets
             # the scheduler place both on one node as a last resort while

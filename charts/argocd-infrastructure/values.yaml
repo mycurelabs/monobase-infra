@@ -1,0 +1,19 @@
+# argocd-infrastructure defaults. Real per-cluster config comes from
+# values/clusters/<cluster>/argocd/infrastructure.yaml (merged over these).
+
+# Ops-plane pod placement for the infrastructure operators (cert-manager,
+# external-secrets, nginx-gateway control plane).
+#
+# Default is NEUTRAL (schedule anywhere) so a cluster without a node-pool
+# taxonomy just works. A cluster that HAS dedicated pools opts in from
+# values/clusters/<cluster>/argocd/infrastructure.yaml, e.g.:
+#   infra:
+#     nodeSelector: { node-pool: infra }
+#     tolerations:
+#       - { key: node-pool, operator: Equal, value: infra, effect: NoSchedule }
+#
+# (Helm deep-merges maps, so keep the default empty — a cluster ADDS its pool
+# rather than trying to clear a non-empty default.)
+infra:
+  nodeSelector: {}
+  tolerations: []

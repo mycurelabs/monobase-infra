@@ -2,6 +2,19 @@
 # These control cluster-wide infrastructure components
 # Note: argocd.repoURL is injected from infrastructure-root.yaml bootstrap file
 
+# Ops-plane placement — pin the infrastructure operators (cert-manager,
+# external-secrets, nginx-gateway control+data plane) to the tainted infra pool,
+# away from the prod/preprod app pools and the noisy nonprod ops jobs. Consumed
+# by the argocd-infrastructure.infraPlacement helper.
+infra:
+  nodeSelector:
+    node-pool: infra
+  tolerations:
+    - key: node-pool
+      operator: Equal
+      value: infra
+      effect: NoSchedule
+
 # Cert Manager - TLS certificate automation
 certManager:
   enabled: true
