@@ -240,6 +240,10 @@ externalSecrets:
   version: 0.9.11
   provider: gcp
 
+  # Store the cluster-scoped ExternalSecrets (cert-manager/external-dns/velero)
+  # read from — must match a store below.
+  secretStoreName: gcp-secretstore
+
   # ClusterSecretStore(s) for this cluster — provider-tagged list piped into the
   # external-secrets-stores chart. mycure-doks-main uses GCP Secret Manager
   # (project mc-v4-prod) with Service Account Key auth (the gcpsm-secret).

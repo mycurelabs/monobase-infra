@@ -3,8 +3,8 @@
 
 # ClusterSecretStore configurations
 # Supports multiple providers: gcp, aws, azure
-stores: []
-  # Example GCP Secret Manager store:
+secretStoreName: gcp-secretstore
+stores: []  # Example GCP Secret Manager store:
   # - name: gcp-secretstore
   #   provider: gcp
   #   gcp:
