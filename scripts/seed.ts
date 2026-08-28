@@ -7604,8 +7604,16 @@ async function resetSeedData() {
 async function provisionCadenceSaKey(): Promise<void> {
   const spinner = ora("Provisioning cadence service-account API key...").start();
 
-  if (!args.env) {
-    spinner.warn("Cadence-key provisioning needs --env (to name the secret); skipping.");
+  // The secret name is env-derived (mycure-<env>-cadence-sa-api-key) and prod +
+  // preprod share ONE GCP project (mc-v4-prod) — isolation is by name prefix,
+  // not project. So the env→name mapping is the real guardrail: a typo'd --env
+  // would write a mis-named secret into the shared project. Require a KNOWN env
+  // (not just any string, and not the --api-url path where env is unset).
+  if (!args.env || !ENVS[args.env]) {
+    spinner.warn(
+      `Cadence-key provisioning needs a known --env (${Object.keys(ENVS).join(", ")}) ` +
+        `to name the secret; got "${args.env ?? "(unset)"}". Skipping.`,
+    );
     return;
   }
   const gcpProject = (args["gcp-project"] as string | undefined) ?? process.env.GCP_PROJECT_ID;
@@ -7653,8 +7661,11 @@ async function provisionCadenceSaKey(): Promise<void> {
   }
 
   // Write to GCP Secret Manager (createSecret upserts a new version). Lazy
-  // import so a normal seed never loads the GCP SDK.
+  // import so a normal seed never loads the GCP SDK. Surface the exact target
+  // (name + project) before mutating — the name is the isolation boundary in
+  // the shared project.
   const secretName = `mycure-${args.env}-cadence-sa-api-key`;
+  spinner.text = `Writing cadence SA key → ${secretName} in GCP project ${gcpProject}...`;
   const { GCPProvider } = await import("./secrets/providers/gcp");
   const provider = new GCPProvider(gcpProject);
   await provider.initialize();
