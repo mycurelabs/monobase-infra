@@ -387,6 +387,8 @@ cadenceRelay:
     repository: n0computer/iroh-relay
     tag: "v1.0.2"
   # hostname defaults to cadence-relay.{global.domain} = cadence-relay.localfirsthealth.com
+  tls:
+    clusterIssuer: letsencrypt-mycure-cloudflare-prod  # mycure's cloudflare DNS-01 issuer
 cadence:
   enabled: true
   rustLog: "cadence=info,cadence_routing=debug,warn"

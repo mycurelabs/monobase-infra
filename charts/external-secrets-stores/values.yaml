@@ -4,6 +4,10 @@
 # ClusterSecretStore configurations
 # Supports multiple providers: gcp, aws, azure
 secretStoreName: gcp-secretstore
+
+# Names for the cluster-scoped ExternalSecrets (override per-cluster in values).
+cloudflareSecretName: cloudflare-api-token        # k8s Secret the cert-manager cloudflare ExternalSecret creates
+veleroObjectStoreSecret: velero-object-store-credentials  # backend secret key the velero ExternalSecret reads
 stores: []  # Example GCP Secret Manager store:
   # - name: gcp-secretstore
   #   provider: gcp
