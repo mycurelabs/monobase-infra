@@ -560,6 +560,7 @@ tenzir:
 # Tailscale egress to the vanaheim workstation Ollama (medical-AI preprod inference)
 ollamaEgress:
   enabled: true
+  tailnetFqdn: office-vanaheim.tail06ec7f.ts.net  # MagicDNS name of the vanaheim Ollama host
 
 # Tailscale K8s operator — tailnet exposure for cluster services. Backs the
 # nginx-internal-gateway: tailnet-only is the cluster-default gateway (deny-first),

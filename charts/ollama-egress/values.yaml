@@ -2,6 +2,7 @@
 # egress). This chart owns the `tailscale` namespace: PSA=privileged because
 # the operator's proxy pods need NET_ADMIN (app namespaces are restricted).
 namespace: tailscale
-# MagicDNS name of the Ollama host (vanaheim) — survives tailnet IP changes.
-tailnetFqdn: office-vanaheim.tail06ec7f.ts.net
+# MagicDNS name of the Ollama host — survives tailnet IP changes. Set the real
+# host per-cluster via ollamaEgress.tailnetFqdn in the cluster infrastructure.yaml.
+tailnetFqdn: ollama.example.ts.net
 port: 11434
