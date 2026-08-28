@@ -1,4 +1,4 @@
-{{- if .Values.policies.retainProtectedPV.enabled }}
+{{- if and .Values.policies.retainProtectedPV.enabled .Values.policies.retainProtectedPV.protectedNamespaces }}
 # Kyverno Policy: Retain PVs bound into protected namespaces
 # On PV CREATE, forces spec.persistentVolumeReclaimPolicy=Retain when the volume
 # is bound to a claim in a protected namespace, so an accidental PVC or namespace
@@ -16,6 +16,10 @@ kind: ClusterPolicy
 metadata:
   name: retain-protected-pv
   annotations:
+    # Apply AFTER protect-namespaces so Kyverno's webhook has settled — avoids a
+    # flaky first-sync admission race on the initial multi-policy apply (retry
+    # also resolves it, but the wave makes it deterministic).
+    argocd.argoproj.io/sync-wave: "1"
     policies.kyverno.io/title: Retain PVs in Protected Namespaces
     policies.kyverno.io/category: Availability
     policies.kyverno.io/severity: high
