@@ -49,7 +49,9 @@ gatewayRoute:
 # TLS via cert-manager (DNS-01, works for an L4 service — no HTTP path needed). The issued Secret is
 # mounted read-only and the relay reads it in `Manual` cert mode.
 tls:
-  clusterIssuer: letsencrypt-mycure-cloudflare-prod
+  # Generic default; the real cert-manager ClusterIssuer is set per-deployment
+  # (cadenceRelay.tls.clusterIssuer in values/deployments).
+  clusterIssuer: letsencrypt-production
   secretName: cadence-relay-tls
 
 resources:

@@ -255,6 +255,9 @@ externalSecrets:
   # Store the cluster-scoped ExternalSecrets (cert-manager/external-dns/velero)
   # read from — must match a store below.
   secretStoreName: gcp-secretstore
+  # Names mycure uses (kept as-is so the ClusterIssuer ref + GCP SM key resolve).
+  cloudflareSecretName: mycure-cloudflare-api-token
+  veleroObjectStoreSecret: monobase-digitalocean-spaces
 
   # ClusterSecretStore(s) for this cluster — provider-tagged list piped into the
   # external-secrets-stores chart. mycure-doks-main uses GCP Secret Manager
