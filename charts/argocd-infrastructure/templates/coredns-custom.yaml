@@ -23,6 +23,14 @@ spec:
     path: charts/coredns-custom
     helm:
       releaseName: coredns-custom
+      # CoreDNS hairpin rewrites (DATA), from corednsCustom.{exact,regex}Rewrites
+      # in the cluster's infrastructure.yaml. Empty defaults keep the chart
+      # tenant-agnostic; a cluster supplies its real rewrites here.
+      valuesObject:
+        exactRewrites:
+          {{- toYaml (.Values.corednsCustom.exactRewrites | default list) | nindent 10 }}
+        regexRewrites:
+          {{- toYaml (.Values.corednsCustom.regexRewrites | default list) | nindent 10 }}
 
   destination:
     server: https://kubernetes.default.svc

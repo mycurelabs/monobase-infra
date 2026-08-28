@@ -50,6 +50,18 @@ certManagerIssuers:
 # Manifests: infrastructure/coredns/
 corednsCustom:
   enabled: true
+  # Exact hairpin: public cadence-relay hostname (LB IP, no hairpin) -> Service.
+  exactRewrites:
+    - from: cadence-relay.preprod.localfirsthealth.com
+      to: cadence-relay.mycure-preprod.svc.cluster.local
+    - from: cadence-relay.localfirsthealth.com
+      to: cadence-relay.mycure-production.svc.cluster.local
+  # Wildcard hairpin: tailnet-only preprod DNS -> the internal gateway ClusterIP
+  # (same listeners/certs, so cadence->hapihub auth/JWKS https keeps working).
+  # Rendered after the exact rewrites, which must win first.
+  regexRewrites:
+    - pattern: (.*)\.preprod\.localfirsthealth\.com
+      to: nginx-internal-gateway-nginx.nginx-gateway-system.svc.cluster.local
 
 # NGINX Gateway Fabric - primary Gateway API implementation
 nginxGateway:
