@@ -1,5 +1,5 @@
-# base.yaml -- shared parent (COPY of _base/mycure.yaml). disabled so it never
-# deploys on its own. Phase-2 cleanup deletes _base/mycure.yaml once re-bootstrapped.
+# base.yaml -- shared parent for the mycure deployments. disabled so it never
+# deploys on its own; each overlay pulls it in via `extends: base`.
 disabled: "true"
 
 # Shared base for mycure deployments. Helm merges this first, then the

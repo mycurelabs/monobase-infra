@@ -1,4 +1,4 @@
-# Production overlay over values/deployments/_base/mycure.yaml (helm merge:
+# Production overlay; extends: base (values/deployments/base.yaml, helm merge:
 # base first, this file wins per key; arrays replace wholesale).
 # MyCure Production Configuration
 # Production environment on DigitalOcean Kubernetes (DOKS)
@@ -12,7 +12,7 @@ global:
 
   # PUBLIC: client-facing prod is internet-exposed BY INTENT — the only
   # deployment allowed on the public gateway. Everything else inherits the
-  # tailnet-only default from _base (deny-first).
+  # tailnet-only default from base (deny-first).
   gateway:
     name: nginx-public-gateway
     namespace: nginx-gateway-system
