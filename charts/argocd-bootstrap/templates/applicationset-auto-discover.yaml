@@ -1,8 +1,12 @@
 # ApplicationSet: auto-discovers client/environment deployments.
 #
-# Scans values/deployments/*.yaml (excluding example-*); each file becomes a
-# root Application "<filename>-root" deploying charts/argocd-applications into
-# the namespace named after the file. Adding a client = adding one values file.
+# Scans values/deployments/*.yaml; each file becomes a root Application
+# "<filename>-root" deploying charts/argocd-applications into the namespace
+# named after the file. Adding a client = adding one values file.
+#
+# Inheritance is explicit: `extends: <name>` names a single parent values file
+# (merged first, this file wins). `disabled: "true"` makes a file parent-only —
+# it never deploys (e.g. base.yaml). Absent keys ⇒ no parent / deployed.
 
 apiVersion: argoproj.io/v1alpha1
 kind: ApplicationSet
@@ -21,8 +25,8 @@ spec:
   generators:
     # Git files generator: scans the deployment overlays this cluster owns.
     # Driven by argocd.deploymentPaths (values.yaml) so each cluster's ArgoCD
-    # discovers only its own set — DOKS excludes mycure-staging.yaml; the
-    # on-prem cluster overrides this to include ONLY mycure-staging.yaml.
+    # discovers only its own set — e.g. the main cluster excludes staging
+    # overlays while a separate cluster overrides this to include only staging.
     - git:
         repoURL: {{ .Values.argocd.repoURL | required "argocd.repoURL is required" }}
         revision: {{ .Values.argocd.targetRevision | default "HEAD" }}
@@ -33,11 +37,19 @@ spec:
             exclude: true
 {{- end }}
 {{- end }}
+      # `disabled: "true"` files (e.g. base.yaml) are parent-only — the git
+      # generator still exposes them as valueFile parents, but this selector
+      # keeps them from becoming their own Application. Absent/other ⇒ included.
+      selector:
+        matchExpressions:
+          - key: disabled
+            operator: NotIn
+            values: ["true"]
 
   # Template for the root Applications
   template:
     metadata:
-      # e.g. mycure-production.yaml -> mycure-production-root
+      # e.g. <client>-production.yaml -> <client>-production-root
       name: '{{"{{"}} .path.filename | trimSuffix ".yaml" {{"}}"}}-root'
       namespace: {{ .Values.argocd.namespace | default "argocd" }}
       labels:
@@ -57,13 +69,18 @@ spec:
         path: charts/argocd-applications
 
         helm:
-          # Optional product base merges first; the discovered env file wins.
-          # Base path derives from the filename: <product>-<env>.yaml ->
-          # _base/<product>.yaml (files without a base render fine —
-          # ignoreMissingValueFiles). Maps deep-merge; arrays replace wholesale.
+          # Explicit parent via `extends: <name>` (single level) merges first;
+          # this file wins per key. hasKey guards missingkey=error for files
+          # with no parent. Maps deep-merge; arrays replace wholesale.
           ignoreMissingValueFiles: true
           valueFiles:
-            - '../../{{"{{"}} .path.path {{"}}"}}/_base/{{"{{"}} .path.filename | trimSuffix ".yaml" | splitList "-" | initial | join "-" {{"}}"}}.yaml'
+            # Explicit parent via `extends: <name>` (single level), merged first;
+            # this file wins. `hasKey` guards missingkey=error; when `extends` is
+            # absent the path resolves to a non-existent file that
+            # ignoreMissingValueFiles skips (no parent). Kept as an inline value
+            # expression (not a bare {{`{{- if }}`}} line) so the Helm-rendered
+            # ApplicationSet is valid YAML.
+            - '../../{{"{{"}} .path.path {{"}}"}}/{{"{{"}} if hasKey . "extends" {{"}}"}}{{"{{"}} .extends {{"}}"}}{{"{{"}} else {{"}}"}}_no_parent_{{"{{"}} end {{"}}"}}.yaml'
             - '../../{{"{{"}} .path.path {{"}}"}}/{{"{{"}} .path.filename {{"}}"}}'
           # Inject repoURL (single source of truth)
           values: |
