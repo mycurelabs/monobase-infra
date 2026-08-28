@@ -89,8 +89,8 @@ markdownlint-cli2 --fix '**/*.md' --ignore node_modules --ignore .git 2>&1 || tr
 description = "Lint Helm charts (render every app-of-apps tree with real values)"
 run = """
 echo "Rendering app-of-apps trees (validates every chart in use)..."
-helm template lint charts/argocd-applications -f values/deployments/_base/mycure.yaml -f values/deployments/mycure-production.yaml --set argocd.repoURL=lint --set argocd.targetRevision=lint > /dev/null
-helm template lint charts/argocd-applications -f values/deployments/_base/mycure.yaml -f values/deployments/mycure-preprod.yaml --set argocd.repoURL=lint --set argocd.targetRevision=lint > /dev/null
+helm template lint charts/argocd-applications -f values/deployments/base.yaml -f values/deployments/mycure-production.yaml --set argocd.repoURL=lint --set argocd.targetRevision=lint > /dev/null
+helm template lint charts/argocd-applications -f values/deployments/base.yaml -f values/deployments/mycure-preprod.yaml --set argocd.repoURL=lint --set argocd.targetRevision=lint > /dev/null
 helm template lint charts/argocd-infrastructure -f values/clusters/mycure-doks-main/argocd/infrastructure.yaml --set argocd.repoURL=lint --set argocd.targetRevision=lint > /dev/null
 helm template lint charts/argocd-bootstrap > /dev/null
 echo "✓ All trees render"

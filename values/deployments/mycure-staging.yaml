@@ -1,4 +1,4 @@
-# Staging overlay over values/deployments/_base/mycure.yaml (helm merge:
+# Staging overlay; extends: base (values/deployments/base.yaml, helm merge:
 # base first, this file wins per key; arrays replace wholesale).
 # MyCure Staging Configuration
 # LEAN staging env on a LOCAL k3d cluster. Unlike preprod (a cloud DOKS
