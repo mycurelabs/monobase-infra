@@ -460,6 +460,7 @@ metadata:
   labels:
     app.kubernetes.io/name: prometheus-rules
     app.kubernetes.io/component: monitoring
+    prometheus: kube-prometheus
 spec:
   groups:
     - name: postgres-wal-archiving

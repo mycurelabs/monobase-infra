@@ -436,14 +436,22 @@ walg:
   enabled: true
 
 postgresql:
-  # postgres_exporter sidecar + metrics Service. A `postgresql` ServiceMonitor
-  # already exists in the monitoring namespace selecting
-  # app.kubernetes.io/name=postgresql on port `metrics`, but no metrics Service
-  # existed, so it has been scraping nothing. Enabling this exposes
-  # pg_stat_archiver_* — the series the WAL-archive alerts depend on. Without
-  # it, a silently failing archive_command is invisible until pg_wal fills.
+  # postgres_exporter sidecar + metrics Service, exposing pg_stat_archiver_* —
+  # the series the WAL-archive alerts depend on. Without it a silently failing
+  # archive_command is invisible until pg_wal fills the volume.
+  #
+  # image MUST be pinned to bitnamilegacy: chart 16.7.27 defaults to
+  # docker.io/bitnami/postgres-exporter:0.17.1-debian-12-r16, which no longer
+  # exists (HTTP 404 — Bitnami moved versioned tags to the legacy org). The
+  # exporter is a SIDECAR in the PG pod, so an ImagePullBackOff makes the pod
+  # NotReady and drops postgresql-primary/-read out of their Service endpoints.
+  # Same reason base.yaml already pins bitnamilegacy for postgresql/valkey/minio.
   metrics:
     enabled: true
+    image:
+      registry: docker.io
+      repository: bitnamilegacy/postgres-exporter
+      tag: 0.17.1-debian-12-r16
 
   architecture: replication
 
