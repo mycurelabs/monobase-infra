@@ -96,40 +96,25 @@ spec:
                     actions:
                       - "s3:ListBucket"
                       - "s3:GetBucketLocation"
-                  # Writes are prefix-scoped per publishing app, one statement
-                  # each — a leaked artifacts-ci key can't host arbitrary content
-                  # under the trusted artifacts.<domain>, nor reach another app's
-                  # prefix. Add a statement when a new app starts publishing.
-                  # Does NOT stop overwrite-within-a-prefix (downgrade/tamper):
-                  # MinIO PutObject can't distinguish create-vs-overwrite, and
-                  # versioning/WORM needs an erasure-coded backend this standalone
-                  # single-drive instance lacks. Install integrity is owned app-side
-                  # by the Tauri Ed25519 artifact signature.
+                  # Writes are prefix-scoped per publishing app, one statement each
+                  # (from minio-artifacts.publishers in the deployment values) — a
+                  # leaked artifacts-ci key can't host arbitrary content under the
+                  # trusted artifacts.<domain>, nor reach another app's prefix. Set
+                  # delete: true only for a publisher that prunes its own old
+                  # releases (keep-last-N); the store has no versioning/lifecycle.
+                  # Does NOT stop overwrite-within-a-prefix — install integrity is
+                  # owned app-side (e.g. a signed-artifact scheme).
+                  {{- range (index .Values "minio-artifacts").publishers | default list }}
                   - effect: "Allow"
                     resources:
-                      - "arn:aws:s3:::artifacts/maestroapp/*"
+                      - "arn:aws:s3:::artifacts/{{ .prefix }}/*"
                     actions:
                       - "s3:PutObject"
                       - "s3:GetObject"
-                      # DeleteObject enables the publisher's keep-last-N prune
-                      # (monobase-mycure#3316) to reclaim old release dirs — the
-                      # store has no versioning/lifecycle so nothing else trims
-                      # them. Marginal blast-radius: PutObject already lets a
-                      # leaked key destroy artifacts by overwrite; delete only
-                      # removes vs clobbers. Still prefix-scoped to maestroapp/.
+                      {{- if .delete }}
                       - "s3:DeleteObject"
-                  # mycureapp/ — the MYCURE desktop release workflow
-                  # (monobase-mycure .github/workflows/mycure-desktop-release.yml)
-                  # publishes here, and apps/mycure/src-tauri/tauri.conf.json points
-                  # its updater endpoint at mycureapp/desktop/<target>_<arch>/latest.json.
-                  # No DeleteObject: apps/mycure/scripts/publish.ts has no keep-last-N
-                  # prune, so the publisher never needs to remove objects.
-                  - effect: "Allow"
-                    resources:
-                      - "arn:aws:s3:::artifacts/mycureapp/*"
-                    actions:
-                      - "s3:PutObject"
-                      - "s3:GetObject"
+                      {{- end }}
+                  {{- end }}
             usersExistingSecrets:
               - minio-artifacts-ci
           persistence:

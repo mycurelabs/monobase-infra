@@ -37,13 +37,14 @@ policies:
     enabled: true
     validationFailureAction: audit  # Start with audit, move to enforce later
 
-    # Approved container registries
-    # Add new registries here as needed
-    allowedRegistries:
-      # Organization
-      - "ghcr.io/mycurelabs/*"
-      - "ghcr.io/monobaselabs/*"
+    # Tenant organization registries — supplied per-cluster (empty by default so
+    # a fork brings its own orgs, e.g. ghcr.io/<org>/*). Ranged before the
+    # shared third-party list below.
+    orgRegistries: []
 
+    # Approved third-party container registries (shared across tenants).
+    # Add new registries here as needed.
+    allowedRegistries:
       # Trusted third-party registries
       - "bitnami/*"
       - "docker.io/bitnamilegacy/*"

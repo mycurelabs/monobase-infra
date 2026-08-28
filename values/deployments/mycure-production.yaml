@@ -478,6 +478,16 @@ minio:
 minio-artifacts:
   enabled: true
 
+  # CI publishers — one write-scoped prefix each on the artifacts bucket.
+  # delete: true only where the publisher prunes its own old releases.
+  publishers:
+    # maestroapp desktop release workflow — keep-last-N prune (mono #3316).
+    - prefix: maestroapp
+      delete: true
+    # mycureapp desktop release workflow — no prune, so no DeleteObject.
+    - prefix: mycureapp
+      delete: false
+
   image:
     repository: bitnamilegacy/minio
     tag: "2025.7.23-debian-12-r3"

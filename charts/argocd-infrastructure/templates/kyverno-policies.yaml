@@ -45,6 +45,11 @@ spec:
           restrictRegistries:
             enabled: {{ .Values.kyverno.policies.restrictRegistries.enabled | default true }}
             validationFailureAction: {{ .Values.kyverno.policies.restrictRegistries.action | default "audit" }}
+            # Tenant org registries (the shared third-party list is a chart default).
+            orgRegistries:
+            {{- range (.Values.kyverno.policies.restrictRegistries | default dict).orgRegistries | default list }}
+              - {{ . | quote }}
+            {{- end }}
 
   destination:
     server: https://kubernetes.default.svc
