@@ -268,6 +268,10 @@ externalSecrets:
   # Store the cluster-scoped ExternalSecrets (cert-manager/external-dns/velero)
   # read from — must match a store below.
   secretStoreName: gcp-secretstore
+  # mycure uses cloudflare DNS-01 (+ velero via velero.enabled) — opt the
+  # cluster-scoped ExternalSecrets in.
+  cloudflare:
+    enabled: true
   # Names mycure uses (kept as-is so the ClusterIssuer ref + GCP SM key resolve).
   cloudflareSecretName: mycure-cloudflare-api-token
   veleroObjectStoreSecret: monobase-digitalocean-spaces
@@ -454,6 +458,7 @@ falco:
 # Alertmanager notification identity (Postmark email + the GCP SM key holding the
 # API token) — piped into the monitoring-resources alertmanager-config secret.
 alertmanager:
+  enabled: true  # mycure has Postmark provisioned — render the alertmanager-config ExternalSecret
   smtpFrom: no-reply@mycure.md
   emailTo: mycure.engineering@gmail.com
   postmarkKey: mycure-production-postmark-api-key

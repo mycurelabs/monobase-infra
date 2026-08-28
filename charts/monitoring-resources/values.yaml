@@ -1,7 +1,10 @@
 # Default values for monitoring-resources.
 # Alertmanager notification identity — override per-cluster in values (the real
 # addresses + the Postmark API-key secret name live in infrastructure.yaml).
+# The alertmanager-config ExternalSecret is OPT-IN (needs a Postmark key in the
+# backend); default off so a tenant without Postmark renders no broken ES.
 alertmanager:
+  enabled: false
   smtpFrom: no-reply@example.com
   emailTo: alerts@example.com
   postmarkKey: infrastructure-postmark-api-key

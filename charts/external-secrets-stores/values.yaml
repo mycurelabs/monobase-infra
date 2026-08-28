@@ -5,6 +5,14 @@
 # Supports multiple providers: gcp, aws, azure
 secretStoreName: gcp-secretstore
 
+# Cluster-scoped ExternalSecrets are OPT-IN (a tenant that doesn't use cloudflare
+# DNS or velero shouldn't sync those secrets into namespaces it lacks). Enable
+# per-cluster in values; default off = store-only.
+cloudflare:
+  enabled: false   # renders the cert-manager + external-dns cloudflare-api-token ExternalSecrets
+velero:
+  enabled: false   # renders the velero-credentials + velero-repo-credentials ExternalSecrets
+
 # Names for the cluster-scoped ExternalSecrets (override per-cluster in values).
 cloudflareSecretName: cloudflare-api-token        # k8s Secret the cert-manager cloudflare ExternalSecret creates
 veleroObjectStoreSecret: velero-object-store-credentials  # backend secret key the velero ExternalSecret reads
