@@ -487,24 +487,10 @@ spec:
             summary: "No WAL archived for >15m in {{ "{{" }} $labels.namespace }}"
             description: "Last successful archive was {{ "{{" }} $value | humanizeDuration }} ago despite archive_timeout=60s. Every minute stalled is a minute of PITR coverage lost."
 
-        - alert: PostgresDataVolumeFillingUp
-          # Last-resort backstop, independent of postgres_exporter. A stuck
-          # archive_command manifests here as steady growth on the PG PVC.
-          expr: |
-            (1 - (kubelet_volume_stats_available_bytes{persistentvolumeclaim=~"data-postgresql-.*"}
-                  / kubelet_volume_stats_capacity_bytes{persistentvolumeclaim=~"data-postgresql-.*"})) * 100 > 80
-          for: 15m
-          labels: {severity: warning}
-          annotations:
-            summary: "PostgreSQL volume {{ "{{" }} $labels.persistentvolumeclaim }} is {{ "{{" }} $value | humanize }}% full"
-            description: "If WAL archiving is enabled, suspect a failing archive_command preventing WAL recycling. Check pg_stat_archiver before extending the volume."
-
-        - alert: PostgresDataVolumeCritical
-          expr: |
-            (1 - (kubelet_volume_stats_available_bytes{persistentvolumeclaim=~"data-postgresql-.*"}
-                  / kubelet_volume_stats_capacity_bytes{persistentvolumeclaim=~"data-postgresql-.*"})) * 100 > 90
-          for: 5m
-          labels: {severity: critical}
-          annotations:
-            summary: "PostgreSQL volume {{ "{{" }} $labels.persistentvolumeclaim }} critically full ({{ "{{" }} $value | humanize }}%)"
-            description: "PostgreSQL will refuse writes when this volume fills. Immediate action required."
+        # NOTE: deliberately NO PostgresDataVolume* alerts here. The
+        # storage-health rule in this same chart already covers every PVC at the
+        # identical 80%/90% thresholds (PersistentVolumeFillingUp /
+        # PersistentVolumeCritical), so PG-specific copies would only double-page.
+        # A failing archive_command surfaces as pg_wal growth, which those
+        # existing PV alerts catch; PostgresWALArchiveFailing above catches the
+        # cause directly and much sooner.
