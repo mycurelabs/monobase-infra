@@ -58,7 +58,7 @@ spec:
             # njs script delivered by the nginx-njs-security-headers ConfigMap
             # (charts/nginx-gateway/templates/njs-security-headers-cm.yaml).
             # Wired into every server block by the nginx-strip-server-header
-            # SnippetsPolicy (values/infrastructure/main.yaml). Closes
+            # SnippetsPolicy (values/clusters/<cluster>/argocd/infrastructure.yaml). Closes
             # vapt-2025#10 L-001 by deleting the `Server` response header.
             volumeMounts:
               - name: njs-security-headers

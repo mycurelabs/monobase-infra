@@ -1,5 +1,5 @@
 # Default values for the SigNoz chart wrapper.
-# Override in deployment-specific values (values/infrastructure/main.yaml -> signoz:).
+# Override in deployment-specific values (values/clusters/<cluster>/argocd/infrastructure.yaml -> signoz:).
 
 # Global configuration (shared across charts)
 global:
