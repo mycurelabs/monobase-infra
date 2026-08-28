@@ -277,8 +277,8 @@ spec:
           # The June d25 incident hit 94% before anyone looked. The changelog
           # is the main growth driver once the allowlist widens.
           expr: |
-            kubelet_volume_stats_used_bytes{namespace=~"mycure-(preprod|production)", persistentvolumeclaim=~"data-postgresql.*"}
-              / kubelet_volume_stats_capacity_bytes{namespace=~"mycure-(preprod|production)", persistentvolumeclaim=~"data-postgresql.*"} > 0.70
+            kubelet_volume_stats_used_bytes{namespace=~".+-(preprod|production)", persistentvolumeclaim=~"data-postgresql.*"}
+              / kubelet_volume_stats_capacity_bytes{namespace=~".+-(preprod|production)", persistentvolumeclaim=~"data-postgresql.*"} > 0.70
           for: 15m
           labels:
             severity: warning
@@ -288,8 +288,8 @@ spec:
 
         - alert: HapihubPostgresVolumeCritical
           expr: |
-            kubelet_volume_stats_used_bytes{namespace=~"mycure-(preprod|production)", persistentvolumeclaim=~"data-postgresql.*"}
-              / kubelet_volume_stats_capacity_bytes{namespace=~"mycure-(preprod|production)", persistentvolumeclaim=~"data-postgresql.*"} > 0.85
+            kubelet_volume_stats_used_bytes{namespace=~".+-(preprod|production)", persistentvolumeclaim=~"data-postgresql.*"}
+              / kubelet_volume_stats_capacity_bytes{namespace=~".+-(preprod|production)", persistentvolumeclaim=~"data-postgresql.*"} > 0.85
           for: 5m
           labels:
             severity: critical
@@ -299,7 +299,7 @@ spec:
 
         - alert: CadenceRestartLoop
           expr: |
-            increase(kube_pod_container_status_restarts_total{namespace=~"mycure-(preprod|production)", pod=~"cadence-.*"}[1h]) > 3
+            increase(kube_pod_container_status_restarts_total{namespace=~".+-(preprod|production)", pod=~"cadence-.*"}[1h]) > 3
           for: 5m
           labels:
             severity: warning
@@ -396,8 +396,8 @@ spec:
 # audit_events table + GET /audit/security-events; this only adds the missing
 # real-time burst signal.
 #
-# PREPROD-GATED via the namespace="mycure-preprod" selector — prod is a separate
-# later human go (add mycure-production to the regex then).
+# Scoped to any deployment namespace via the namespace=~".+-(preprod|production)"
+# selector (preprod AND production; prod entered scope by a deliberate human go).
 #
 # DORMANT until the hapihub app ships the `audit_events_total{action,outcome}`
 # Prometheus counter on /metrics AND the hapihub ServiceMonitor is scraping it
@@ -421,7 +421,7 @@ spec:
         - alert: AuditSignInFailureBurst
           # >100 failed sign-ins in 5m in preprod = likely credential stuffing.
           expr: |
-            sum(increase(audit_events_total{namespace="mycure-preprod", action="auth.sign_in_failed"}[5m])) > 100
+            sum(increase(audit_events_total{namespace=~".+-(preprod|production)", action="auth.sign_in_failed"}[5m])) > 100
           for: 5m
           labels: {severity: warning}
           annotations:
@@ -430,7 +430,7 @@ spec:
         - alert: AuditPhiExportBurst
           # >50 PHI record exports in 5m in preprod = likely mass-export / exfil.
           expr: |
-            sum(increase(audit_events_total{namespace="mycure-preprod", action="phi.record_exported"}[5m])) > 50
+            sum(increase(audit_events_total{namespace=~".+-(preprod|production)", action="phi.record_exported"}[5m])) > 50
           for: 5m
           labels: {severity: critical}
           annotations:
