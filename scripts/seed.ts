@@ -41,6 +41,16 @@ ${chalk.yellow("Options:")}
   --env       Target environment: ${Object.keys(ENVS).join(", ")}
   --api-url   Override API URL (skips env lookup)
   --confirm   Required when targeting production
+  --provision-cadence-key
+              Mint the cadence service-account API key and write it to GCP
+              Secret Manager (mycure-<env>-cadence-sa-api-key). The cadence
+              ExternalSecret syncs it into the pod; without a fresh key after
+              a reseed, cadence enroll fails with INVALID_API_KEY. Auto-runs
+              at the end of a non-production --reset. Standalone (no --reset)
+              mints only and exits. Needs --gcp-project (or $GCP_PROJECT_ID).
+  --gcp-project <id>
+              GCP project for the cadence key write. Preprod is
+              secret-isolated — pass its own project.
   --reset     Delete all existing seed data before re-seeding (idempotent
               wipe of seed users + their memberships + the seed orgs).
               Requires the current PASSWORD to still match what was used
@@ -187,6 +197,17 @@ const { values: args } = parseArgs({
     // Same convention as --patients — DEFAULT_PATIENT_ACCOUNT_COUNT is
     // the source of truth, parsed below.
     "patient-accounts": { type: "string" },
+    // Mint the cadence service-account API key and write it to GCP Secret
+    // Manager (mycure-<env>-cadence-sa-api-key) so the cadence-secrets
+    // ExternalSecret can sync it. Auto-runs at the end of a non-production
+    // --reset (a reseed wipes the api_key row, so cadence's enroll would 401
+    // until re-provisioned); pass this flag to force it (standalone, or on
+    // production). Standalone (no --reset) mints only and exits.
+    "provision-cadence-key": { type: "boolean", default: false },
+    // GCP project holding the target env's Secret Manager secrets. Required
+    // for cadence-key provisioning; falls back to $GCP_PROJECT_ID. Preprod is
+    // secret-isolated, so pass its own project explicitly.
+    "gcp-project": { type: "string" },
     help: { type: "boolean", default: false },
   },
   strict: true,
@@ -7567,6 +7588,85 @@ async function resetSeedData() {
 }
 
 // ---------------------------------------------------------------------------
+// Cadence service-account API key provisioning
+// ---------------------------------------------------------------------------
+
+// Mint a fresh better-auth API key for the platform service account and write
+// it to GCP Secret Manager as mycure-<env>-cadence-sa-api-key. The cadence
+// chart's `cadence-secrets` ExternalSecret syncs that into the cadence pod as
+// `sa-api-key`, which the enroll initContainer presents as CADENCE_AUTH_BEARER
+// to mint the hub's '*' grant against hapihub. A reseed wipes the api_key row,
+// so without this step the synced key is stale and enroll fails with
+// INVALID_API_KEY until it's re-provisioned by hand — this closes that gap.
+//
+// Self-contained: signs in fresh as the service account (must already exist,
+// which it does on a running env), so it doesn't depend on ambient seed state.
+async function provisionCadenceSaKey(): Promise<void> {
+  const spinner = ora("Provisioning cadence service-account API key...").start();
+
+  if (!args.env) {
+    spinner.warn("Cadence-key provisioning needs --env (to name the secret); skipping.");
+    return;
+  }
+  const gcpProject = (args["gcp-project"] as string | undefined) ?? process.env.GCP_PROJECT_ID;
+  if (!gcpProject) {
+    spinner.warn(
+      "Cadence-key provisioning skipped: no GCP project. Pass --gcp-project <id> " +
+        "(preprod is secret-isolated — use its own project) or set $GCP_PROJECT_ID. " +
+        "Cadence enroll will 401 until the key is provisioned.",
+    );
+    return;
+  }
+  const serviceEmail = [...SERVICE_ACCOUNT_EMAILS][0];
+  if (!serviceEmail) {
+    spinner.warn("No SERVICE_ACCOUNT_EMAILS configured; skipping cadence-key provisioning.");
+    return;
+  }
+
+  // Fresh service-account session (the api() wrapper tracks the cookie).
+  sessionCookie = "";
+  try {
+    await signIn(serviceEmail, PASSWORD);
+  } catch {
+    spinner.fail(
+      `Could not sign in as ${serviceEmail} to mint the cadence key — ` +
+        `provision it once the service account exists.`,
+    );
+    throw new Error("cadence-key: service-account sign-in failed");
+  }
+  const sess = (await api("GET", "/auth/get-session")) as { user?: { id?: string } } | null;
+  const svcUid = sess?.user?.id;
+  if (!svcUid) {
+    spinner.fail("Lost the service-account session before minting the cadence key.");
+    throw new Error("cadence-key: no service-account uid");
+  }
+
+  // Mint a non-expiring key (a service credential must not expire under cadence).
+  const minted = (await api("POST", "/auth/api-key/create", {
+    name: "cadence-sa-key",
+    userId: svcUid,
+    expiresIn: null,
+  })) as { key?: string; id?: string } | null;
+  if (!minted?.key) {
+    spinner.fail("better-auth /auth/api-key/create returned no key.");
+    throw new Error("cadence-key: mint returned no key");
+  }
+
+  // Write to GCP Secret Manager (createSecret upserts a new version). Lazy
+  // import so a normal seed never loads the GCP SDK.
+  const secretName = `mycure-${args.env}-cadence-sa-api-key`;
+  const { GCPProvider } = await import("./secrets/providers/gcp");
+  const provider = new GCPProvider(gcpProject);
+  await provider.initialize();
+  await provider.createSecret(secretName, minted.key);
+
+  spinner.succeed(
+    `Cadence SA API key minted (id ${minted.id}) → GCP SM ${secretName} (${gcpProject}). ` +
+      `The cadence-secrets ExternalSecret will sync it; restart the cadence pod to pick it up now.`,
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
 
@@ -7582,6 +7682,14 @@ async function main() {
         `      Verify with: kubectl exec deploy/hapihub -- printenv ACCOUNTS_SERVICE_ACCOUNT_EMAILS\n`,
       ),
     );
+  }
+
+  // Standalone: --provision-cadence-key WITHOUT --reset just (re)mints the
+  // cadence SA key and exits — no full reseed. Useful to fix cadence enroll
+  // without wiping data.
+  if (args["provision-cadence-key"] && !args.reset) {
+    await provisionCadenceSaKey();
+    return;
   }
 
   // Optional pre-step: --reset wipes existing seed data so we re-create
@@ -8094,6 +8202,23 @@ async function main() {
       );
     }
     console.log("-".repeat(72));
+  }
+
+  // After a reseed the api_key row is gone, so re-mint the cadence SA key.
+  // Auto for non-production; production only when explicitly asked (rotating
+  // prod's live cadence key mid-seed is disruptive). Never fails the seed —
+  // the data is already in, provisioning is a follow-on.
+  if (args.reset && (args.env !== "production" || args["provision-cadence-key"])) {
+    try {
+      await provisionCadenceSaKey();
+    } catch (err) {
+      console.log(
+        chalk.yellow(
+          `\n⚠️  Reseed succeeded but cadence-key provisioning failed: ${(err as Error).message}\n` +
+            `    Re-run: bun scripts/seed.ts --env ${args.env} --provision-cadence-key --gcp-project <id>`,
+        ),
+      );
+    }
   }
 
   console.log(`\n${chalk.gray("Login at:")} ${CMS_URL}`);
