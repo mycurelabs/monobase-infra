@@ -19,6 +19,10 @@ spec:
     path: charts/ollama-egress
     helm:
       releaseName: ollama-egress
+      # MagicDNS name of the Ollama host, from ollamaEgress.tailnetFqdn in the
+      # cluster's infrastructure.yaml (falls back to the chart's placeholder).
+      valuesObject:
+        tailnetFqdn: {{ .Values.ollamaEgress.tailnetFqdn | default "ollama.example.ts.net" | quote }}
   destination:
     server: https://kubernetes.default.svc
     namespace: tailscale
