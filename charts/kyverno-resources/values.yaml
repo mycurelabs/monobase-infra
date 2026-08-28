@@ -5,6 +5,23 @@
 
 # Enable/disable specific policies
 policies:
+  # Protect client namespaces from deletion (availability / data-loss guard).
+  # Denies DELETE of any namespace carrying protectedLabelKey=true. The namespace
+  # chart stamps that label when namespace.protect=true — keep the keys in sync.
+  protectNamespaces:
+    enabled: true
+    validationFailureAction: Enforce
+    protectedLabelKey: monobase.io/protected
+
+  # Force reclaimPolicy=Retain on NEW PVs bound into a protected namespace, so a
+  # future accidental PVC/namespace deletion can't destroy the backing volume.
+  # List the protected namespaces per cluster (via values); empty = inert.
+  retainProtectedPV:
+    enabled: true
+    protectedNamespaces: []
+    #   - client-production
+    #   - client-preprod
+
   # Pod Security Standards (Restricted Profile)
   podSecurity:
     enabled: true

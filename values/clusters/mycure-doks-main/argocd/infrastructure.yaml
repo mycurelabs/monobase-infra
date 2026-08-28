@@ -273,6 +273,19 @@ kyverno:
   replicas: 2
   policies:
     enabled: true
+    # Availability guards (2026-08-28 post-incident): namespace-deletion +
+    # PV-reclaim protection for the prod/preprod client namespaces. These
+    # ENFORCE (unlike the audit-mode security policies below) — protectNamespaces
+    # only blocks DELETE of labeled namespaces, retainProtectedPV only mutates
+    # new PVs bound into the listed namespaces, so enforcing is safe.
+    protectNamespaces:
+      enabled: true
+      action: Enforce
+    retainProtectedPV:
+      enabled: true
+      protectedNamespaces:
+        - mycure-production
+        - mycure-preprod
     # All three ship in `audit` to start: policies are cluster-wide but
     # audit blocks nothing anywhere — it only writes PolicyReports. This
     # is the prod-safe rollout: validate against mycure-preprod reports

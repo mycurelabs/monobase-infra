@@ -2,11 +2,28 @@ apiVersion: v1
 kind: Namespace
 metadata:
   name: {{ .Values.namespace.name }}
-  {{- with .Values.namespace.labels }}
+  {{- /*
+    protect (default true): make this namespace un-deletable by accident.
+    - argocd.argoproj.io/sync-options: Delete=false,Prune=false — ArgoCD never
+      prunes it and never cascade-deletes it when its parent Application is
+      removed (an Application delete otherwise cascades via resources-finalizer
+      to the namespace -> its PVCs -> with reclaimPolicy=Delete, the volumes).
+    - protectedLabelKey=true — the cluster Kyverno policies (protect-namespaces
+      deny-delete, retain-protected-pv) match on this label. Keep the key in sync
+      with charts/kyverno-resources.
+    Set protect=false only for ephemeral namespaces you want ArgoCD to prune.
+  */ -}}
+  {{- $labels := deepCopy (.Values.namespace.labels | default dict) }}
+  {{- $ann := deepCopy (.Values.namespace.annotations | default dict) }}
+  {{- if .Values.namespace.protect }}
+  {{- $_ := set $labels (.Values.namespace.protectedLabelKey | default "monobase.io/protected") "true" }}
+  {{- $_ := set $ann "argocd.argoproj.io/sync-options" "Delete=false,Prune=false" }}
+  {{- end }}
+  {{- with $labels }}
   labels:
     {{- toYaml . | nindent 4 }}
   {{- end }}
-  {{- with .Values.namespace.annotations }}
+  {{- with $ann }}
   annotations:
     {{- toYaml . | nindent 4 }}
   {{- end }}

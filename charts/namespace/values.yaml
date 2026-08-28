@@ -5,6 +5,14 @@ namespace:
   name: default
   labels: {}
   annotations: {}
+  # Protect the namespace from accidental deletion (default ON). Emits the
+  # ArgoCD Delete=false,Prune=false sync-option annotation AND the protection
+  # label the cluster Kyverno policies match. Set false only for ephemeral
+  # namespaces ArgoCD is allowed to prune.
+  protect: true
+  # Label key stamped when protect=true; must match
+  # charts/kyverno-resources policies.*.protectedLabelKey.
+  protectedLabelKey: monobase.io/protected
 
 resourceQuota:
   enabled: false
