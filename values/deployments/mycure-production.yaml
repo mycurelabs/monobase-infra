@@ -3,6 +3,8 @@
 # MyCure Production Configuration
 # Production environment on DigitalOcean Kubernetes (DOKS)
 
+extends: base
+
 global:
   domain: localfirsthealth.com
   namespace: mycure-production

@@ -9,6 +9,8 @@
 # external integrations (Google OAuth, Stripe, GCS storage) stubbed until real
 # staging values are provisioned. Tear down with `k3d cluster delete`.
 
+extends: base
+
 global:
   # provisional; tailnet-only exposure + final hostnames resolved at Checkpoint 4
   domain: staging.localfirsthealth.com

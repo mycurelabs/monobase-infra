@@ -10,6 +10,8 @@
 # (mailpit, no public linking, short-lived). Tear down with
 # `kubectl delete ns mycure-preprod` when the rehearsal is done.
 
+extends: base
+
 global:
   domain: preprod.localfirsthealth.com
   namespace: mycure-preprod
