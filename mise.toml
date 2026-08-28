@@ -93,6 +93,10 @@ helm template lint charts/argocd-applications -f values/deployments/base.yaml -f
 helm template lint charts/argocd-applications -f values/deployments/base.yaml -f values/deployments/mycure-preprod.yaml --set argocd.repoURL=lint --set argocd.targetRevision=lint > /dev/null
 helm template lint charts/argocd-infrastructure -f values/clusters/mycure-doks-main/argocd/infrastructure.yaml --set argocd.repoURL=lint --set argocd.targetRevision=lint > /dev/null
 helm template lint charts/argocd-bootstrap > /dev/null
+# Leaf charts referenced BY the Applications above are not rendered by the
+# app-of-apps trees — render them directly or template bugs reach main green.
+helm template lint charts/database-secrets --set global.namespace=lint --set walg.enabled=true > /dev/null
+helm template lint charts/monitoring-resources --set global.namespace=lint > /dev/null
 echo "✓ All trees render"
 """
 
