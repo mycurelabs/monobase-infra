@@ -451,6 +451,13 @@ falco:
     database:
       enabled: true
 
+# Alertmanager notification identity (Postmark email + the GCP SM key holding the
+# API token) — piped into the monitoring-resources alertmanager-config secret.
+alertmanager:
+  smtpFrom: no-reply@mycure.md
+  emailTo: mycure.engineering@gmail.com
+  postmarkKey: mycure-production-postmark-api-key
+
 # Monitoring - Prometheus + Grafana stack
 monitoring:
   enabled: true  # Optional, enable for observability
