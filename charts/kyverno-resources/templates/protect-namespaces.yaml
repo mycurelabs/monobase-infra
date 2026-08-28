@@ -1,0 +1,42 @@
+{{- if .Values.policies.protectNamespaces.enabled }}
+# Kyverno Policy: Protect Client Namespaces from Deletion
+# Defense-in-depth beyond the ArgoCD Delete=false,Prune=false sync-option: even a
+# direct kubectl/API delete is denied. A namespace delete cascades to its PVCs;
+# with a Delete reclaim policy that destroys the backing volumes (DB data loss).
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: protect-namespaces
+  annotations:
+    policies.kyverno.io/title: Protect Client Namespaces from Deletion
+    policies.kyverno.io/category: Availability
+    policies.kyverno.io/severity: critical
+    policies.kyverno.io/subject: Namespace
+    policies.kyverno.io/description: >-
+      Denies DELETE of any namespace carrying the protection label. Remove the
+      label deliberately first if a deletion is genuinely intended.
+spec:
+  validationFailureAction: {{ .Values.policies.protectNamespaces.validationFailureAction | default "Enforce" }}
+  background: false  # admission-time only; DELETE is not a background-scan concern
+  rules:
+  - name: deny-protected-namespace-deletion
+    match:
+      any:
+      - resources:
+          kinds:
+          - Namespace
+          selector:
+            matchLabels:
+              {{ .Values.policies.protectNamespaces.protectedLabelKey | default "monobase.io/protected" }}: "true"
+    preconditions:
+      all:
+      - key: "{{ `{{ request.operation }}` }}"
+        operator: Equals
+        value: DELETE
+    validate:
+      message: >-
+        Namespace {{ `{{ request.oldObject.metadata.name }}` }} is protected
+        ({{ .Values.policies.protectNamespaces.protectedLabelKey | default "monobase.io/protected" }}=true)
+        and cannot be deleted. Remove the label deliberately first if intended.
+      deny: {}
+{{- end }}

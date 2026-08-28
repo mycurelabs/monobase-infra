@@ -1,0 +1,48 @@
+{{- if .Values.policies.retainProtectedPV.enabled }}
+# Kyverno Policy: Retain PVs bound into protected namespaces
+# On PV CREATE, forces spec.persistentVolumeReclaimPolicy=Retain when the volume
+# is bound to a claim in a protected namespace, so an accidental PVC or namespace
+# deletion cannot destroy the underlying volume. Mutate-on-CREATE deliberately:
+# a StatefulSet's volumeClaimTemplates storageClassName is immutable, so switching
+# the class to a *-retain variant in values would fail the sync on a running STS —
+# this covers new AND re-provisioned volumes (incl. after a namespace recreate)
+# without touching the workload.
+#
+# Uses a values-driven namespace list (not a namespace-label apiCall) on purpose:
+# a failing apiCall in a mutating webhook on every PV CREATE could block volume
+# provisioning cluster-wide. The list is the safe, proven shape.
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: retain-protected-pv
+  annotations:
+    policies.kyverno.io/title: Retain PVs in Protected Namespaces
+    policies.kyverno.io/category: Availability
+    policies.kyverno.io/severity: high
+    policies.kyverno.io/subject: PersistentVolume
+    policies.kyverno.io/description: >-
+      Forces reclaimPolicy=Retain on new PVs bound into a protected namespace.
+spec:
+  background: false
+  rules:
+  - name: force-retain-protected-pv
+    match:
+      any:
+      - resources:
+          kinds:
+          - PersistentVolume
+          operations:
+          - CREATE
+    preconditions:
+      all:
+      - key: "{{ `{{ request.object.spec.claimRef.namespace || '' }}` }}"
+        operator: AnyIn
+        value:
+        {{- range .Values.policies.retainProtectedPV.protectedNamespaces }}
+        - {{ . | quote }}
+        {{- end }}
+    mutate:
+      patchStrategicMerge:
+        spec:
+          persistentVolumeReclaimPolicy: Retain
+{{- end }}

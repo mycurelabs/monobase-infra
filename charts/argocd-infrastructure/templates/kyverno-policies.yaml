@@ -23,6 +23,19 @@ spec:
       releaseName: kyverno-resources
       values: |
         policies:
+          # Availability guards (default ON): protect client namespaces from
+          # deletion + force reclaimPolicy=Retain on their PVs. protectNamespaces
+          # is label-driven (Enforce is safe — only blocks DELETE of labeled
+          # namespaces); retainProtectedPV needs the per-cluster namespace list.
+          protectNamespaces:
+            enabled: {{ (.Values.kyverno.policies.protectNamespaces | default dict).enabled | default true }}
+            validationFailureAction: {{ (.Values.kyverno.policies.protectNamespaces | default dict).action | default "Enforce" }}
+          retainProtectedPV:
+            enabled: {{ (.Values.kyverno.policies.retainProtectedPV | default dict).enabled | default true }}
+            protectedNamespaces:
+            {{- range (.Values.kyverno.policies.retainProtectedPV | default dict).protectedNamespaces | default list }}
+              - {{ . | quote }}
+            {{- end }}
           podSecurity:
             enabled: {{ .Values.kyverno.policies.podSecurity.enabled | default true }}
             validationFailureAction: {{ .Values.kyverno.policies.podSecurity.action | default "enforce" }}
