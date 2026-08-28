@@ -427,7 +427,24 @@ openmed:
 # the nonprod pool. The primary's PVC (data-postgresql-primary-0) is a CSI
 # snapshot clone of the pre-replication data-postgresql-0 (215Gi, expanded from
 # the original 200Gi) — see the migration runbook in the PR.
+# WAL archiving / PITR (added after the 2026-08-28 data-loss incident, where the
+# only recovery point was a 23h-old Velero backup). Gates the postgresql-walg
+# ExternalSecret in charts/database-secrets, which syncs the shared Spaces
+# credential (GCP key monobase-digitalocean-spaces — the same one Velero uses)
+# into the namespace for archive_command. See postgresql.primary below.
+walg:
+  enabled: true
+
 postgresql:
+  # postgres_exporter sidecar + metrics Service. A `postgresql` ServiceMonitor
+  # already exists in the monitoring namespace selecting
+  # app.kubernetes.io/name=postgresql on port `metrics`, but no metrics Service
+  # existed, so it has been scraping nothing. Enabling this exposes
+  # pg_stat_archiver_* — the series the WAL-archive alerts depend on. Without
+  # it, a silently failing archive_command is invisible until pg_wal fills.
+  metrics:
+    enabled: true
+
   architecture: replication
 
   auth:
@@ -454,6 +471,76 @@ postgresql:
       autovacuum_max_workers = 6
       autovacuum_vacuum_cost_limit = 2000
       autovacuum_naptime = 30s
+      # --- Continuous WAL archiving (PITR). Cuts RPO from 24h (daily Velero
+      # backup) to ~archive_timeout. Added after the 2026-08-28 incident, where
+      # a 23h-old backup was the only recovery point. archive_mode needs a
+      # RESTART; archive_command alone is reload-only.
+      # wal-g is not in the Bitnami image — an initContainer copies the binary
+      # onto the walg-bin emptyDir below (the PG container has
+      # readOnlyRootFilesystem: true, so it cannot be installed at runtime).
+      archive_mode = on
+      archive_command = '/opt/wal-g/wal-g wal-push %p'
+      archive_timeout = 60
+    # Binary delivery for archive_command. The image is a thin debian:12-slim
+    # wrapper around the upstream wal-g release (ubuntu-22.04 build: glibc 2.35,
+    # forward-compatible with the image's Debian 12 / glibc 2.36). It also serves
+    # as the runner image for the backup-push / retention CronJobs.
+    initContainers:
+      - name: walg-install
+        image: ghcr.io/mycurelabs/wal-g:v3.0.9
+        imagePullPolicy: IfNotPresent
+        command:
+          - sh
+          - -c
+          - cp /usr/local/bin/wal-g /opt/wal-g/wal-g && chmod 0755 /opt/wal-g/wal-g
+        volumeMounts:
+          - name: walg-bin
+            mountPath: /opt/wal-g
+        securityContext:
+          runAsUser: 1001
+          runAsGroup: 1001
+          runAsNonRoot: true
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop: ["ALL"]
+          seccompProfile:
+            type: RuntimeDefault
+        resources:
+          requests:
+            cpu: 10m
+            memory: 32Mi
+          limits:
+            cpu: 100m
+            memory: 128Mi
+    extraVolumes:
+      - name: walg-bin
+        emptyDir: {}
+    extraVolumeMounts:
+      - name: walg-bin
+        mountPath: /opt/wal-g
+        readOnly: true
+    extraEnvVars:
+      - name: WALG_S3_PREFIX
+        value: "s3://mycure-doks-velero-backups/wal/mycure-preprod"
+      - name: AWS_ENDPOINT
+        value: "https://sgp1.digitaloceanspaces.com"
+      - name: AWS_REGION
+        value: "sgp1"
+      - name: AWS_S3_FORCE_PATH_STYLE
+        value: "false"
+      - name: WALG_COMPRESSION_METHOD
+        value: "zstd"
+      - name: AWS_ACCESS_KEY_ID
+        valueFrom:
+          secretKeyRef:
+            name: postgresql-walg
+            key: AWS_ACCESS_KEY_ID
+      - name: AWS_SECRET_ACCESS_KEY
+        valueFrom:
+          secretKeyRef:
+            name: postgresql-walg
+            key: AWS_SECRET_ACCESS_KEY
     persistence:
       size: 215Gi
     resources:
