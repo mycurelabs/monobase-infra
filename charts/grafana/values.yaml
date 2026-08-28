@@ -55,6 +55,15 @@ grafana:
     storageClass: ""  # Use cluster default
     size: "10Gi"
 
+  # RWO PVC + single replica → Recreate strategy so a roll terminates the old
+  # pod BEFORE the new one attaches the volume (RollingUpdate deadlocks on
+  # Multi-Attach with a ReadWriteOnce volume — the new pod is stuck
+  # ContainerCreating). bitnami grafana reads this at .Values.grafana.updateStrategy,
+  # so under this subchart alias (`grafana:`) it needs the extra `grafana:` nesting.
+  grafana:
+    updateStrategy:
+      type: Recreate
+
   # Security context
   securityContext:
     enabled: true
