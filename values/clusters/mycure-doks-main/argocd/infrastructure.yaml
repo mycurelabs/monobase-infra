@@ -373,7 +373,7 @@ velero:
     production:
       daily:
         enabled: true
-        schedule: "0 2 * * *"  # 2 AM daily
+        schedule: "CRON_TZ=Asia/Manila 0 2 * * *"  # 2 AM PHT (Velero cron is UTC by default; CRON_TZ pins it to Manila. PHT has no DST.)
         # 14d, not 30d: the mycure-production Kopia repo is ~4x the single-snapshot
         # floor at 30d of daily history. 14d ~halves it on both DO Spaces and the
         # on-prem mirror (which can't hold 30d on its 1.8T disk). See
