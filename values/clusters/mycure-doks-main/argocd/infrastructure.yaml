@@ -239,7 +239,24 @@ externalSecrets:
   enabled: true
   version: 0.9.11
   provider: gcp
-  
+
+  # ClusterSecretStore(s) for this cluster — provider-tagged list piped into the
+  # external-secrets-stores chart. mycure-doks-main uses GCP Secret Manager
+  # (project mc-v4-prod) with Service Account Key auth (the gcpsm-secret).
+  stores:
+    - name: gcp-secretstore
+      provider: gcp
+      gcp:
+        projectId: mc-v4-prod
+        # DOKS (no GKE Workload Identity) — auth via the gcpsm-secret SA key.
+        auth:
+          serviceAccountKey:
+            enabled: true
+            secretRef:
+              name: gcpsm-secret
+              key: secret-access-credentials
+              namespace: external-secrets-system
+
   # AWS Secrets Manager configuration
   aws:
     region: us-east-1
