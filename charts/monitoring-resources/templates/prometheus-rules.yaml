@@ -419,20 +419,22 @@ spec:
       interval: 30s
       rules:
         - alert: AuditSignInFailureBurst
-          # >100 failed sign-ins in 5m in preprod = likely credential stuffing.
+          # >100 failed sign-ins in 5m in any preprod/production namespace = likely
+          # credential stuffing. `by (namespace)` so it fires + labels PER env.
           expr: |
-            sum(increase(audit_events_total{namespace=~".+-(preprod|production)", action="auth.sign_in_failed"}[5m])) > 100
+            sum by (namespace) (increase(audit_events_total{namespace=~".+-(preprod|production)", action="auth.sign_in_failed"}[5m])) > 100
           for: 5m
           labels: {severity: warning}
           annotations:
-            summary: "Sign-in failure burst in mycure-preprod ({{ "{{" }} $value | humanize }} in 5m)"
+            summary: "Sign-in failure burst in {{ "{{" }} $labels.namespace }} ({{ "{{" }} $value | humanize }} in 5m)"
             description: "Possible credential-stuffing. Check source IPs / accounts via GET /audit/security-events; Better Auth rate-limit is the first lever."
         - alert: AuditPhiExportBurst
-          # >50 PHI record exports in 5m in preprod = likely mass-export / exfil.
+          # >50 PHI record exports in 5m in any preprod/production namespace =
+          # likely mass-export / exfil. `by (namespace)` so it fires + labels PER env.
           expr: |
-            sum(increase(audit_events_total{namespace=~".+-(preprod|production)", action="phi.record_exported"}[5m])) > 50
+            sum by (namespace) (increase(audit_events_total{namespace=~".+-(preprod|production)", action="phi.record_exported"}[5m])) > 50
           for: 5m
           labels: {severity: critical}
           annotations:
-            summary: "PHI export burst in mycure-preprod ({{ "{{" }} $value | humanize }} in 5m)"
+            summary: "PHI export burst in {{ "{{" }} $labels.namespace }} ({{ "{{" }} $value | humanize }} in 5m)"
             description: "Possible mass PHI exfiltration. Identify the actor via GET /audit/security-events and review whether the export scope is authorized."
