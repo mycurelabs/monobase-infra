@@ -28,6 +28,7 @@ spec:
         # Alertmanager notification identity (Postmark email + the API-key secret),
         # from alertmanager.* in the cluster's infrastructure.yaml.
         alertmanager:
+          enabled: {{ (.Values.alertmanager | default dict).enabled | default false }}
           smtpFrom: {{ (.Values.alertmanager | default dict).smtpFrom | default "no-reply@example.com" | quote }}
           emailTo: {{ (.Values.alertmanager | default dict).emailTo | default "alerts@example.com" | quote }}
           postmarkKey: {{ (.Values.alertmanager | default dict).postmarkKey | default "infrastructure-postmark-api-key" | quote }}
