@@ -75,9 +75,13 @@ prevents — the rehearsal is not optional.
    every restore/backup command fails. **Fixed** by the `postgresql-walg-passwd` mount (on `main`).
 2. **`backup-push` needs PG credentials** (`PGHOST`/`PGUSER`/`PGPASSWORD`) to
    call `pg_backup_start`. The CronJob injects them; archiving alone does not.
-3. **`default-deny-egress`** — the backup Job reaches Spaces via the
-   namespace-wide 443 egress allow. A *restore* pod in another namespace needs
-   its own egress rule.
+3. **`default-deny-egress` blocks the backup Job from the API server.** The Job
+   pod runs `kubectl` (get pod + exec); the namespace is default-deny and, unlike
+   the primary (allow-all egress), it has no rule — so it can't reach the API
+   server and fails with `dial tcp <apiserver>:443: i/o timeout`. Fixed by the
+   `walg-backup` NetworkPolicy (DNS + 443) that ships with the CronJob. The Job
+   never talks to Spaces itself — the exec'd `wal-g` runs in the primary, which
+   has its own egress. A *restore* pod in another namespace still needs its own.
 4. **Bitnami keeps `pg_hba.conf` / `pg_ident.conf` OUTSIDE `PGDATA`** → a
    restored base backup won't start until you supply them. **Runbook requirement.**
 5. **Bitnami keeps `extendedConfiguration` in `conf.d`, outside `PGDATA`** → a
