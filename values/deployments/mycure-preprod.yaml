@@ -434,6 +434,16 @@ openmed:
 # into the namespace for archive_command. See postgresql.primary below.
 walg:
   enabled: true
+  # Weekly base backup + retention, run by a CronJob that `kubectl exec`s
+  # `wal-g backup-push` into the primary (backup-push needs $PGDATA, which lives
+  # only on the primary's RWO PVC — a standalone pod can't mount it). Retention
+  # is base-relative (`delete retain FULL 4`), never age-based, so a base and the
+  # WAL needed to replay from it are pruned together. See
+  # charts/database-secrets/templates/walg-backup.yaml.
+  backup:
+    enabled: true
+    schedule: "0 18 * * 0"   # Sun 18:00 UTC (~02:00 PHT Mon) — off clinic hours
+    retainFull: 4            # ~1 month of weekly base backups
 
 postgresql:
   # postgres_exporter sidecar + metrics Service, exposing pg_stat_archiver_* —
@@ -527,7 +537,8 @@ postgresql:
       # /etc/passwd shim: uid 1001 has no passwd entry in the Bitnami image, and
       # cgo-built wal-g calls getpwuid() for backup-push/backup-list/backup-fetch
       # ("user: unknown userid 1001"). wal-push does not, which is why archiving
-      # works while every base-backup and RESTORE command fails.
+      # works while every base-backup and RESTORE command fails. The base-backup
+      # CronJob (walg.backup) execs backup-push here and relies on this shim.
       - name: walg-passwd
         configMap:
           name: postgresql-walg-passwd
