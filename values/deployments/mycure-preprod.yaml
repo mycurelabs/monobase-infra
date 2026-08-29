@@ -524,9 +524,20 @@ postgresql:
     extraVolumes:
       - name: walg-bin
         emptyDir: {}
+      # /etc/passwd shim: uid 1001 has no passwd entry in the Bitnami image, and
+      # cgo-built wal-g calls getpwuid() for backup-push/backup-list/backup-fetch
+      # ("user: unknown userid 1001"). wal-push does not, which is why archiving
+      # works while every base-backup and RESTORE command fails.
+      - name: walg-passwd
+        configMap:
+          name: postgresql-walg-passwd
     extraVolumeMounts:
       - name: walg-bin
         mountPath: /opt/wal-g
+        readOnly: true
+      - name: walg-passwd
+        mountPath: /etc/passwd
+        subPath: passwd
         readOnly: true
     extraEnvVars:
       - name: WALG_S3_PREFIX
