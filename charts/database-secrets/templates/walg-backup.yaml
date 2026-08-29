@@ -1,0 +1,157 @@
+{{- /*
+wal-g BASE BACKUP + RETENTION for PostgreSQL PITR.
+
+WHY THIS IS AN EXEC-INTO-PRIMARY CRONJOB (not a standalone backup pod):
+`wal-g backup-push` reads the primary's $PGDATA files directly (it only calls
+pg_backup_start/stop over the connection — it does NOT stream a base backup over
+the replication protocol the way pg_basebackup/pgBackRest do). The PG data PVC is
+DigitalOcean block storage = ReadWriteOnce, so no second pod can mount it while
+the primary holds it. Every wal-g-on-Kubernetes setup therefore runs backup-push
+INSIDE the DB pod: operators (Zalando Spilo, CloudNativePG) embed it; operator-less
+Helm deployments like this one use a CronJob that `kubectl exec`s into the primary.
+
+The exec inherits WALG_S3_PREFIX / AWS_* from the primary container (already set
+there for archive_command), so this Job only supplies PG connection creds. The
+uid-1001 /etc/passwd entry that wal-g's cgo build needs (backup-push/backup-list/
+delete abort with `user: unknown userid 1001` without it — wal-push does not) is
+supplied by the `postgresql-walg-passwd` ConfigMap (walg-passwd-configmap.yaml),
+mounted at /etc/passwd on the PRIMARY where these commands actually run.
+
+Gated on .Values.walg.backup.enabled so archiving can run without base-backup
+automation, and so non-adopting overlays render byte-identical.
+*/ -}}
+{{- if and .Values.walg .Values.walg.enabled .Values.walg.backup .Values.walg.backup.enabled }}
+{{- $b := .Values.walg.backup }}
+{{- $ns := .Values.global.namespace }}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: walg-backup
+  namespace: {{ $ns }}
+  labels:
+    app.kubernetes.io/name: walg-backup
+    app.kubernetes.io/component: postgresql-backup
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: walg-backup
+  namespace: {{ $ns }}
+  labels:
+    app.kubernetes.io/name: walg-backup
+    app.kubernetes.io/component: postgresql-backup
+rules:
+  # Minimum needed to find the primary pod and run wal-g inside it. Namespaced
+  # Role (not ClusterRole) — the grant cannot reach pods in other namespaces.
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list"]
+  - apiGroups: [""]
+    resources: ["pods/exec"]
+    verbs: ["create"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: walg-backup
+  namespace: {{ $ns }}
+  labels:
+    app.kubernetes.io/name: walg-backup
+    app.kubernetes.io/component: postgresql-backup
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: walg-backup
+subjects:
+  - kind: ServiceAccount
+    name: walg-backup
+    namespace: {{ $ns }}
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: walg-base-backup
+  namespace: {{ $ns }}
+  labels:
+    app.kubernetes.io/name: walg-base-backup
+    app.kubernetes.io/component: postgresql-backup
+spec:
+  # Weekly full is the industry default for a DB this size; deltas are a later
+  # optimisation. delete-retain prunes WAL relative to retained bases (never by
+  # age), so a base and the WAL needed to replay from it are pruned together.
+  schedule: {{ $b.schedule | default "0 18 * * 0" | quote }}
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 3600
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      activeDeadlineSeconds: {{ $b.activeDeadlineSeconds | default 10800 }}
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: walg-base-backup
+            app.kubernetes.io/component: postgresql-backup
+        spec:
+          serviceAccountName: walg-backup
+          restartPolicy: Never
+          securityContext:
+            runAsNonRoot: true
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: walg-backup
+              image: {{ $b.kubectlImage | default "registry.k8s.io/kubectl:v1.31.4" | quote }}
+              imagePullPolicy: IfNotPresent
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop: ["ALL"]
+              env:
+                - name: HOME
+                  value: /tmp
+                - name: RETAIN_FULL
+                  value: {{ $b.retainFull | default 4 | quote }}
+                - name: PGUSER
+                  value: {{ $b.pgUser | default "postgres" | quote }}
+                - name: PGPASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ $b.pgSecret | default "postgresql" | quote }}
+                      key: {{ $b.pgPasswordKey | default "postgres-password" | quote }}
+              command:
+                - /bin/sh
+                - -c
+                - |
+                  set -eu
+                  POD=$(kubectl get pod \
+                    -l app.kubernetes.io/name=postgresql,app.kubernetes.io/component=primary \
+                    -o jsonpath='{.items[0].metadata.name}')
+                  if [ -z "$POD" ]; then echo "no primary pod found" >&2; exit 1; fi
+                  echo "primary pod: $POD"
+                  # Base backup — exec inherits WALG_S3_PREFIX / AWS_* from the PG
+                  # container; PGDATA is resolved inside it. PGPASSWORD is passed
+                  # in so we don't depend on socket peer-auth.
+                  kubectl exec "$POD" -c postgresql -- \
+                    env PGHOST=127.0.0.1 PGUSER="$PGUSER" PGPASSWORD="$PGPASSWORD" PGDATABASE=postgres \
+                    sh -c '/opt/wal-g/wal-g backup-push "${PGDATA:-/bitnami/postgresql/data}"'
+                  # Prune: keep the last N base backups + the WAL they require.
+                  kubectl exec "$POD" -c postgresql -- \
+                    /opt/wal-g/wal-g delete retain FULL "$RETAIN_FULL" --confirm
+                  echo "base backup + retention complete"
+              resources:
+                requests:
+                  cpu: 25m
+                  memory: 64Mi
+                limits:
+                  cpu: 200m
+                  memory: 256Mi
+              volumeMounts:
+                - name: tmp
+                  mountPath: /tmp
+          volumes:
+            - name: tmp
+              emptyDir: {}
+{{- end }}

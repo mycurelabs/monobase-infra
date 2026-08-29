@@ -24,6 +24,13 @@ Tier 4 is a pull-only `rclone` mirror of the Velero bucket onto on-prem hosts. D
 
 > The 4 tiers above protect **production data** (Kubernetes PVs / Velero). They do **not** cover source code — see the separate section below.
 
+> **PostgreSQL PITR (RPO ~1 min).** The tiers above are Velero — discrete
+> snapshots, so PostgreSQL's RPO is 24h (Tier 2). Continuous WAL archiving via
+> `wal-g` adds recovery to **any second** on top of these backups (base backup +
+> replayed WAL). Live in `mycure-preprod`, not yet in production. It's the right
+> tool for accidental `DELETE` / bad-migration recovery — see
+> [PITR-RESTORE.md](PITR-RESTORE.md). Velero remains the whole-namespace rebuild.
+
 ---
 
 ## Source-code & project backup (GitHub)
