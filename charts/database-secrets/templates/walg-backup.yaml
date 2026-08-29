@@ -67,6 +67,41 @@ subjects:
     name: walg-backup
     namespace: {{ $ns }}
 ---
+# The Job pod runs `kubectl` (get pod + exec) against the in-cluster API server.
+# The namespace is default-deny-egress, and unlike the PG primary (which has an
+# allow-all egress netpol from the Bitnami chart) this pod has none — so without
+# this it cannot reach the API server (10.245.x.x:443) and every run fails with
+# `dial tcp <apiserver>:443: i/o timeout`. Egress is tighter than the primary's:
+# only DNS + 443 (the API server; 0.0.0.0/0:443 because the DOKS apiserver is a
+# managed IP that standard NetworkPolicy can't select by pod/entity). The pod
+# never talks to Spaces itself — the exec'd wal-g runs in the primary.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: walg-backup
+  namespace: {{ $ns }}
+  labels:
+    app.kubernetes.io/name: walg-backup
+    app.kubernetes.io/component: postgresql-backup
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: walg-base-backup
+  policyTypes: ["Egress"]
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - {port: 53, protocol: UDP}
+        - {port: 53, protocol: TCP}
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+      ports:
+        - {port: 443, protocol: TCP}
+---
 apiVersion: batch/v1
 kind: CronJob
 metadata:
