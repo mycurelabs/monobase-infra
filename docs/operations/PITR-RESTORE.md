@@ -104,13 +104,16 @@ env (`WALG_S3_PREFIX`, `AWS_*`) must be present in the restore pod.
 # 0. Pick the target. T = the second to recover to (just before the bad event).
 T="2026-08-28 14:31:59+00"
 
-# 1. List available base backups; confirm one predates T.
+# 1. List available base backups; pick the newest one whose start time is
+#    BEFORE T (do NOT blindly use LATEST — a base taken after T already
+#    contains the bad data and can't be rolled back past its start).
 kubectl exec postgresql-primary-0 -c postgresql -- \
   /opt/wal-g/wal-g backup-list --detail
+BASE=base_000000010000...   # the name from the list that predates T
 
 # 2. In a scratch pod with the wal-g image + WALG_S3_PREFIX/AWS_* + the passwd
-#    mount, fetch the latest base backup that predates T into an empty PGDATA:
-wal-g backup-fetch /bitnami/postgresql/data LATEST     # or a named base before T
+#    mount, fetch that base into an empty PGDATA:
+wal-g backup-fetch /bitnami/postgresql/data "$BASE"    # LATEST only if it predates T
 
 # 3. Supply the Bitnami-external configs (finding 4) into the restored PGDATA,
 #    and the recovery-time parameters (finding 5):
@@ -189,6 +192,14 @@ DB halts when the volume fills — the failure mode the alerts exist to catch.
 3. **Last resort only** (accepts a broken WAL chain): temporarily set
    `archive_command = /bin/true` to let Postgres recycle, then **immediately take
    a fresh base backup** — the archive is valid only up to the break.
+
+> **Disabling archiving:** don't just flip `walg.enabled: false` to pause it —
+> that prunes the `postgresql-walg-passwd` ConfigMap the primary mounts at
+> `/etc/passwd`, so the next primary restart fails
+> (`MountVolume.SetUp failed: configmap "postgresql-walg-passwd" not found`).
+> To pause, set `archive_command` to a no-op (or `archive_mode=off`, needs a
+> restart) and leave `walg.enabled` on; only remove `walg.enabled` together with
+> the `postgresql.primary` passwd volume/mount.
 
 ---
 
