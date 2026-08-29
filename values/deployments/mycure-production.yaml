@@ -317,7 +317,29 @@ hapihub-docs:
     hostname: "docs.localfirsthealth.com"
     sectionName: https-lfh
 
+# WAL archiving / PITR for production. Mirrors mycure-preprod (proven end-to-end
+# there): continuous archiving + a weekly base-backup CronJob — RPO ~1min vs the
+# 24h Velero backup that was the only recovery point in the 2026-08-28 incident.
+# ENABLING ROLLS THE PRIMARY (archive_mode needs a restart) — merge off clinic
+# hours. See docs/operations/PITR-RESTORE.md.
+walg:
+  enabled: true
+  backup:
+    enabled: true
+    schedule: "0 18 * * 0"   # Sun 18:00 UTC (~02:00 PHT Mon) — off clinic hours
+    retainFull: 4            # ~1 month of weekly base backups
+
 postgresql:
+  # postgres_exporter sidecar exposing pg_stat_archiver_* — the series the
+  # WAL-archive alerts (which already match *-production) depend on. Pinned to
+  # bitnamilegacy: the chart default docker.io/bitnami/postgres-exporter 404s.
+  metrics:
+    enabled: true
+    image:
+      registry: docker.io
+      repository: bitnamilegacy/postgres-exporter
+      tag: 0.17.1-debian-12-r16
+
   architecture: replication
 
   auth:
@@ -370,6 +392,82 @@ postgresql:
       autovacuum_max_workers = 6
       autovacuum_vacuum_cost_limit = 2000
       autovacuum_naptime = 30s
+      # --- Continuous WAL archiving (PITR). archive_mode needs a RESTART;
+      # archive_command alone is reload-only. wal-g is delivered onto the
+      # walg-bin emptyDir by the initContainer below (PG container is
+      # readOnlyRootFilesystem).
+      archive_mode = on
+      archive_command = '/opt/wal-g/wal-g wal-push %p'
+      archive_timeout = 60
+    # wal-g binary delivery for archive_command + the exec'd base-backup CronJob.
+    initContainers:
+      - name: walg-install
+        image: ghcr.io/mycurelabs/wal-g:v3.0.9
+        imagePullPolicy: IfNotPresent
+        command:
+          - sh
+          - -c
+          - cp /usr/local/bin/wal-g /opt/wal-g/wal-g && chmod 0755 /opt/wal-g/wal-g
+        volumeMounts:
+          - name: walg-bin
+            mountPath: /opt/wal-g
+        securityContext:
+          runAsUser: 1001
+          runAsGroup: 1001
+          runAsNonRoot: true
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop: ["ALL"]
+          seccompProfile:
+            type: RuntimeDefault
+        resources:
+          requests:
+            cpu: 10m
+            memory: 32Mi
+          limits:
+            cpu: 100m
+            memory: 128Mi
+    extraVolumes:
+      - name: walg-bin
+        emptyDir: {}
+      # /etc/passwd shim: uid 1001 has no passwd entry in the Bitnami image, and
+      # cgo-built wal-g calls getpwuid() for backup-push/backup-list/backup-fetch
+      # ("user: unknown userid 1001"). wal-push does not, which is why archiving
+      # works while every base-backup and RESTORE command fails. The base-backup
+      # CronJob (walg.backup) execs backup-push here and relies on this shim.
+      - name: walg-passwd
+        configMap:
+          name: postgresql-walg-passwd
+    extraVolumeMounts:
+      - name: walg-bin
+        mountPath: /opt/wal-g
+        readOnly: true
+      - name: walg-passwd
+        mountPath: /etc/passwd
+        subPath: passwd
+        readOnly: true
+    extraEnvVars:
+      - name: WALG_S3_PREFIX
+        value: "s3://mycure-doks-velero-backups/wal/mycure-production"
+      - name: AWS_ENDPOINT
+        value: "https://sgp1.digitaloceanspaces.com"
+      - name: AWS_REGION
+        value: "sgp1"
+      - name: AWS_S3_FORCE_PATH_STYLE
+        value: "false"
+      - name: WALG_COMPRESSION_METHOD
+        value: "zstd"
+      - name: AWS_ACCESS_KEY_ID
+        valueFrom:
+          secretKeyRef:
+            name: postgresql-walg
+            key: AWS_ACCESS_KEY_ID
+      - name: AWS_SECRET_ACCESS_KEY
+        valueFrom:
+          secretKeyRef:
+            name: postgresql-walg
+            key: AWS_SECRET_ACCESS_KEY
   readReplicas:
     replicaCount: 1
     # NOTE: the read replica PVC (data-postgresql-read-0) is excluded from Velero
