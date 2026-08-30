@@ -67,7 +67,10 @@ hapihub:
     # HOLD-PROD IS STILL IN EFFECT: R4 always-enforce lands in 11.20.105, so 11.20.103 is PRE-R4 and this
     # bump does NOT promote R4. Do not go >= 11.20.105 on prod until R4 is validated + operator-approved.
     # NEVER deploy 11.20.62 (mid-response abort/502 storm) or 11.20.44 (stale binary).
-    tag: "11.20.103"
+    # 11.20.104 = 11.20.103 + the reconstruct_inputs migration that the 11.20.102 journal
+    # reset dropped (the table was missing in prod, so every reconstruct save 500'd). Same
+    # stable 11.20.102 base, still PRE-R4 — the hold above is unaffected.
+    tag: "11.20.104"
   cache:
     # Response cache OFF in prod — interim mitigation for the single-hot-key
     # bentocache stampede that wedged prod (#179, #2839, #2617). The serve-stale
