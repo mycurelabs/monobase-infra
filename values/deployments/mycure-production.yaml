@@ -61,12 +61,13 @@ mycure-pxp:
 
 hapihub:
   image:
-    # DIGEST-PINNED (safeguard): the #3403 R4 authnz release RE-USED tag 11.20.102 (re-pushed 2026-08-19 to
-    # sha256:d0f4bebd = the always-enforce R4 image), colliding with this pin. Pinning to the pre-R4 digest
-    # prod already runs (cbfc4323) immunizes prod against pulling R4 on any scale/restart while HOLD-PROD is
-    # in effect (preprod-validation-first). Revert to a bare version tag once R4 is validated + promoted.
+    # Moved off the digest pin onto a clean bare tag. The pin existed because the #3403 R4 authnz release
+    # RE-USED tag 11.20.102 (re-pushed 2026-08-19 to sha256:d0f4bebd = always-enforce R4), so the bare tag
+    # was ambiguous; 11.20.103 is its own untouched tag (sha256:4f5c8f60) and needs no pin.
+    # HOLD-PROD IS STILL IN EFFECT: R4 always-enforce lands in 11.20.105, so 11.20.103 is PRE-R4 and this
+    # bump does NOT promote R4. Do not go >= 11.20.105 on prod until R4 is validated + operator-approved.
     # NEVER deploy 11.20.62 (mid-response abort/502 storm) or 11.20.44 (stale binary).
-    tag: "11.20.102@sha256:cbfc4323ba59d8d59b121115227503d9056637bff73eadde3c2cd4471370574a"
+    tag: "11.20.103"
   cache:
     # Response cache OFF in prod — interim mitigation for the single-hot-key
     # bentocache stampede that wedged prod (#179, #2839, #2617). The serve-stale
