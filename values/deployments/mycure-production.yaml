@@ -100,7 +100,7 @@ hapihub:
       rpId: "localfirsthealth.com"
 
   config:
-    CORS_ORIGINS: "https://mycure.localfirsthealth.com,https://mycurelocal.localfirsthealth.com,https://mycure-myaccount.localfirsthealth.com,https://mycure-dashboard.localfirsthealth.com,https://mycure-pxp.localfirsthealth.com"
+    CORS_ORIGINS: "https://mycure.localfirsthealth.com,https://mycurelocal.localfirsthealth.com,https://mycure-myaccount.localfirsthealth.com,https://mycure-dashboard.localfirsthealth.com,https://mycure-pxp.localfirsthealth.com,https://mycure-reconstruct.localfirsthealth.com,https://mycure-reconstruct.web.app,https://mycure-reconstruct.firebaseapp.com"
     STORAGE_DOWNLOAD_URL_HOST: "https://hapihub-next.localfirsthealth.com"
     # mono#2114: background jobs (exports, email, doc-ingestion, PDF/Chromium)
     # moved to the hapihub-worker release below — a single export/PDF

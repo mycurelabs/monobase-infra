@@ -107,7 +107,7 @@ hapihub:
       rpId: "preprod.localfirsthealth.com"
 
   config:
-    CORS_ORIGINS: "https://hapihub.preprod.localfirsthealth.com,https://mycure.preprod.localfirsthealth.com,https://mycurelocal.preprod.localfirsthealth.com,https://mycure-myaccount.preprod.localfirsthealth.com,https://mycure-dashboard.preprod.localfirsthealth.com,https://mycure-pxp.preprod.localfirsthealth.com,https://mycure-pr--*.web.app,https://medleyapp.preprod.localfirsthealth.com"
+    CORS_ORIGINS: "https://hapihub.preprod.localfirsthealth.com,https://mycure.preprod.localfirsthealth.com,https://mycurelocal.preprod.localfirsthealth.com,https://mycure-myaccount.preprod.localfirsthealth.com,https://mycure-dashboard.preprod.localfirsthealth.com,https://mycure-pxp.preprod.localfirsthealth.com,https://mycure-reconstruct.preprod.localfirsthealth.com,https://mycure-pr--*.web.app,https://mycure-reconstruct.web.app,https://mycure-reconstruct.firebaseapp.com,https://medleyapp.preprod.localfirsthealth.com"
     # ---- Phase 2: medical-AI integration (medgemma-worker + openmed enabled below) ----
     INGESTION_ENABLED: "true"
     OPENMED_ENABLED: "true"
