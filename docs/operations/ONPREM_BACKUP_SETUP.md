@@ -270,6 +270,21 @@ The script is idempotent. Re-running with different flags reconfigures cleanly.
 > The on-prem mirror faithfully holds whatever Spaces holds for the namespaces it
 > mirrors; it cannot keep fewer *days* than the cloud without an independent Kopia
 > repo.
+>
+> **Scope: Velero only — the PITR catalog is NOT mirrored.** `--namespaces`
+> builds the rclone filter as `--include "infrastructure/backups/**"` +
+> `--include "infrastructure/kopia/mycure-production/**"` + `--exclude "**"`. The
+> wal-g PITR catalog lives at `wal/mycure-production/` — a **sibling** of
+> `infrastructure/` in the same bucket — so base backups and WAL segments are
+> **excluded** from the on-prem mirror. If DO Spaces is lost, on-prem recovers the
+> daily Velero snapshots but **not** PITR. Mirroring it too is a deliberate
+> deferred decision (~160G today, +5–20G/day — needs a look at the disk budget);
+> to enable, add `--include "wal/mycure-production/**"` to the filter.
+>
+> **systemd version:** a named-timezone `OnCalendar` suffix (`Asia/Manila`) needs
+> **systemd ≥ 252**; older systemd accepts only a `UTC` suffix (which is why the
+> script's default uses one). niflheim runs 255, so it's fine — relevant only when
+> copy-pasting this onto an older box.
 
 ### Rotate the Spaces access key
 

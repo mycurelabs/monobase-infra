@@ -474,6 +474,11 @@ cat > "$SYSTEMD_DIR/$SERVICE_NAME.service" <<UNIT
 Description=Mirror Velero backups from DO Spaces (Mycure on-prem tier-4)
 After=network-online.target
 Wants=network-online.target
+# Refuse to run if the backup disk isn't mounted. With --encryption=none there's
+# no mycure-backup-volume.service dep, so without this an unmounted --backup-dir
+# (fstab nofail, disk swap, post-reboot race) would let rclone recreate the tree
+# on the root FS and sync into it for up to TimeoutStartSec, filling root.
+RequiresMountsFor=$BACKUP_DIR
 $( [[ "$ENCRYPTION" != "none" ]] && printf 'Requires=mycure-backup-volume.service\nAfter=mycure-backup-volume.service\n' )
 $failure_onfailure
 
