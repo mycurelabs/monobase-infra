@@ -241,22 +241,35 @@ Both commands should succeed.
 
 The script is idempotent. Re-running with different flags reconfigures cleanly.
 
-> **Bounded subset (current prod config):** the `hel.niflheim` box has a 1.8T
-> disk and cannot hold the full 30-day repo. It mirrors **only the
-> `mycure-production` namespace** (plus all backup metadata) — always pass
-> `--namespaces` on re-run or the mirror re-downloads the `monitoring` + `velero`
-> Kopia repos (~316G) and re-fills the disk:
+> **Bounded subset (current prod config):** the `hel.niflheim` box's 1.8T disk is
+> mounted at `/mnt/storage` (the root FS is only ~110G), and it cannot hold the
+> full 30-day repo. It mirrors **only the `mycure-production` namespace** (plus all
+> backup metadata) — always pass `--namespaces` on re-run or the mirror
+> re-downloads the `monitoring` + `velero` Kopia repos (~316G) and re-fills the
+> disk. The exact invocation in use:
 >
 > ```sh
 > sudo SPACES_ACCESS_KEY=… SPACES_SECRET_KEY=… KOPIA_PASSWORD=… \
->   scripts/onprem-backup-setup.sh --namespaces=mycure-production
+>   scripts/onprem-backup-setup.sh \
+>     --namespaces=mycure-production \
+>     --backup-dir=/mnt/storage/mycure \
+>     --timer-on-calendar="*-*-* 03,15:00:00 Asia/Manila"
 > ```
 >
+> **Timer — twice daily, 3h after each source backup.** The `production-daily`
+> schedule runs at **00:00 & 12:00 PHT**
+> (`values/clusters/mycure-doks-main/argocd/infrastructure.yaml` →
+> `velero.schedules.production.daily.schedule: "CRON_TZ=Asia/Manila 0 0,12 * * *"`).
+> The mirror fires at **03:00 & 15:00 PHT** — a 3h margin so each data-mover
+> backup (pg is ~188G; a run can exceed 2h) has completed before the mirror pulls
+> it. If a run ever overruns the margin, that snapshot is simply picked up by the
+> next mirror run; twice-daily keeps the newest snapshot on-prem within ~12h.
+>
 > Retention (how many days) is a **source-side** setting — it's the Velero
-> schedule TTL (`values/infrastructure/main.yaml` → `velero.schedules.*.retention`),
-> not an on-prem flag. The on-prem mirror faithfully holds whatever Spaces holds
-> for the namespaces it mirrors; it cannot keep fewer *days* than the cloud
-> without an independent Kopia repo.
+> schedule TTL (same file → `velero.schedules.*.retention`), not an on-prem flag.
+> The on-prem mirror faithfully holds whatever Spaces holds for the namespaces it
+> mirrors; it cannot keep fewer *days* than the cloud without an independent Kopia
+> repo.
 
 ### Rotate the Spaces access key
 
