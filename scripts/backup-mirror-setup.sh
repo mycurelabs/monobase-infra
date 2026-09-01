@@ -357,12 +357,14 @@ install -m 0755 /dev/stdin "$RUN_BIN" <<'RUN'
 set -euo pipefail
 name="${1:?usage: backup-mirror-run NAME}"
 . "/etc/backup-mirror/${name}.env"
-# --max-delete is a tripwire: if the source is empty/truncated (e.g. its own
-# mount dropped and it rebuilt an empty tree), --delete would wipe this replica's
-# good copy silently. Any bound turns that into a loud failure. Legit deletions
-# are source-side Kopia TTL expiry — steady and modest, well under this ceiling.
-# ponytail: fixed 10000-file bound; raise if a normal expiry ever trips it.
-exec /usr/bin/rsync -a --delete --max-delete=10000 --numeric-ids --partial \
+# --max-delete is a tripwire: if the source is empty/truncated (its own mount
+# dropped and it rebuilt an empty tree), --delete would silently wipe this
+# replica's good copy. The bound only works if it sits BELOW the repo's file
+# count. Measured source: 17,310 files (mycure-production, 2026-09-01), so 5000
+# (~29%) trips on a full/near-full wipe while staying above daily Kopia TTL churn.
+# ponytail: re-derive as ~10-30% of `find $SOURCE_PATH | wc -l` when the source
+# or its retention changes; raise if a normal expiry ever trips it.
+exec /usr/bin/rsync -a --delete --max-delete=5000 --numeric-ids --partial \
   -e "ssh -i $SSH_KEY -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=$KNOWN_HOSTS" \
   "$SOURCE_USER@$SOURCE_HOST:$SOURCE_PATH/" "$TARGET_DIR/" \
   --stats
@@ -382,7 +384,7 @@ name="${1:?usage: backup-mirror-verify NAME}"
 [[ -d "$TARGET_DIR" ]] || { echo "missing $TARGET_DIR (no successful pull yet?)" >&2; exit 1; }
 
 echo "==> pre-verify sync (close lag so remaining diffs are real)"
-/usr/bin/rsync -a --delete --max-delete=10000 --numeric-ids --partial \
+/usr/bin/rsync -a --delete --max-delete=5000 --numeric-ids --partial \
   -e "ssh -i $SSH_KEY -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=$KNOWN_HOSTS" \
   "$SOURCE_USER@$SOURCE_HOST:$SOURCE_PATH/" "$TARGET_DIR/" --stats || exit 1
 
