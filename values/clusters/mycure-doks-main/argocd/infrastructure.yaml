@@ -426,11 +426,15 @@ velero:
     production:
       daily:
         enabled: true
-        schedule: "CRON_TZ=Asia/Manila 0 2 * * *"  # 2 AM PHT (Velero cron is UTC by default; CRON_TZ pins it to Manila. PHT has no DST.)
-        # 14d, not 30d: the mycure-production Kopia repo is ~4x the single-snapshot
-        # floor at 30d of daily history. 14d ~halves it on both DO Spaces and the
-        # on-prem mirror (which can't hold 30d on its 1.8T disk). See
-        # docs/operations/ONPREM_BACKUP_SETUP.md.
+        # Twice daily: 00:00 & 12:00 PHT (issue #3890). CRON_TZ pins to Manila
+        # (Velero cron is UTC by default; PHT has no DST). Kept the "daily" key /
+        # `production-daily` Schedule name to avoid orphaning existing backups.
+        schedule: "CRON_TZ=Asia/Manila 0 0,12 * * *"  # 00:00 & 12:00 PHT
+        # 14d TTL. At 2 runs/day that's ~28 live snapshots (was ~14). Kopia
+        # dedupes, so the repo grows by intra-day churn deltas, not 2x. 14d, not
+        # 30d: the mycure-production Kopia repo is ~4x the single-snapshot floor
+        # at 30d; 14d ~halves it on both DO Spaces and the on-prem mirror (1.8T
+        # disk can't hold 30d). See docs/operations/ONPREM_BACKUP_SETUP.md.
         retention: 336h  # 14 days
         namespaces:
           - mycure-production
