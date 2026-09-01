@@ -6,9 +6,15 @@ minute. This is the mechanism from issue [#3870](https://github.com/mycurelabs/m
 added after the **2026-08-28** incident where the only recovery point was a
 ~23h-old Velero backup and ~23h of clinical records were unrecoverable.
 
-> **Status:** live and PITR-proven in `mycure-preprod`. **Production is not yet
-> enabled** — see [Production rollout](#production-rollout). This runbook is a
-> *correctness requirement*, not documentation: findings 4 & 5 below cannot be
+> **Status:** live and PITR-proven in **both `mycure-preprod` and
+> `mycure-production`** (prod enabled 2026-08-29; prod restore drill passed
+> 2026-08-30 — recovered to an exact second, `restored_medical_records`
+> correctly fewer than live). The restore recipe in step 3 below was
+> **independently re-drilled in `mycure-preprod` 2026-09-01** — fetch → the
+> finding-6 blocker reproduced verbatim → finding-5 param abort reproduced
+> verbatim → fix applied → `consistent recovery state reached` / `pausing at end
+> of recovery`, data queryable, timeline not forked. This runbook is a
+> *correctness requirement*, not documentation: findings 4, 5 & 6 cannot be
 > re-derived during an incident.
 
 ---
@@ -63,11 +69,13 @@ inside the DB pod; ours is a `CronJob` that `kubectl exec`s into
 
 ---
 
-## Five things the preprod rehearsal caught (all still apply)
+## Six things the rehearsals caught (all still apply)
 
 In every one, WAL archiving reported **healthy** (`pg_stat_archiver.failed_count
 = 0`) while recovery was impossible. That is the same shape as the incident this
-prevents — the rehearsal is not optional.
+prevents — the rehearsal is not optional. Findings 1–5 are from the preprod
+rehearsal; finding 6 (the drill *blocker*) surfaced only in the 2026-08-30
+production drill.
 
 1. **uid 1001 has no `/etc/passwd` entry** in the Bitnami image → `wal-g`'s cgo
    build aborts `backup-push`/`backup-list`/`backup-fetch` with `user: unknown
@@ -82,27 +90,45 @@ prevents — the rehearsal is not optional.
    `walg-backup` NetworkPolicy (DNS + 443) that ships with the CronJob. The Job
    never talks to Spaces itself — the exec'd `wal-g` runs in the primary, which
    has its own egress. A *restore* pod in another namespace still needs its own.
-4. **Bitnami keeps `pg_hba.conf` / `pg_ident.conf` OUTSIDE `PGDATA`** → a
-   restored base backup won't start until you supply them. **Runbook requirement.**
+4. **Bitnami keeps `pg_hba.conf` OUTSIDE `PGDATA`** → it is not in the base, so a
+   restored base backup won't start until you supply it. **Runbook requirement.**
+   `pg_ident.conf`, by contrast, lives *inside* `PGDATA` (verified: `ident_file =
+   /bitnami/postgresql/data/pg_ident.conf`), so `backup-fetch` restores it
+   automatically — **do not** try to `cp` it (Joff's original `cp … pg_ident.conf`
+   from the conf dir would fail: it isn't there, and under `set -e` that aborts
+   the whole restore).
 5. **Bitnami keeps `extendedConfiguration` in `conf.d`, outside `PGDATA`** → a
    restore starts with `max_connections=100` against a primary that ran 300 and
    Postgres refuses: *"recovery aborted because of insufficient parameter
-   settings"*. You **must** mirror these at recovery time:
+   settings"*. You **must** mirror these at recovery time (values captured from
+   the live prod primary 2026-08-30, `server_version 16.4`, `wal_level=replica`):
 
    ```text
    max_connections = 300
-   max_wal_senders          # match primary
-   max_worker_processes     # match primary
-   max_locks_per_transaction
-   max_prepared_transactions
+   max_wal_senders = 16
+   max_worker_processes = 8      # the default; extendedConfiguration raises
+                                 # autovacuum_max_workers=6 but never this
+   max_locks_per_transaction = 64
+   max_prepared_transactions = 0
    ```
+6. **Bitnami keeps `postgresql.conf` OUTSIDE `PGDATA` too** (in
+   `/opt/bitnami/postgresql/conf/`) → `backup-push` never captures it, so
+   `backup-fetch` gives a valid data dir **no Postgres can open**:
+   *"could not access the server configuration file
+   `/bitnami/postgresql/data/postgresql.conf`: No such file or directory"*.
+   **This blocked the production drill.** Copy it into `PGDATA` and neuter its
+   `include_dir` (the `conf.d` it references lives outside `PGDATA`) — see restore
+   step 3.
 
 ---
 
 ## Restore — Path A: wal-g native base (primary method, rehearsed 2026-08-29)
 
 Restore into a **scratch namespace/PVC**, never over a live primary. `wal-g`
-env (`WALG_S3_PREFIX`, `AWS_*`) must be present in the restore pod.
+env (`WALG_S3_PREFIX`, `AWS_*`) must be present in the restore pod. **Use a
+read-only Spaces key** for restore pods — it makes archive pollution (a promoted
+timeline fork) and accidental `wal-g delete` *structurally* impossible rather
+than procedurally avoided.
 
 ```bash
 # 0. Pick the target. T = the second to recover to (just before the bad event).
@@ -119,20 +145,36 @@ BASE=base_000000010000...   # the name from the list that predates T
 #    mount, fetch that base into an empty PGDATA:
 wal-g backup-fetch /bitnami/postgresql/data "$BASE"    # LATEST only if it predates T
 
-# 3. Supply the Bitnami-external configs (finding 4) into the restored PGDATA,
-#    and the recovery-time parameters (finding 5):
-cp pg_hba.conf pg_ident.conf /bitnami/postgresql/data/
-cat >> /bitnami/postgresql/data/postgresql.auto.conf <<EOF
+# 3. Supply the two config files that live OUTSIDE PGDATA and are therefore NOT
+#    in the base (findings 4 & 6 — verified by drill 2026-09-01: a fetched base
+#    contains pg_ident.conf + postgresql.auto.conf but NOT postgresql.conf or
+#    pg_hba.conf). Source them from the restore image's conf dir; the wal-g /
+#    bitnami postgresql image ships both there.
+D=/bitnami/postgresql/data
+cp /opt/bitnami/postgresql/conf/postgresql.conf "$D/postgresql.conf"      # finding 6 (BLOCKER)
+sed -i 's|^include_dir|#include_dir|' "$D/postgresql.conf"                # conf.d lives outside PGDATA
+cp /opt/bitnami/postgresql/conf/pg_hba.conf "$D/pg_hba.conf"
+# DO NOT copy pg_ident.conf — it lives INSIDE PGDATA, so backup-fetch already
+# restored it (verified). Copying a stray one over it is wrong. With no
+# hba_file/ident_file set in the copied conf, Postgres resolves both from PGDATA.
+
+cat >> "$D/postgresql.auto.conf" <<EOF
 restore_command = '/opt/wal-g/wal-g wal-fetch %f %p'
 recovery_target_time = '$T'
-recovery_target_action = 'promote'
+# DRILL SAFETY: 'pause' stops at the target WITHOUT forking the timeline.
+# 'promote' forks to TLI 2 and — if archiving is on with the same prefix —
+# writes that fork into the PRODUCTION archive. Only use 'promote' for a real
+# recovery you intend to keep.
+recovery_target_action = 'pause'
+archive_mode = off
+# finding 5 — mirror the live primary or Postgres refuses to start:
 max_connections = 300
-max_wal_senders = <match primary>
-max_worker_processes = <match primary>
-max_locks_per_transaction = <match primary>
-max_prepared_transactions = <match primary>
+max_wal_senders = 16
+max_worker_processes = 8
+max_locks_per_transaction = 64
+max_prepared_transactions = 0
 EOF
-touch /bitnami/postgresql/data/recovery.signal
+touch "$D/recovery.signal"
 
 # 4. Start Postgres. It crash-recovers from the base, then replays archived WAL
 #    forward and STOPS at T. Confirm in the log:
@@ -176,6 +218,12 @@ The CronJob runs `wal-g delete retain FULL 4 --confirm` — keeps the last 4 wee
 bases **and the WAL needed to replay from them** (base-relative, never age-based;
 age-based pruning silently orphans bases you still depend on).
 
+> ⬜ **Still unexercised (finding 6):** with only 2 bases the delete correctly
+> no-ops (`No backup found for deletion`). It won't actually delete until the 5th
+> weekly base (~4 weeks out). **Do a manual `--confirm`-less dry-run before then**
+> to confirm it drops the *oldest* base, not — via the `pg_upgrade` sort footgun
+> below — the newest.
+
 > **After any PostgreSQL major-version upgrade (`pg_upgrade`)**, the timeline
 > prefix in backup names changes, breaking `delete retain FULL`'s alphabetic
 > sort — it can delete the **newest** bases ([wal-g #636](https://github.com/wal-g/wal-g/issues/636)).
@@ -217,6 +265,10 @@ DB halts when the volume fills — the failure mode the alerts exist to catch.
 
 `wal-g wal-verify integrity` between drills catches WAL-chain gaps proactively
 (wal-g's verification is weaker than pgBackRest's — the drill is what matters).
+It **needs PG credentials** (`PGHOST`/`PGUSER`/`PGPASSWORD`) — same class as
+finding 2 — and fails `password authentication failed for user "postgres"`
+without them. This is the command you reach for at 3am to answer "can we
+actually recover?", so don't discover the missing creds then.
 
 ---
 
@@ -226,21 +278,32 @@ DO Spaces bills **$0 per request** and **free inbound**, so `archive_timeout=60`
 (a segment/minute) costs nothing in requests, and archiving traffic is free.
 Storage is $0.02/GiB-mo over the 250 GiB base.
 
-- **WAL:** preprod 0.5–2 GB/day compressed; **prod estimate 5–20 GB/day — measure
-  after 48h** via `pg_stat_archiver` + Spaces usage before extrapolating.
-- **Base backups:** 188 GB → zstd ≈ ~70 GB each; `retain FULL 4` ≈ 280 GB.
-- **Total prod PITR footprint** ≈ ~560 GB ≈ **~$11/mo incremental** — a rounding
-  error beside the Velero snapshots already in the same bucket.
+- **WAL:** preprod 0.5–2 GB/day compressed. Prod's first 2.5 days measured
+  **~1,865 segments/day** (`4687 archived / 2.51 days`, ~1.3 seg/min — above the
+  `archive_timeout=60` floor, so it's real write volume, not idle-timeout churn)
+  = **~29 GiB/day *raw***, above the original 5–20 GB/day estimate. That's a
+  segment count, not billed bytes — empty segments compress hard under zstd.
+  ⬜ **Still open (finding 5): someone with DO Spaces access must read actual
+  bucket usage** (`s3cmd du`/console) to get the compressed figure before
+  trusting the retention/cost math below.
+- **Base backups:** 160 GB fetched in the prod drill; zstd ≈ ~70 GB each;
+  `retain FULL 4` ≈ 280 GB.
+- **Total prod PITR footprint** ≈ ~560 GB ≈ **~$11/mo incremental** (pending the
+  compressed WAL measurement above) — a rounding error beside the Velero
+  snapshots already in the same bucket.
 - **Scale risk = operational, not $:** a stalled archiver fills `pg_wal`. Confirm
   the `pg_wal` PV has headroom for a multi-hour outage; the alerts + PV-fill
   backstop cover it. Weekly fulls bound WAL replay (and RTO) to ≤7 days.
 
 ---
 
-## Production rollout
+## Production rollout — DONE (2026-08-29)
 
-Preprod-only today. To enable production (needs a brief primary **restart** for
-`archive_mode`, scheduled outside clinic hours):
+Enabled in production 2026-08-29: primary rolled cleanly (~36s restart), first
+base `base_0000000100000322000000B8` (start LSN `322/B8000028`, ~157 GB in ~17
+min) in Spaces, `pg_stat_archiver.failed_count = 0`. Restore drill passed
+2026-08-30 (see Status). The steps that were followed, for reference / other
+environments:
 
 1. Push the image to GHCR (see `docker/wal-g/Dockerfile` header).
 2. Mirror the `walg` / `metrics` / `primary.initContainers` / `extraVolumes` /
