@@ -740,7 +740,11 @@ if [[ "$WAL_MIRROR" == "1" ]]; then
 Description=Mirror PostgreSQL WAL archive from DO Spaces (Mycure on-prem PITR tier-4)
 After=network-online.target
 Wants=network-online.target
-$( [[ "$ENCRYPTION" != "none" ]] && printf 'Requires=mycure-backup-volume.service\nAfter=mycure-backup-volume.service\n' )
+# Same root-FS guard as the Kopia mirror (PR #397): an unmounted --backup-dir must
+# not let a *per-minute* rclone recreate the tree on the root FS and fill it. With
+# --encryption=none there's no volume unit, so pin the mount directly; LUKS modes
+# mount imperatively via mycure-backup-volume.service, so depend on that instead.
+$( if [[ "$ENCRYPTION" == "none" ]]; then printf 'RequiresMountsFor=%s\n' "$BACKUP_DIR"; else printf 'Requires=mycure-backup-volume.service\nAfter=mycure-backup-volume.service\n'; fi )
 $wal_failure_onfailure
 
 [Service]
