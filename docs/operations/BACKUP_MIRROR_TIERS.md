@@ -79,7 +79,15 @@ sudo [DISCORD_WEBHOOK_URL=...] scripts/backup-mirror-setup.sh --role=replica \
 - `--target-dir` should be on a disk with room for the full copy.
 - Schedule: default is **05:00 & 17:00 PHT** — 2h after niflheim's 03:00/15:00
   pull, which is 3h after the 00:00/12:00 PHT source Velero backups. Each tier
-  leaves the one below it time to finish. (`Asia/Manila` suffix needs systemd ≥ 240.)
+  leaves the one below it time to finish. (A named-timezone `OnCalendar` suffix
+  like `Asia/Manila` needs **systemd ≥ 252**; older systemd accepts only a `UTC`
+  suffix. Both niflheim and vanaheim run 255.)
+
+> **A replica only holds what the source exposes.** With niflheim exposing
+> `/mnt/storage/mycure`, the copy contains the Velero data-mover Kopia repos for
+> `mycure-production` — it does **not** include the wal-g PITR catalog
+> (`wal/mycure-production/` in DO Spaces), which niflheim itself doesn't mirror.
+> See the scope note in [ONPREM_BACKUP_SETUP.md](ONPREM_BACKUP_SETUP.md).
 
 The script generates `/etc/backup-mirror/<name>.key`, installs the pull + weekly
 verify units, and prints the pubkey + the source command.

@@ -152,6 +152,10 @@ if [[ "$ROLE" == "source" ]]; then
   [[ -n "$REPLICA_IP" ]]   || err "--replica-ip is required (from= lock)"
   [[ -d "$ALLOWED_PATH" ]] || err "--allowed-path $ALLOWED_PATH does not exist"
   command -v "$RRSYNC_BIN" >/dev/null || err "$RRSYNC_BIN not found (install rsync)"
+  # Both are interpolated into the authorized_keys line — validate so a stray
+  # value (e.g. --replica-ip='*') cannot silently defeat the from= lock.
+  [[ "$REPLICA_NAME" =~ ^[a-zA-Z0-9._-]+$ ]] || err "--replica-name must be [a-zA-Z0-9._-]"
+  [[ "$REPLICA_IP" =~ ^[0-9a-fA-F:.]+$ ]]    || err "--replica-ip must be a bare IPv4/IPv6 address (no globs/CIDR/spaces)"
 
   # Resolve the pubkey (inline or file) and normalise to "type keydata".
   if [[ -n "$REPLICA_PUBKEY_FILE" ]]; then
@@ -174,8 +178,13 @@ if [[ "$ROLE" == "source" ]]; then
   home="$(getent passwd "$REPLICA_USER" | cut -d: -f6)"
   [[ -n "$home" ]] || err "could not resolve home for $REPLICA_USER"
 
-  # Grant read access to the exposed dir via its owning group.
+  # Grant read access to the exposed dir via its owning group. Refuse a
+  # privileged (system-core, gid<100) group — genericity means --allowed-path
+  # could be root-owned, and `usermod -aG root` is not what "read one dir" means.
   path_group="$(stat -c '%G' "$ALLOWED_PATH")"
+  path_gid="$(getent group "$path_group" | cut -d: -f3)"
+  [[ -n "$path_gid" && "$path_gid" -ge 100 ]] \
+    || err "refusing to add $REPLICA_USER to privileged group $path_group (gid ${path_gid:-?}); expose a non-system-owned dir instead"
   if ! id -nG "$REPLICA_USER" | tr ' ' '\n' | grep -qx "$path_group"; then
     log "adding $REPLICA_USER to group $path_group (read $ALLOWED_PATH)"
     usermod -aG "$path_group" "$REPLICA_USER"
@@ -190,7 +199,9 @@ if [[ "$ROLE" == "source" ]]; then
   marker="mirror-replica:$REPLICA_NAME"
   line="from=\"$REPLICA_IP\",restrict,command=\"$RRSYNC_BIN -ro $ALLOWED_PATH\" $key_type $key_data $marker"
   tmp="$(mktemp)"
-  grep -vF " $marker" "$ak" > "$tmp" 2>/dev/null || true
+  # Anchor to end-of-line: a substring match would let re-running for "vanaheim"
+  # drop "vanaheim-2"'s line and silently revoke it (breaks fan-out).
+  grep -vE " ${marker}$" "$ak" > "$tmp" 2>/dev/null || true
   printf '%s\n' "$line" >> "$tmp"
   install -m 0600 -o "$REPLICA_USER" -g "$REPLICA_USER" "$tmp" "$ak"
   rm -f "$tmp"
@@ -346,7 +357,12 @@ install -m 0755 /dev/stdin "$RUN_BIN" <<'RUN'
 set -euo pipefail
 name="${1:?usage: backup-mirror-run NAME}"
 . "/etc/backup-mirror/${name}.env"
-exec /usr/bin/rsync -a --delete --numeric-ids --partial \
+# --max-delete is a tripwire: if the source is empty/truncated (e.g. its own
+# mount dropped and it rebuilt an empty tree), --delete would wipe this replica's
+# good copy silently. Any bound turns that into a loud failure. Legit deletions
+# are source-side Kopia TTL expiry — steady and modest, well under this ceiling.
+# ponytail: fixed 10000-file bound; raise if a normal expiry ever trips it.
+exec /usr/bin/rsync -a --delete --max-delete=10000 --numeric-ids --partial \
   -e "ssh -i $SSH_KEY -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=$KNOWN_HOSTS" \
   "$SOURCE_USER@$SOURCE_HOST:$SOURCE_PATH/" "$TARGET_DIR/" \
   --stats
@@ -366,17 +382,24 @@ name="${1:?usage: backup-mirror-verify NAME}"
 [[ -d "$TARGET_DIR" ]] || { echo "missing $TARGET_DIR (no successful pull yet?)" >&2; exit 1; }
 
 echo "==> pre-verify sync (close lag so remaining diffs are real)"
-/usr/bin/rsync -a --delete --numeric-ids --partial \
+/usr/bin/rsync -a --delete --max-delete=10000 --numeric-ids --partial \
   -e "ssh -i $SSH_KEY -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=$KNOWN_HOSTS" \
   "$SOURCE_USER@$SOURCE_HOST:$SOURCE_PATH/" "$TARGET_DIR/" --stats || exit 1
 
 echo "==> checksum diff (rsync -anc, itemized)"
-report=$(mktemp); trap 'rm -f "$report"' EXIT
+report=$(mktemp); errfile=$(mktemp); trap 'rm -f "$report" "$errfile"' EXIT
 # -n dry-run, -c checksum, -i itemize. With --delete, any line means the local
 # copy differs from source. On a settled content-addressed store this is empty.
-/usr/bin/rsync -anci --delete --numeric-ids \
+# Keep stderr OUT of $report: an SSH warning or connection failure must surface
+# as a transport error, not be miscounted as "corruption" on the one alert whose
+# whole job is to mean corruption. A non-zero rsync exit is a real failure.
+if ! /usr/bin/rsync -anci --delete --numeric-ids \
   -e "ssh -i $SSH_KEY -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=$KNOWN_HOSTS" \
-  "$SOURCE_USER@$SOURCE_HOST:$SOURCE_PATH/" "$TARGET_DIR/" > "$report" 2>&1 || true
+  "$SOURCE_USER@$SOURCE_HOST:$SOURCE_PATH/" "$TARGET_DIR/" > "$report" 2>"$errfile"; then
+  echo "verify rsync failed (transport/IO error, NOT necessarily corruption):" >&2
+  cat "$errfile" >&2
+  exit 1
+fi
 
 # Ignore pure "." dir-time itemizations and blank lines; anything else is a real
 # content/size/presence difference.
@@ -423,6 +446,9 @@ cat > "$SYSTEMD_DIR/$SERVICE_NAME.service" <<UNIT
 Description=Read-only backup mirror pull ($NAME) from $SOURCE_HOST
 After=network-online.target
 Wants=network-online.target
+# Don't run if the target disk isn't mounted — otherwise rsync would recreate
+# the tree on the root filesystem and fill it.
+RequiresMountsFor=$TARGET_DIR
 $m_fail
 
 [Service]
@@ -472,6 +498,7 @@ cat > "$SYSTEMD_DIR/$VERIFY_SERVICE_NAME.service" <<UNIT
 Description=Integrity verify for backup-mirror ($NAME)
 After=network-online.target
 Wants=network-online.target
+RequiresMountsFor=$TARGET_DIR
 $v_fail
 
 [Service]
