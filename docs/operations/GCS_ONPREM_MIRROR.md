@@ -23,18 +23,65 @@ never touched. Script: `scripts/gcs-onprem-mirror.sh`.
 
 ## Prerequisites (not in the script)
 
-1. **Read-only GCS SA** in `mc-v4-prod`: `roles/storage.objectViewer` on
-   `mc-v4-prod.appspot.com` (list + read only). Download its JSON key.
+1. **Read-only GCS SA** — ✅ **already provisioned** (2026-09-01):
+   `gcs-dr-onprem-ro@mc-v4-prod.iam.gserviceaccount.com`, granted
+   `roles/storage.objectViewer` on `gs://mc-v4-prod.appspot.com` (bucket-scoped).
+   **No key minted yet** — mint it at rollout only (a long-lived key shouldn't
+   sit around while the rollout is gated). See the rollout checklist below.
 2. **Crypt password** (+ optional salt): generate offline, **escrow it** with
    the same custody policy as the secrets-DR age key
    ([[secrets-dr-3882]] / #3882) — it is the GCS-mirror analogue of the Kopia
    password. Losing it = the on-prem copy is unrecoverable.
 3. **Go-ahead on egress + capacity** (see below).
 
+## Rollout checklist (exact commands)
+
+Run in order once #2/#3 above are decided. Steps 0–1 create credential material —
+do them at rollout, not before.
+
+```bash
+# 0. Mint the SA key and land it on niflheim (off-GCP host can't use workload
+#    identity, so it needs an exported key). Mint → scp → shred the local copy.
+gcloud iam service-accounts keys create /tmp/gcs-dr-ro.json \
+  --iam-account=gcs-dr-onprem-ro@mc-v4-prod.iam.gserviceaccount.com
+scp /tmp/gcs-dr-ro.json hel.niflheim:/root/gcs-dr-ro.json
+shred -u /tmp/gcs-dr-ro.json          # never leave the key on the workstation
+
+# 1. Generate + ESCROW the crypt password and salt (reuse the #3882 custody).
+openssl rand -base64 32     # -> GCS_CRYPT_PASSWORD  (escrow, do not commit)
+openssl rand -base64 32     # -> GCS_CRYPT_PASSWORD2 (escrow, do not commit)
+
+# 2. On niflheim, run the setup (measure size first for egress/capacity).
+ssh hel.niflheim
+gcloud storage du -s gs://mc-v4-prod.appspot.com   # confirm it fits /mnt/storage (1.8T; PG ~188G)
+sudo GCS_SA_JSON=/root/gcs-dr-ro.json \
+     GCS_CRYPT_PASSWORD='…' GCS_CRYPT_PASSWORD2='…' \
+     DISCORD_WEBHOOK_URL='https://discord.com/api/webhooks/…' \
+  /path/to/repo/scripts/gcs-onprem-mirror.sh \
+     --bucket=mc-v4-prod.appspot.com \
+     --backup-dir=/mnt/storage/mycure-gcs
+sudo rm -f /root/gcs-dr-ro.json       # script copied it to /etc/mycure-gcs/; remove the drop
+
+# 3. Trigger the first pull + confirm encrypted-at-rest.
+sudo systemctl start mycure-gcs-mirror.service
+sudo journalctl --namespace=mycure-gcs -u mycure-gcs-mirror.service -f
+
+# 4. Wire the host→host fan-out (#400) to include /mnt/storage/mycure-gcs so
+#    vanaheim pulls the ciphertext (see backup-mirror-setup.sh --role=source).
+```
+If rclone errors on bucket metadata (`storage.buckets.get`), add the fallback
+role: `gcloud storage buckets add-iam-policy-binding gs://mc-v4-prod.appspot.com
+--member=serviceAccount:gcs-dr-onprem-ro@mc-v4-prod.iam.gserviceaccount.com
+--role=roles/storage.legacyBucketReader`.
+
+**Teardown / revoke** (if abandoned): `gcloud iam service-accounts delete
+gcs-dr-onprem-ro@mc-v4-prod.iam.gserviceaccount.com` (removes the SA + its
+bucket binding + any keys).
+
 ## Setup (on niflheim)
 
 ```bash
-sudo GCS_SA_JSON=/root/mc-v4-prod-ro-sa.json \
+sudo GCS_SA_JSON=/root/gcs-dr-ro.json \
      GCS_CRYPT_PASSWORD='…' GCS_CRYPT_PASSWORD2='…' \
      DISCORD_WEBHOOK_URL='https://discord.com/api/webhooks/…' \
   scripts/gcs-onprem-mirror.sh \
