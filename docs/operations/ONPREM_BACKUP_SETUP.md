@@ -314,8 +314,14 @@ systemd unit (`mycure-wal-mirror`), not folded into the Kopia mirror:
   disjoint subtrees (this is why `--wal-mirror` requires `--namespaces`).
 - **Cadence & overlap.** Timer fires every minute (`*:*:00`, `AccuracySec=1s`, no
   randomized delay). systemd skips a tick whose service is still active, so a slow
-  sync coalesces instead of stacking. On-prem WAL lag ≈ `archive_timeout` + sync
-  latency (~1-2 min).
+  sync coalesces instead of stacking. Steady-state delta runs finish in seconds
+  (`TimeoutStartSec=600s` bounds a hang). On-prem WAL lag ≈ `archive_timeout` +
+  sync latency (~1-2 min).
+- **First install seeds synchronously.** The initial pull moves the whole retained
+  WAL backlog (~81 GiB for `mycure-production` as of 2026-09), which the per-minute
+  10-min cap can't absorb — so the setup script runs one blocking `rclone sync` to
+  completion *before* arming the timer (no `OnFailure` alerts fire during it).
+  Expect the first `--wal-mirror` run to take a while; re-runs are fast no-op deltas.
 - **Notifications.** Failure-only, rate-limited to 3 pings/hour
   (`StartLimitBurst=3` / `StartLimitIntervalSec=1h`) — a per-minute *success*
   webhook would be 1440 msgs/day, and a sustained outage would otherwise fire 60
@@ -324,8 +330,8 @@ systemd unit (`mycure-wal-mirror`), not folded into the Kopia mirror:
 - **Disk.** Bounded by source retention: `rclone sync` mirrors `wal-g delete`
   prunes, so on-prem holds only what the cloud `wal/<ns>/` holds (WAL kept until
   the oldest base backup ages out — `walg.backup.retainFull=4` weekly ≈ 4-5
-  weeks). Expect tens of GB; confirm `df -h <backup-dir>` has headroom on top of
-  the Kopia repo.
+  weeks). ~81 GiB for `mycure-production` (2026-09); confirm `df -h <backup-dir>`
+  has headroom on top of the Kopia repo.
 
 > **Restoring PITR from the on-prem WAL copy** (cloud unreachable) is a separate
 > drill — point wal-g at the local files (`WALG_FILE_PREFIX`) or re-serve the
