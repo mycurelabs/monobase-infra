@@ -7,9 +7,9 @@ added after the **2026-08-28** incident where the only recovery point was a
 ~23h-old Velero backup and ~23h of clinical records were unrecoverable.
 
 > **Status:** live and PITR-proven in **both `mycure-preprod` and
-> `mycure-production`** (prod enabled 2026-08-29; prod restore drill passed
-> 2026-08-30 — recovered to an exact second, `restored_medical_records`
-> correctly fewer than live). The restore recipe in step 3 below was
+> `mycure-production`** (prod enabled 2026-08-29; prod restore drill **ran
+> 2026-09-01**, recovering to target `2026-08-30 19:00:00+00` — an exact second,
+> `restored_medical_records` correctly fewer than live). The restore recipe in step 3 below was
 > **independently re-drilled in `mycure-preprod` 2026-09-01** — fetch → the
 > finding-6 blocker reproduced verbatim → finding-5 param abort reproduced
 > verbatim → fix applied → `consistent recovery state reached` / `pausing at end
@@ -74,7 +74,7 @@ inside the DB pod; ours is a `CronJob` that `kubectl exec`s into
 In every one, WAL archiving reported **healthy** (`pg_stat_archiver.failed_count
 = 0`) while recovery was impossible. That is the same shape as the incident this
 prevents — the rehearsal is not optional. Findings 1–5 are from the preprod
-rehearsal; finding 6 (the drill *blocker*) surfaced only in the 2026-08-30
+rehearsal; finding 6 (the drill *blocker*) surfaced only in the 2026-09-01
 production drill.
 
 1. **uid 1001 has no `/etc/passwd` entry** in the Bitnami image → `wal-g`'s cgo
@@ -100,8 +100,9 @@ production drill.
 5. **Bitnami keeps `extendedConfiguration` in `conf.d`, outside `PGDATA`** → a
    restore starts with `max_connections=100` against a primary that ran 300 and
    Postgres refuses: *"recovery aborted because of insufficient parameter
-   settings"*. You **must** mirror these at recovery time (values captured from
-   the live prod primary 2026-08-30, `server_version 16.4`, `wal_level=replica`):
+   settings"*. You **must** mirror these at recovery time (independently confirmed
+   on the live preprod primary 2026-09-01, and prod runs the identical set;
+   `server_version 16.4`, `wal_level=replica`):
 
    ```text
    max_connections = 300
@@ -122,7 +123,7 @@ production drill.
 
 ---
 
-## Restore — Path A: wal-g native base (primary method, rehearsed 2026-08-29)
+## Restore — Path A: wal-g native base (primary method, re-drilled 2026-09-01)
 
 Restore into a **scratch namespace/PVC**, never over a live primary. `wal-g`
 env (`WALG_S3_PREFIX`, `AWS_*`) must be present in the restore pod. **Use a
@@ -218,10 +219,11 @@ The CronJob runs `wal-g delete retain FULL 4 --confirm` — keeps the last 4 wee
 bases **and the WAL needed to replay from them** (base-relative, never age-based;
 age-based pruning silently orphans bases you still depend on).
 
-> ⬜ **Still unexercised (finding 6):** with only 2 bases the delete correctly
-> no-ops (`No backup found for deletion`). It won't actually delete until the 5th
-> weekly base (~4 weeks out). **Do a manual `--confirm`-less dry-run before then**
-> to confirm it drops the *oldest* base, not — via the `pg_upgrade` sort footgun
+> ⬜ **Open follow-up B — retention deletion unexercised:** with only 2 bases the
+> delete correctly no-ops (`No objects matched the deletion criteria`; verified as
+> a dry-run on preprod 2026-09-01). It won't actually delete until the 5th weekly
+> base (~4 weeks out). **Do a manual `--confirm`-less dry-run before then** to
+> confirm it drops the *oldest* base, not — via the `pg_upgrade` sort footgun
 > below — the newest.
 
 > **After any PostgreSQL major-version upgrade (`pg_upgrade`)**, the timeline
@@ -278,19 +280,19 @@ DO Spaces bills **$0 per request** and **free inbound**, so `archive_timeout=60`
 (a segment/minute) costs nothing in requests, and archiving traffic is free.
 Storage is $0.02/GiB-mo over the 250 GiB base.
 
-- **WAL:** preprod 0.5–2 GB/day compressed. Prod's first 2.5 days measured
-  **~1,865 segments/day** (`4687 archived / 2.51 days`, ~1.3 seg/min — above the
-  `archive_timeout=60` floor, so it's real write volume, not idle-timeout churn)
-  = **~29 GiB/day *raw***, above the original 5–20 GB/day estimate. That's a
-  segment count, not billed bytes — empty segments compress hard under zstd.
-  ⬜ **Still open (finding 5): someone with DO Spaces access must read actual
-  bucket usage** (`s3cmd du`/console) to get the compressed figure before
-  trusting the retention/cost math below.
-- **Base backups:** 160 GB fetched in the prod drill; zstd ≈ ~70 GB each;
-  `retain FULL 4` ≈ 280 GB.
-- **Total prod PITR footprint** ≈ ~560 GB ≈ **~$11/mo incremental** (pending the
-  compressed WAL measurement above) — a rounding error beside the Velero
-  snapshots already in the same bucket.
+- **WAL — MEASURED from actual Spaces usage 2026-09-01 (not extrapolated):**
+  prod `wal/mycure-production/wal_005` = **6.15 GB compressed over 2.64 days =
+  ~2.33 GB/day**. The raw segment count (~1,876/day ≈ **29 GiB/day uncompressed**)
+  overstates the footprint ~13×: with `archive_timeout=60` a large fraction of
+  segments are timeout-forced and near-empty (preprod, which sits at the pure
+  1440-seg/day floor, compresses **360×** to ~45 KB/segment; its whole WAL history
+  is ~65 MB/day). So the compressed figure lands **below** the original 5–20
+  GB/day estimate — **use billed bytes, never the raw segment count, for cost.**
+- **Base backups (measured):** prod `basebackups_005` = 80.6 GB for 2 bases ≈
+  **~37.5 GiB each** compressed; `retain FULL 4` ≈ **~150 GiB**.
+- **Total prod PITR footprint (measured):** ≈ 150 GiB bases + ~4 weeks WAL
+  (~61 GiB) ≈ **~210 GiB ≈ ~$4/mo incremental** — a rounding error beside the
+  Velero snapshots already in the same bucket.
 - **Scale risk = operational, not $:** a stalled archiver fills `pg_wal`. Confirm
   the `pg_wal` PV has headroom for a multi-hour outage; the alerts + PV-fill
   backstop cover it. Weekly fulls bound WAL replay (and RTO) to ≤7 days.
@@ -301,9 +303,9 @@ Storage is $0.02/GiB-mo over the 250 GiB base.
 
 Enabled in production 2026-08-29: primary rolled cleanly (~36s restart), first
 base `base_0000000100000322000000B8` (start LSN `322/B8000028`, ~157 GB in ~17
-min) in Spaces, `pg_stat_archiver.failed_count = 0`. Restore drill passed
-2026-08-30 (see Status). The steps that were followed, for reference / other
-environments:
+min) in Spaces, `pg_stat_archiver.failed_count = 0`. Restore drill **ran
+2026-09-01** (recovering to target `2026-08-30 19:00:00+00`; see Status). The
+steps that were followed, for reference / other environments:
 
 1. Push the image to GHCR (see `docker/wal-g/Dockerfile` header).
 2. Mirror the `walg` / `metrics` / `primary.initContainers` / `extraVolumes` /
