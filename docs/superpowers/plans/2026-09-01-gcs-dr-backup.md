@@ -4,9 +4,11 @@
 
 **Goal:** Give the prod patient-file bucket `gs://mc-v4-prod.appspot.com` an automated, isolated, point-in-time-recoverable DR backup (issue [monobase-mycure#3878](https://github.com/mycurelabs/monobase-mycure/issues/3878)).
 
-**Architecture:** A **Storage Transfer Service (STS)** job in a **separate GCP org/project** mirrors the source bucket into a hardened backup bucket twice daily (00:00 & 12:00 PHT). The backup bucket has **object versioning + a 30-day noncurrent-version lifecycle + soft-delete**, so it holds a rolling 30-day point-in-time window. Isolation comes from the *separate org* (its IAM/billing has no overlap with `mc-v4-prod`), so a compromise or accidental mass-delete on prod cannot reach or purge the backup. STS is fully managed — no compute, no exported credentials.
+**Architecture:** Two **additive** DR tiers (both built — not either/or), same defense-in-depth as PG (Spaces → niflheim → vanaheim):
+- **Tier 1 — cloud (STS → separate GCP org):** a Storage Transfer Service job in a **separate GCP org/project** mirrors the source bucket into a hardened backup bucket twice daily (00:00 & 12:00 PHT), with **versioning + 30-day noncurrent lifecycle + soft-delete** (rolling 30-day point-in-time). Isolated from a `mc-v4-prod` compromise, $0 egress, fully managed, no exported creds. **Fast RTO, but still on Google.**
+- **Tier 2 — on-prem (GCS → niflheim → vanaheim), NEW:** the existing `onprem-backup-setup.sh` pattern gains a `--source=gcs` mode — rclone pulls the bucket from GCS (read-only SA) through an **rclone `crypt`** remote so objects land **encrypted at rest** on `hel.niflheim`, then the generic host→host mirror (#400) fans the ciphertext niflheim→vanaheim for free. **Fully off-Google** (survives total Google loss / billing termination / org-wide compromise). Costs GCS egress on the pull; on-prem storage is ~free. Verified end-to-end on the same niflheim (backup) + vanaheim (dev) boxes #400 was proven on.
 
-**Tech Stack:** OpenTofu (`google` provider), Google Cloud Storage, Storage Transfer Service, DO Spaces S3 backend (reused for tofu state), `mise` tasks (`cluster-init/plan/apply`).
+**Tech Stack:** OpenTofu (`google` provider), Google Cloud Storage, Storage Transfer Service, DO Spaces S3 backend (tofu state); **rclone (crypt remote) + systemd timers on niflheim/vanaheim** reusing `scripts/onprem-backup-setup.sh` + `scripts/backup-mirror-setup.sh` (#400); `mise` tasks (`cluster-init/plan/apply`).
 
 **Spec:** This plan; requirements captured from issue #3878 + the biz/eng decisions recorded on that issue (STS, separate GCP org, twice-daily, 30-day retention).
 
@@ -382,15 +384,100 @@ git commit -m "docs(dr): GCS DR backup runbook + restore drill (monobase-mycure#
 
 ---
 
+> **Tasks 1–5 = Tier 1 (cloud/STS). Tasks 6–7 = Tier 2 (on-prem), additive — both ship.**
+
+### Task 6: On-prem tier — `--source=gcs` mode for `onprem-backup-setup.sh`
+
+**Files:**
+- Modify: `scripts/onprem-backup-setup.sh` (add a `--source=gcs` branch alongside the existing Spaces/Kopia source)
+
+**Interfaces:**
+- Consumes: read-only GCS SA (prereq P5 below), an rclone `crypt` password (held like `KOPIA_PASSWORD`, supplied out-of-band).
+- Produces: an encrypted-at-rest mirror at `<backup-dir>/gcs/mc-v4-prod.appspot.com` on niflheim + a systemd pull timer — a backup dir shaped exactly like the Kopia mirror so **#400 stacks it unchanged**.
+
+**Prereq P5 (human):** create a read-only exporter SA in `mc-v4-prod` with `roles/storage.objectViewer` on `mc-v4-prod.appspot.com`; put its JSON in `/etc/rclone/` on niflheim (same place as the read-only Spaces key). Generate the rclone crypt password offline; escrow it (reuse the [[secrets-dr-3882]] escrow policy — it's the GCS-mirror analogue of the Kopia password).
+
+- [ ] **Step 1:** Add rclone remotes to `/etc/rclone/rclone.conf` on niflheim (documented by the script):
+
+```ini
+[gcs-src]
+type = google cloud storage
+service_account_file = /etc/rclone/mc-v4-prod-readonly-sa.json
+project_number = <mc-v4-prod number>
+
+[gcs-crypt]
+type = crypt
+remote = /mnt/storage/mycure/gcs/mc-v4-prod.appspot.com
+password = <obscured crypt password>   # rclone obscure; real pw escrowed offline
+```
+
+- [ ] **Step 2:** In `onprem-backup-setup.sh`, add the `--source=gcs` pull command (encrypt-on-ingest so plaintext PHI never rests on the host — the invariant that keeps the host→host stack ciphertext-only):
+
+```bash
+# --source=gcs : rclone pull GCS -> crypt (encrypted at rest). Unlike the Kopia
+# source (blobs arrive pre-encrypted), raw GCS objects are plaintext patient
+# files, so we write THROUGH the crypt remote. --backup-dir keeps a dated copy of
+# overwritten/deleted objects = point-in-time on-prem without versioned storage.
+"$RCLONE_BIN" --config "$RCLONE_CONFIG" sync gcs-src:mc-v4-prod.appspot.com gcs-crypt: \
+  --backup-dir "gcs-crypt-archive:$(date -u +%Y-%m-%d)" \
+  --transfers "$RCLONE_TRANSFERS" --checkers "$RCLONE_CHECKERS" --fast-list
+```
+
+- [ ] **Step 3:** Install a pull timer (offset from the STS run for freshness; reuse the script's timer scaffolding): e.g. `--timer-on-calendar='04:30,16:30 Asia/Manila'`. Weekly `rclone check gcs-src:… gcs-crypt:…` verify (the script already wires a check step).
+
+- [ ] **Step 4: shellcheck + commit**
+
+Run: `shellcheck scripts/onprem-backup-setup.sh`
+```bash
+git add scripts/onprem-backup-setup.sh
+git commit -m "feat(onprem-backup): --source=gcs encrypted mirror of the uploads bucket (monobase-mycure#3878)"
+```
+
+---
+
+### Task 7: Stack host→host (#400) + verify/restore drill on niflheim + vanaheim
+
+**Files:**
+- Modify: `docs/operations/GCS_DR_BACKUP.md` (add the on-prem tier + the drill)
+
+This tier is **host-side only** (both boxes are off-cluster) — no GitOps changes, same as #400. It must be **testable on the same niflheim (backup) + vanaheim (dev) setup** #400 was proven on.
+
+- [ ] **Step 1: Fan-out is free** — the encrypted `gcs/` mirror dir is just more blobs under the backup root, so the existing `backup-mirror-setup.sh` (#400) replica on vanaheim already pulls it. Confirm it lands: `ls /mnt/hdd/backup-mirror/niflheim/.../gcs/` on vanaheim.
+
+- [ ] **Step 2: Verify encrypted-at-rest** — on niflheim, confirm files under `/mnt/storage/mycure/gcs/...` are **ciphertext** (not viewable), and that decryption needs the crypt password:
+```bash
+file /mnt/storage/mycure/gcs/<obscured-name>      # not a recognizable image/pdf
+rclone --config /etc/rclone/rclone.conf ls gcs-crypt: | head   # readable only WITH the crypt remote
+```
+
+- [ ] **Step 3: Restore drill (on the dev box, vanaheim)** — the whole point of "local = testable":
+```bash
+# On vanaheim, using ONLY the replica's blobs + the crypt password (supplied at
+# restore, like Kopia): decrypt one object and checksum it against the source.
+rclone --config <cfg-with-crypt> copy gcs-crypt:<path> /tmp/restore/
+gcloud storage hash gs://mc-v4-prod.appspot.com/<path>   # compare md5/crc32c
+```
+Expected: checksum matches source. Record the drill result on #3878 (mirrors #400's live-host verification + the PG restore-drill precedent [[pg-backup-restore-drill]]).
+
+- [ ] **Step 4: Document + commit** the on-prem tier section in `GCS_DR_BACKUP.md` (mechanism, crypt-password escrow, the drill above, capacity note).
+```bash
+git add docs/operations/GCS_DR_BACKUP.md
+git commit -m "docs(dr): on-prem GCS tier + niflheim/vanaheim restore drill"
+```
+
+---
+
 ## Self-Review
 
-**Spec coverage:** twice-daily schedule → Task 1 (schedule block, UTC-converted). 30-day retention → Task 2 (versioning + lifecycle). Separate-org isolation → prereqs P1/P2 + separate provider. STS mechanism → Task 1 job. Runbook → Task 5. Verification/restore → Tasks 4–5. ✅
+**Spec coverage — Tier 1 (cloud):** twice-daily schedule → Task 1. 30-day retention → Task 2. Separate-org isolation → prereqs P1/P2 + separate provider. STS mechanism → Task 1 job. Runbook → Task 5. Verification/restore → Tasks 4–5. **Tier 2 (on-prem):** GCS→niflheim encrypted mirror → Task 6 (`--source=gcs` + rclone crypt); host→host fan-out + local restore drill on niflheim/vanaheim → Task 7. ✅
 
 **Open items for biz/owner decision (issue #3878):**
-1. Approve standing up a **separate GCP org + billing account** (P1) — the isolation the design depends on. Lighter fallback = new project under a separate billing account (weaker: shares org-level admins).
+1. Approve standing up a **separate GCP org + billing account** (P1) — the isolation Tier 1 depends on. Lighter fallback = new project under a separate billing account (weaker: shares org-level admins).
 2. `backup_location`: `us-central1` regional Nearline (cheapest storage, small delta egress) **vs** `US` multi-region Nearline ($0 egress, ~1.5× storage). Decide against measured bucket size.
 3. Confirm "6hrs interval" in the issue really means twice-daily (00:00/12:00) — plan uses 12h; switch `repeat_interval` to `21600s` for true 6h if they want tighter RPO.
+4. **On-prem tier egress + capacity** — the GCS→niflheim pull pays **$0.12/GB Google egress** on the initial full copy (deltas after), and the mirror must fit `hel.niflheim` `/mnt/storage` (1.8T; PG data-mover already ~188G) **plus** headroom on vanaheim. Both gated on the **measured bucket size** (`gcloud storage du -s` — scan still pending). If the bucket is very large, consider a prefix/age filter for the on-prem tier while keeping Tier 1 whole.
+5. **Crypt-password escrow** for the on-prem mirror — reuse the [[secrets-dr-3882]] age/Shamir escrow policy (this password is the GCS-mirror analogue of the Kopia password).
 
-**Placeholder scan:** `<backup_project_id>`, `<backup_bucket>`, `<job>`, `<SIZE_GB>` are operational fill-ins (real project id / measured size), not logic gaps — resolved at apply time. No TODO logic.
+**Placeholder scan:** `<backup_project_id>`, `<backup_bucket>`, `<job>`, `<SIZE_GB>`, `<mc-v4-prod number>`, `<obscured crypt password>`, `<path>` are operational fill-ins (real ids / measured size / escrowed secret), not logic gaps. No TODO logic.
 
 **Type consistency:** `google_storage_bucket.backup.name` referenced consistently in `main.tf` (sink IAM + job) and `outputs.tf`; `data.google_storage_transfer_project_service_account.sts.email` referenced in both IAM grants. ✅
