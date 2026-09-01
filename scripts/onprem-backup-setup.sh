@@ -755,9 +755,12 @@ Environment=RCLONE_CONFIG=$RCLONE_CONFIG
 LogNamespace=$LOG_NAMESPACE
 SyslogIdentifier=$WAL_SERVICE_NAME
 $wal_exec_lines
-# A per-minute run must finish before the next tick; systemd skips a tick whose
-# service is still active, so a slow sync coalesces instead of stacking.
-TimeoutStartSec=90s
+# Steady-state delta runs finish in seconds; 10min bounds a network hang (and any
+# post-downtime catch-up) without the multi-hour blind window the Kopia mirror uses.
+# systemd skips a tick whose service is still active, so runs coalesce, never stack.
+# The initial (potentially large) seed is done synchronously at install — see below —
+# so the timer never has to move the whole backlog under this cap.
+TimeoutStartSec=600s
 Nice=10
 IOSchedulingClass=best-effort
 IOSchedulingPriority=7
@@ -814,8 +817,19 @@ log "$SERVICE_NAME.timer enabled"
 systemctl enable --now "$VERIFY_SERVICE_NAME.timer" >/dev/null
 log "$VERIFY_SERVICE_NAME.timer enabled"
 if [[ "$WAL_MIRROR" == "1" ]]; then
+  # Seed synchronously BEFORE arming the timer. The first sync moves the whole
+  # retained WAL backlog (tens of GB — e.g. ~81 GiB for mycure-production), which
+  # can't fit the service's 10min per-run cap; doing it here means every timer run
+  # is a fast delta and no OnFailure alerts fire during the initial pull. Idempotent:
+  # on a re-run this is a quick no-op delta.
+  for ns in ${NAMESPACES//,/ }; do
+    log "seeding WAL mirror wal/$ns/ (first pull can be large; this blocks until done)…"
+    sudo -u "$SERVICE_USER" RCLONE_CONFIG="$RCLONE_CONFIG" \
+      "$RCLONE_BIN" sync "spaces:$BUCKET/wal/$ns/" "$BACKUP_DIR/spaces/wal/$ns/" \
+      --transfers 8 --checkers 16 --fast-list --stats 30s --stats-one-line --log-level INFO
+  done
   systemctl enable --now "$WAL_SERVICE_NAME.timer" >/dev/null
-  log "$WAL_SERVICE_NAME.timer enabled"
+  log "$WAL_SERVICE_NAME.timer enabled (seeded; per-minute runs do deltas only)"
 fi
 
 # ---------- summary ----------
