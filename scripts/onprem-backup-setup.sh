@@ -474,11 +474,14 @@ cat > "$SYSTEMD_DIR/$SERVICE_NAME.service" <<UNIT
 Description=Mirror Velero backups from DO Spaces (Mycure on-prem tier-4)
 After=network-online.target
 Wants=network-online.target
-# Refuse to run if the backup disk isn't mounted. With --encryption=none there's
-# no mycure-backup-volume.service dep, so without this an unmounted --backup-dir
-# (fstab nofail, disk swap, post-reboot race) would let rclone recreate the tree
-# on the root FS and sync into it for up to TimeoutStartSec, filling root.
-RequiresMountsFor=$BACKUP_DIR
+# Refuse to run if the backup disk isn't mounted. Only for --encryption=none:
+# there BACKUP_DIR is an fstab mount (or root), so RequiresMountsFor resolves to a
+# real .mount unit and blocks the run when unmounted — otherwise rclone recreates
+# the tree on the root FS and fills it. In the LUKS modes the mount is imperative
+# (mycure-backup-volume.service runs /bin/mount; no fstab entry, no .mount unit),
+# so RequiresMountsFor can't resolve — the Requires= line below is the equivalent
+# guard there. The two are mutually exclusive.
+$( [[ "$ENCRYPTION" == "none" ]] && printf 'RequiresMountsFor=%s\n' "$BACKUP_DIR" )
 $( [[ "$ENCRYPTION" != "none" ]] && printf 'Requires=mycure-backup-volume.service\nAfter=mycure-backup-volume.service\n' )
 $failure_onfailure
 
