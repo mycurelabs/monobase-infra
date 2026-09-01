@@ -30,6 +30,9 @@ NAMESPACES=""                                    # comma/space list of namespace
 BSL_PREFIX=infrastructure                        # BackupStorageLocation prefix inside the bucket
 SERVICE_USER=mycure-backup
 TIMER_ON_CALENDAR="*-*-* 02:30:00 UTC"
+WAL_MIRROR=0                                     # 1 = also mirror the PITR WAL prefix (wal/<ns>/) on a tight timer
+WAL_TIMER_ON_CALENDAR="*:*:00"                   # every minute; WAL lands in Spaces every archive_timeout (60s)
+WAL_SERVICE_NAME=mycure-wal-mirror
 YES_WIPE_DEVICE=0
 KOPIA_VERSION=0.21.1
 RCLONE_VERSION=1.69.1
@@ -78,6 +81,9 @@ Flags:
   --bsl-prefix=PREFIX     BackupStorageLocation prefix in bucket (default: $BSL_PREFIX)
   --service-user=USER     system user that runs the mirror     (default: $SERVICE_USER)
   --timer-on-calendar=S   systemd OnCalendar=                  (default: "$TIMER_ON_CALENDAR")
+  --wal-mirror            also mirror the PITR WAL prefix (wal/<ns>/) via a
+                          separate per-minute unit; requires --namespaces
+  --wal-timer-on-calendar=S  OnCalendar= for the WAL mirror    (default: "$WAL_TIMER_ON_CALENDAR")
   --yes-wipe-device       required confirm for luks-partition mode
   --kopia-version=VER     kopia release tag to install         (default: $KOPIA_VERSION)
   --notify-on=MODE        both | failure-only | success-only | off  (default: $NOTIFY_ON)
@@ -114,6 +120,8 @@ while [[ $# -gt 0 ]]; do
     --bsl-prefix=*)         BSL_PREFIX="${1#*=}";          shift;;
     --service-user=*)       SERVICE_USER="${1#*=}";        shift;;
     --timer-on-calendar=*)  TIMER_ON_CALENDAR="${1#*=}";   shift;;
+    --wal-mirror)           WAL_MIRROR=1;                  shift;;
+    --wal-timer-on-calendar=*) WAL_TIMER_ON_CALENDAR="${1#*=}"; shift;;
     --kopia-version=*)      KOPIA_VERSION="${1#*=}";       shift;;
     --notify-on=*)          NOTIFY_ON="${1#*=}";           shift;;
     --discord-webhook-url=*) DISCORD_WEBHOOK_URL="${1#*=}";shift;;
@@ -127,6 +135,13 @@ case "$NOTIFY_ON" in
   both|failure-only|success-only|off) ;;
   *) err "--notify-on must be one of: both | failure-only | success-only | off";;
 esac
+
+# WAL is archived per-namespace under wal/<ns>/, so we need to know which one(s).
+# Requiring --namespaces also means the main mirror's filter is active (it excludes
+# **, so it never touches wal/) — no overlap between the two units.
+if [[ "$WAL_MIRROR" == "1" && -z "$NAMESPACES" ]]; then
+  err "--wal-mirror requires --namespaces (WAL lives under wal/<ns>/ in the bucket)"
+fi
 
 # ---------- preflight ----------
 need_root
@@ -701,6 +716,85 @@ Unit=$SERVICE_NAME.service
 WantedBy=timers.target
 UNIT
 
+# ---------- WAL-archive mirror (optional, separate from the Kopia mirror) ----------
+# A second, near-live copy of the PITR WAL chain (wal/<ns>/), pulled every minute.
+# Kept OUT of the twice-daily Kopia mirror: different cadence, different size (small
+# segments), and independent failure isolation. WAL lands in Spaces every
+# archive_timeout (60s in prod), so a per-minute pull keeps on-prem ~1-2min behind.
+# Point rclone directly at the wal/<ns>/ sub-prefix so its delete-extraneous scope
+# is confined to that subtree and can never touch the Kopia repo dirs.
+if [[ "$WAL_MIRROR" == "1" ]]; then
+  wal_exec_lines=""
+  for ns in ${NAMESPACES//,/ }; do
+    wal_exec_lines+="ExecStart=$RCLONE_BIN sync spaces:$BUCKET/wal/$ns/ $BACKUP_DIR/spaces/wal/$ns/ --transfers 4 --checkers 8 --fast-list --log-level INFO --stats 30s --stats-one-line"$'\n'
+  done
+
+  # Failure notifications only (a per-minute success webhook = 1440 msgs/day).
+  # Reuse the same enablement condition as the main mirror's failure notifier.
+  wal_failure_onfailure=""
+  [[ -n "$failure_onfailure" ]] && wal_failure_onfailure="OnFailure=${WAL_SERVICE_NAME}-failure.service"
+
+  log "writing systemd unit $WAL_SERVICE_NAME.service"
+  cat > "$SYSTEMD_DIR/$WAL_SERVICE_NAME.service" <<UNIT
+[Unit]
+Description=Mirror PostgreSQL WAL archive from DO Spaces (Mycure on-prem PITR tier-4)
+After=network-online.target
+Wants=network-online.target
+$( [[ "$ENCRYPTION" != "none" ]] && printf 'Requires=mycure-backup-volume.service\nAfter=mycure-backup-volume.service\n' )
+$wal_failure_onfailure
+
+[Service]
+Type=oneshot
+User=$SERVICE_USER
+Group=$SERVICE_USER
+Environment=RCLONE_CONFIG=$RCLONE_CONFIG
+LogNamespace=$LOG_NAMESPACE
+SyslogIdentifier=$WAL_SERVICE_NAME
+$wal_exec_lines
+# A per-minute run must finish before the next tick; systemd skips a tick whose
+# service is still active, so a slow sync coalesces instead of stacking.
+TimeoutStartSec=90s
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7
+
+[Install]
+WantedBy=multi-user.target
+UNIT
+
+  # Failure sibling, rate-limited: at most 3 pings/hour so a sustained Spaces
+  # outage can't fire 60 alerts/hour. The mirror itself keeps retrying every
+  # minute regardless — only the notifier is damped.
+  # ponytail: start-limit is the flap guard; add richer flap-damping only if 3/hr still spams.
+  cat > "$SYSTEMD_DIR/${WAL_SERVICE_NAME}-failure.service" <<UNIT
+[Unit]
+Description=Notify on failure of $WAL_SERVICE_NAME.service
+StartLimitIntervalSec=1h
+StartLimitBurst=3
+
+[Service]
+Type=oneshot
+LogNamespace=$LOG_NAMESPACE
+SyslogIdentifier=${WAL_SERVICE_NAME}-failure
+ExecStart=$NOTIFY_BIN failure
+UNIT
+
+  log "writing systemd timer $WAL_SERVICE_NAME.timer"
+  cat > "$SYSTEMD_DIR/$WAL_SERVICE_NAME.timer" <<UNIT
+[Unit]
+Description=Per-minute timer for Mycure on-prem WAL-archive mirror
+
+[Timer]
+OnCalendar=$WAL_TIMER_ON_CALENDAR
+Persistent=false
+AccuracySec=1s
+Unit=$WAL_SERVICE_NAME.service
+
+[Install]
+WantedBy=timers.target
+UNIT
+fi
+
 # ---------- credential validation (dry-run) ----------
 log "validating credentials with rclone lsd …"
 if ! sudo -u "$SERVICE_USER" RCLONE_CONFIG="$RCLONE_CONFIG" \
@@ -715,6 +809,10 @@ systemctl enable --now "$SERVICE_NAME.timer" >/dev/null
 log "$SERVICE_NAME.timer enabled"
 systemctl enable --now "$VERIFY_SERVICE_NAME.timer" >/dev/null
 log "$VERIFY_SERVICE_NAME.timer enabled"
+if [[ "$WAL_MIRROR" == "1" ]]; then
+  systemctl enable --now "$WAL_SERVICE_NAME.timer" >/dev/null
+  log "$WAL_SERVICE_NAME.timer enabled"
+fi
 
 # ---------- summary ----------
 echo
@@ -731,6 +829,11 @@ echo "  namespaces    : ${NAMESPACES:-all (whole bucket)}${NAMESPACES:+ (+ backu
 echo "  mirror timer  : $TIMER_ON_CALENDAR"
 mirror_next=$(systemctl list-timers --no-legend --no-pager "$SERVICE_NAME.timer" 2>/dev/null | awk '{print $1, $2, $3}' | head -1)
 echo "  next mirror   : ${mirror_next:-see: systemctl list-timers}"
+if [[ "$WAL_MIRROR" == "1" ]]; then
+  echo "  wal mirror    : $WAL_TIMER_ON_CALENDAR  (PITR WAL: wal/{${NAMESPACES// /,}}/)"
+  wal_next=$(systemctl list-timers --no-legend --no-pager "$WAL_SERVICE_NAME.timer" 2>/dev/null | awk '{print $1, $2, $3}' | head -1)
+  echo "  next wal      : ${wal_next:-see: systemctl list-timers}"
+fi
 echo "  verify timer  : $VERIFY_TIMER_ON_CALENDAR  (verifies ${VERIFY_FILES_PERCENT}% of blobs)"
 verify_next=$(systemctl list-timers --no-legend --no-pager "$VERIFY_SERVICE_NAME.timer" 2>/dev/null | awk '{print $1, $2, $3}' | head -1)
 echo "  next verify   : ${verify_next:-see: systemctl list-timers}"

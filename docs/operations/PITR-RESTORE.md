@@ -58,6 +58,7 @@ WAL archive   → roll forward from the anchor to any second   (RPO ~1min)
 | **Base backup + retention CronJob** (weekly `backup-push` + `delete retain FULL 4`) | `charts/database-secrets/templates/walg-backup.yaml` (gated `walg.backup.enabled`) |
 | uid-1001 `/etc/passwd` mount on the primary | `postgresql-walg-passwd` ConfigMap + `postgresql.primary.extraVolumes` |
 | Alerts `PostgresWALArchiveFailing` / `PostgresWALArchiveStalled` | `charts/monitoring-resources/templates/prometheus-rules.yaml` |
+| *(optional)* second on-prem copy of the WAL prefix, pulled every minute | `scripts/onprem-backup-setup.sh --wal-mirror` — see [ONPREM_BACKUP_SETUP.md](ONPREM_BACKUP_SETUP.md#wal-archive-mirror-pitr-second-copy). Restore from it via `WALG_FILE_PREFIX` if Spaces is unreachable. |
 
 **Why the base backup is an exec-into-primary CronJob:** `wal-g backup-push`
 reads the primary's `$PGDATA` files directly (it only calls `pg_backup_start/stop`
