@@ -114,6 +114,8 @@ sudo SPACES_ACCESS_KEY=… SPACES_SECRET_KEY=… KOPIA_PASSWORD=… \
 | `--bsl-prefix=PREFIX` | `infrastructure` | BackupStorageLocation prefix inside the bucket; used to build the `--namespaces` path filters. |
 | `--service-user=USER` | `mycure-backup` | System user that runs the mirror. |
 | `--timer-on-calendar=S` | `*-*-* 02:30:00 UTC` | systemd OnCalendar for the mirror. |
+| `--wal-mirror` | off | Also mirror the PITR **WAL** catalog (`wal/<ns>/`) via two separate units — `mycure-wal-mirror` (per-minute, add-only `copy`) + `mycure-wal-reconcile` (daily `sync` with 30-day deletion **quarantine**) — independent of the twice-daily Kopia mirror. Requires `--namespaces`. See [WAL-archive mirror](#wal-archive-mirror-pitr-second-copy) below. |
+| `--wal-timer-on-calendar=S` | `*:*:00` | systemd OnCalendar for the WAL mirror. Default = every minute (WAL lands in Spaces every `archive_timeout`, 60s in prod). |
 | `--kopia-version=VER` | pinned in script | Kopia static binary release. |
 | `--notify-on=MODE` | `both` | `both` / `failure-only` / `success-only` / `off`. Controls Discord notifications. |
 | `--discord-webhook-url=URL` | (env var) | Same as `DISCORD_WEBHOOK_URL`. Stored at `/etc/mycure-backup/discord-webhook.url`. |
@@ -228,6 +230,11 @@ Both commands should succeed.
 | `/etc/systemd/system/mycure-backup-mirror-failure.service` | 0644 | root | OnFailure handler that calls the notifier (only when `--notify-on` covers failure). |
 | `/etc/systemd/system/mycure-backup-verify.{service,timer}` | 0644 | root | Weekly Kopia integrity check. |
 | `/etc/systemd/system/mycure-backup-verify-failure.service` | 0644 | root | OnFailure handler for the verify run. |
+| `/etc/systemd/system/mycure-wal-mirror.{service,timer}` | 0644 | root | Per-minute add-only WAL `copy` (only with `--wal-mirror`). |
+| `/etc/systemd/system/mycure-wal-mirror-failure.service` | 0644 | root | OnFailure handler for the WAL mirror; rate-limited to 3 pings/hour. |
+| `/etc/systemd/system/mycure-wal-reconcile.{service,timer}` | 0644 | root | Daily WAL `sync` + deletion quarantine (only with `--wal-mirror`). |
+| `/etc/systemd/system/mycure-wal-reconcile-failure.service` | 0644 | root | OnFailure handler for the daily reconcile. |
+| `/usr/local/sbin/mycure-wal-reconcile` | 0755 | root | Helper: dated-quarantine `rclone sync` + prune quarantine >30d. |
 | `/usr/local/sbin/mycure-backup-verify` | 0755 | root | Helper: connect to local Kopia repo + run content verify. |
 | `/etc/systemd/system/mycure-backup-volume.service` | 0644 | root | LUKS open+mount at boot (only LUKS modes). |
 | `/etc/systemd/journald@mycure-backup.conf` | 0644 | root | Per-unit journal namespace config (size-capped). |
@@ -241,22 +248,125 @@ Both commands should succeed.
 
 The script is idempotent. Re-running with different flags reconfigures cleanly.
 
-> **Bounded subset (current prod config):** the `hel.niflheim` box has a 1.8T
-> disk and cannot hold the full 30-day repo. It mirrors **only the
-> `mycure-production` namespace** (plus all backup metadata) — always pass
-> `--namespaces` on re-run or the mirror re-downloads the `monitoring` + `velero`
-> Kopia repos (~316G) and re-fills the disk:
+> **Bounded subset (current prod config):** the `hel.niflheim` box's 1.8T disk is
+> mounted at `/mnt/storage` (the root FS is only ~110G), and it cannot hold the
+> full 30-day repo. It mirrors **only the `mycure-production` namespace** (plus all
+> backup metadata) — always pass `--namespaces` on re-run or the mirror
+> re-downloads the `monitoring` + `velero` Kopia repos (~316G) and re-fills the
+> disk. The exact invocation in use:
 >
 > ```sh
 > sudo SPACES_ACCESS_KEY=… SPACES_SECRET_KEY=… KOPIA_PASSWORD=… \
->   scripts/onprem-backup-setup.sh --namespaces=mycure-production
+>   scripts/onprem-backup-setup.sh \
+>     --namespaces=mycure-production \
+>     --backup-dir=/mnt/storage/mycure \
+>     --timer-on-calendar="*-*-* 03,15:00:00 Asia/Manila" \
+>     --wal-mirror
 > ```
 >
+> (`--wal-mirror` adds the separate per-minute WAL/PITR copy — see the
+> [WAL-archive mirror](#wal-archive-mirror-pitr-second-copy) section. Drop it for
+> the Kopia mirror only.)
+>
+> **Timer — twice daily, 3h after each source backup.** The `production-daily`
+> schedule runs at **00:00 & 12:00 PHT**
+> (`values/clusters/mycure-doks-main/argocd/infrastructure.yaml` →
+> `velero.schedules.production.daily.schedule: "CRON_TZ=Asia/Manila 0 0,12 * * *"`).
+> The mirror fires at **03:00 & 15:00 PHT** — a 3h margin so each data-mover
+> backup (pg is ~188G; a run can exceed 2h) has completed before the mirror pulls
+> it. If a run ever overruns the margin, that snapshot is simply picked up by the
+> next mirror run; twice-daily keeps the newest snapshot on-prem within ~12h.
+>
 > Retention (how many days) is a **source-side** setting — it's the Velero
-> schedule TTL (`values/infrastructure/main.yaml` → `velero.schedules.*.retention`),
-> not an on-prem flag. The on-prem mirror faithfully holds whatever Spaces holds
-> for the namespaces it mirrors; it cannot keep fewer *days* than the cloud
-> without an independent Kopia repo.
+> schedule TTL (same file → `velero.schedules.*.retention`), not an on-prem flag.
+> The on-prem mirror faithfully holds whatever Spaces holds for the namespaces it
+> mirrors; it cannot keep fewer *days* than the cloud without an independent Kopia
+> repo.
+>
+> **Scope: this Kopia mirror is Velero only** — `--namespaces` builds the rclone
+> filter as `--include "infrastructure/backups/**"` +
+> `--include "infrastructure/kopia/mycure-production/**"` + `--exclude "**"`. The
+> wal-g PITR catalog lives at `wal/mycure-production/` — a **sibling** of
+> `infrastructure/` in the same bucket — so base backups and WAL segments are
+> **excluded** from *this* mirror. They are covered by the **separate**
+> `--wal-mirror` unit (see [WAL-archive mirror](#wal-archive-mirror-pitr-second-copy)
+> below), not by widening this filter — keeping the two on independent cadences.
+>
+> **systemd version:** a named-timezone `OnCalendar` suffix (`Asia/Manila`) needs
+> **systemd ≥ 252**; older systemd accepts only a `UTC` suffix (which is why the
+> script's default uses one). niflheim runs 255, so it's fine — relevant only when
+> copy-pasting this onto an older box.
+
+### WAL-archive mirror (PITR second copy)
+
+`--wal-mirror` adds a second, near-live copy of the PostgreSQL **WAL catalog**
+(base backups + WAL segments) that powers point-in-time recovery. Without it the
+on-prem host holds only the twice-daily Velero backup (~12h old); if DO Spaces is
+lost you can restore to that, but **not** PITR. It installs **two** systemd units,
+separate from the Kopia mirror:
+
+- **Why separate from the Kopia mirror.** That mirror is a heavy twice-daily
+  `rclone sync` of the ~188 GB repo (8h timeout). WAL is the opposite — tiny
+  segments arriving every ~60s (`archive_timeout=60`). Different cadence, size, and
+  failure isolation. Both aim rclone directly at `wal/<ns>/`, and the Kopia mirror's
+  `--exclude "**"` never touches `wal/` — disjoint subtrees (why `--wal-mirror`
+  requires `--namespaces`).
+- **`mycure-wal-mirror` — every minute, add-only.**
+  `rclone copy --max-age 6h --no-traverse spaces:<bucket>/wal/<ns>/ → <backup-dir>/spaces/wal/<ns>/`.
+  `copy` **never deletes**. `--max-age` bounds the *transfer* set to recent objects
+  and `--no-traverse` skips the destination walk — so the run only transfers new WAL.
+  Enumeration of the *source* prefix still scales with the archive (~5.5k objects
+  today → ~53k at plateau), but that's cheap LIST pagination (seconds);
+  `TimeoutStartSec=300s` caps a hang. Steady-state lag ≈ `archive_timeout` + latency
+  (~1-2 min) — **but `--max-age` is relative to *now***, so if the per-minute unit is
+  down > 6h, objects that aged out of the window during the outage are only recovered
+  by the next daily reconcile: real RPO after a long stall is up to ~24h, not 1-2 min
+  (the damped failure notifier tells you it stalled). systemd skips a tick whose
+  service is still active, so runs coalesce, never stack.
+- **`mycure-wal-reconcile` — daily, air-gapped prune.** `rclone sync …
+  --backup-dir=<backup-dir>/spaces/wal-deleted/<date>/<ns>` (default 04:00 PHT).
+  Catches anything older than the copy's `--max-age` window **and** applies the
+  cloud's (base-aware, wal-g-driven) prunes — but **quarantines** the removals into
+  a dated dir instead of unlinking them. See the next point.
+- **This is a backup, not a replica — it survives deletion.** A plain per-minute
+  `rclone sync` would replicate a cloud-side *deletion* on-prem within ~60s: a
+  mis-scoped `wal-g delete`, a leaked key, a bucket lifecycle rule, or the
+  `pg_upgrade` retention footgun ([wal-g #636](https://github.com/wal-g/wal-g/issues/636),
+  which deletes the **newest** bases) would destroy the second copy exactly when
+  it's needed — and the **2026-08-28 incident was data *loss*, not an outage**.
+  Here the per-minute path can't delete at all, and the daily reconcile
+  **quarantines** deletions for **30 days** (`WAL_QUARANTINE_DAYS`) under
+  `wal-deleted/<date>/`, pruned by *quarantine* age (dir mtime), not object age.
+  That independent on-prem retention is the air gap.
+- **First install seeds synchronously.** The initial pull is the whole retained
+  catalog (~81 GiB today, see Disk), too big for a per-minute run — so the script
+  runs one blocking `rclone copy` to completion *before* arming the timers. The
+  first `--wal-mirror` run takes a while; re-runs are fast no-ops.
+- **Notifications.** Failure-only. The per-minute unit is rate-limited to 3
+  pings/hour (`StartLimitBurst=3` / `StartLimitIntervalSec=1h`) — a per-minute
+  *success* webhook would be 1440 msgs/day, and a sustained outage would otherwise
+  fire 60/hour; the daily reconcile just alerts on failure.
+- **Disk.** Bounded by source retention **plus the 30-day quarantine**: the mirror
+  holds what the cloud `wal/<ns>/` holds (WAL kept until the oldest base backup ages
+  out — `walg.backup.retainFull=4` weekly ≈ 4-5 weeks) plus up to 30 days of
+  quarantined deletions under `wal-deleted/`. Measured 2026-09-01 (**source of
+  record: PITR-RESTORE.md cost section, #401**): seeds at **~81 GiB today** for
+  `mycure-production` (2 of 4 eventual weekly bases + WAL; matches the niflheim seed
+  of 81 GiB / 5,471 objects), grows **~2.33 GB/day compressed** (~29 GiB/day raw,
+  ~13× compression) **plus one ~37.5 GiB base/week until the *live* set plateaus at
+  ~210 GiB** (4 bases ~150 GiB + ~4 wks WAL ~61 GiB). **Quarantine adds ~225 GiB**:
+  at plateau the cloud's deletion rate equals its ingest (~7.5 GiB/day = 211 GiB per
+  4-week cycle), held `WAL_QUARANTINE_DAYS=30` → ~225 GiB under `wal-deleted/`.
+  **Budget ~435 GiB total** (210 live + 225 quarantine), not today's 81 GiB — still
+  fits niflheim's 1.8T `/mnt/storage` with room (drop to a 7-day quarantine ≈ 53 GiB
+  if you'd rather hold the footprint). Confirm `df -h <backup-dir>` headroom on top of
+  the Kopia repo.
+
+> **Restoring PITR from the on-prem WAL copy** (cloud unreachable) is a separate
+> drill — point wal-g at the local files (`WALG_FILE_PREFIX`) or re-serve the
+> prefix. This runbook only guarantees the *bytes* are on-prem; see
+> [PITR-RESTORE.md](PITR-RESTORE.md). On-prem WAL *freshness* is not yet
+> Prometheus-monitored.
 
 ### Rotate the Spaces access key
 
@@ -273,6 +383,8 @@ The Kopia password is owned by the cluster, not this host. Rotate via the cluste
 ```sh
 sudo systemctl disable --now mycure-backup-mirror.timer mycure-backup-mirror.service \
                               mycure-backup-verify.timer mycure-backup-verify.service
+sudo systemctl disable --now mycure-wal-mirror.timer mycure-wal-mirror.service 2>/dev/null || true
+sudo systemctl disable --now mycure-wal-reconcile.timer mycure-wal-reconcile.service 2>/dev/null || true
 sudo systemctl disable --now mycure-backup-volume.service 2>/dev/null || true
 sudo umount /var/backups/mycure 2>/dev/null || true
 sudo cryptsetup close mycure-backup 2>/dev/null || true
@@ -280,10 +392,13 @@ sudo kopia repository disconnect 2>/dev/null || true
 sudo rm -rf /etc/mycure-backup /etc/rclone/rclone.conf \
             /etc/systemd/system/mycure-backup-mirror.* \
             /etc/systemd/system/mycure-backup-verify.* \
+            /etc/systemd/system/mycure-wal-mirror.* \
+            /etc/systemd/system/mycure-wal-reconcile.* \
             /etc/systemd/system/mycure-backup-volume.service \
             /etc/systemd/journald@mycure-backup.conf \
             /usr/local/sbin/mycure-backup-notify \
-            /usr/local/sbin/mycure-backup-verify
+            /usr/local/sbin/mycure-backup-verify \
+            /usr/local/sbin/mycure-wal-reconcile
 sudo systemctl reset-failed "systemd-journald@mycure-backup.service" 2>/dev/null || true
 sudo rm -rf /var/log/journal/*/system@mycure-backup-* 2>/dev/null || true
 sudo userdel mycure-backup 2>/dev/null || true
