@@ -33,6 +33,12 @@ TIMER_ON_CALENDAR="*-*-* 02:30:00 UTC"
 WAL_MIRROR=0                                     # 1 = also mirror the PITR WAL prefix (wal/<ns>/) on a tight timer
 WAL_TIMER_ON_CALENDAR="*:*:00"                   # every minute; WAL lands in Spaces every archive_timeout (60s)
 WAL_SERVICE_NAME=mycure-wal-mirror
+WAL_COPY_MAX_AGE=6h                              # per-minute `rclone copy` only considers objects newer than this
+                                                 # (bounded work; never deletes). Daily reconcile catches the rest.
+WAL_RECONCILE_NAME=mycure-wal-reconcile          # daily `sync --backup-dir` — quarantines cloud-side deletions
+WAL_RECONCILE_ON_CALENDAR="*-*-* 20:00:00 UTC"   # daily 04:00 PHT; UTC default (systemd <252 safe, see #397 note)
+WAL_QUARANTINE_DAYS=30                           # on-prem retention for deleted objects — the air-gap window
+WAL_RECONCILE_BIN=/usr/local/sbin/mycure-wal-reconcile
 YES_WIPE_DEVICE=0
 KOPIA_VERSION=0.21.1
 RCLONE_VERSION=1.69.1
@@ -717,22 +723,42 @@ WantedBy=timers.target
 UNIT
 
 # ---------- WAL-archive mirror (optional, separate from the Kopia mirror) ----------
-# A second, near-live copy of the PITR WAL chain (wal/<ns>/), pulled every minute.
-# Kept OUT of the twice-daily Kopia mirror: different cadence, different size (small
-# segments), and independent failure isolation. WAL lands in Spaces every
-# archive_timeout (60s in prod), so a per-minute pull keeps on-prem ~1-2min behind.
-# Point rclone directly at the wal/<ns>/ sub-prefix so its delete-extraneous scope
-# is confined to that subtree and can never touch the Kopia repo dirs.
+# A second, near-live copy of the PITR WAL catalog (wal/<ns>/ = base backups + WAL
+# segments). Two units, because a backup must survive DELETION, not just a source
+# outage (the 2026-08-28 incident was data loss):
+#
+#   * mycure-wal-mirror   (per minute) — `rclone COPY --max-age`. Adds new objects
+#     only; NEVER deletes. Work is O(new data), so it can't fall behind at full
+#     retention. Gives ~1-2min freshness.
+#   * mycure-wal-reconcile (daily)      — `rclone SYNC --backup-dir=wal-deleted/<date>`.
+#     Catches anything older than the copy window AND applies the cloud's (base-aware,
+#     wal-g-driven) prunes, but QUARANTINES would-be-deletions into a dated dir
+#     instead of unlinking. A bad cloud-side delete (mis-scoped `wal-g delete`,
+#     leaked key, lifecycle rule, wal-g #636) is therefore recoverable on-prem for
+#     WAL_QUARANTINE_DAYS. That independent retention is what makes this a backup,
+#     not a replica. Old quarantine dirs are pruned by their own age (= days since
+#     the deletion), never by the object's original mtime.
+#
+# Both point rclone directly at wal/<ns>/ so they can't touch the Kopia repo dirs;
+# the Kopia mirror's --exclude "**" likewise can't touch wal/. Disjoint subtrees.
 if [[ "$WAL_MIRROR" == "1" ]]; then
   wal_exec_lines=""
   for ns in ${NAMESPACES//,/ }; do
-    wal_exec_lines+="ExecStart=$RCLONE_BIN sync spaces:$BUCKET/wal/$ns/ $BACKUP_DIR/spaces/wal/$ns/ --transfers 4 --checkers 8 --fast-list --log-level INFO --stats 30s --stats-one-line"$'\n'
+    wal_exec_lines+="ExecStart=$RCLONE_BIN copy spaces:$BUCKET/wal/$ns/ $BACKUP_DIR/spaces/wal/$ns/ --max-age $WAL_COPY_MAX_AGE --transfers 4 --checkers 8 --fast-list --log-level INFO --stats 30s --stats-one-line"$'\n'
   done
 
   # Failure notifications only (a per-minute success webhook = 1440 msgs/day).
   # Reuse the same enablement condition as the main mirror's failure notifier.
   wal_failure_onfailure=""
   [[ -n "$failure_onfailure" ]] && wal_failure_onfailure="OnFailure=${WAL_SERVICE_NAME}-failure.service"
+  wal_reconcile_failure=""
+  [[ -n "$failure_onfailure" ]] && wal_reconcile_failure="OnFailure=${WAL_RECONCILE_NAME}-failure.service"
+
+  # Shared root-FS mount guard (PR #397): an unmounted --backup-dir must not let
+  # rclone recreate the tree on the root FS and fill it. --encryption=none has no
+  # volume unit, so pin the mount directly; LUKS modes depend on the volume unit.
+  if [[ "$ENCRYPTION" == "none" ]]; then wal_mount_guard="RequiresMountsFor=$BACKUP_DIR"
+  else wal_mount_guard=$'Requires=mycure-backup-volume.service\nAfter=mycure-backup-volume.service'; fi
 
   log "writing systemd unit $WAL_SERVICE_NAME.service"
   cat > "$SYSTEMD_DIR/$WAL_SERVICE_NAME.service" <<UNIT
@@ -740,11 +766,7 @@ if [[ "$WAL_MIRROR" == "1" ]]; then
 Description=Mirror PostgreSQL WAL archive from DO Spaces (Mycure on-prem PITR tier-4)
 After=network-online.target
 Wants=network-online.target
-# Same root-FS guard as the Kopia mirror (PR #397): an unmounted --backup-dir must
-# not let a *per-minute* rclone recreate the tree on the root FS and fill it. With
-# --encryption=none there's no volume unit, so pin the mount directly; LUKS modes
-# mount imperatively via mycure-backup-volume.service, so depend on that instead.
-$( if [[ "$ENCRYPTION" == "none" ]]; then printf 'RequiresMountsFor=%s\n' "$BACKUP_DIR"; else printf 'Requires=mycure-backup-volume.service\nAfter=mycure-backup-volume.service\n'; fi )
+$wal_mount_guard
 $wal_failure_onfailure
 
 [Service]
@@ -755,12 +777,10 @@ Environment=RCLONE_CONFIG=$RCLONE_CONFIG
 LogNamespace=$LOG_NAMESPACE
 SyslogIdentifier=$WAL_SERVICE_NAME
 $wal_exec_lines
-# Steady-state delta runs finish in seconds; 10min bounds a network hang (and any
-# post-downtime catch-up) without the multi-hour blind window the Kopia mirror uses.
+# copy --max-age is O(new data): a run lists the prefix then transfers only the last
+# $WAL_COPY_MAX_AGE of objects, finishing in seconds. 5min bounds a network hang.
 # systemd skips a tick whose service is still active, so runs coalesce, never stack.
-# The initial (potentially large) seed is done synchronously at install — see below —
-# so the timer never has to move the whole backlog under this cap.
-TimeoutStartSec=600s
+TimeoutStartSec=300s
 Nice=10
 IOSchedulingClass=best-effort
 IOSchedulingPriority=7
@@ -800,6 +820,82 @@ Unit=$WAL_SERVICE_NAME.service
 [Install]
 WantedBy=timers.target
 UNIT
+
+  # ----- daily reconcile + quarantine helper -----
+  # \$D (quarantine date) is evaluated at RUN time, not now. Per-ns sync lines are
+  # baked in; deletions move to wal-deleted/<date>/<ns>/ and are pruned by dir age.
+  wal_reconcile_lines=""
+  for ns in ${NAMESPACES//,/ }; do
+    wal_reconcile_lines+="\"$RCLONE_BIN\" sync \"spaces:$BUCKET/wal/$ns/\" \"$BACKUP_DIR/spaces/wal/$ns/\" --backup-dir \"$BACKUP_DIR/spaces/wal-deleted/\$D/$ns\" --transfers 8 --checkers 16 --fast-list --log-level INFO --stats 1m --stats-one-line"$'\n'
+  done
+  log "installing WAL reconcile helper at $WAL_RECONCILE_BIN"
+  install -m 0755 /dev/stdin "$WAL_RECONCILE_BIN" <<RECONCILE
+#!/usr/bin/env bash
+# Daily air-gap reconcile of the on-prem WAL mirror. rclone sync makes on-prem match
+# the cloud (catching anything the per-minute copy's --max-age window missed), but
+# --backup-dir moves would-be-deletions into a dated quarantine dir instead of
+# unlinking them — so a cloud-side deletion is recoverable on-prem for
+# $WAL_QUARANTINE_DAYS days. Managed by $WAL_RECONCILE_NAME.service. Do not edit;
+# regenerated by scripts/onprem-backup-setup.sh.
+set -euo pipefail
+D=\$(date -u +%F)
+$wal_reconcile_lines
+# Prune quarantine by DIR age (= days since deletion), not the objects' original mtime.
+find "$BACKUP_DIR/spaces/wal-deleted" -mindepth 1 -maxdepth 1 -type d -mtime +$WAL_QUARANTINE_DAYS -exec rm -rf {} + 2>/dev/null || true
+RECONCILE
+
+  log "writing systemd unit $WAL_RECONCILE_NAME.service"
+  cat > "$SYSTEMD_DIR/$WAL_RECONCILE_NAME.service" <<UNIT
+[Unit]
+Description=Daily reconcile + quarantine of the on-prem WAL mirror (air-gap prune)
+After=network-online.target
+Wants=network-online.target
+$wal_mount_guard
+$wal_reconcile_failure
+
+[Service]
+Type=oneshot
+User=$SERVICE_USER
+Group=$SERVICE_USER
+Environment=RCLONE_CONFIG=$RCLONE_CONFIG
+LogNamespace=$LOG_NAMESPACE
+SyslogIdentifier=$WAL_RECONCILE_NAME
+ExecStart=$WAL_RECONCILE_BIN
+# A full reconcile can be large; match the Kopia mirror's generous cap.
+TimeoutStartSec=8h
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7
+
+[Install]
+WantedBy=multi-user.target
+UNIT
+
+  cat > "$SYSTEMD_DIR/${WAL_RECONCILE_NAME}-failure.service" <<UNIT
+[Unit]
+Description=Notify on failure of $WAL_RECONCILE_NAME.service
+
+[Service]
+Type=oneshot
+LogNamespace=$LOG_NAMESPACE
+SyslogIdentifier=${WAL_RECONCILE_NAME}-failure
+ExecStart=$NOTIFY_BIN failure
+UNIT
+
+  log "writing systemd timer $WAL_RECONCILE_NAME.timer"
+  cat > "$SYSTEMD_DIR/$WAL_RECONCILE_NAME.timer" <<UNIT
+[Unit]
+Description=Daily timer for Mycure on-prem WAL reconcile + quarantine
+
+[Timer]
+OnCalendar=$WAL_RECONCILE_ON_CALENDAR
+Persistent=true
+RandomizedDelaySec=10m
+Unit=$WAL_RECONCILE_NAME.service
+
+[Install]
+WantedBy=timers.target
+UNIT
 fi
 
 # ---------- credential validation (dry-run) ----------
@@ -817,19 +913,21 @@ log "$SERVICE_NAME.timer enabled"
 systemctl enable --now "$VERIFY_SERVICE_NAME.timer" >/dev/null
 log "$VERIFY_SERVICE_NAME.timer enabled"
 if [[ "$WAL_MIRROR" == "1" ]]; then
-  # Seed synchronously BEFORE arming the timer. The first sync moves the whole
-  # retained WAL backlog (tens of GB — e.g. ~81 GiB for mycure-production), which
-  # can't fit the service's 10min per-run cap; doing it here means every timer run
-  # is a fast delta and no OnFailure alerts fire during the initial pull. Idempotent:
-  # on a re-run this is a quick no-op delta.
+  # Seed synchronously BEFORE arming the timers. The first pull is the whole retained
+  # WAL backlog (tens of GB — ~81 GiB for mycure-production, plateauing ~210 GiB),
+  # which can't fit the per-minute cap; doing it here means every timer run is a fast
+  # delta. `copy` (no --max-age) pulls everything and never deletes. Idempotent:
+  # a re-run is a quick no-op.
   for ns in ${NAMESPACES//,/ }; do
     log "seeding WAL mirror wal/$ns/ (first pull can be large; this blocks until done)…"
     sudo -u "$SERVICE_USER" RCLONE_CONFIG="$RCLONE_CONFIG" \
-      "$RCLONE_BIN" sync "spaces:$BUCKET/wal/$ns/" "$BACKUP_DIR/spaces/wal/$ns/" \
+      "$RCLONE_BIN" copy "spaces:$BUCKET/wal/$ns/" "$BACKUP_DIR/spaces/wal/$ns/" \
       --transfers 8 --checkers 16 --fast-list --stats 30s --stats-one-line --log-level INFO
   done
   systemctl enable --now "$WAL_SERVICE_NAME.timer" >/dev/null
-  log "$WAL_SERVICE_NAME.timer enabled (seeded; per-minute runs do deltas only)"
+  log "$WAL_SERVICE_NAME.timer enabled (seeded; per-minute copy pulls new WAL only)"
+  systemctl enable --now "$WAL_RECONCILE_NAME.timer" >/dev/null
+  log "$WAL_RECONCILE_NAME.timer enabled (daily reconcile + ${WAL_QUARANTINE_DAYS}d quarantine)"
 fi
 
 # ---------- summary ----------
@@ -848,9 +946,10 @@ echo "  mirror timer  : $TIMER_ON_CALENDAR"
 mirror_next=$(systemctl list-timers --no-legend --no-pager "$SERVICE_NAME.timer" 2>/dev/null | awk '{print $1, $2, $3}' | head -1)
 echo "  next mirror   : ${mirror_next:-see: systemctl list-timers}"
 if [[ "$WAL_MIRROR" == "1" ]]; then
-  echo "  wal mirror    : $WAL_TIMER_ON_CALENDAR  (PITR WAL: wal/{${NAMESPACES// /,}}/)"
+  echo "  wal mirror    : $WAL_TIMER_ON_CALENDAR  (copy --max-age $WAL_COPY_MAX_AGE; PITR wal/{${NAMESPACES// /,}}/)"
   wal_next=$(systemctl list-timers --no-legend --no-pager "$WAL_SERVICE_NAME.timer" 2>/dev/null | awk '{print $1, $2, $3}' | head -1)
   echo "  next wal      : ${wal_next:-see: systemctl list-timers}"
+  echo "  wal reconcile : $WAL_RECONCILE_ON_CALENDAR  (sync + ${WAL_QUARANTINE_DAYS}d deletion quarantine)"
 fi
 echo "  verify timer  : $VERIFY_TIMER_ON_CALENDAR  (verifies ${VERIFY_FILES_PERCENT}% of blobs)"
 verify_next=$(systemctl list-timers --no-legend --no-pager "$VERIFY_SERVICE_NAME.timer" 2>/dev/null | awk '{print $1, $2, $3}' | head -1)
