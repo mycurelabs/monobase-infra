@@ -262,7 +262,7 @@ hapihubWorker:
 # ===== HEALTHCARE: Frontend Application =====
 mycure:
   image:
-    tag: "10.25.120"
+    tag: "10.25.120-1"
   resources:
     requests:
       cpu: 10m
