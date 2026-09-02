@@ -5,7 +5,7 @@
 **Goal:** Give the prod patient-file bucket `gs://mc-v4-prod.appspot.com` an automated, isolated, point-in-time-recoverable DR backup (issue [monobase-mycure#3878](https://github.com/mycurelabs/monobase-mycure/issues/3878)).
 
 **Architecture:** Two **additive** DR tiers (both built — not either/or), same defense-in-depth as PG (Spaces → niflheim → vanaheim):
-- **Tier 1 — cloud (STS → separate GCP org):** a Storage Transfer Service job in a **separate GCP org/project** mirrors the source bucket into a hardened backup bucket twice daily (00:00 & 12:00 PHT), with **versioning + 30-day noncurrent lifecycle + soft-delete** (rolling 30-day point-in-time). Isolated from a `mc-v4-prod` compromise, $0 egress, fully managed, no exported creds. **Fast RTO, but still on Google.**
+- **Tier 1 — cloud (STS → separate GCP org):** a Storage Transfer Service job in a **separate GCP org/project** mirrors the source bucket into a hardened backup bucket twice daily (00:00 & 12:00 PHT), with **versioning + 30-day noncurrent lifecycle + soft-delete** (rolling 30-day point-in-time). Isolated from a `mc-v4-prod` compromise, **$0 STS service fee**, fully managed, no exported creds. (Egress is *not* $0 at the default `us-central1` location — ~$6 one-time inter-region on the initial copy, ~$0/mo after; it's $0 only if `backup_location = US` multi-region — see the cost section + open item #2.) **Fast RTO, but still on Google.**
 - **Tier 2 — on-prem (GCS → niflheim → vanaheim), NEW:** the existing `onprem-backup-setup.sh` pattern gains a `--source=gcs` mode — rclone pulls the bucket from GCS (read-only SA) through an **rclone `crypt`** remote so objects land **encrypted at rest** on `hel.niflheim`, then the generic host→host mirror (#400) fans the ciphertext niflheim→vanaheim for free. **Fully off-Google** (survives total Google loss / billing termination / org-wide compromise). Costs GCS egress on the pull; on-prem storage is ~free. Verified end-to-end on the same niflheim (backup) + vanaheim (dev) boxes #400 was proven on.
 
 **Tech Stack:** OpenTofu (`google` provider), Google Cloud Storage, Storage Transfer Service, DO Spaces S3 backend (tofu state); **rclone (crypt remote) + systemd timers on niflheim/vanaheim** reusing `scripts/onprem-backup-setup.sh` + `scripts/backup-mirror-setup.sh` (#400); `mise` tasks (`cluster-init/plan/apply`).
@@ -57,14 +57,33 @@
 - [ ] **Step 1: Write `variables.tf`**
 
 ```hcl
-variable "backup_project_id"    { type = string }
-variable "source_project_id"    { type = string, default = "mc-v4-prod" }
-variable "source_bucket"        { type = string, default = "mc-v4-prod.appspot.com" }
-variable "backup_bucket"        { type = string } # globally unique, e.g. "mycure-prod-appspot-dr"
-variable "backup_location"      { type = string, default = "us-central1" } # regional Nearline (cheapest total)
-variable "backup_storage_class" { type = string, default = "NEARLINE" }
-variable "retention_days"       { type = number, default = 30 }
-variable "schedule_start_date"  { type = object({ year = number, month = number, day = number }) }
+# HCL2 requires a newline between attributes — multi-attribute bodies cannot be
+# comma-separated on one line (that's a "Missing newline between arguments" error).
+variable "backup_project_id" { type = string }
+variable "source_project_id" {
+  type    = string
+  default = "mc-v4-prod"
+}
+variable "source_bucket" {
+  type    = string
+  default = "mc-v4-prod.appspot.com"
+}
+variable "backup_bucket" { type = string } # globally unique, e.g. "mycure-prod-appspot-dr"
+variable "backup_location" {
+  type    = string
+  default = "us-central1" # regional Nearline (cheapest total)
+}
+variable "backup_storage_class" {
+  type    = string
+  default = "NEARLINE"
+}
+variable "retention_days" {
+  type    = number
+  default = 30
+}
+variable "schedule_start_date" {
+  type = object({ year = number, month = number, day = number })
+}
 ```
 
 - [ ] **Step 2: Write `main.tf` (backend + providers + STS agent + source IAM + job)**
@@ -147,14 +166,15 @@ resource "google_storage_transfer_job" "dr" {
     gcs_data_sink   { bucket_name = google_storage_bucket.backup.name }
 
     transfer_options {
-      # Update objects whose content changed; skip identical ones (STS diffs by
-      # checksum/size). delete_objects_unique_in_sink = true makes this a MIRROR:
-      # a source delete removes the live object in the sink, but versioning keeps
-      # it as a noncurrent version for `retention_days` (see bucket.tf). That is
-      # the bounded 30-day point-in-time window. Because the sink lives in a
-      # separate org, a prod-side mass-delete cannot purge those versions.
-      overwrite_objects_already_existing_in_sink = true
-      delete_objects_unique_in_sink              = true
+      # Rely on STS's DEFAULT overwrite behavior: only objects that DIFFER from the
+      # source are rewritten. Do NOT set overwrite_objects_already_existing_in_sink
+      # = true — that rewrites ALL ~302 GB every run (~$540/mo egress + ~18 TB of
+      # identical noncurrent versions; see the cost section). delete_objects_unique_
+      # in_sink = true makes this a MIRROR: a source delete removes the live object
+      # in the sink, but versioning keeps it as a noncurrent version for
+      # `retention_days` (see bucket.tf) = the bounded 30-day point-in-time window.
+      # The separate org means a prod-side mass-delete cannot purge those versions.
+      delete_objects_unique_in_sink = true
     }
   }
 
@@ -365,14 +385,18 @@ bucket/project is lost.)
    becomes a noncurrent version in the backup and is restorable.
 4. Record the drill result on the DR tracking issue.
 
-## Cost (measure real size first: `gcloud storage du -s gs://mc-v4-prod.appspot.com`)
+## Cost — measured (bucket = 302 GB, 2026-09; GCP list rates, verify vs committed-use)
 - STS service fee: $0.
-- Storage: <SIZE_GB> × $0.010/GB/mo (us-central1 Nearline) ≈ $<...>/mo, plus up
-  to 30 days of churned noncurrent versions.
-- Egress: source is US multi-region, sink is us-central1 → inter-region egress
-  (~$0.02/GB) on the INITIAL full copy once, then only on changed bytes per run.
-  To make egress $0, switch `backup_location` to `US` multi-region (storage then
-  ~$0.015/GB Nearline-MR instead of $0.010 regional — pick per size).
+- Storage: 302 GB × $0.010/GB/mo (us-central1 Nearline) ≈ **$3.02/mo** (grows with
+  the bucket) + a small churn of noncurrent versions (low — patient files rarely change).
+- Egress: US multi-region source → us-central1 sink = inter-region ~$0.02/GB.
+  Initial copy 302 GB × $0.02 ≈ **$6 one-time**; then changed bytes only → ~$0–few/mo.
+- **TOTAL ≈ ~$3/mo + delta egress.**
+- `backup_location = US` multi-region (open item #2): initial egress $0, storage
+  ~$0.015/GB-mo ≈ **$4.5/mo** — trade ~$1.5/mo for zero egress.
+- ⚠️ Assumes STS DEFAULT overwrite (delta-only). Setting
+  `overwrite_objects_already_existing_in_sink = true` re-copies all 302 GB twice
+  daily → ~$362/mo egress + ~18 TB noncurrent ≈ **~$544/mo**. Do NOT set it.
 ```
 
 - [ ] **Step 2: Commit**
@@ -386,10 +410,18 @@ git commit -m "docs(dr): GCS DR backup runbook + restore drill (monobase-mycure#
 
 > **Tasks 1–5 = Tier 1 (cloud/STS). Tasks 6–7 = Tier 2 (on-prem), additive — both ship.**
 
-### Task 6: On-prem tier — `--source=gcs` mode for `onprem-backup-setup.sh`
+### Task 6: On-prem tier — encrypted GCS mirror
+
+> **⚠️ SUPERSEDED BY WHAT SHIPPED.** This was drafted as a `--source=gcs` branch of
+> `onprem-backup-setup.sh`, but #402 shipped it as a **separate sibling script,
+> `scripts/gcs-onprem-mirror.sh`**, deliberately — extending the load-bearing,
+> battle-tested Spaces/Kopia mirror risked a regression in a working path. The
+> canonical implementation + runbook is `docs/operations/GCS_ONPREM_MIRROR.md`.
+> The snippets below are kept for design context; the shipped script is the source
+> of truth (and adds the `RequiresMountsFor` guard + crypt-pw idempotency guard).
 
 **Files:**
-- Modify: `scripts/onprem-backup-setup.sh` (add a `--source=gcs` branch alongside the existing Spaces/Kopia source)
+- Ship: `scripts/gcs-onprem-mirror.sh` (separate script — NOT a branch of `onprem-backup-setup.sh`)
 
 **Interfaces:**
 - Consumes: read-only GCS SA (prereq P5 below), an rclone `crypt` password (held like `KOPIA_PASSWORD`, supplied out-of-band).
@@ -408,7 +440,9 @@ project_number = <mc-v4-prod number>
 [gcs-crypt]
 type = crypt
 remote = /mnt/storage/mycure/gcs/mc-v4-prod.appspot.com
-password = <obscured crypt password>   # rclone obscure; real pw escrowed offline
+filename_encryption = standard          # REQUIRED — else filenames stay plaintext,
+directory_name_encryption = true        # breaking the "ciphertext-only replica" invariant
+password = <obscured crypt password>    # rclone obscure; real pw escrowed offline
 ```
 
 - [ ] **Step 2:** In `onprem-backup-setup.sh`, add the `--source=gcs` pull command (encrypt-on-ingest so plaintext PHI never rests on the host — the invariant that keeps the host→host stack ciphertext-only):
@@ -419,7 +453,7 @@ password = <obscured crypt password>   # rclone obscure; real pw escrowed offlin
 # files, so we write THROUGH the crypt remote. --backup-dir keeps a dated copy of
 # overwritten/deleted objects = point-in-time on-prem without versioned storage.
 "$RCLONE_BIN" --config "$RCLONE_CONFIG" sync gcs-src:mc-v4-prod.appspot.com gcs-crypt: \
-  --backup-dir "gcs-crypt-archive:$(date -u +%Y-%m-%d)" \
+  --backup-dir "gcs-crypt:archive/$(date -u +%Y-%m-%d)" \   # same crypt remote, disjoint subtree
   --transfers "$RCLONE_TRANSFERS" --checkers "$RCLONE_CHECKERS" --fast-list
 ```
 
@@ -477,6 +511,7 @@ git commit -m "docs(dr): on-prem GCS tier + niflheim/vanaheim restore drill"
 3. Confirm "6hrs interval" in the issue really means twice-daily (00:00/12:00) — plan uses 12h; switch `repeat_interval` to `21600s` for true 6h if they want tighter RPO.
 4. **On-prem tier egress + capacity** — the GCS→niflheim pull pays **$0.12/GB Google egress** on the initial full copy (deltas after), and the mirror must fit `hel.niflheim` `/mnt/storage` (1.8T; PG data-mover already ~188G) **plus** headroom on vanaheim. Both gated on the **measured bucket size** (`gcloud storage du -s` — scan still pending). If the bucket is very large, consider a prefix/age filter for the on-prem tier while keeping Tier 1 whole.
 5. **Crypt-password escrow** for the on-prem mirror — reuse the [[secrets-dr-3882]] age/Shamir escrow policy (this password is the GCS-mirror analogue of the Kopia password).
+6. **Tier 1 failure alerting** — STS has no built-in paging. Add a `notification_config` (Pub/Sub topic on `TRANSFER_OPERATION_FAILED`) to the transfer job + a Cloud Monitoring alert, or a scheduled check of the last operation's status, so a silently-failing cloud tier is noticed. Tier 2 already has the Discord notifier + weekly cryptcheck.
 
 **Placeholder scan:** `<backup_project_id>`, `<backup_bucket>`, `<job>`, `<SIZE_GB>`, `<mc-v4-prod number>`, `<obscured crypt password>`, `<path>` are operational fill-ins (real ids / measured size / escrowed secret), not logic gaps. No TODO logic.
 
