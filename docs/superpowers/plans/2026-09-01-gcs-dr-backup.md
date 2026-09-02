@@ -343,6 +343,40 @@ git commit -m "chore(dr): pin google provider lockfile for GCS DR root"
 
 ---
 
+### Task 4.5: Tier 1 failure alerting (STS → Pub/Sub)
+
+STS has no built-in paging — a silently-failing cloud tier is the worst kind. Wire a Pub/Sub notification on failed operations + an alert off it.
+
+**Files:** Modify `values/clusters/mycure-gcs-dr/terraform/main.tf`
+
+- [ ] **Step 1:** Add a topic + the job's `notification_config`:
+
+```hcl
+resource "google_pubsub_topic" "sts_alerts" {
+  provider = google.backup
+  project  = var.backup_project_id
+  name     = "gcs-dr-sts-alerts"
+}
+
+# add inside resource "google_storage_transfer_job" "dr" { ... }:
+  notification_config {
+    pubsub_topic   = google_pubsub_topic.sts_alerts.id
+    event_types    = ["TRANSFER_OPERATION_FAILED"]
+    payload_format = "JSON"
+  }
+```
+
+- [ ] **Step 2:** Alert off the topic — a Cloud Monitoring alert policy, or a tiny push-subscription → Discord (reuse Tier 2's webhook). Force a failure (e.g. revoke the source IAM briefly) and confirm it pages.
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add values/clusters/mycure-gcs-dr/terraform/main.tf
+git commit -m "feat(dr): STS failure alerting via Pub/Sub (monobase-mycure#3878)"
+```
+
+---
+
 ### Task 5: Runbook (backup verification + restore drill)
 
 **Files:**
@@ -452,8 +486,11 @@ password = <obscured crypt password>    # rclone obscure; real pw escrowed offli
 # source (blobs arrive pre-encrypted), raw GCS objects are plaintext patient
 # files, so we write THROUGH the crypt remote. --backup-dir keeps a dated copy of
 # overwritten/deleted objects = point-in-time on-prem without versioned storage.
+# --backup-dir writes to the same crypt remote, a disjoint subtree. Keep the
+# comment on its own line: a trailing `\` must end the line, or it escapes the
+# following space and the command terminates early.
 "$RCLONE_BIN" --config "$RCLONE_CONFIG" sync gcs-src:mc-v4-prod.appspot.com gcs-crypt: \
-  --backup-dir "gcs-crypt:archive/$(date -u +%Y-%m-%d)" \   # same crypt remote, disjoint subtree
+  --backup-dir "gcs-crypt:archive/$(date -u +%Y-%m-%d)" \
   --transfers "$RCLONE_TRANSFERS" --checkers "$RCLONE_CHECKERS" --fast-list
 ```
 
@@ -511,8 +548,8 @@ git commit -m "docs(dr): on-prem GCS tier + niflheim/vanaheim restore drill"
 3. Confirm "6hrs interval" in the issue really means twice-daily (00:00/12:00) — plan uses 12h; switch `repeat_interval` to `21600s` for true 6h if they want tighter RPO.
 4. **On-prem tier egress + capacity** — the GCS→niflheim pull pays **$0.12/GB Google egress** on the initial full copy (deltas after), and the mirror must fit `hel.niflheim` `/mnt/storage` (1.8T; PG data-mover already ~188G) **plus** headroom on vanaheim. Both gated on the **measured bucket size** (`gcloud storage du -s` — scan still pending). If the bucket is very large, consider a prefix/age filter for the on-prem tier while keeping Tier 1 whole.
 5. **Crypt-password escrow** for the on-prem mirror — reuse the [[secrets-dr-3882]] age/Shamir escrow policy (this password is the GCS-mirror analogue of the Kopia password).
-6. **Tier 1 failure alerting** — STS has no built-in paging. Add a `notification_config` (Pub/Sub topic on `TRANSFER_OPERATION_FAILED`) to the transfer job + a Cloud Monitoring alert, or a scheduled check of the last operation's status, so a silently-failing cloud tier is noticed. Tier 2 already has the Discord notifier + weekly cryptcheck.
+6. **Tier 1 failure alerting** — now **Task 4.5** (STS `notification_config` → Pub/Sub on `TRANSFER_OPERATION_FAILED` + alert). Tier 2 already has the Discord notifier + weekly cryptcheck.
 
-**Placeholder scan:** `<backup_project_id>`, `<backup_bucket>`, `<job>`, `<SIZE_GB>`, `<mc-v4-prod number>`, `<obscured crypt password>`, `<path>` are operational fill-ins (real ids / measured size / escrowed secret), not logic gaps. No TODO logic.
+**Placeholder scan:** `<backup_project_id>`, `<backup_bucket>`, `<job>`, `<mc-v4-prod number>`, `<obscured crypt password>`, `<path>` are operational fill-ins (real ids / escrowed secret), not logic gaps. No TODO logic.
 
 **Type consistency:** `google_storage_bucket.backup.name` referenced consistently in `main.tf` (sink IAM + job) and `outputs.tf`; `data.google_storage_transfer_project_service_account.sts.email` referenced in both IAM grants. ✅
