@@ -4,7 +4,7 @@
 
 **Goal:** Give the ~115 irreplaceable secrets in GCP Secret Manager (`mc-v4-prod`) an automated, **off-provider**, break-glass-recoverable backup that survives a full loss of GCP access (compromise, billing lockout, project deletion) — issue [monobase-mycure#3882](https://github.com/mycurelabs/monobase-mycure/issues/3882).
 
-**Architecture:** A daily in-cluster CronJob (mirrors the existing wal-g backup pattern) reads every Secret Manager secret with a **read-only** GCP SA, encrypts the whole set with **SOPS + age to an OFFLINE recipient key**, and writes only the ciphertext to off-provider storage we already run (DO Spaces with Object Lock → auto-mirrored to on-prem niflheim). The age **private** key is never in GCP or the cluster — it is escrowed out-of-band (Shamir-split among officers). Decryption depends only on `ciphertext + offline age key`, zero GCP dependency. A provider-specific *warm-standby* alternative (HashiCorp Vault / Akeyless / Infisical via native GCP import) is documented but **not built now** — Option A is the priority.
+**Architecture:** A daily in-cluster CronJob (mirrors the existing wal-g backup pattern) reads every Secret Manager secret with a **read-only** GCP SA, encrypts the whole set with **SOPS + age to an OFFLINE recipient key**, and writes only the ciphertext to off-provider storage we already run (DO Spaces — versioning only, **Spaces has no Object Lock** — auto-mirrored to on-prem niflheim, where the mirror uses a `--backup-dir` quarantine (#403-style) so a deletion by a compromised Spaces key cannot erase the on-prem copy). The age **private** key is never in GCP or the cluster — it is escrowed out-of-band (Shamir-split among officers). Decryption depends only on `ciphertext + offline age key`, zero GCP dependency. A provider-specific *warm-standby* alternative (HashiCorp Vault / Akeyless / Infisical via native GCP import) is documented but **not built now** — Option A is the priority.
 
 **Tech Stack:** GCP Secret Manager, `gcloud`, SOPS + age, Kubernetes CronJob, External Secrets Operator (for the exporter SA + Spaces creds), DO Spaces (S3), on-prem niflheim mirror, ArgoCD.
 
@@ -17,7 +17,7 @@
 - **Encryption uses a PUBLIC key; the PRIVATE key is offline.** The cluster/CronJob can encrypt but can **never** decrypt past backups — so a full cluster or GCP compromise cannot read the DR archive. This is the whole security model.
 - **No new plaintext at rest.** Plaintext exists only in a memory-backed tmpfs inside the job pod, piped straight into SOPS; never written to a persistent disk, never logged.
 - **No new read exposure.** ESO already reads all these secrets, so a read-only exporter SA adds no attack surface beyond what exists; the *only* new artifact is ciphertext useless without the offline key (LastPass lesson: strong offline key, encrypt everything).
-- **Reuse existing off-provider stores** — DO Spaces (add Object Lock) + on-prem niflheim mirror (see [[onprem-backup-mirror-niflheim]]); no new cloud account required for Option A.
+- **Reuse existing off-provider stores** — DO Spaces (enable versioning — **API-only; Spaces has no Object Lock**) + on-prem niflheim mirror **with a `--backup-dir` quarantine** (#403 pattern — deletions don't propagate) (see [[onprem-backup-mirror-niflheim]]); no new cloud account required for Option A. Real WORM immutability, if wanted, comes from a 3rd store where Object Lock actually works (B2/Wasabi/R2/S3).
 - **Chart conventions:** new chart `charts/secrets-dr-backup/`, auto-discovered by ArgoCD, deployed into `mycure-production`. Mirror `charts/database-secrets` walg pattern (SA + RBAC + default-deny NetworkPolicy + hardened securityContext + ESO-sourced creds).
 - **No secrets in git.** age *public* key is committed (ConfigMap); everything else via ESO.
 
@@ -64,7 +64,7 @@ Secrets are KB-scale, so unlike the GCS bucket (#3878) this is essentially free 
 **Human prerequisites (not chart-managed):**
 - **P1. Generate the age key pair OFFLINE** (`age-keygen`) on an air-gapped/trusted machine. Commit only the **public** recipient (`age1...`). The **private** key is escrowed per the policy in Task 5 — never touches GCP, the cluster, or git.
 - **P2. Create a read-only exporter GCP SA** in `mc-v4-prod` with `roles/secretmanager.viewer` + `roles/secretmanager.secretAccessor` (list + access, NO write/delete). Store its JSON key in Secret Manager as `mycure-production-secrets-dr-exporter-sa` (ESO reads it). `# ponytail: reuse ESO's existing reader SA only if it's already read-only-scoped; else a dedicated one keeps blast radius to read.`
-- **P3. Create the DO Spaces backup bucket** with **versioning + Object Lock** (e.g. `mycure-secrets-dr`), and confirm the niflheim mirror covers its prefix.
+- **P3. Create the DO Spaces backup bucket** with **versioning** (API-only, `mc version enable` — **Spaces has no Object Lock, don't rely on it**) (e.g. `mycure-secrets-dr`), and confirm the niflheim mirror covers its prefix **with a `--backup-dir` quarantine** (not a plain delete-propagating sync).
 - **P4. Decide age-key escrow** (Task 5 policy) — biz/security call, see handover.
 
 ---
@@ -99,7 +99,7 @@ ageRecipients: []         # list of age1... public keys (offline private keys)
 spaces:
   bucket: "mycure-secrets-dr"
   endpoint: "https://sgp1.digitaloceanspaces.com"
-retentionNote: "versioning + Object Lock on the bucket; 90 daily versions kept via lifecycle"
+retentionNote: "Spaces versioning (API-only; no Object Lock); real immutability = niflheim --backup-dir quarantine; ~90 daily versions"
 image: "docker.io/google/cloud-sdk:slim"   # has gcloud + gsutil; SOPS+age installed in-script or baked
 global:
   namespace: mycure-production
@@ -200,12 +200,17 @@ data:
     OUT=/dev/shm/secrets.json          # tmpfs (Memory) — never a real disk
     echo '{}' > "$OUT"
     # Assemble {name: latest_value} for every secret. Values held only in tmpfs.
-    for NAME in $(gcloud secrets list --project="$PROJECT" --format='value(name)' \
+    # name.basename() — `name` alone is the full resource path
+    # (projects/<num>/secrets/<id>); the bare <id> is what `secrets create` needs
+    # on restore, so a full path would bake the OLD project number into the new one.
+    for NAME in $(gcloud secrets list --project="$PROJECT" --format='value(name.basename())' \
                     ${SECRET_FILTER:+--filter="name:${SECRET_FILTER}"}); do
-      VAL=$(gcloud secrets versions access latest --secret="$NAME" --project="$PROJECT")
-      # jq --arg keeps binary-ish values intact; base64 to be safe on newlines/keys
-      jq --arg n "$NAME" --arg v "$(printf '%s' "$VAL" | base64 -w0)" \
-         '.[$n]=$v' "$OUT" > "$OUT.tmp" && mv "$OUT.tmp" "$OUT"
+      # base64 BEFORE the shell can touch the bytes: $(...) strips ALL trailing
+      # newlines, so PEM keys (PRIVATE_KEY/PUBLIC_KEY/CADENCE_ISSUER_KEY, SA JSONs)
+      # would lose their trailing \n at capture. Piping into base64 -w0 never lets
+      # the substitution see a trailing newline, so raw bytes round-trip exactly.
+      B64=$(gcloud secrets versions access latest --secret="$NAME" --project="$PROJECT" | base64 -w0)
+      jq --arg n "$NAME" --arg v "$B64" '.[$n]=$v' "$OUT" > "$OUT.tmp" && mv "$OUT.tmp" "$OUT"
     done
     COUNT=$(jq 'length' "$OUT"); echo "exported $COUNT secrets"
     # Encrypt to the OFFLINE age recipient(s). Ciphertext is the only thing that
@@ -214,7 +219,9 @@ data:
     sops --encrypt --age "$RECIPIENTS" --input-type json --output-type json "$OUT" \
       > /dev/shm/secrets.enc.json
     shred -u "$OUT" 2>/dev/null || rm -f "$OUT"
-    # Upload ciphertext to Spaces (versioned + Object Lock). Date from runtime.
+    # Upload ciphertext to Spaces (versioned; Spaces has NO Object Lock — the
+    # niflheim --backup-dir quarantine is what makes a delete non-destructive).
+    # Date from runtime.
     STAMP=$(date -u +%Y-%m-%dT%H%M%SZ)
     export AWS_ACCESS_KEY_ID="$SPACES_ACCESS_KEY" AWS_SECRET_ACCESS_KEY="$SPACES_SECRET_KEY"
     aws --endpoint-url "$SPACES_ENDPOINT" s3 cp /dev/shm/secrets.enc.json \
@@ -320,7 +327,7 @@ secretsDrBackup:
   - [ ] Exporter SA is read-only (`viewer` + `secretAccessor`, no write/delete).
   - [ ] `ageRecipients` are the OFFLINE public keys; no private key anywhere in repo/cluster.
   - [ ] Plaintext path is `/dev/shm` (Memory emptyDir) only; `readOnlyRootFilesystem: true`.
-  - [ ] Spaces bucket has versioning + Object Lock; niflheim mirror covers the prefix.
+  - [ ] Spaces bucket has versioning (API-only); niflheim mirror covers the prefix **with `--backup-dir` quarantine** (no delete-propagation).
   - [ ] NetworkPolicy limits egress to DNS + 443.
 
 - [ ] **Step 3:** Do NOT auto-merge to prod until biz sign-off on the escrow policy (this is plan-first).
@@ -358,7 +365,7 @@ sops --decrypt <obj>   # expect: no matching age identity
 # Off-Provider Secrets DR — Runbook (GCP Secret Manager)
 
 **What:** daily encrypted export of all mc-v4-prod Secret Manager secrets to
-DO Spaces (Object Lock) + niflheim mirror, encrypted with age to OFFLINE keys.
+DO Spaces (versioning; no Object Lock) + niflheim mirror (--backup-dir quarantine), encrypted with age to OFFLINE keys.
 Chart: charts/secrets-dr-backup. Issue: monobase-mycure#3882.
 
 ## age key escrow policy (THE security model)
@@ -416,7 +423,7 @@ git commit -m "docs(secrets-dr): runbook + age-key escrow policy + break-glass d
 
 **Open items for biz/owner decision (issue #3882):**
 1. **age private-key escrow** — who are the M-of-N custodians and the threshold (recommend 2-of-3)? This is the entire security model.
-2. **Off-provider stores** — Spaces (Object Lock) + niflheim confirmed sufficient, or add a 3rd (e.g. AWS S3 Object Lock) for a truly independent second copy?
+2. **Off-provider stores** — Spaces (versioning) + niflheim (`--backup-dir` quarantine) sufficient, or add a 3rd store where **Object Lock actually works** (Backblaze B2 / Wasabi / Cloudflare R2 / AWS S3) for true WORM? The Spaces write key lives in-cluster, so without an immutable copy a cluster compromise could delete the Spaces archive — the on-prem quarantine closes that half; a WORM 3rd store closes it fully. <100 MB ciphertext → cents/mo.
 3. **Warm standby** — build the provider-specific Vault/Akeyless/Infisical layer now, or defer (plan defers it; Option A only).
 4. **Cadence/retention** — daily export + 90 daily versions OK?
 
