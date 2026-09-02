@@ -727,9 +727,10 @@ UNIT
 # segments). Two units, because a backup must survive DELETION, not just a source
 # outage (the 2026-08-28 incident was data loss):
 #
-#   * mycure-wal-mirror   (per minute) — `rclone COPY --max-age`. Adds new objects
-#     only; NEVER deletes. Work is O(new data), so it can't fall behind at full
-#     retention. Gives ~1-2min freshness.
+#   * mycure-wal-mirror   (per minute) — `rclone COPY --max-age --no-traverse`. Adds
+#     new objects only; NEVER deletes. --max-age bounds the TRANSFER and --no-traverse
+#     skips the dest walk; the source LIST still scales with the archive (~53k objects
+#     at plateau) but is cheap pagination. Gives ~1-2min freshness in steady operation.
 #   * mycure-wal-reconcile (daily)      — `rclone SYNC --backup-dir=wal-deleted/<date>`.
 #     Catches anything older than the copy window AND applies the cloud's (base-aware,
 #     wal-g-driven) prunes, but QUARANTINES would-be-deletions into a dated dir
@@ -744,7 +745,7 @@ UNIT
 if [[ "$WAL_MIRROR" == "1" ]]; then
   wal_exec_lines=""
   for ns in ${NAMESPACES//,/ }; do
-    wal_exec_lines+="ExecStart=$RCLONE_BIN copy spaces:$BUCKET/wal/$ns/ $BACKUP_DIR/spaces/wal/$ns/ --max-age $WAL_COPY_MAX_AGE --transfers 4 --checkers 8 --fast-list --log-level INFO --stats 30s --stats-one-line"$'\n'
+    wal_exec_lines+="ExecStart=$RCLONE_BIN copy spaces:$BUCKET/wal/$ns/ $BACKUP_DIR/spaces/wal/$ns/ --max-age $WAL_COPY_MAX_AGE --no-traverse --transfers 4 --checkers 8 --fast-list --log-level INFO --stats 30s --stats-one-line"$'\n'
   done
 
   # Failure notifications only (a per-minute success webhook = 1440 msgs/day).
@@ -777,8 +778,10 @@ Environment=RCLONE_CONFIG=$RCLONE_CONFIG
 LogNamespace=$LOG_NAMESPACE
 SyslogIdentifier=$WAL_SERVICE_NAME
 $wal_exec_lines
-# copy --max-age is O(new data): a run lists the prefix then transfers only the last
-# $WAL_COPY_MAX_AGE of objects, finishing in seconds. 5min bounds a network hang.
+# --max-age bounds the TRANSFER and --no-traverse skips the dest walk, so a run only
+# moves new WAL. The source LIST still scales with the archive (~53k objs at plateau)
+# but is cheap pagination (seconds). 5min bounds a network hang. NB --max-age is
+# relative to now: a >6h stall of this unit needs the daily reconcile to catch up.
 # systemd skips a tick whose service is still active, so runs coalesce, never stack.
 TimeoutStartSec=300s
 Nice=10

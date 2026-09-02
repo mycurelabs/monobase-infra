@@ -312,11 +312,17 @@ separate from the Kopia mirror:
   `--exclude "**"` never touches `wal/` — disjoint subtrees (why `--wal-mirror`
   requires `--namespaces`).
 - **`mycure-wal-mirror` — every minute, add-only.**
-  `rclone copy --max-age 6h spaces:<bucket>/wal/<ns>/ → <backup-dir>/spaces/wal/<ns>/`.
-  `copy` **never deletes**; `--max-age` bounds the work to recent objects, so a run
-  finishes in seconds no matter how large the archive grows (`TimeoutStartSec=300s`
-  caps a hang). On-prem WAL lag ≈ `archive_timeout` + latency (~1-2 min). systemd
-  skips a tick whose service is still active, so runs coalesce, never stack.
+  `rclone copy --max-age 6h --no-traverse spaces:<bucket>/wal/<ns>/ → <backup-dir>/spaces/wal/<ns>/`.
+  `copy` **never deletes**. `--max-age` bounds the *transfer* set to recent objects
+  and `--no-traverse` skips the destination walk — so the run only transfers new WAL.
+  Enumeration of the *source* prefix still scales with the archive (~5.5k objects
+  today → ~53k at plateau), but that's cheap LIST pagination (seconds);
+  `TimeoutStartSec=300s` caps a hang. Steady-state lag ≈ `archive_timeout` + latency
+  (~1-2 min) — **but `--max-age` is relative to *now***, so if the per-minute unit is
+  down > 6h, objects that aged out of the window during the outage are only recovered
+  by the next daily reconcile: real RPO after a long stall is up to ~24h, not 1-2 min
+  (the damped failure notifier tells you it stalled). systemd skips a tick whose
+  service is still active, so runs coalesce, never stack.
 - **`mycure-wal-reconcile` — daily, air-gapped prune.** `rclone sync …
   --backup-dir=<backup-dir>/spaces/wal-deleted/<date>/<ns>` (default 04:00 PHT).
   Catches anything older than the copy's `--max-age` window **and** applies the
@@ -347,10 +353,13 @@ separate from the Kopia mirror:
   record: PITR-RESTORE.md cost section, #401**): seeds at **~81 GiB today** for
   `mycure-production` (2 of 4 eventual weekly bases + WAL; matches the niflheim seed
   of 81 GiB / 5,471 objects), grows **~2.33 GB/day compressed** (~29 GiB/day raw,
-  ~13× compression) **plus one ~37.5 GiB base/week until it plateaus at ~210 GiB
-  steady-state** (4 bases ~150 GiB + ~4 wks WAL ~61 GiB). **Budget ~210 GiB + up to
-  ~one weekly base of quarantine churn**, not today's 81 GiB — fits niflheim's 1.8T
-  `/mnt/storage` with wide margin. Confirm `df -h <backup-dir>` headroom on top of
+  ~13× compression) **plus one ~37.5 GiB base/week until the *live* set plateaus at
+  ~210 GiB** (4 bases ~150 GiB + ~4 wks WAL ~61 GiB). **Quarantine adds ~225 GiB**:
+  at plateau the cloud's deletion rate equals its ingest (~7.5 GiB/day = 211 GiB per
+  4-week cycle), held `WAL_QUARANTINE_DAYS=30` → ~225 GiB under `wal-deleted/`.
+  **Budget ~435 GiB total** (210 live + 225 quarantine), not today's 81 GiB — still
+  fits niflheim's 1.8T `/mnt/storage` with room (drop to a 7-day quarantine ≈ 53 GiB
+  if you'd rather hold the footprint). Confirm `df -h <backup-dir>` headroom on top of
   the Kopia repo.
 
 > **Restoring PITR from the on-prem WAL copy** (cloud unreachable) is a separate
