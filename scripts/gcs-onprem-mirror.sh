@@ -39,6 +39,7 @@ RCLONE_BIN=/usr/local/bin/rclone
 RCLONE_TRANSFERS=4
 RCLONE_CHECKERS=8
 NOTIFY_ON=both                                   # both | failure-only | success-only | off
+ROTATE_CRYPT=0                                   # 1 = intentionally re-key an existing vault
 
 CONFIG_DIR=/etc/mycure-gcs
 RCLONE_CONFIG=/etc/rclone/gcs.conf
@@ -74,6 +75,7 @@ Flags:
   --timer-on-calendar=S   systemd OnCalendar= for the mirror       (default: "$TIMER_ON_CALENDAR")
   --verify-on-calendar=S  systemd OnCalendar= for the weekly check (default: "$VERIFY_TIMER_ON_CALENDAR")
   --notify-on=MODE        both | failure-only | success-only | off (default: $NOTIFY_ON)
+  --rotate-crypt-password intentionally re-key an existing vault (re-downloads all)
   -h, --help              this help
 
 Environment (required):
@@ -101,6 +103,7 @@ while [[ $# -gt 0 ]]; do
     --timer-on-calendar=*)  TIMER_ON_CALENDAR="${1#*=}";   shift;;
     --verify-on-calendar=*) VERIFY_TIMER_ON_CALENDAR="${1#*=}"; shift;;
     --notify-on=*)          NOTIFY_ON="${1#*=}";           shift;;
+    --rotate-crypt-password) ROTATE_CRYPT=1;               shift;;
     --discord-webhook-url=*) DISCORD_WEBHOOK_URL="${1#*=}";shift;;
     -h|--help)              usage; exit 0;;
     *) err "unknown flag: $1 (see --help)";;
@@ -169,6 +172,20 @@ chmod 0750 "$BACKUP_DIR"
 # crypt password/salt are stored OBSCURED (reversible, like kopia.password/
 # luks.key already are on this host) in a 0640 root:service file — never in git,
 # never propagated to a host→host replica.
+# Idempotency guard for the ONE input that is NOT safely reconcilable: a changed
+# crypt password silently orphans the whole vault — old ciphertext becomes
+# undecryptable, `sync` then treats all of it as extraneous and moves 302 GB into
+# archive/<date>, and re-downloads the bucket at egress. rclone obscure is
+# non-deterministic (random IV), so compare via `reveal`, not string equality.
+if [[ -f "$RCLONE_CONFIG" ]] && grep -q '^\[gcs-crypt\]' "$RCLONE_CONFIG" && [[ "$ROTATE_CRYPT" -eq 0 ]]; then
+  existing_ob=$(awk '/^\[gcs-crypt\]/{f=1} f&&/^password *=/{print $3; exit}' "$RCLONE_CONFIG")
+  if [[ -n "$existing_ob" ]] && [[ "$("$RCLONE_BIN" reveal "$existing_ob" 2>/dev/null)" != "$GCS_CRYPT_PASSWORD" ]]; then
+    err "GCS_CRYPT_PASSWORD differs from the existing vault's key ($RCLONE_CONFIG). Re-keying orphans the \
+whole encrypted vault (old ciphertext unreadable + full re-download at egress). Pass --rotate-crypt-password \
+to re-key intentionally."
+  fi
+fi
+
 log "writing rclone config to $RCLONE_CONFIG"
 obscured_pw=$("$RCLONE_BIN" obscure "$GCS_CRYPT_PASSWORD")
 salt_line=""
@@ -351,6 +368,11 @@ cat > "$SYSTEMD_DIR/$SERVICE_NAME.service" <<UNIT
 Description=Mirror GCS bucket $BUCKET to encrypted on-prem vault (Mycure DR tier-2)
 After=network-online.target
 Wants=network-online.target
+# Refuse to start unless the vault's disk is mounted — otherwise an unmounted
+# target lets rclone recreate a 302 GB tree on the root FS (the #397/cb2e6d3
+# guard, carried by #403). No LUKS/imperative-mount mode here, so the single
+# unconditional line is correct; no-op if BACKUP_DIR is on root (-.mount).
+RequiresMountsFor=$BACKUP_DIR
 $n_fail
 
 [Service]
@@ -396,6 +418,7 @@ cat > "$SYSTEMD_DIR/$VERIFY_SERVICE_NAME.service" <<UNIT
 Description=Weekly cryptcheck of the on-prem GCS mirror
 After=network-online.target
 Wants=network-online.target
+RequiresMountsFor=$BACKUP_DIR
 $v_fail
 
 [Service]
