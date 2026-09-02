@@ -330,8 +330,14 @@ systemd unit (`mycure-wal-mirror`), not folded into the Kopia mirror:
 - **Disk.** Bounded by source retention: `rclone sync` mirrors `wal-g delete`
   prunes, so on-prem holds only what the cloud `wal/<ns>/` holds (WAL kept until
   the oldest base backup ages out — `walg.backup.retainFull=4` weekly ≈ 4-5
-  weeks). ~81 GiB for `mycure-production` (2026-09); confirm `df -h <backup-dir>`
-  has headroom on top of the Kopia repo.
+  weeks). Measured 2026-09-01 (**source of record: PITR-RESTORE.md cost section,
+  #401**): seeds at **~81 GiB today** for `mycure-production` (2 of 4 eventual
+  weekly bases + WAL; matches the niflheim seed of 81 GiB / 5,471 objects), then
+  grows **~2.33 GB/day compressed** (~29 GiB/day raw, ~13× compression) **plus one
+  ~37.5 GiB base/week until it plateaus at ~210 GiB steady-state** (4 bases
+  ~150 GiB + ~4 wks WAL ~61 GiB). **Budget for ~210 GiB, not today's 81 GiB** —
+  fits niflheim's 1.8T `/mnt/storage` with wide margin. Confirm `df -h <backup-dir>`
+  headroom on top of the Kopia repo.
 
 > **Restoring PITR from the on-prem WAL copy** (cloud unreachable) is a separate
 > drill — point wal-g at the local files (`WALG_FILE_PREFIX`) or re-serve the
