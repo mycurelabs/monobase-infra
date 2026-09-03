@@ -72,7 +72,7 @@ hapihub:
   # serviceConfig arg. POSTs every audit_events INSERT to the Tenzir pipeline.
   # 11.20.118 (#3745, #3747) = telemetry parity metrics.
   image:
-    tag: "11.20.119"
+    tag: "11.20.120-rc.0"
   cache:
     enabled: true
 
@@ -215,7 +215,7 @@ hapihub:
     serviceName: postgresql-primary
 mycure:
   image:
-    tag: "10.25.132"
+    tag: "10.25.134-rc.0"
     # 10.25.131 = PostHog removal + EMR back-routing reconcile.
     # (#2992, PR #3426 merged as d7d535fcf). Supersedes the pre-merge branch build 10.25.118 — carries the
     # on-device fixes to the onboarding copy, the user_code format the anti-phishing check depends on, and
