@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 /**
- * Seed script for MyCure environments
+ * Seed script for MYCURE environments
  * Creates a demo organization with 7 role-based user accounts.
  *
  * Usage:
@@ -30,7 +30,7 @@ const ENVS: Record<string, { api: string; cms: string }> = {
 
 function printUsage() {
   console.log(`
-${chalk.bold("MyCure Seed Script")}
+${chalk.bold("MYCURE Seed Script")}
 Creates a demo organization with 7 role-based user accounts.
 
 ${chalk.yellow("Usage:")}
@@ -432,6 +432,15 @@ const USERS: SeedUser[] = [
   // Pharmacy / inventory custodian. 'pharmacist' (read + POS) + 'pharmacy_custodian'
   // (full inventory management) = a pharmacy account with inventory privileges.
   { email: "pharmacist@mycure.test", name: "Grace Tolentino", roleIds: ["pharmacist", "pharmacy_custodian"],                superadmin: false },
+  // Six more clinicians, purely so the public directory has depth and a
+  // spread of specialties to search across. Same 'doctor' role as the
+  // three above — nothing here changes privileges.
+  { email: "derma@mycure.test",      name: "Camille Ocampo",  roleIds: ["doctor"],                                          superadmin: false },
+  { email: "obgyne@mycure.test",     name: "Patricia Villar", roleIds: ["doctor"],                                          superadmin: false },
+  { email: "cardio@mycure.test",     name: "Enrique Salazar", roleIds: ["doctor"],                                          superadmin: false },
+  { email: "dentist@mycure.test",    name: "Nathaniel Uy",    roleIds: ["doctor"],                                          superadmin: false },
+  { email: "ortho@mycure.test",      name: "Ramon Delgado",   roleIds: ["doctor"],                                          superadmin: false },
+  { email: "ent@mycure.test",        name: "Ivy Chua",        roleIds: ["doctor"],                                          superadmin: false },
 ];
 
 // ---------------------------------------------------------------------------
@@ -476,6 +485,203 @@ interface UserProfileExtras {
 }
 
 const USER_PROFILES: Record<string, UserProfileExtras> = {
+  "derma@mycure.test": {
+    mobileNo: "+639171234020",
+    sex: "female",
+    dateOfBirth: "1984-02-17",
+    bloodType: "O+",
+    nationality: "Filipino",
+    maritalStatus: "married",
+    address: {
+      street1: "9 Molave St, Ayala Alabang",
+      city: "Muntinlupa",
+      province: "Metro Manila",
+      region: "NCR",
+      country: "PHL",
+      zipCode: "1780",
+    },
+    doc_title: "Dr.",
+    doc_bio:
+      "Dermatologist practising medical, surgical and cosmetic dermatology. Runs the acne and pigmentation programmes at the MYCURE skin centre.",
+    doc_PRCLicenseNo: "PRC-0110234",
+    doc_PRCLicenseExp: "2029-06-30",
+    doc_PTRNumber: "PTR-MUN-2026-004411",
+    doc_S2Number: "S2-D-33412",
+    doc_philhealthPAN: "PHIC-12-445678901-3",
+    doc_practicingSince: "2012-08-01",
+    doc_specialties: ["Dermatology", "Cosmetic Dermatology"],
+    doc_professions: ["Physician", "Dermatologist"],
+    doc_education: [
+      { school: "University of Santo Tomas Faculty of Medicine and Surgery", degree: "Doctor of Medicine", year: 2010 },
+    ],
+    doc_affiliations: [
+      { name: "Philippine Dermatological Society", role: "Fellow" },
+    ],
+  },
+  "obgyne@mycure.test": {
+    mobileNo: "+639171234021",
+    sex: "female",
+    dateOfBirth: "1981-11-05",
+    bloodType: "B+",
+    nationality: "Filipino",
+    maritalStatus: "married",
+    address: {
+      street1: "18 Kalayaan Avenue",
+      city: "Quezon City",
+      province: "Metro Manila",
+      region: "NCR",
+      country: "PHL",
+      zipCode: "1101",
+    },
+    doc_title: "Dr.",
+    doc_bio:
+      "Obstetrician-gynaecologist covering prenatal care, high-risk pregnancy and minimally invasive gynaecologic surgery. Delivers at partner tertiary hospitals.",
+    doc_PRCLicenseNo: "PRC-0105511",
+    doc_PRCLicenseExp: "2028-09-30",
+    doc_PTRNumber: "PTR-QC-2026-004412",
+    doc_S2Number: "S2-O-22119",
+    doc_philhealthPAN: "PHIC-12-445678902-1",
+    doc_practicingSince: "2009-05-01",
+    doc_specialties: ["Obstetrics & Gynecology", "Maternal-Fetal Medicine"],
+    doc_professions: ["Physician", "Obstetrician"],
+    doc_education: [
+      { school: "University of the Philippines College of Medicine", degree: "Doctor of Medicine", year: 2007 },
+    ],
+    doc_affiliations: [
+      { name: "Philippine Obstetrical and Gynecological Society", role: "Fellow" },
+    ],
+  },
+  "cardio@mycure.test": {
+    mobileNo: "+639171234022",
+    sex: "male",
+    dateOfBirth: "1976-07-30",
+    bloodType: "A+",
+    nationality: "Filipino",
+    maritalStatus: "married",
+    address: {
+      street1: "5 Banyan Road, Corinthian Gardens",
+      city: "Quezon City",
+      province: "Metro Manila",
+      region: "NCR",
+      country: "PHL",
+      zipCode: "1110",
+    },
+    doc_title: "Dr.",
+    doc_bio:
+      "Interventional cardiologist managing coronary artery disease, heart failure and arrhythmia. Runs the weekly 2D-echo and treadmill stress clinic.",
+    doc_PRCLicenseNo: "PRC-0092210",
+    doc_PRCLicenseExp: "2027-12-31",
+    doc_PTRNumber: "PTR-QC-2026-004413",
+    doc_S2Number: "S2-C-11876",
+    doc_philhealthPAN: "PHIC-12-445678903-9",
+    doc_practicingSince: "2005-03-01",
+    doc_specialties: ["Cardiology", "Internal Medicine"],
+    doc_professions: ["Physician", "Cardiologist"],
+    doc_education: [
+      { school: "University of Santo Tomas Faculty of Medicine and Surgery", degree: "Doctor of Medicine", year: 2003 },
+    ],
+    doc_affiliations: [
+      { name: "Philippine College of Cardiology", role: "Fellow" },
+    ],
+  },
+  "dentist@mycure.test": {
+    mobileNo: "+639171234023",
+    sex: "male",
+    dateOfBirth: "1987-01-19",
+    bloodType: "O-",
+    nationality: "Filipino",
+    maritalStatus: "single",
+    address: {
+      street1: "22 McKinley Road",
+      city: "Taguig",
+      province: "Metro Manila",
+      region: "NCR",
+      country: "PHL",
+      zipCode: "1634",
+    },
+    doc_title: "Dr.",
+    doc_bio:
+      "General and cosmetic dentist. Preventive care, restorations, crowns and clear-aligner orthodontics, with digital intraoral scanning.",
+    doc_PRCLicenseNo: "PRC-0121987",
+    doc_PRCLicenseExp: "2029-03-31",
+    doc_PTRNumber: "PTR-TAG-2026-004414",
+    doc_philhealthPAN: "PHIC-12-445678904-7",
+    doc_practicingSince: "2014-06-01",
+    doc_specialties: ["Dentistry", "Orthodontics", "Cosmetic Dentistry"],
+    doc_professions: ["Dentist"],
+    doc_education: [
+      { school: "University of the East College of Dentistry", degree: "Doctor of Dental Medicine", year: 2012 },
+    ],
+    doc_affiliations: [
+      { name: "Philippine Dental Association", role: "Member" },
+    ],
+  },
+  "ortho@mycure.test": {
+    mobileNo: "+639171234024",
+    sex: "male",
+    dateOfBirth: "1979-09-08",
+    bloodType: "AB+",
+    nationality: "Filipino",
+    maritalStatus: "married",
+    address: {
+      street1: "40 Ipil St, Marikina Heights",
+      city: "Marikina",
+      province: "Metro Manila",
+      region: "NCR",
+      country: "PHL",
+      zipCode: "1810",
+    },
+    doc_title: "Dr.",
+    doc_bio:
+      "Orthopaedic surgeon focused on sports injuries, arthroscopy and joint replacement. Handles the clinic's occupational musculoskeletal referrals.",
+    doc_PRCLicenseNo: "PRC-0099876",
+    doc_PRCLicenseExp: "2028-05-31",
+    doc_PTRNumber: "PTR-MAR-2026-004415",
+    doc_S2Number: "S2-R-55231",
+    doc_philhealthPAN: "PHIC-12-445678905-5",
+    doc_practicingSince: "2008-02-01",
+    doc_specialties: ["Orthopedics", "Sports Medicine"],
+    doc_professions: ["Physician", "Orthopedic Surgeon"],
+    doc_education: [
+      { school: "Cebu Institute of Medicine", degree: "Doctor of Medicine", year: 2006 },
+    ],
+    doc_affiliations: [
+      { name: "Philippine Orthopaedic Association", role: "Fellow" },
+    ],
+  },
+  "ent@mycure.test": {
+    mobileNo: "+639171234025",
+    sex: "female",
+    dateOfBirth: "1986-05-24",
+    bloodType: "A-",
+    nationality: "Filipino",
+    maritalStatus: "single",
+    address: {
+      street1: "11 Lahug Road",
+      city: "Cebu City",
+      province: "Cebu",
+      region: "Region VII",
+      country: "PHL",
+      zipCode: "6000",
+    },
+    doc_title: "Dr.",
+    doc_bio:
+      "Otolaryngologist (ENT) treating sinus disease, hearing loss and paediatric airway problems. Runs audiometry and endoscopy clinics at the Cebu branch.",
+    doc_PRCLicenseNo: "PRC-0118442",
+    doc_PRCLicenseExp: "2029-01-31",
+    doc_PTRNumber: "PTR-CEB-2026-004416",
+    doc_S2Number: "S2-E-77120",
+    doc_philhealthPAN: "PHIC-12-445678906-3",
+    doc_practicingSince: "2013-09-01",
+    doc_specialties: ["Otolaryngology", "Pediatric ENT"],
+    doc_professions: ["Physician", "Otolaryngologist"],
+    doc_education: [
+      { school: "Cebu Institute of Medicine", degree: "Doctor of Medicine", year: 2011 },
+    ],
+    doc_affiliations: [
+      { name: "Philippine Society of Otolaryngology - Head and Neck Surgery", role: "Fellow" },
+    ],
+  },
   "superadmin@mycure.test": {
     mobileNo: "+639171234001",
     sex: "male",
@@ -526,7 +732,7 @@ const USER_PROFILES: Record<string, UserProfileExtras> = {
     doc_title: "Dr.",
     doc_bio:
       "Internal medicine specialist with 15 years of clinical practice. " +
-      "Subspecialty in adult endocrinology. Active consultant at MyCure Demo Clinic.",
+      "Subspecialty in adult endocrinology. Active consultant at MYCURE Demo Clinic.",
     doc_PRCLicenseNo: "PRC-0098765",
     doc_PRCLicenseExp: "2028-12-31",
     doc_PTRNumber: "PTR-MNL-2026-001234",
@@ -563,7 +769,7 @@ const USER_PROFILES: Record<string, UserProfileExtras> = {
     doc_bio:
       "Pediatrician with 12 years of practice in well-child care, " +
       "developmental assessments, and adolescent medicine. Active consultant " +
-      "at MyCure Demo Clinic.",
+      "at MYCURE Demo Clinic.",
     doc_PRCLicenseNo: "PRC-0123456",
     doc_PRCLicenseExp: "2027-06-30",
     doc_PTRNumber: "PTR-QC-2026-002345",
@@ -721,10 +927,34 @@ const USER_PROFILES: Record<string, UserProfileExtras> = {
 
 let sessionCookie = "";
 
+/**
+ * Better Auth rate-limits `/auth/sign-in/*` aggressively — a handful of
+ * attempts inside its window is enough to start returning 429, and this
+ * script signs in once per seed user plus once per `withUser()` block. That
+ * is a normal seeding volume, not abuse, so a 429 is retried with backoff
+ * rather than treated as fatal. Honours `Retry-After` when the server sends
+ * one; otherwise 2s, 4s, 8s, 16s, 32s.
+ */
+const RATE_LIMIT_RETRIES = 8;
+
+/**
+ * Minimum gap between `/auth/*` calls. Backoff alone is not enough: the limiter
+ * allows roughly three sign-ins per ten seconds, and this script signs in once
+ * per seed user plus once per `withUser()` block. Retrying after a 429 just
+ * consumed the next window's budget immediately, so a queue of ~18 sign-ins
+ * never drained and the run died on the retry ceiling. Spacing them keeps the
+ * script under the limit instead of racing it.
+ */
+const AUTH_MIN_INTERVAL_MS = 4000;
+let lastAuthAt = 0;
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
 async function api(
   method: string,
   path: string,
   body?: unknown,
+  attempt = 0,
 ): Promise<unknown> {
   const url = `${API_URL}${path}`;
   const headers: Record<string, string> = {
@@ -733,12 +963,28 @@ async function api(
   };
   if (sessionCookie) headers["Cookie"] = sessionCookie;
 
+  if (path.startsWith("/auth/")) {
+    const since = Date.now() - lastAuthAt;
+    if (since < AUTH_MIN_INTERVAL_MS) await sleep(AUTH_MIN_INTERVAL_MS - since);
+    lastAuthAt = Date.now();
+  }
+
   const res = await fetch(url, {
     method,
     headers,
     body: body ? JSON.stringify(body) : undefined,
     redirect: "manual",
   });
+
+  if (res.status === 429 && attempt < RATE_LIMIT_RETRIES) {
+    const retryAfter = Number(res.headers.get("retry-after"));
+    const waitMs = Number.isFinite(retryAfter) && retryAfter > 0
+      ? retryAfter * 1000
+      : Math.min(30_000, 2000 * 2 ** attempt);
+    await res.text().catch(() => undefined);
+    await sleep(waitMs);
+    return api(method, path, body, attempt + 1);
+  }
 
   // Capture set-cookie for session
   const setCookie = res.headers.getSetCookie?.() ?? [];
@@ -788,8 +1034,8 @@ async function createOrganization(
     // get created in the same transaction.
     ...(types && types.length > 0 ? { types } : {}),
     description: parent
-      ? "MyCure demo branch (child facility for hierarchy testing)"
-      : "MyCure demo clinic for environment verification",
+      ? "MYCURE demo branch (child facility for hierarchy testing)"
+      : "MYCURE demo clinic for environment verification",
     ...(parent ? { parent } : {}),
   })) as { id?: string };
 }
@@ -805,7 +1051,7 @@ async function createOrganization(
 interface OrgProfile {
   /** Human-readable name to find/create the org under. */
   name: string;
-  /** "MyCure Demo Clinic" is the parent; the rest are child branches. */
+  /** "MYCURE Demo Clinic" is the parent; the rest are child branches. */
   parentName?: string;
   description: string;
   /**
@@ -821,6 +1067,13 @@ interface OrgProfile {
   email: string;
   phone: string;
   website?: string;
+  /**
+   * Facility logo. Read by the app's facility header AND copied onto the
+   * public profile by populateFromRef, so the directory card and the public
+   * page show a mark instead of initials. DiceBear renders deterministic SVG
+   * from the seed string — no binary asset to ship with this script.
+   */
+  logoURL?: string;
   timezone: string;
   address: {
     street1: string;
@@ -835,18 +1088,27 @@ interface OrgProfile {
   tags?: string[];
 }
 
+/** Deterministic placeholder logo for a demo facility. */
+function demoLogoURL(seed: string, color: string): string {
+  return (
+    "https://api.dicebear.com/9.x/initials/svg" +
+    `?seed=${encodeURIComponent(seed)}&backgroundColor=${color}&radius=12`
+  );
+}
+
 const ORG_PROFILES: OrgProfile[] = [
   // Parent — must come first so branches can reference its id.
   {
-    name: "MyCure Demo Clinic",
+    name: "MYCURE Demo Clinic",
     description:
-      "Flagship outpatient clinic of the MyCure demo network. Multi-specialty " +
+      "Flagship outpatient clinic of the MYCURE demo network. Multi-specialty " +
       "care including general medicine, internal medicine, paediatrics, OB-Gyne, " +
       "laboratory, radiology and dental services. Demo data only — not a real facility.",
     types: ["clinic"],
     email: "main@mycure-demo.example.ph",
     phone: "+6328123450",
     website: "https://demo.mycure.example.ph",
+    logoURL: demoLogoURL("MYCURE Demo Clinic", "0099cc"),
     timezone: "Asia/Manila",
     address: {
       street1: "1 Ayala Avenue",
@@ -866,14 +1128,15 @@ const ORG_PROFILES: OrgProfile[] = [
   },
   // Branch 1 — Quezon City
   {
-    name: "MyCure Demo Branch - QC",
-    parentName: "MyCure Demo Clinic",
+    name: "MYCURE Demo Branch - QC",
+    parentName: "MYCURE Demo Clinic",
     description:
-      "MyCure Demo Clinic — Quezon City branch. Outpatient services and walk-in PME clinic.",
+      "MYCURE Demo Clinic — Quezon City branch. Outpatient services and walk-in PME clinic.",
     types: ["clinic"],
     email: "qc@mycure-demo.example.ph",
     phone: "+6329123451",
     website: "https://demo.mycure.example.ph/qc",
+    logoURL: demoLogoURL("MYCURE QC", "0aa2a2"),
     timezone: "Asia/Manila",
     address: {
       street1: "120 Tomas Morato Avenue",
@@ -890,14 +1153,15 @@ const ORG_PROFILES: OrgProfile[] = [
   },
   // Branch 2 — Cebu
   {
-    name: "MyCure Demo Branch - Cebu",
-    parentName: "MyCure Demo Clinic",
+    name: "MYCURE Demo Branch - Cebu",
+    parentName: "MYCURE Demo Clinic",
     description:
-      "MyCure Demo Clinic — Cebu City branch. Provincial outpatient and diagnostic centre.",
+      "MYCURE Demo Clinic — Cebu City branch. Provincial outpatient and diagnostic centre.",
     types: ["clinic"],
     email: "cebu@mycure-demo.example.ph",
     phone: "+6332123452",
     website: "https://demo.mycure.example.ph/cebu",
+    logoURL: demoLogoURL("MYCURE Cebu", "6a5acd"),
     timezone: "Asia/Manila",
     address: {
       street1: "88 Osmeña Boulevard",
@@ -911,6 +1175,108 @@ const ORG_PROFILES: OrgProfile[] = [
       facebook: "https://facebook.com/mycure-demo-cebu",
     },
     tags: ["demo", "seed", "branch", "visayas"],
+  },
+  // Branch 3 — Davao. Gives the public directory a Mindanao entry, so
+  // city search is exercised across all three island groups.
+  {
+    name: "MYCURE Demo Branch - Davao",
+    parentName: "MYCURE Demo Clinic",
+    description:
+      "MYCURE Demo Clinic — Davao City branch. Family medicine, occupational health " +
+      "and pre-employment medical exams for southern Mindanao.",
+    types: ["clinic"],
+    email: "davao@mycure-demo.example.ph",
+    phone: "+6382123453",
+    website: "https://demo.mycure.example.ph/davao",
+    logoURL: demoLogoURL("MYCURE Davao", "e07a5f"),
+    timezone: "Asia/Manila",
+    address: {
+      street1: "24 Quimpo Boulevard",
+      city: "Davao City",
+      province: "Davao del Sur",
+      region: "Region XI",
+      country: "PHL",
+      zipCode: "8000",
+    },
+    socialMediaURLs: { facebook: "https://facebook.com/mycure-demo-davao" },
+    tags: ["demo", "seed", "branch", "mindanao"],
+  },
+  // Branch 4 — a DENTAL clinic. Deliberately not another general clinic:
+  // the directory should show that facilities differ in kind, and the
+  // profile's `types` is what the public page reads for its eyebrow label.
+  {
+    name: "MYCURE Dental Studio - BGC",
+    parentName: "MYCURE Demo Clinic",
+    description:
+      "Dental studio of the MYCURE demo network. Preventive dentistry, restorations, " +
+      "orthodontics and cosmetic work, with digital intraoral scanning.",
+    types: ["clinic", "dental-clinic"],
+    email: "dental@mycure-demo.example.ph",
+    phone: "+6328123454",
+    website: "https://demo.mycure.example.ph/dental",
+    logoURL: demoLogoURL("MYCURE Dental", "2a9d8f"),
+    timezone: "Asia/Manila",
+    address: {
+      street1: "7th Avenue corner 32nd Street",
+      street2: "Unit 402, One Bonifacio High Street",
+      city: "Taguig",
+      province: "Metro Manila",
+      region: "NCR",
+      country: "PHL",
+      zipCode: "1634",
+    },
+    socialMediaURLs: { instagram: "https://instagram.com/mycure.dental" },
+    tags: ["demo", "seed", "branch", "dental"],
+  },
+  // Branch 5 — dermatology / aesthetics.
+  {
+    name: "MYCURE Skin & Laser Center - Alabang",
+    parentName: "MYCURE Demo Clinic",
+    description:
+      "Dermatology and laser centre. Medical dermatology, acne and pigmentation " +
+      "programmes, minor skin surgery and cosmetic laser treatments.",
+    types: ["clinic", "dermatology-clinic"],
+    email: "skin@mycure-demo.example.ph",
+    phone: "+6328123455",
+    website: "https://demo.mycure.example.ph/skin",
+    logoURL: demoLogoURL("MYCURE Skin", "e76f51"),
+    timezone: "Asia/Manila",
+    address: {
+      street1: "Commerce Avenue",
+      street2: "3rd Floor, Alabang Town Center",
+      city: "Muntinlupa",
+      province: "Metro Manila",
+      region: "NCR",
+      country: "PHL",
+      zipCode: "1780",
+    },
+    socialMediaURLs: { instagram: "https://instagram.com/mycure.skin" },
+    tags: ["demo", "seed", "branch", "dermatology"],
+  },
+  // Branch 6 — diagnostics-led facility.
+  {
+    name: "MYCURE Diagnostics Hub - Ortigas",
+    parentName: "MYCURE Demo Clinic",
+    description:
+      "Diagnostics hub of the MYCURE demo network. Clinical laboratory, X-ray, " +
+      "ultrasound, ECG and executive check-up packages, with same-day results.",
+    types: ["clinic", "diagnostic-center"],
+    email: "diagnostics@mycure-demo.example.ph",
+    phone: "+6328123456",
+    website: "https://demo.mycure.example.ph/diagnostics",
+    logoURL: demoLogoURL("MYCURE Diagnostics", "3d5a80"),
+    timezone: "Asia/Manila",
+    address: {
+      street1: "Julia Vargas Avenue",
+      street2: "Ground Floor, Emerald Tower",
+      city: "Pasig",
+      province: "Metro Manila",
+      region: "NCR",
+      country: "PHL",
+      zipCode: "1605",
+    },
+    socialMediaURLs: { facebook: "https://facebook.com/mycure-demo-diagnostics" },
+    tags: ["demo", "seed", "branch", "diagnostics"],
   },
 ];
 
@@ -1065,6 +1431,20 @@ function randomDateBetween(yearsAgoMin: number, yearsAgoMax: number): Date {
 }
 function slugify(s: string): string {
   return s.toLowerCase().replace(/[^a-z]/g, "");
+}
+
+/**
+ * Public-profile URL slug. Must satisfy hapihub's
+ * `^[a-z0-9][a-z0-9-]*[a-z0-9]$` — words joined by hyphens, not the
+ * letters-only squash `slugify()` does for externalIds.
+ */
+function urlSlug(s: string): string {
+  return s
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
 }
 
 interface SeedPatient {
@@ -3350,6 +3730,7 @@ async function seedClinicProfiles(
         phone: profile.phone,
         phones: [profile.phone],
         website: profile.website,
+        logoURL: profile.logoURL,
         timezone: profile.timezone,
         address: profile.address,
         socialMediaURLs: profile.socialMediaURLs,
@@ -3890,7 +4271,7 @@ const SEED_PRIVACY_NOTICES: PrivacyNoticeTemplate[] = [
     title: "Patient Privacy Notice",
     acceptButtonText: "I Agree",
     text:
-      "MyCure Demo Clinic respects your privacy. By proceeding, you consent " +
+      "MYCURE Demo Clinic respects your privacy. By proceeding, you consent " +
       "to the collection, use, and storage of your personal health information " +
       "for the purpose of medical evaluation, treatment, billing, and statutory " +
       "reporting (Republic Act No. 10173 — Data Privacy Act of 2012). Your " +
@@ -3904,7 +4285,7 @@ const SEED_PRIVACY_NOTICES: PrivacyNoticeTemplate[] = [
     title: "Pahatid Tungkol sa Pribasiya",
     acceptButtonText: "Sang-ayon Ako",
     text:
-      "Iginagalang ng MyCure Demo Clinic ang inyong privacy. Sa pagpapatuloy, " +
+      "Iginagalang ng MYCURE Demo Clinic ang inyong privacy. Sa pagpapatuloy, " +
       "pumapayag kayo sa pagkolekta, paggamit, at pag-iimbak ng inyong " +
       "personal na impormasyong pangkalusugan para sa medikal na pagsusuri, " +
       "paggamot, pagsingil, at iniaatas na pag-uulat (Batas Republika Blg. " +
@@ -6221,12 +6602,35 @@ async function seedProducts(
 // Legacy names from earlier revisions of this script are included so that
 // running `--reset` against an env seeded with the older script still
 // cleans up cleanly (one-shot upgrade path).
-const LEGACY_SEED_ORG_NAMES = ["MyCure Demo Branch"];
-const SEED_ORG_NAMES = [
-  ...LEGACY_SEED_ORG_NAMES,
-  ...ORG_PROFILES.filter((o) => o.parentName).map((o) => o.name),
-  ...ORG_PROFILES.filter((o) => !o.parentName).map((o) => o.name),
+// Names from earlier revisions, kept so `--reset` still clears an env seeded
+// before they changed. The "MyCure"-cased entries pre-date the brand-casing
+// fix; without them a reset would leave the old orgs (and their public
+// profiles) behind while the seed creates correctly-cased duplicates.
+const LEGACY_SEED_ORG_NAMES = [
+  "MyCure Demo Branch",
+  "MYCURE Demo Branch",
+  "MyCure Demo Clinic",
+  "MyCure Demo Branch - QC",
+  "MyCure Demo Branch - Cebu",
+  "MyCure Demo Branch - Davao",
+  "MyCure Dental Studio - BGC",
+  "MyCure Skin & Laser Center - Alabang",
+  "MyCure Diagnostics Hub - Ortigas",
 ];
+// A function, not a const: DIRECTORY_CLINICS is declared further down (next
+// to the code that uses it) and a module-level spread would read it before
+// initialisation. Function declarations hoist; the call sites are all runtime.
+function seedOrgNames(): string[] {
+  return [
+    ...LEGACY_SEED_ORG_NAMES,
+    // Directory-only orgs. Children first so a group's clinics are deleted
+    // before the group itself.
+    ...DIRECTORY_CLINICS.map((c) => c.name),
+    ...([...new Set(DIRECTORY_CLINICS.map((c) => c.groupName).filter(Boolean))] as string[]),
+    ...ORG_PROFILES.filter((o) => o.parentName).map((o) => o.name),
+    ...ORG_PROFILES.filter((o) => !o.parentName).map((o) => o.name),
+  ];
+}
 
 async function listAccountIdByEmail(email: string): Promise<string | undefined> {
   try {
@@ -7150,7 +7554,7 @@ async function resetSeedData() {
   // member-level fields (withholdingTax) ride on the org / member rows
   // themselves, so they're cleaned up automatically by the org delete.
   const seedOrgIdsForCleanup: string[] = [];
-  for (const name of SEED_ORG_NAMES) {
+  for (const name of seedOrgNames()) {
     seedOrgIdsForCleanup.push(...(await listOrgIdsByName(name)));
   }
   for (const orgId of seedOrgIdsForCleanup) {
@@ -7449,7 +7853,7 @@ async function resetSeedData() {
 
   // Step 3b: Delete seed orgs (any duplicates from previous broken-state
   // runs are caught by listing all by name with $limit=100).
-  for (const name of SEED_ORG_NAMES) {
+  for (const name of seedOrgNames()) {
     const ids = (await api(
       "GET",
       `/organizations?name=${encodeURIComponent(name)}&%24limit=100`,
@@ -7701,8 +8105,1127 @@ async function provisionCadenceSaKey(): Promise<void> {
 // Main
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Public profiles + bookable schedules (mycure.md directory)
+// ---------------------------------------------------------------------------
+// A public profile is what the patient-facing site lists at
+// mycure.md/c/<slug> (clinic) and mycure.md/d/<slug> (provider), and what the
+// /directory page searches over. Two things gate visibility:
+//
+//   1. The profile row must be `published`. A draft profile is 404 to an
+//      anonymous caller, so an unpublished profile is invisible in the demo.
+//   2. Bookability comes from LINKED BOOKING EVENTS, not from the clinic's
+//      service catalogue. `profile.events` is the allow-list: an event not
+//      referenced by a published profile stays private
+//      (services/hapihub/src/services/public/profiles.ts, listPublicProfileEvents).
+//
+// A booking always routes by SCHEDULE, never by doctor: hapihub copies the
+// event's `organization` onto the booking (booking/bookings.ts). So a provider
+// who consults at several branches needs one event PER branch, and the branch
+// the patient picks is the branch they are seen at. The doctor profiles below
+// are deliberately spread across branches to exercise that.
+
+interface PublicProfileEvent {
+  title: string;
+  description: string;
+  locationTypes: Array<"in-person" | "video" | "phone">;
+  /** Local clinic time, "HH:MM". */
+  start: string;
+  end: string;
+  slotDuration: number;
+  /** Weekdays only unless given; keys match hapihub's dailyConfigs. */
+  days?: string[];
+}
+
+interface ClinicPublicProfileSeed {
+  /** Matches an ORG_PROFILES name. */
+  orgName: string;
+  slug: string;
+  background: string;
+  tagline: string;
+  servicesOffered: Array<{ name: string; description: string; isBookable: boolean }>;
+  insuranceAccepted: Array<{ name: string; type: string }>;
+  events: PublicProfileEvent[];
+}
+
+interface DoctorPublicProfileSeed {
+  /** Matches a USERS email. */
+  email: string;
+  slug: string;
+  background: string;
+  credentials: string;
+  languages: string[];
+  /** Branch each schedule belongs to — an ORG_PROFILES name. */
+  events: Array<PublicProfileEvent & { orgName: string }>;
+}
+
+const WEEKDAYS = ["monday", "tuesday", "wednesday", "thursday", "friday"];
+
+// The five predefined cover patterns the Public Profile Builder offers.
+// Anything else is rejected by the API once the profile-background enum is
+// deployed; on older hapihub the value is simply carried through.
+const PROFILE_BACKGROUNDS = [
+  "care-plus",
+  "heartbeat",
+  "capsule",
+  "wellness-leaf",
+  "care-network",
+] as const;
+
+const HMO_STANDARD = [
+  { name: "Maxicare", type: "hmo" },
+  { name: "Intellicare", type: "hmo" },
+  { name: "PhilHealth", type: "government" },
+];
+
+const CLINIC_PUBLIC_PROFILES: ClinicPublicProfileSeed[] = [
+  {
+    orgName: "MYCURE Demo Clinic",
+    slug: "mycure-demo-clinic",
+    background: "care-plus",
+    tagline: "Multi-specialty outpatient care in the heart of Makati",
+    servicesOffered: [
+      { name: "General Consultation", description: "Walk-in and scheduled consults with family medicine physicians.", isBookable: true },
+      { name: "Laboratory", description: "CBC, chemistry, urinalysis and send-out panels.", isBookable: true },
+      { name: "Radiology", description: "X-ray, ultrasound and 2D-echo.", isBookable: true },
+      { name: "Executive Check-up", description: "Annual physical exam packages for individuals and companies.", isBookable: true },
+      { name: "Dental", description: "Cleaning, restorations and extractions.", isBookable: false },
+    ],
+    insuranceAccepted: [...HMO_STANDARD, { name: "Medicard", type: "hmo" }],
+    events: [
+      { title: "General Consultation", description: "20-minute consult with the duty physician.", locationTypes: ["in-person", "video"], start: "08:00", end: "17:00", slotDuration: 20 },
+      { title: "Annual Physical Exam (APE)", description: "History, physical exam, labs and chest X-ray.", locationTypes: ["in-person"], start: "07:00", end: "11:00", slotDuration: 60 },
+    ],
+  },
+  {
+    orgName: "MYCURE Demo Branch - QC",
+    slug: "mycure-demo-qc",
+    background: "heartbeat",
+    tagline: "Neighbourhood clinic and diagnostics in Quezon City",
+    servicesOffered: [
+      { name: "General Consultation", description: "Adult and paediatric consults.", isBookable: true },
+      { name: "Laboratory", description: "Routine blood and urine work.", isBookable: true },
+      { name: "Vaccination", description: "Adult and childhood immunisation.", isBookable: true },
+    ],
+    insuranceAccepted: HMO_STANDARD,
+    events: [
+      { title: "Clinic Consultation", description: "Book a slot with the branch duty physician.", locationTypes: ["in-person"], start: "09:00", end: "16:00", slotDuration: 20 },
+      { title: "Vaccination Visit", description: "Adult or childhood immunisation, by appointment.", locationTypes: ["in-person"], start: "09:00", end: "12:00", slotDuration: 15 },
+    ],
+  },
+  {
+    orgName: "MYCURE Demo Branch - Cebu",
+    slug: "mycure-demo-cebu",
+    background: "wellness-leaf",
+    tagline: "Full-service clinic and laboratory in Cebu City",
+    servicesOffered: [
+      { name: "General Consultation", description: "Family and internal medicine.", isBookable: true },
+      { name: "ENT Clinic", description: "Audiometry, endoscopy and sinus care.", isBookable: true },
+      { name: "Laboratory", description: "In-house chemistry and haematology.", isBookable: true },
+    ],
+    insuranceAccepted: [{ name: "Intellicare", type: "hmo" }, { name: "PhilHealth", type: "government" }],
+    events: [
+      { title: "Clinic Consultation", description: "Book a slot with any available Cebu-branch physician.", locationTypes: ["in-person", "video"], start: "08:00", end: "17:00", slotDuration: 30 },
+    ],
+  },
+  {
+    orgName: "MYCURE Demo Branch - Davao",
+    slug: "mycure-demo-davao",
+    background: "care-network",
+    tagline: "Family medicine and occupational health in Davao City",
+    servicesOffered: [
+      { name: "General Consultation", description: "Family medicine consults, walk-in or booked.", isBookable: true },
+      { name: "Pre-Employment Medical Exam", description: "Full PME battery with same-day clearance.", isBookable: true },
+      { name: "Drug Testing", description: "DOH-accredited drug testing for employment.", isBookable: false },
+    ],
+    insuranceAccepted: HMO_STANDARD,
+    events: [
+      { title: "Clinic Consultation", description: "Consult with the Davao branch duty physician.", locationTypes: ["in-person"], start: "08:00", end: "16:00", slotDuration: 20 },
+      { title: "Pre-Employment Medical Exam", description: "Complete PME battery. Fasting required.", locationTypes: ["in-person"], start: "07:00", end: "10:00", slotDuration: 45 },
+    ],
+  },
+  {
+    orgName: "MYCURE Dental Studio - BGC",
+    slug: "mycure-dental-bgc",
+    background: "capsule",
+    tagline: "Preventive, restorative and cosmetic dentistry in BGC",
+    servicesOffered: [
+      { name: "Dental Cleaning", description: "Oral prophylaxis and fluoride treatment.", isBookable: true },
+      { name: "Restorations", description: "Composite fillings, inlays and crowns.", isBookable: true },
+      { name: "Clear Aligners", description: "Digital scanning and aligner therapy.", isBookable: true },
+      { name: "Tooth Extraction", description: "Simple and surgical extractions.", isBookable: false },
+    ],
+    insuranceAccepted: [{ name: "Maxicare", type: "hmo" }, { name: "Medicard", type: "hmo" }],
+    events: [
+      { title: "Dental Cleaning", description: "45-minute oral prophylaxis appointment.", locationTypes: ["in-person"], start: "09:00", end: "17:00", slotDuration: 45 },
+      { title: "Orthodontic Consultation", description: "Assessment and digital scan for aligner therapy.", locationTypes: ["in-person"], start: "13:00", end: "17:00", slotDuration: 30 },
+    ],
+  },
+  {
+    orgName: "MYCURE Skin & Laser Center - Alabang",
+    slug: "mycure-skin-alabang",
+    background: "wellness-leaf",
+    tagline: "Medical dermatology and laser treatments in Alabang",
+    servicesOffered: [
+      { name: "Skin Consultation", description: "Assessment of skin, hair and nail concerns.", isBookable: true },
+      { name: "Acne Programme", description: "Structured multi-visit acne and pigmentation care.", isBookable: true },
+      { name: "Laser Treatment", description: "Pigment, vascular and hair-removal laser sessions.", isBookable: true },
+      { name: "Minor Skin Surgery", description: "Excision of cysts, moles and skin tags.", isBookable: false },
+    ],
+    insuranceAccepted: [{ name: "Maxicare", type: "hmo" }],
+    events: [
+      { title: "Skin Consultation", description: "Dermatology consult, in clinic or by video.", locationTypes: ["in-person", "video"], start: "10:00", end: "18:00", slotDuration: 30 },
+      { title: "Laser Session", description: "Booked laser treatment. Consultation required first.", locationTypes: ["in-person"], start: "13:00", end: "18:00", slotDuration: 45 },
+    ],
+  },
+  {
+    orgName: "MYCURE Diagnostics Hub - Ortigas",
+    slug: "mycure-diagnostics-ortigas",
+    background: "heartbeat",
+    tagline: "Laboratory and imaging with same-day results in Ortigas",
+    servicesOffered: [
+      { name: "Clinical Laboratory", description: "Haematology, chemistry, urinalysis and serology.", isBookable: true },
+      { name: "X-ray", description: "Chest and skeletal radiography.", isBookable: true },
+      { name: "Ultrasound", description: "Abdominal, pelvic and thyroid ultrasound.", isBookable: true },
+      { name: "2D Echo with ECG", description: "Cardiac imaging read by a cardiologist.", isBookable: true },
+      { name: "Executive Check-up Package", description: "Bundled labs, imaging and physician review.", isBookable: true },
+    ],
+    insuranceAccepted: [...HMO_STANDARD, { name: "Medicard", type: "hmo" }],
+    events: [
+      { title: "Laboratory Visit", description: "Walk-in labs with a reserved slot. Fasting tests are morning only.", locationTypes: ["in-person"], start: "06:30", end: "15:00", slotDuration: 15 },
+      { title: "Ultrasound Appointment", description: "Booked ultrasound. Preparation instructions are sent on confirmation.", locationTypes: ["in-person"], start: "08:00", end: "16:00", slotDuration: 30 },
+      { title: "Executive Check-up", description: "Half-day bundled check-up with physician review.", locationTypes: ["in-person"], start: "07:00", end: "10:00", slotDuration: 60 },
+    ],
+  },
+];
+
+const DOCTOR_PUBLIC_PROFILES: DoctorPublicProfileSeed[] = [
+  {
+    email: "doctor@mycure.test",
+    slug: "juan-cruz-md",
+    background: "care-plus",
+    credentials: "MD, FPCP",
+    languages: ["english", "filipino"],
+    events: [
+      { orgName: "MYCURE Demo Clinic", title: "Internal Medicine Consultation", description: "New and follow-up adult consults.", locationTypes: ["in-person", "video"], start: "09:00", end: "17:00", slotDuration: 30 },
+      { orgName: "MYCURE Demo Branch - QC", title: "Diabetes Clinic", description: "Endocrine and diabetes follow-up.", locationTypes: ["in-person"], start: "13:00", end: "16:00", slotDuration: 30 },
+    ],
+  },
+  {
+    email: "pedia@mycure.test",
+    slug: "sofia-reyes-pedia",
+    background: "wellness-leaf",
+    credentials: "MD, FPPS",
+    languages: ["english", "filipino", "cebuano"],
+    events: [
+      { orgName: "MYCURE Demo Branch - QC", title: "Well-Baby Check-up", description: "Growth, development and immunisation visit.", locationTypes: ["in-person"], start: "08:00", end: "12:00", slotDuration: 30 },
+      { orgName: "MYCURE Demo Clinic", title: "Paediatric Teleconsult", description: "Video follow-up for previously seen children.", locationTypes: ["video", "phone"], start: "14:00", end: "17:00", slotDuration: 20 },
+    ],
+  },
+  {
+    email: "familymd@mycure.test",
+    slug: "mateo-santos-fammed",
+    background: "care-network",
+    credentials: "MD, FPAFP",
+    languages: ["english", "filipino"],
+    events: [
+      { orgName: "MYCURE Demo Clinic", title: "Family Medicine Consultation", description: "Whole-family primary care.", locationTypes: ["in-person", "video"], start: "09:00", end: "17:00", slotDuration: 20 },
+    ],
+  },
+  {
+    email: "derma@mycure.test",
+    slug: "camille-ocampo-derma",
+    background: "capsule",
+    credentials: "MD, FPDS",
+    languages: ["english", "filipino", "spanish"],
+    events: [
+      { orgName: "MYCURE Skin & Laser Center - Alabang", title: "Dermatology Consultation", description: "Skin, hair and nail assessment.", locationTypes: ["in-person", "video"], start: "10:00", end: "18:00", slotDuration: 30 },
+      { orgName: "MYCURE Demo Clinic", title: "Skin Clinic (Makati)", description: "Weekly dermatology clinic at the flagship branch.", locationTypes: ["in-person"], start: "09:00", end: "12:00", slotDuration: 30, days: ["wednesday"] },
+    ],
+  },
+  {
+    email: "obgyne@mycure.test",
+    slug: "patricia-villar-obgyne",
+    background: "heartbeat",
+    credentials: "MD, FPOGS",
+    languages: ["english", "filipino"],
+    events: [
+      { orgName: "MYCURE Demo Branch - QC", title: "Prenatal Check-up", description: "Routine prenatal visit with ultrasound as needed.", locationTypes: ["in-person"], start: "09:00", end: "15:00", slotDuration: 30 },
+      { orgName: "MYCURE Demo Clinic", title: "Gynaecology Consultation", description: "Well-woman and gynaecologic concerns.", locationTypes: ["in-person", "video"], start: "13:00", end: "17:00", slotDuration: 30 },
+    ],
+  },
+  {
+    email: "cardio@mycure.test",
+    slug: "enrique-salazar-cardio",
+    background: "heartbeat",
+    credentials: "MD, FPCC",
+    languages: ["english", "filipino"],
+    events: [
+      { orgName: "MYCURE Diagnostics Hub - Ortigas", title: "Cardiology Consultation", description: "Initial or follow-up cardiology consult.", locationTypes: ["in-person", "video"], start: "10:00", end: "16:00", slotDuration: 30 },
+      { orgName: "MYCURE Diagnostics Hub - Ortigas", title: "2D Echo Reading Clinic", description: "Review of echo and stress-test results.", locationTypes: ["in-person"], start: "16:00", end: "18:00", slotDuration: 20, days: ["tuesday", "thursday"] },
+    ],
+  },
+  {
+    email: "dentist@mycure.test",
+    slug: "nathaniel-uy-dmd",
+    background: "capsule",
+    credentials: "DMD",
+    languages: ["english", "filipino"],
+    events: [
+      { orgName: "MYCURE Dental Studio - BGC", title: "Dental Check-up", description: "Examination, cleaning and treatment planning.", locationTypes: ["in-person"], start: "09:00", end: "17:00", slotDuration: 45 },
+    ],
+  },
+  {
+    email: "ortho@mycure.test",
+    slug: "ramon-delgado-ortho",
+    background: "care-network",
+    credentials: "MD, FPOA",
+    languages: ["english", "filipino"],
+    events: [
+      { orgName: "MYCURE Demo Clinic", title: "Orthopaedic Consultation", description: "Sports injury, joint and spine assessment.", locationTypes: ["in-person"], start: "09:00", end: "15:00", slotDuration: 30 },
+      { orgName: "MYCURE Demo Branch - Davao", title: "Orthopaedic Clinic (Davao)", description: "Monthly visiting orthopaedic clinic.", locationTypes: ["in-person"], start: "09:00", end: "15:00", slotDuration: 30, days: ["friday"] },
+    ],
+  },
+  {
+    email: "ent@mycure.test",
+    slug: "ivy-chua-ent",
+    background: "care-plus",
+    credentials: "MD, FPSO-HNS",
+    languages: ["english", "filipino", "cebuano"],
+    events: [
+      { orgName: "MYCURE Demo Branch - Cebu", title: "ENT Consultation", description: "Ear, nose and throat assessment with endoscopy.", locationTypes: ["in-person"], start: "09:00", end: "16:00", slotDuration: 30 },
+    ],
+  },
+];
+
+/** Find-or-create an active booking event, matched on (organization, owner, title). */
+async function findOrCreateBookingEvent(
+  organization: string,
+  owner: string | undefined,
+  ev: PublicProfileEvent,
+): Promise<string | undefined> {
+  const ownerQuery = owner ? `&owner=${encodeURIComponent(owner)}` : "";
+  const res = (await api(
+    "GET",
+    `/booking/events?organization=${encodeURIComponent(organization)}${ownerQuery}&%24limit=100`,
+  )) as { data?: Array<{ id: string; title: string }> } | Array<{ id: string; title: string }>;
+  const list = Array.isArray(res) ? res : res.data ?? [];
+  // `title` is not a queryable field on the list op, so match client-side.
+  const hit = list.find((e) => e.title === ev.title);
+  if (hit) return hit.id;
+
+  const days = ev.days ?? WEEKDAYS;
+  const dailyConfigs: Record<string, unknown> = {};
+  for (const day of days) {
+    dailyConfigs[day] = {
+      enabled: true,
+      timeBlocks: [
+        { startTime: ev.start, endTime: ev.end, slotDuration: ev.slotDuration, bufferTime: 0 },
+      ],
+    };
+  }
+
+  const created = (await api("POST", "/booking/events", {
+    title: ev.title,
+    description: ev.description,
+    ...(owner ? { owner } : {}),
+    organization,
+    timezone: "Asia/Manila",
+    status: "active",
+    locationTypes: ev.locationTypes,
+    maxBookingDays: 60,
+    // The 1440-minute default would make every slot inside the next 24h
+    // unbookable, which reads as "no availability" in a demo.
+    minBookingMinutes: 60,
+    effectiveFrom: new Date().toISOString(),
+    dailyConfigs,
+    formConfig: {
+      fields: [
+        { name: "fullName", type: "text", label: "Full name", required: true },
+        { name: "mobileNo", type: "phone", label: "Mobile number", required: true },
+        { name: "reason", type: "textarea", label: "Reason for visit", required: false },
+      ],
+    },
+  })) as { id?: string };
+  return created.id;
+}
+
+/** The profile row for an entity, if one exists. `ref` and `type` are both queryable. */
+async function findPublicProfile(
+  type: "organization" | "person",
+  ref: string,
+): Promise<{ id: string; status: string; slug?: string } | undefined> {
+  const res = (await api(
+    "GET",
+    `/public-profiles?type=${type}&ref=${encodeURIComponent(ref)}&%24limit=10`,
+  )) as
+    | { data?: Array<{ id: string; status: string; slug?: string; ref: string }> }
+    | Array<{ id: string; status: string; slug?: string; ref: string }>;
+  const list = Array.isArray(res) ? res : res.data ?? [];
+  return list.find((p) => p.ref === ref);
+}
+
+async function syncPublicProfile(id: string): Promise<void> {
+  try {
+    await api("POST", `/public-profiles/${id}/sync`, {});
+  } catch {
+    // Sync is a refresh, not a requirement — a source entity that has since
+    // been removed shouldn't abort the seed.
+  }
+}
+
+async function publishPublicProfile(id: string): Promise<void> {
+  // draft | unpublished -> published. Publishing an already-published profile
+  // is rejected by the state machine, so only call this when it can apply.
+  await api("POST", `/public-profiles/${id}/publish`, {});
+}
+
+async function seedPublicProfiles(
+  facilities: Array<{ id: string; label: string; profile: OrgProfile }>,
+  userIds: Record<string, string>,
+): Promise<void> {
+  const spinner = ora("Seeding public profiles + bookable schedules...").start();
+  const orgIdByName = new Map(facilities.map((f) => [f.profile.name, f.id]));
+  const orgProfileByName = new Map(facilities.map((f) => [f.profile.name, f.profile]));
+  let clinics = 0;
+  let doctors = 0;
+  let events = 0;
+  let published = 0;
+  const skipped: string[] = [];
+
+  // --- Clinics -------------------------------------------------------------
+  for (const seed of CLINIC_PUBLIC_PROFILES) {
+    const orgId = orgIdByName.get(seed.orgName);
+    if (!orgId) {
+      skipped.push(`clinic '${seed.orgName}' (org not seeded)`);
+      continue;
+    }
+    spinner.text = `Public profile: ${seed.orgName}…`;
+
+    const eventIds: string[] = [];
+    for (const ev of seed.events) {
+      const id = await findOrCreateBookingEvent(orgId, undefined, ev);
+      if (id) {
+        eventIds.push(id);
+        events++;
+      }
+    }
+
+    const body = {
+      slug: seed.slug,
+      background: seed.background,
+      events: eventIds,
+      organization: {
+        // Snapshotted at create by populateFromRef, so a later org rename
+        // would never reach the directory unless it is rewritten here.
+        name: seed.orgName,
+        tagline: seed.tagline,
+        servicesOffered: seed.servicesOffered,
+        insuranceAccepted: seed.insuranceAccepted,
+        // Sent on every write, not just create: populateFromRef copies the
+        // source org only when the profile row is first created, so a profile
+        // seeded before the org had a logo would never pick one up.
+        ...(orgProfileByName.get(seed.orgName)?.logoURL
+          ? { logoURL: orgProfileByName.get(seed.orgName)!.logoURL }
+          : {}),
+      },
+      seo: {
+        title: `${seed.orgName} — Book online`,
+        description: seed.tagline,
+      },
+    };
+
+    const existing = await findPublicProfile("organization", orgId);
+    let profileId = existing?.id;
+    if (profileId) {
+      await syncPublicProfile(profileId);
+      await api("PATCH", `/public-profiles/${profileId}`, body);
+    } else {
+      const created = (await api("POST", "/public-profiles", {
+        type: "organization",
+        ref: orgId,
+        ...body,
+      })) as { id?: string };
+      profileId = created.id;
+    }
+    clinics++;
+
+    if (profileId && existing?.status !== "published") {
+      await publishPublicProfile(profileId);
+      published++;
+    }
+  }
+
+  // --- Doctors -------------------------------------------------------------
+  for (const seed of DOCTOR_PUBLIC_PROFILES) {
+    const uid = userIds[seed.email];
+    if (!uid) {
+      skipped.push(`doctor '${seed.email}' (no account)`);
+      continue;
+    }
+    spinner.text = `Public profile: ${seed.email}…`;
+
+    const eventIds: string[] = [];
+    for (const ev of seed.events) {
+      const orgId = orgIdByName.get(ev.orgName);
+      if (!orgId) {
+        skipped.push(`schedule '${ev.title}' for ${seed.email} (org '${ev.orgName}' not seeded)`);
+        continue;
+      }
+      const id = await findOrCreateBookingEvent(orgId, uid, ev);
+      if (id) {
+        eventIds.push(id);
+        events++;
+      }
+    }
+
+    // Name, bio, specialties and photo are auto-populated from
+    // personal-details when the profile is created (populateFromRef), so only
+    // the fields with no source column are set here.
+    const body = {
+      slug: seed.slug,
+      background: seed.background,
+      events: eventIds,
+      person: {
+        credentials: seed.credentials,
+        languages: seed.languages,
+      },
+    };
+
+    const existing = await findPublicProfile("person", uid);
+    let profileId = existing?.id;
+    if (profileId) {
+      await syncPublicProfile(profileId);
+      await api("PATCH", `/public-profiles/${profileId}`, body);
+    } else {
+      const created = (await api("POST", "/public-profiles", {
+        type: "person",
+        ref: uid,
+        ...body,
+      })) as { id?: string };
+      profileId = created.id;
+    }
+    doctors++;
+
+    if (profileId && existing?.status !== "published") {
+      await publishPublicProfile(profileId);
+      published++;
+    }
+  }
+
+  const note = skipped.length ? ` — skipped ${skipped.length} (${skipped[0]}${skipped.length > 1 ? ", …" : ""})` : "";
+  spinner.succeed(
+    `Public profiles: ${clinics} clinics + ${doctors} providers, ${published} newly published, ${events} bookable schedules${note}`,
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Directory-only clinics and providers
+// ---------------------------------------------------------------------------
+// The MYCURE demo network above is a WORKING clinic: every facility in
+// ORG_PROFILES gets the full clinical fixture set (services, LIS/RIS
+// catalogues, products, queues, HR schedules, patients). That is what you log
+// into.
+//
+// A believable public DIRECTORY needs far more breadth than that, and none of
+// it needs to be operable — nobody logs into these. So they are seeded on a
+// deliberately lighter path:
+//
+//   clinics   → organization + public profile + bookable schedules. NOT added
+//               to `orgsToSeed`, so they skip every per-facility clinical
+//               step. One extra org costs three requests instead of ~200.
+//   providers → `personal-details` ONLY, with no Better Auth account and no
+//               organization membership. A person public profile's `ref` is a
+//               personal-details id, not an account id — an account is needed
+//               to log in, not to be listed. This is what keeps 40+ providers
+//               cheap: no signups (which the auth rate limiter would throttle
+//               to a crawl), no memberships, no HR rows.
+//
+// The independent groups are here because a directory of one brand's branches
+// is not a directory. Two multi-site groups plus standalone clinics give the
+// search something real to disambiguate.
+
+interface DirectoryClinicSeed {
+  name: string;
+  /** Parent group name, when this clinic belongs to one. Groups are seeded first. */
+  groupName?: string;
+  types: string[];
+  description: string;
+  tagline: string;
+  street1: string;
+  city: string;
+  province: string;
+  region: string;
+  zipCode: string;
+  phone: string;
+  logoColor: string;
+  background: string;
+  services: Array<[string, string, boolean]>;
+  insurance: string[];
+  /** [title, description, start, end, slotMinutes, locationTypes] */
+  events: Array<[string, string, string, string, number, Array<"in-person" | "video" | "phone">]>;
+}
+
+const INSURERS: Record<string, string> = {
+  Maxicare: "hmo",
+  Intellicare: "hmo",
+  Medicard: "hmo",
+  PhilCare: "hmo",
+  ValuCare: "hmo",
+  PhilHealth: "government",
+};
+
+const DIRECTORY_CLINICS: DirectoryClinicSeed[] = [
+  // --- Group 1: Sanravi Health Group (3 sites) -----------------------------
+  {
+    name: "Sanravi Family Clinic - Mandaluyong",
+    groupName: "Sanravi Health Group",
+    types: ["clinic"],
+    description:
+      "Sanravi Health Group's flagship family practice. Primary care for all ages, " +
+      "chronic disease management and same-day sick visits.",
+    tagline: "Primary care for the whole family, seven days a week",
+    street1: "512 Shaw Boulevard", city: "Mandaluyong", province: "Metro Manila",
+    region: "NCR", zipCode: "1550", phone: "+6327123401",
+    logoColor: "1d7874", background: "care-plus",
+    services: [
+      ["General Consultation", "Adult and paediatric primary care.", true],
+      ["Chronic Care Programme", "Structured follow-up for diabetes and hypertension.", true],
+      ["Minor Procedures", "Suturing, wound care and abscess drainage.", false],
+    ],
+    insurance: ["Maxicare", "Intellicare", "PhilHealth"],
+    events: [
+      ["Family Medicine Consultation", "Primary care consult, in clinic or by video.", "08:00", "17:00", 20, ["in-person", "video"]],
+      ["Chronic Care Follow-up", "Scheduled review for diabetes and hypertension patients.", "13:00", "16:00", 30, ["in-person", "phone"]],
+    ],
+  },
+  {
+    name: "Sanravi Women's Health - Ortigas",
+    groupName: "Sanravi Health Group",
+    types: ["clinic"],
+    description:
+      "Women's health centre of the Sanravi group. Obstetrics, gynaecology, fertility " +
+      "counselling and menopause care, with in-house ultrasound.",
+    tagline: "Obstetrics, gynaecology and women's wellness in Ortigas",
+    street1: "18 San Miguel Avenue", city: "Pasig", province: "Metro Manila",
+    region: "NCR", zipCode: "1605", phone: "+6327123402",
+    logoColor: "b5179e", background: "wellness-leaf",
+    services: [
+      ["Prenatal Care", "Routine prenatal visits with in-house ultrasound.", true],
+      ["Gynaecology Consultation", "Well-woman exams and gynaecologic concerns.", true],
+      ["Fertility Counselling", "Initial workup and referral pathway.", true],
+    ],
+    insurance: ["Maxicare", "Medicard", "PhilHealth"],
+    events: [
+      ["Prenatal Visit", "Routine prenatal check with ultrasound as indicated.", "09:00", "16:00", 30, ["in-person"]],
+      ["Gynaecology Consultation", "Well-woman and gynaecologic consult.", "13:00", "17:00", 30, ["in-person", "video"]],
+    ],
+  },
+  {
+    name: "Sanravi Pediatric Center - Antipolo",
+    groupName: "Sanravi Health Group",
+    types: ["clinic"],
+    description:
+      "Paediatric centre serving Rizal province. Newborn care, immunisation, growth " +
+      "monitoring and paediatric subspecialty referrals.",
+    tagline: "Children's health from newborn to teen, in Antipolo",
+    street1: "9 Sumulong Highway", city: "Antipolo", province: "Rizal",
+    region: "Region IV-A", zipCode: "1870", phone: "+6328123403",
+    logoColor: "f4a261", background: "capsule",
+    services: [
+      ["Well-Baby Visit", "Growth, development and immunisation.", true],
+      ["Sick Child Consultation", "Same-day paediatric consults.", true],
+      ["Newborn Screening", "Heel-prick screening and follow-up.", false],
+    ],
+    insurance: ["Intellicare", "PhilHealth"],
+    events: [
+      ["Well-Baby Check-up", "Growth, development and immunisation visit.", "08:00", "12:00", 30, ["in-person"]],
+      ["Paediatric Teleconsult", "Video follow-up for established patients.", "14:00", "17:00", 20, ["video", "phone"]],
+    ],
+  },
+
+  // --- Group 2: Bayanihan Medical Network (2 sites) -------------------------
+  {
+    name: "Bayanihan Community Clinic - Caloocan",
+    groupName: "Bayanihan Medical Network",
+    types: ["clinic"],
+    description:
+      "Community clinic offering affordable primary care, maternal health and " +
+      "PhilHealth-covered consultations in northern Metro Manila.",
+    tagline: "Affordable community primary care in Caloocan",
+    street1: "77 A. Mabini Street", city: "Caloocan", province: "Metro Manila",
+    region: "NCR", zipCode: "1400", phone: "+6328123404",
+    logoColor: "457b9d", background: "care-network",
+    services: [
+      ["General Consultation", "Walk-in and booked primary care.", true],
+      ["Maternal Health", "Prenatal and postnatal visits.", true],
+      ["TB DOTS", "DOH-accredited TB treatment programme.", false],
+    ],
+    insurance: ["PhilHealth", "ValuCare"],
+    events: [
+      ["Community Consultation", "Primary care consult with the duty physician.", "08:00", "16:00", 15, ["in-person"]],
+    ],
+  },
+  {
+    name: "Bayanihan Health Center - Iloilo",
+    groupName: "Bayanihan Medical Network",
+    types: ["clinic"],
+    description:
+      "Western Visayas site of the Bayanihan network. General medicine, maternal " +
+      "health and a satellite laboratory.",
+    tagline: "General medicine and maternal care in Iloilo City",
+    street1: "24 General Luna Street", city: "Iloilo City", province: "Iloilo",
+    region: "Region VI", zipCode: "5000", phone: "+6333123405",
+    logoColor: "2a9d8f", background: "care-plus",
+    services: [
+      ["General Consultation", "Primary care for adults and children.", true],
+      ["Laboratory", "Routine blood and urine testing.", true],
+    ],
+    insurance: ["PhilHealth", "Intellicare"],
+    events: [
+      ["Clinic Consultation", "Book a slot with the duty physician.", "08:00", "16:00", 20, ["in-person"]],
+    ],
+  },
+
+  // --- Standalone clinics ---------------------------------------------------
+  {
+    name: "Northgate Cardiology Institute",
+    types: ["clinic"],
+    description:
+      "Independent cardiology practice. Non-invasive cardiac diagnostics, heart " +
+      "failure clinic and pre-operative cardiac clearance.",
+    tagline: "Specialist heart care and cardiac diagnostics in Alabang",
+    street1: "Northgate Cyberzone, Filinvest City", city: "Muntinlupa",
+    province: "Metro Manila", region: "NCR", zipCode: "1781", phone: "+6328123406",
+    logoColor: "e63946", background: "heartbeat",
+    services: [
+      ["Cardiology Consultation", "Specialist consult with ECG.", true],
+      ["2D Echo with Doppler", "Cardiac ultrasound read same day.", true],
+      ["Treadmill Stress Test", "Exercise stress testing with cardiologist supervision.", true],
+      ["Holter Monitoring", "24-hour ambulatory ECG.", false],
+    ],
+    insurance: ["Maxicare", "Medicard", "PhilCare"],
+    events: [
+      ["Cardiology Consultation", "Specialist heart consult with resting ECG.", "09:00", "17:00", 30, ["in-person", "video"]],
+      ["2D Echo Appointment", "Booked cardiac ultrasound.", "08:00", "12:00", 45, ["in-person"]],
+    ],
+  },
+  {
+    name: "Bright Smile Dental Clinic",
+    types: ["clinic", "dental-clinic"],
+    description:
+      "Neighbourhood dental clinic in Quezon City. Preventive dentistry, restorations, " +
+      "paediatric dentistry and same-day emergency care.",
+    tagline: "Gentle family dentistry in Quezon City",
+    street1: "45 Kamias Road", city: "Quezon City", province: "Metro Manila",
+    region: "NCR", zipCode: "1102", phone: "+6328123407",
+    logoColor: "48cae4", background: "capsule",
+    services: [
+      ["Oral Prophylaxis", "Cleaning and fluoride treatment.", true],
+      ["Tooth Restoration", "Composite fillings and crowns.", true],
+      ["Paediatric Dentistry", "Child-friendly dental care.", true],
+      ["Emergency Dental Care", "Same-day relief for dental pain.", false],
+    ],
+    insurance: ["Maxicare", "ValuCare"],
+    events: [
+      ["Dental Check-up & Cleaning", "Examination and oral prophylaxis.", "09:00", "18:00", 45, ["in-person"]],
+    ],
+  },
+  {
+    name: "Clearview Eye Center",
+    types: ["clinic"],
+    description:
+      "Ophthalmology centre offering comprehensive eye examinations, glaucoma " +
+      "screening, retina clinic and refractive surgery assessment.",
+    tagline: "Comprehensive eye care and vision correction in Makati",
+    street1: "220 Salcedo Street, Legazpi Village", city: "Makati",
+    province: "Metro Manila", region: "NCR", zipCode: "1229", phone: "+6328123408",
+    logoColor: "0077b6", background: "wellness-leaf",
+    services: [
+      ["Comprehensive Eye Exam", "Refraction, tonometry and fundus examination.", true],
+      ["Glaucoma Screening", "Visual field and optic nerve assessment.", true],
+      ["Retina Clinic", "Diabetic retinopathy and macular assessment.", true],
+    ],
+    insurance: ["Maxicare", "Intellicare", "PhilHealth"],
+    events: [
+      ["Eye Examination", "Comprehensive eye exam with refraction.", "09:00", "17:00", 30, ["in-person"]],
+    ],
+  },
+  {
+    name: "Serenity Mental Health Clinic",
+    types: ["clinic"],
+    description:
+      "Outpatient mental health practice. Psychiatric assessment, medication " +
+      "management and psychotherapy, in person or by secure video.",
+    tagline: "Confidential psychiatry and therapy, in clinic or online",
+    street1: "3 Scout Borromeo Street", city: "Quezon City", province: "Metro Manila",
+    region: "NCR", zipCode: "1103", phone: "+6328123409",
+    logoColor: "7209b7", background: "wellness-leaf",
+    services: [
+      ["Psychiatric Assessment", "Initial evaluation and treatment planning.", true],
+      ["Medication Review", "Follow-up for ongoing psychiatric care.", true],
+      ["Psychotherapy Session", "50-minute individual therapy.", true],
+    ],
+    insurance: ["Maxicare", "PhilCare"],
+    events: [
+      ["Psychiatric Consultation", "Initial assessment or follow-up.", "10:00", "18:00", 45, ["in-person", "video"]],
+      ["Therapy Session", "50-minute individual psychotherapy.", "10:00", "18:00", 50, ["video", "in-person"]],
+    ],
+  },
+  {
+    name: "Baguio Wellness & Skin Clinic",
+    types: ["clinic", "dermatology-clinic"],
+    description:
+      "Dermatology and wellness clinic in the Cordilleras. Medical dermatology, " +
+      "allergy testing and aesthetic treatments.",
+    tagline: "Dermatology and skin wellness in Baguio City",
+    street1: "12 Session Road", city: "Baguio", province: "Benguet",
+    region: "CAR", zipCode: "2600", phone: "+6374123410",
+    logoColor: "606c38", background: "wellness-leaf",
+    services: [
+      ["Dermatology Consultation", "Skin, hair and nail assessment.", true],
+      ["Allergy Patch Testing", "Contact dermatitis investigation.", true],
+      ["Aesthetic Treatments", "Peels and non-laser rejuvenation.", false],
+    ],
+    insurance: ["Intellicare", "PhilHealth"],
+    events: [
+      ["Skin Consultation", "Dermatology consult, in clinic or by video.", "09:00", "17:00", 30, ["in-person", "video"]],
+    ],
+  },
+  {
+    name: "Cagayan Valley Diagnostic Center",
+    types: ["clinic", "diagnostic-center"],
+    description:
+      "Regional diagnostic centre serving Cagayan Valley. Clinical laboratory, " +
+      "radiography, ultrasound and ECG with same-day results.",
+    tagline: "Laboratory and imaging with same-day results in Tuguegarao",
+    street1: "8 Rizal Street", city: "Tuguegarao", province: "Cagayan",
+    region: "Region II", zipCode: "3500", phone: "+6378123411",
+    logoColor: "3d5a80", background: "heartbeat",
+    services: [
+      ["Clinical Laboratory", "Haematology, chemistry and urinalysis.", true],
+      ["X-ray", "Chest and skeletal radiography.", true],
+      ["Ultrasound", "Abdominal, pelvic and obstetric ultrasound.", true],
+      ["ECG", "12-lead electrocardiography.", false],
+    ],
+    insurance: ["PhilHealth", "Maxicare"],
+    events: [
+      ["Laboratory Visit", "Reserved slot for blood and urine collection.", "06:30", "15:00", 15, ["in-person"]],
+      ["Ultrasound Appointment", "Booked ultrasound with preparation instructions.", "08:00", "16:00", 30, ["in-person"]],
+    ],
+  },
+  {
+    name: "Zamboanga Family Health Clinic",
+    types: ["clinic"],
+    description:
+      "Family practice serving western Mindanao. Primary care, immunisation and " +
+      "occupational health assessments.",
+    tagline: "Primary care and occupational health in Zamboanga City",
+    street1: "31 Veterans Avenue", city: "Zamboanga City", province: "Zamboanga del Sur",
+    region: "Region IX", zipCode: "7000", phone: "+6362123412",
+    logoColor: "bc6c25", background: "care-plus",
+    services: [
+      ["General Consultation", "Primary care for all ages.", true],
+      ["Immunisation", "Adult and childhood vaccines.", true],
+      ["Occupational Health Exam", "Annual and pre-employment assessments.", true],
+    ],
+    insurance: ["PhilHealth", "ValuCare"],
+    events: [
+      ["Clinic Consultation", "Primary care consult with the duty physician.", "08:00", "16:00", 20, ["in-person"]],
+    ],
+  },
+  {
+    name: "Bacolod Orthopedic & Sports Clinic",
+    types: ["clinic"],
+    description:
+      "Orthopaedic and sports medicine practice. Injury assessment, rehabilitation " +
+      "planning and joint injections.",
+    tagline: "Sports injury and joint care in Bacolod City",
+    street1: "5 Lacson Street", city: "Bacolod", province: "Negros Occidental",
+    region: "Region VI", zipCode: "6100", phone: "+6334123413",
+    logoColor: "d62828", background: "care-network",
+    services: [
+      ["Orthopaedic Consultation", "Injury and joint assessment.", true],
+      ["Sports Injury Clinic", "Assessment and return-to-play planning.", true],
+      ["Joint Injection", "Image-guided intra-articular injection.", false],
+    ],
+    insurance: ["Maxicare", "PhilHealth"],
+    events: [
+      ["Orthopaedic Consultation", "Assessment of injury, joint or spine complaints.", "09:00", "16:00", 30, ["in-person"]],
+    ],
+  },
+];
+
+/** [firstName, lastName, sex, prefix, credentials, specialties, professions, clinicName, languages] */
+type DirectoryProviderSeed = [
+  string, string, "male" | "female", string, string, string[], string[], string, string[],
+];
+
+const EN_FIL = ["english", "filipino"];
+const EN_FIL_CEB = ["english", "filipino", "cebuano"];
+const EN_FIL_ILO = ["english", "filipino", "ilocano"];
+const EN_FIL_HIL = ["english", "filipino", "hiligaynon"];
+
+// 44 directory-only providers spread across the network and the independent
+// clinics. Personal-details rows only — no accounts, no memberships.
+const DIRECTORY_PROVIDERS: DirectoryProviderSeed[] = [
+  // Sanravi Family Clinic - Mandaluyong
+  ["Alejandro", "Bautista", "male", "Dr.", "MD, FPAFP", ["Family Medicine"], ["Physician"], "Sanravi Family Clinic - Mandaluyong", EN_FIL],
+  ["Marisol", "Domingo", "female", "Dr.", "MD", ["Family Medicine", "Geriatrics"], ["Physician"], "Sanravi Family Clinic - Mandaluyong", EN_FIL],
+  ["Teodoro", "Ramos", "male", "Dr.", "MD, FPCP", ["Internal Medicine"], ["Physician", "Internist"], "Sanravi Family Clinic - Mandaluyong", EN_FIL],
+  ["Lourdes", "Aquino", "female", "Dr.", "MD", ["Family Medicine", "Diabetes Care"], ["Physician"], "Sanravi Family Clinic - Mandaluyong", EN_FIL],
+  // Sanravi Women's Health - Ortigas
+  ["Beatrice", "Manalo", "female", "Dr.", "MD, FPOGS", ["Obstetrics & Gynecology"], ["Physician", "Obstetrician"], "Sanravi Women's Health - Ortigas", EN_FIL],
+  ["Cristina", "Palma", "female", "Dr.", "MD", ["Obstetrics & Gynecology", "Maternal-Fetal Medicine"], ["Physician"], "Sanravi Women's Health - Ortigas", EN_FIL],
+  ["Rowena", "Sandoval", "female", "Dr.", "MD", ["Reproductive Endocrinology"], ["Physician"], "Sanravi Women's Health - Ortigas", EN_FIL],
+  // Sanravi Pediatric Center - Antipolo
+  ["Emilio", "Torres", "male", "Dr.", "MD, FPPS", ["Pediatrics"], ["Physician", "Pediatrician"], "Sanravi Pediatric Center - Antipolo", EN_FIL],
+  ["Angelica", "Ferrer", "female", "Dr.", "MD", ["Pediatrics", "Neonatology"], ["Physician"], "Sanravi Pediatric Center - Antipolo", EN_FIL],
+  ["Joselito", "Mercado", "male", "Dr.", "MD", ["Pediatrics", "Pediatric Pulmonology"], ["Physician"], "Sanravi Pediatric Center - Antipolo", EN_FIL],
+  // Bayanihan Community Clinic - Caloocan
+  ["Corazon", "Alvarez", "female", "Dr.", "MD", ["Family Medicine"], ["Physician"], "Bayanihan Community Clinic - Caloocan", EN_FIL],
+  ["Danilo", "Espiritu", "male", "Dr.", "MD", ["General Medicine", "Public Health"], ["Physician"], "Bayanihan Community Clinic - Caloocan", EN_FIL],
+  ["Imelda", "Navarro", "female", "", "RM", ["Midwifery"], ["Midwife"], "Bayanihan Community Clinic - Caloocan", EN_FIL],
+  // Bayanihan Health Center - Iloilo
+  ["Ricardo", "Gallardo", "male", "Dr.", "MD", ["Family Medicine"], ["Physician"], "Bayanihan Health Center - Iloilo", EN_FIL_HIL],
+  ["Perla", "Sison", "female", "Dr.", "MD", ["Internal Medicine"], ["Physician"], "Bayanihan Health Center - Iloilo", EN_FIL_HIL],
+  // Northgate Cardiology Institute
+  ["Fernando", "Yulo", "male", "Dr.", "MD, FPCC", ["Cardiology", "Interventional Cardiology"], ["Physician", "Cardiologist"], "Northgate Cardiology Institute", EN_FIL],
+  ["Estrella", "Buenaventura", "female", "Dr.", "MD, FPCC", ["Cardiology", "Echocardiography"], ["Physician", "Cardiologist"], "Northgate Cardiology Institute", EN_FIL],
+  ["Vicente", "Lazaro", "male", "Dr.", "MD", ["Cardiology", "Electrophysiology"], ["Physician"], "Northgate Cardiology Institute", EN_FIL],
+  ["Nelia", "Panganiban", "female", "Dr.", "MD, FPCP", ["Internal Medicine", "Cardiology"], ["Physician"], "Northgate Cardiology Institute", EN_FIL],
+  // Bright Smile Dental Clinic
+  ["Gerardo", "Ilagan", "male", "Dr.", "DMD", ["Dentistry"], ["Dentist"], "Bright Smile Dental Clinic", EN_FIL],
+  ["Mildred", "Cabral", "female", "Dr.", "DMD", ["Pediatric Dentistry"], ["Dentist"], "Bright Smile Dental Clinic", EN_FIL],
+  ["Arturo", "Zamora", "male", "Dr.", "DMD, MSc", ["Orthodontics"], ["Dentist", "Orthodontist"], "Bright Smile Dental Clinic", EN_FIL],
+  // Clearview Eye Center
+  ["Rosalinda", "Concepcion", "female", "Dr.", "MD, FPAO", ["Ophthalmology"], ["Physician", "Ophthalmologist"], "Clearview Eye Center", EN_FIL],
+  ["Benigno", "Roxas", "male", "Dr.", "MD", ["Ophthalmology", "Retina"], ["Physician"], "Clearview Eye Center", EN_FIL],
+  ["Editha", "Solis", "female", "Dr.", "MD", ["Ophthalmology", "Glaucoma"], ["Physician"], "Clearview Eye Center", EN_FIL],
+  // Serenity Mental Health Clinic
+  ["Ignacio", "Del Rosario", "male", "Dr.", "MD, FPPA", ["Psychiatry"], ["Physician", "Psychiatrist"], "Serenity Mental Health Clinic", EN_FIL],
+  ["Veronica", "Lim", "female", "Dr.", "MD", ["Psychiatry", "Child & Adolescent Psychiatry"], ["Physician"], "Serenity Mental Health Clinic", EN_FIL],
+  ["Samuel", "Ocampo", "male", "", "RPsy", ["Clinical Psychology"], ["Psychologist"], "Serenity Mental Health Clinic", EN_FIL],
+  ["Katrina", "Fajardo", "female", "", "RPsy", ["Clinical Psychology", "Cognitive Behavioural Therapy"], ["Psychologist"], "Serenity Mental Health Clinic", EN_FIL],
+  // Baguio Wellness & Skin Clinic
+  ["Lorna", "Bagayan", "female", "Dr.", "MD, FPDS", ["Dermatology"], ["Physician", "Dermatologist"], "Baguio Wellness & Skin Clinic", EN_FIL_ILO],
+  ["Manuel", "Carino", "male", "Dr.", "MD", ["Dermatology", "Allergology"], ["Physician"], "Baguio Wellness & Skin Clinic", EN_FIL_ILO],
+  // Cagayan Valley Diagnostic Center
+  ["Aurora", "Baccay", "female", "Dr.", "MD, FPSP", ["Pathology", "Clinical Pathology"], ["Physician", "Pathologist"], "Cagayan Valley Diagnostic Center", EN_FIL_ILO],
+  ["Rodolfo", "Tumaliuan", "male", "Dr.", "MD, FPCR", ["Radiology"], ["Physician", "Radiologist"], "Cagayan Valley Diagnostic Center", EN_FIL_ILO],
+  ["Jocelyn", "Pascual", "female", "", "RMT", ["Medical Technology"], ["Medical Technologist"], "Cagayan Valley Diagnostic Center", EN_FIL_ILO],
+  // Zamboanga Family Health Clinic
+  ["Alfredo", "Jalosjos", "male", "Dr.", "MD", ["Family Medicine", "Occupational Medicine"], ["Physician"], "Zamboanga Family Health Clinic", EN_FIL],
+  ["Norma", "Atilano", "female", "Dr.", "MD", ["Family Medicine"], ["Physician"], "Zamboanga Family Health Clinic", EN_FIL],
+  // Bacolod Orthopedic & Sports Clinic
+  ["Eduardo", "Montelibano", "male", "Dr.", "MD, FPOA", ["Orthopedics", "Sports Medicine"], ["Physician", "Orthopedic Surgeon"], "Bacolod Orthopedic & Sports Clinic", EN_FIL_HIL],
+  ["Cecilia", "Locsin", "female", "Dr.", "MD", ["Rehabilitation Medicine"], ["Physician", "Physiatrist"], "Bacolod Orthopedic & Sports Clinic", EN_FIL_HIL],
+  ["Rafael", "Golez", "male", "", "PTRP", ["Physical Therapy"], ["Physical Therapist"], "Bacolod Orthopedic & Sports Clinic", EN_FIL_HIL],
+  // A few more on the MYCURE network itself, so the flagship isn't thin.
+  ["Isabel", "Marquez", "female", "Dr.", "MD, FPCP", ["Internal Medicine", "Nephrology"], ["Physician"], "MYCURE Demo Clinic", EN_FIL],
+  ["Gregorio", "Panlilio", "male", "Dr.", "MD", ["Gastroenterology", "Internal Medicine"], ["Physician"], "MYCURE Demo Clinic", EN_FIL],
+  ["Yolanda", "Bituin", "female", "Dr.", "MD", ["Pulmonology", "Internal Medicine"], ["Physician"], "MYCURE Diagnostics Hub - Ortigas", EN_FIL],
+  ["Antonio", "Rivera", "male", "Dr.", "MD", ["Neurology"], ["Physician", "Neurologist"], "MYCURE Demo Clinic", EN_FIL],
+  ["Marilou", "Estrada", "female", "Dr.", "MD", ["Endocrinology", "Internal Medicine"], ["Physician"], "MYCURE Demo Branch - QC", EN_FIL],
+];
+
+const PROVIDER_BIO = (specialties: string[], clinic: string) =>
+  `${specialties[0]} practising at ${clinic}. Accepts new patients for consultation ` +
+  `and follow-up care. Demo data — not a real provider.`;
+
+function directorySlug(first: string, last: string, specialty: string): string {
+  return urlSlug(`${first} ${last} ${specialty.split(" ")[0]}`);
+}
+
+/** Find-or-create the personal-details row a directory provider's profile points at. */
+async function findOrCreateDirectoryPerson(
+  p: DirectoryProviderSeed,
+): Promise<string | undefined> {
+  const [first, last, sex, prefix, , specialties, professions, clinic, languages] = p;
+  const externalId = `SEED-DIR-PROVIDER-${slugify(`${first}-${last}`)}`;
+
+  const res = (await api(
+    "GET",
+    `/personal-details?externalId=${encodeURIComponent(externalId)}&%24limit=1`,
+  )) as { data?: Array<{ id: string }> } | Array<{ id: string }>;
+  const list = Array.isArray(res) ? res : res.data ?? [];
+  if (list[0]?.id) return list[0].id;
+
+  const created = (await api("POST", "/personal-details", {
+    type: "accounts",
+    externalId,
+    name: { prefix: prefix || undefined, firstName: first, lastName: last },
+    sex,
+    nationality: "Filipino",
+    picURL: `https://i.pravatar.cc/400?u=${encodeURIComponent(externalId)}`,
+    doc_bio: PROVIDER_BIO(specialties, clinic),
+    doc_specialties: specialties,
+    doc_professions: professions,
+    // Languages have no personal-details column; they live on the public
+    // profile, which is set from `languages` below.
+  })) as { id?: string };
+  void languages;
+  return created.id;
+}
+
+async function seedDirectory(
+  facilities: Array<{ id: string; label: string; profile: OrgProfile }>,
+): Promise<void> {
+  const spinner = ora("Seeding directory clinics + providers...").start();
+  const orgIdByName = new Map(facilities.map((f) => [f.profile.name, f.id]));
+  let groups = 0;
+  let clinics = 0;
+  let providers = 0;
+  let events = 0;
+  const problems: string[] = [];
+
+  // Groups first — an independent clinic that belongs to one is created as its
+  // child, so the org hierarchy mirrors how a real multi-site group is set up.
+  const groupNames = [...new Set(DIRECTORY_CLINICS.map((c) => c.groupName).filter(Boolean))] as string[];
+  for (const name of groupNames) {
+    spinner.text = `Directory group: ${name}…`;
+    const existing = await listOrgIdsByName(name);
+    let id = existing[0];
+    if (!id) {
+      const org = await createOrganization(name, "facility", undefined, ["clinic"]);
+      id = org.id ?? "";
+      groups++;
+    }
+    orgIdByName.set(name, id);
+  }
+
+  for (const c of DIRECTORY_CLINICS) {
+    spinner.text = `Directory clinic: ${c.name}…`;
+    const parentId = c.groupName ? orgIdByName.get(c.groupName) : undefined;
+    const existing = await listOrgIdsByName(c.name);
+    let orgId = existing[0];
+    if (!orgId) {
+      const org = await createOrganization(c.name, "facility", parentId, c.types);
+      orgId = org.id ?? "";
+      clinics++;
+    }
+    if (!orgId) {
+      problems.push(`clinic '${c.name}' could not be created`);
+      continue;
+    }
+    orgIdByName.set(c.name, orgId);
+
+    const logoURL = demoLogoURL(c.name, c.logoColor);
+    await patchOrg(orgId, {
+      description: c.description,
+      phone: c.phone,
+      phones: [c.phone],
+      logoURL,
+      timezone: "Asia/Manila",
+      address: {
+        street1: c.street1,
+        city: c.city,
+        province: c.province,
+        region: c.region,
+        country: "PHL",
+        zipCode: c.zipCode,
+      },
+      metadata: { seed: true, isDemoOrg: true, demoMarkers: ["demo", "seed", "directory"] },
+      isPublic: false,
+    });
+
+    const eventIds: string[] = [];
+    for (const [title, description, start, end, slotDuration, locationTypes] of c.events) {
+      const id = await findOrCreateBookingEvent(orgId, undefined, {
+        title, description, start, end, slotDuration, locationTypes,
+      });
+      if (id) {
+        eventIds.push(id);
+        events++;
+      }
+    }
+
+    const body = {
+      slug: urlSlug(c.name),
+      background: c.background,
+      events: eventIds,
+      organization: {
+        name: c.name,
+        tagline: c.tagline,
+        logoURL,
+        servicesOffered: c.services.map(([name, description, isBookable]) => ({
+          name, description, isBookable,
+        })),
+        insuranceAccepted: c.insurance.map((name) => ({ name, type: INSURERS[name] ?? "hmo" })),
+      },
+      seo: { title: `${c.name} — Book online`, description: c.tagline },
+    };
+
+    const profile = await findPublicProfile("organization", orgId);
+    let profileId = profile?.id;
+    if (profileId) {
+      await syncPublicProfile(profileId);
+      await api("PATCH", `/public-profiles/${profileId}`, body);
+    } else {
+      const created = (await api("POST", "/public-profiles", {
+        type: "organization", ref: orgId, ...body,
+      })) as { id?: string };
+      profileId = created.id;
+    }
+    if (profileId && profile?.status !== "published") await publishPublicProfile(profileId);
+  }
+
+  for (const p of DIRECTORY_PROVIDERS) {
+    const [first, last, , , credentials, specialties, , clinicName, languages] = p;
+    spinner.text = `Directory provider: ${first} ${last}…`;
+    const personId = await findOrCreateDirectoryPerson(p);
+    if (!personId) {
+      problems.push(`provider '${first} ${last}' has no personal-details row`);
+      continue;
+    }
+    const orgId = orgIdByName.get(clinicName);
+    if (!orgId) {
+      problems.push(`provider '${first} ${last}': clinic '${clinicName}' not seeded`);
+      continue;
+    }
+
+    // One consultation schedule each, at their clinic. The booking routes by
+    // schedule, so this is also what ties the provider to that facility.
+    const eventId = await findOrCreateBookingEvent(orgId, personId, {
+      title: `${specialties[0]} Consultation`,
+      description: `Consultation with ${first} ${last}.`,
+      locationTypes: ["in-person", "video"],
+      start: "09:00",
+      end: "17:00",
+      slotDuration: 30,
+    });
+    if (eventId) events++;
+
+    const body = {
+      slug: directorySlug(first, last, specialties[0]),
+      background: PROFILE_BACKGROUNDS[(first.length + last.length) % PROFILE_BACKGROUNDS.length],
+      events: eventId ? [eventId] : [],
+      person: { credentials, languages },
+    };
+
+    const profile = await findPublicProfile("person", personId);
+    let profileId = profile?.id;
+    if (profileId) {
+      await syncPublicProfile(profileId);
+      await api("PATCH", `/public-profiles/${profileId}`, body);
+    } else {
+      const created = (await api("POST", "/public-profiles", {
+        type: "person", ref: personId, ...body,
+      })) as { id?: string };
+      profileId = created.id;
+    }
+    providers++;
+    if (profileId && profile?.status !== "published") await publishPublicProfile(profileId);
+  }
+
+  const note = problems.length ? ` — ${problems.length} problem(s): ${problems[0]}` : "";
+  spinner.succeed(
+    `Directory: ${groupNames.length} groups (${groups} new), ${DIRECTORY_CLINICS.length} clinics (${clinics} new), ${providers} providers, ${events} schedules${note}`,
+  );
+}
+
 async function main() {
-  console.log(`\n${chalk.bold("MyCure Seed Script")}`);
+  console.log(`\n${chalk.bold("MYCURE Seed Script")}`);
   console.log(`${chalk.gray("API:")} ${API_URL}\n`);
 
   if (SERVICE_ACCOUNT_EMAILS.size > 0) {
@@ -8008,6 +9531,19 @@ async function main() {
   // Step 12: Service providers — link clinicians to services with a
   // reader's-fee commission. Depends on members + services existing.
   await seedServiceProviders(orgsToSeed, userIds);
+
+  // Step 12b: Public profiles for every seeded clinic and clinician, each
+  // published and linked to bookable schedules. This is what the patient-facing
+  // directory at mycure.md/directory lists, and what /c/<slug> and /d/<slug>
+  // render. Runs after members + user profiles so populateFromRef has a name,
+  // bio and specialties to copy.
+  await seedPublicProfiles(orgsToSeed, userIds);
+
+  // Step 12c: the wider public directory — independent groups, standalone
+  // clinics and ~44 providers that exist ONLY to be listed. Deliberately not
+  // part of `orgsToSeed`: they skip every clinical fixture step, so the extra
+  // breadth costs a few hundred requests rather than a few hours.
+  await seedDirectory(orgsToSeed);
 
   // Step 13: Withholding tax — patch doctor + nurse memberships in each org.
   // Depends on memberships existing.
