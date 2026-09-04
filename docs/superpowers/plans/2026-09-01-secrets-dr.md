@@ -4,7 +4,7 @@
 
 **Goal:** Give the ~115 irreplaceable secrets in GCP Secret Manager (`mc-v4-prod`) an automated, **off-provider**, break-glass-recoverable backup that survives a full loss of GCP access (compromise, billing lockout, project deletion) — issue [monobase-mycure#3882](https://github.com/mycurelabs/monobase-mycure/issues/3882).
 
-**Architecture:** A daily in-cluster CronJob (mirrors the existing wal-g backup pattern) reads every Secret Manager secret with a **read-only** GCP SA, encrypts the whole set with **SOPS + age to an OFFLINE recipient key**, and writes only the ciphertext to off-provider storage we already run (DO Spaces — versioning only, **Spaces has no Object Lock** — then mirrored to on-prem niflheim by a **small dedicated quarantining sync this plan will build** (an `rclone sync --backup-dir=…/secrets-deleted/<date>`, modeled on `mycure-wal-reconcile` — **not** the general Kopia mirror, which has no `--backup-dir`, and **not** a change to the shared `onprem-backup-setup.sh`) so a deletion by a compromised Spaces key cannot erase the on-prem copy). The age **private** key is never in GCP or the cluster — it is escrowed out-of-band (Shamir-split among officers). Decryption depends only on `ciphertext + offline age key`, zero GCP dependency. A provider-specific *warm-standby* alternative (HashiCorp Vault / Akeyless / Infisical via native GCP import) is documented but **not built now** — Option A is the priority.
+**Architecture:** Two halves that meet only through the Spaces bucket. (1) An **in-cluster** daily CronJob (mirrors the existing wal-g backup pattern) reads every Secret Manager secret with a **read-only** GCP SA, encrypts the whole set with **SOPS + age to an OFFLINE recipient key**, and writes only the ciphertext to off-provider storage we already run (DO Spaces — versioning only, **Spaces has no Object Lock**). (2) A **host-side script on niflheim** (`scripts/secrets-dr-mirror-setup.sh`, Task 6) then quarantine-mirrors that bucket with an `rclone sync --backup-dir=…/secrets-deleted/<date>` (modeled on `mycure-wal-reconcile` — **not** the general Kopia mirror, which has no `--backup-dir`, and **not** a change to the shared `onprem-backup-setup.sh`) so a deletion by a compromised Spaces key cannot erase the on-prem copy. The CronJob runs in the `mycure-production` namespace; the quarantine runs on the off-cluster bare-metal niflheim host a Helm chart can't reach — same host/cluster split as PRs #400/#402 (host work ships as a `scripts/` script + runbook, not chart templates). The age **private** key is never in GCP or the cluster — it is escrowed out-of-band (Shamir-split among officers). Decryption depends only on `ciphertext + offline age key`, zero GCP dependency. A provider-specific *warm-standby* alternative (HashiCorp Vault / Akeyless / Infisical via native GCP import) is documented but **not built now** — Option A is the priority.
 
 **Tech Stack:** GCP Secret Manager, `gcloud`, SOPS + age, Kubernetes CronJob, External Secrets Operator (for the exporter SA + Spaces creds), DO Spaces (S3), on-prem niflheim mirror, ArgoCD.
 
@@ -17,7 +17,7 @@
 - **Encryption uses a PUBLIC key; the PRIVATE key is offline.** The cluster/CronJob can encrypt but can **never** decrypt past backups — so a full cluster or GCP compromise cannot read the DR archive. This is the whole security model.
 - **No new plaintext at rest.** Plaintext exists only in a memory-backed tmpfs inside the job pod, piped straight into SOPS; never written to a persistent disk, never logged.
 - **No new read exposure.** ESO already reads all these secrets, so a read-only exporter SA adds no attack surface beyond what exists; the *only* new artifact is ciphertext useless without the offline key (LastPass lesson: strong offline key, encrypt everything).
-- **Reuse existing off-provider stores** — DO Spaces (enable versioning — **API-only; Spaces has no Object Lock**) + a **new small dedicated quarantining sync built here** — the `mycure-secrets-dr` bucket is mirrored by nothing today, and the general niflheim mirror has no `--backup-dir`, so this must be built (standalone, modeled on `mycure-wal-reconcile`, NOT by editing the shared `onprem-backup-setup.sh`) so deletions don't propagate (see [[onprem-backup-mirror-niflheim]]); no new cloud account required for Option A. Real WORM immutability, if wanted, comes from a 3rd store where Object Lock actually works (B2/Wasabi/R2/S3).
+- **Reuse existing off-provider stores** — DO Spaces (enable versioning — **API-only; Spaces has no Object Lock**) + a **new small dedicated quarantining sync built here** — the `mycure-secrets-dr` bucket is mirrored by nothing today, and the general niflheim mirror has no `--backup-dir`, so this must be built as **a script on niflheim (`scripts/secrets-dr-mirror-setup.sh`, Task 6)**, modeled on `mycure-wal-reconcile`, NOT by editing the shared `onprem-backup-setup.sh`, so deletions don't propagate (see [[onprem-backup-mirror-niflheim]]); no new cloud account required for Option A. Real WORM immutability, if wanted, comes from a 3rd store where Object Lock actually works (B2/Wasabi/R2/S3).
 - **Chart conventions:** new chart `charts/secrets-dr-backup/`, auto-discovered by ArgoCD, deployed into `mycure-production`. Mirror `charts/database-secrets` walg pattern (SA + RBAC + default-deny NetworkPolicy + hardened securityContext + ESO-sourced creds).
 - **No secrets in git.** age *public* key is committed (ConfigMap); everything else via ESO.
 
@@ -58,13 +58,15 @@ Secrets are KB-scale, so unlike the GCS bucket (#3878) this is essentially free 
 | `charts/secrets-dr-backup/templates/externalsecret.yaml` | ESO: read-only GCP exporter SA JSON + DO Spaces key/secret. |
 | `charts/secrets-dr-backup/templates/configmap.yaml` | age recipient public key(s) + the export script. |
 | `charts/secrets-dr-backup/templates/cronjob.yaml` | The daily export→encrypt→upload job. |
+| `charts/secrets-dr-backup/templates/prometheusrule.yaml` | Failure + staleness alerts for the CronJob (Task 4.5). |
 | `values/deployments/mycure-production.yaml` | Enable the chart + its ESO remoteKeys (exporter SA, Spaces creds). |
+| `scripts/secrets-dr-mirror-setup.sh` | **Host-side** (niflheim) quarantining mirror of the Spaces bucket — systemd service + timer, `rclone sync --backup-dir`. NOT a chart template (Task 6). |
 | `docs/operations/SECRETS_DR.md` | Runbook: verify, restore/break-glass, key escrow policy, quarterly drill. |
 
 **Human prerequisites (not chart-managed):**
 - **P1. Generate the age key pair OFFLINE** (`age-keygen`) on an air-gapped/trusted machine. Commit only the **public** recipient (`age1...`). The **private** key is escrowed per the policy in Task 5 — never touches GCP, the cluster, or git.
 - **P2. Create a read-only exporter GCP SA** in `mc-v4-prod` with `roles/secretmanager.viewer` + `roles/secretmanager.secretAccessor` (list + access, NO write/delete). Store its JSON key in Secret Manager as `mycure-production-secrets-dr-exporter-sa` (ESO reads it). `# ponytail: reuse ESO's existing reader SA only if it's already read-only-scoped; else a dedicated one keeps blast radius to read.`
-- **P3. Create the DO Spaces backup bucket** `mycure-secrets-dr` with **versioning** (API-only, `mc version enable` — **Spaces has no Object Lock, don't rely on it**). **Nothing mirrors this bucket today**, so this plan must **BUILD** a small dedicated quarantining sync for it on niflheim — a trimmed copy of `mycure-wal-reconcile`'s `rclone sync --backup-dir=…/secrets-deleted/<date>` shape (retention like `WAL_QUARANTINE_DAYS`), **standalone in this chart, NOT a modification of the shared `onprem-backup-setup.sh`** (another owner's hotspot). It's <100 MB of ciphertext → trivial.
+- **P3. Create the DO Spaces backup bucket** `mycure-secrets-dr` with **versioning** (API-only, `mc version enable` — **Spaces has no Object Lock, don't rely on it**). That's it: the quarantining mirror that consumes this bucket is **built by the plan** as a host-side script on niflheim (Task 6, `scripts/secrets-dr-mirror-setup.sh`) — it is NOT a human prerequisite and NOT chart-managed.
 - **P4. Decide age-key escrow** (Task 5 policy) — biz/security call, see handover.
 
 ---
@@ -100,7 +102,10 @@ spaces:
   bucket: "mycure-secrets-dr"
   endpoint: "https://sgp1.digitaloceanspaces.com"
 retentionNote: "Spaces versioning (API-only; no Object Lock); real immutability = niflheim --backup-dir quarantine; ~90 daily versions"
-image: "docker.io/google/cloud-sdk:slim"   # has gcloud + gsutil; SOPS+age installed in-script or baked
+image: ""                 # REQUIRED: a baked image with gcloud + sops + age + jq + the S3
+                          # uploader (aws-cli OR rclone). `cloud-sdk:slim` ships gcloud+gsutil
+                          # but NOT aws/sops/age/jq — see Task 2 image note. No default: fail
+                          # loud rather than silently run a broken slim image.
 global:
   namespace: mycure-production
 ```
@@ -294,7 +299,7 @@ spec:
 {{- end }}
 ```
 
-> **Image note:** `cloud-sdk:slim` has `gcloud`/`aws` but not `sops`/`age`/`jq` — either add an `initContainer`/in-script install, or bake a small image with `gcloud + aws + sops + age + jq` (preferred; pin it). Resolve at implementation; `# ponytail: bake one pinned image, don't apt-install on every run`.
+> **Image note:** `cloud-sdk:slim` has `gcloud`/`gsutil` but **NOT** `aws`, `sops`, `age`, or `jq` — and the upload target is DO Spaces (S3-compatible), which `gsutil`/`gcloud storage` can't write. So the uploader needs a real S3 client. Bake a small pinned image with `gcloud + aws + sops + age + jq` (preferred), or swap the `aws s3 cp` upload for `rclone copyto` against a Spaces remote (the same tool niflheim uses in Task 6). Either way, the default `image: ""` must be overridden with a baked image — don't ship `cloud-sdk:slim`. Resolve at implementation; `# ponytail: bake one pinned image, don't apt-install on every run`.
 
 - [ ] **Step 3: Render + commit**
 
@@ -328,7 +333,7 @@ secretsDrBackup:
   - [ ] `ageRecipients` are the OFFLINE public keys; no private key anywhere in repo/cluster.
   - [ ] Plaintext path is `/dev/shm` (Memory emptyDir) only; `readOnlyRootFilesystem: true`.
   - [ ] Spaces bucket has versioning (API-only); the **dedicated quarantining sync is BUILT** for the `mycure-secrets-dr` prefix (standalone, `--backup-dir=…/secrets-deleted/<date>`) — no delete-propagation.
-  - [ ] NetworkPolicy limits egress to DNS + 443.
+  - [ ] NetworkPolicy scopes egress to DNS + 443 only. **Framing:** with `ipBlock: 0.0.0.0/0` this is an egress-*scoping* / allowlist-intent control (port-restricting, documents where the pod is allowed to talk, trips on a policy that tries to widen it), **not** a confidentiality control — 0.0.0.0/0 egress hides nothing. Confidentiality comes solely from the age public-key encryption; the NetworkPolicy just bounds the blast radius of a compromised pod.
 
 - [ ] **Step 3:** Do NOT auto-merge to prod until biz sign-off on the escrow policy (this is plan-first).
 
@@ -351,6 +356,66 @@ sops --decrypt <obj>   # expect: no matching age identity
 ```
 
 - [ ] **Step 3:** Confirm it landed on the niflheim mirror (see [[onprem-backup-mirror-niflheim]]).
+
+---
+
+### Task 4.5: CronJob failure alerting
+
+A silently-failing secrets backup is the worst kind — this job protects the *irreplaceable* keys, so it is strictly more critical than the wal-g/GCS tiers and must page on failure, not wait for a weekly manual `s3 ls`. Mirrors PR #398's Task 4.5 (Tier-1 alerting), adapted to a k8s CronJob.
+
+**Files:**
+- Modify: `charts/secrets-dr-backup/values.yaml` (add `alert.enabled` + webhook/receiver ref).
+- Create: `charts/secrets-dr-backup/templates/prometheusrule.yaml` (alert on job failure).
+
+- [ ] **Step 1:** Add the alerting knobs to `values.yaml`:
+
+```yaml
+alert:
+  enabled: true
+  # Fires when the most recent job failed OR no job has succeeded in >36h
+  # (a missed schedule is as bad as a failed run for a daily DR job).
+  staleAfter: 36h
+```
+
+- [ ] **Step 2:** Add a `PrometheusRule` (the cluster already runs kube-state-metrics + Alertmanager for the other backup tiers — reuse that receiver, no new plumbing):
+
+```yaml
+{{- if and .Values.enabled .Values.alert.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: secrets-dr-backup
+  namespace: {{ .Values.global.namespace }}
+  labels: { release: monitoring }
+spec:
+  groups:
+    - name: secrets-dr-backup
+      rules:
+        - alert: SecretsDrBackupJobFailed
+          expr: kube_job_status_failed{namespace="{{ .Values.global.namespace }}",job_name=~"secrets-dr-backup.*"} > 0
+          for: 5m
+          labels: { severity: critical }
+          annotations:
+            summary: "Off-provider secrets DR export FAILED"
+            description: "The daily secrets-dr-backup CronJob failed — the irreplaceable Secret Manager keys are NOT being backed up off-provider. Check `kubectl logs -n {{ .Values.global.namespace }} job/<name>`. Issue monobase-mycure#3882."
+        - alert: SecretsDrBackupStale
+          expr: (time() - max(kube_job_status_completion_time{namespace="{{ .Values.global.namespace }}",job_name=~"secrets-dr-backup.*"})) > {{ .Values.alert.staleAfter | default "36h" | trimSuffix "h" | atoi | mul 3600 }}
+          labels: { severity: critical }
+          annotations:
+            summary: "Off-provider secrets DR export is STALE"
+            description: "No secrets-dr-backup job has succeeded within the freshness window — the off-provider archive is aging out. Issue monobase-mycure#3882."
+{{- end }}
+```
+
+> **Fallback if the cluster has no Prometheus-Operator CRDs:** add an `OnFailure`-style notifier container to the CronJob that POSTs to the same Discord webhook the niflheim mirror uses (`mycure-backup-notify` shape), or an Alertmanager `alertmanager://` push. At minimum this task must produce an *automated* failure signal — never a documented manual check.
+
+- [ ] **Step 3: Render + commit**
+
+Run: `helm template charts/secrets-dr-backup --set enabled=true --set ageRecipients={age1xxx} | grep -A2 'kind: PrometheusRule'`
+```bash
+git add charts/secrets-dr-backup/{values.yaml,templates/prometheusrule.yaml}
+git commit -m "feat(secrets-dr): CronJob failure + staleness alerting (monobase-mycure#3882)"
+```
 
 ---
 
@@ -384,15 +449,36 @@ Latest object within 24h. If stale: check CronJob / job logs.
 1. Reassemble the age private key from M-of-N shares on a trusted machine.
 2. Pull the latest ciphertext (from Spaces OR niflheim).
 3. Decrypt: `sops --decrypt <obj> > /dev/shm/secrets.json` (tmpfs only).
-4. Re-create secrets in a new/recovered project:
+4. Re-create secrets in a new/recovered project. Only the "already exists"
+   case falls through to `versions add`; any OTHER create failure (permission,
+   quota, bad project) surfaces and aborts — a blanket `2>/dev/null ||` would
+   silently mask a broken restore:
        jq -r 'to_entries[] | "\(.key)\t\(.value)"' /dev/shm/secrets.json | \
        while IFS=$'\t' read -r NAME B64; do
-         printf '%s' "$B64" | base64 -d | \
-           gcloud secrets create "$NAME" --project=<new> --data-file=- 2>/dev/null || \
-         printf '%s' "$B64" | base64 -d | \
-           gcloud secrets versions add "$NAME" --project=<new> --data-file=-
+         err=$(printf '%s' "$B64" | base64 -d | \
+           gcloud secrets create "$NAME" --project=<new> --data-file=- 2>&1) && continue
+         if printf '%s' "$err" | grep -qiE 'already exists|ALREADY_EXISTS'; then
+           printf '%s' "$B64" | base64 -d | \
+             gcloud secrets versions add "$NAME" --project=<new> --data-file=-
+         else
+           printf 'restore FAILED for %s: %s\n' "$NAME" "$err" >&2
+           exit 1
+         fi
        done
 5. Repoint ESO ClusterSecretStore at <new>; shred /dev/shm/secrets.json.
+
+## What the restore gives you (and what it does NOT)
+The export captures the **`latest` version value of each secret only**. A restore
+therefore reconstructs the current secret set — enough to bring the platform back —
+but it is a value snapshot, not a fidelity clone of the Secret Manager project:
+- **No version history** — prior versions are dropped; the restored secret starts at v1.
+- **No labels / annotations** — metadata used for filtering/organization is not preserved.
+- **No replication policy** — restored secrets take the new project's default (usually
+  automatic); re-apply any user-managed replication explicitly if required.
+- **No IAM bindings / rotation config / expiry** — per-secret access grants and
+  rotation schedules must be re-applied out of band.
+This is acceptable for break-glass (the *values* are the irreplaceable part), but the
+restorer must know they are rebuilding metadata, not inheriting it.
 
 ## Quarterly break-glass drill (proves it, per PG-drill precedent)
 - Reassemble the key, decrypt the latest archive into a THROWAWAY project,
@@ -417,9 +503,227 @@ git commit -m "docs(secrets-dr): runbook + age-key escrow policy + break-glass d
 
 ---
 
+### Task 6: niflheim quarantining mirror (host-side script)
+
+The in-cluster CronJob (Tasks 1–2) only *uploads* to `mycure-secrets-dr` — **nothing mirrors that bucket off-provider yet**. This task builds the second half: a **host-side script on niflheim**, not a chart template. `charts/secrets-dr-backup/` deploys into the in-cluster `mycure-production` namespace; niflheim is an off-cluster bare-metal host a Helm chart can't reach — same host/cluster split PRs #400/#402 navigate, so it ships as a `scripts/` script + runbook. The two halves meet **only** through the Spaces bucket. The mirror uses `rclone sync --backup-dir` so a delete on Spaces (compromised/mis-scoped write key) moves the object into a dated quarantine directory locally instead of deleting the on-prem copy; a prune sweeps quarantine dirs older than a retention window (the `WAL_QUARANTINE_DAYS` pattern, here `QUARANTINE_DAYS`). Modeled on `mycure-wal-reconcile`; **NOT** an edit to the shared `onprem-backup-setup.sh` (another owner's hotspot).
+
+**Files:**
+- Create: `scripts/secrets-dr-mirror-setup.sh`
+- Modify: `docs/operations/SECRETS_DR.md` (add a "niflheim quarantine mirror" section pointing at the script + the quarantine dir).
+
+**Interfaces:**
+- Consumes (env): `SPACES_ACCESS_KEY`, `SPACES_SECRET_KEY` (read-only Spaces key preferred); flags for bucket/region/dir/retention.
+- Produces: one systemd `secrets-dr-mirror.service` + `.timer` on niflheim that runs `rclone sync spaces:mycure-secrets-dr/ <dir>/ --backup-dir <dir>/secrets-deleted/<date>`, plus an age-based quarantine prune.
+
+- [ ] **Step 1: `scripts/secrets-dr-mirror-setup.sh`** — a trimmed sibling of `onprem-backup-setup.sh` (same defaults/arg-parsing/systemd idiom, but a plain `rclone sync` — no kopia, no LUKS). The script *emits* the units; the `rclone` command inside them is what actually quarantines:
+
+```bash
+#!/usr/bin/env bash
+# Sets up a QUARANTINING pull-mirror of the mycure-secrets-dr Spaces bucket on
+# niflheim. Unlike the shared onprem-backup-setup.sh (Kopia/Velero, no
+# --backup-dir), this uses `rclone sync --backup-dir` so a delete on Spaces
+# (compromised write key) can NEVER erase the on-prem DR copy — the object is
+# moved into a dated quarantine dir instead. A prune sweeps quarantine dirs
+# older than QUARANTINE_DAYS (mirrors the wal-reconcile WAL_QUARANTINE_DAYS knob).
+# Ciphertext only (<100 MB); the age private key is never here.
+#
+# Usage:
+#   sudo SPACES_ACCESS_KEY=… SPACES_SECRET_KEY=… scripts/secrets-dr-mirror-setup.sh [flags]
+set -euo pipefail
+
+# ---------- defaults ----------
+BACKUP_DIR=/var/backups/mycure-secrets-dr
+BUCKET=mycure-secrets-dr
+REGION=sgp1
+QUARANTINE_DAYS=90                         # prune secrets-deleted/<date> dirs older than this
+SERVICE_USER=mycure-secrets-dr
+TIMER_ON_CALENDAR="*-*-* 03:20:00 UTC"     # after the 01:00 PHT cluster export lands
+RCLONE_VERSION=1.69.1
+RCLONE_BIN=/usr/local/bin/rclone
+RCLONE_CONFIG=/etc/rclone/secrets-dr.conf
+SERVICE_NAME=secrets-dr-mirror
+SYSTEMD_DIR=/etc/systemd/system
+PRUNE_BIN=/usr/local/sbin/secrets-dr-prune
+
+log() { printf '\033[1;34m[secrets-dr]\033[0m %s\n' "$*"; }
+err() { printf '\033[1;31m[secrets-dr]\033[0m %s\n' "$*" >&2; exit 1; }
+
+# ---------- arg parsing ----------
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --backup-dir=*)        BACKUP_DIR="${1#*=}";        shift;;
+    --bucket=*)            BUCKET="${1#*=}";            shift;;
+    --region=*)            REGION="${1#*=}";            shift;;
+    --quarantine-days=*)   QUARANTINE_DAYS="${1#*=}";   shift;;
+    --service-user=*)      SERVICE_USER="${1#*=}";      shift;;
+    --timer-on-calendar=*) TIMER_ON_CALENDAR="${1#*=}"; shift;;
+    -h|--help) grep '^#' "$0" | sed 's/^# \{0,1\}//'; exit 0;;
+    *) err "unknown flag: $1 (see --help)";;
+  esac
+done
+
+[[ $EUID -eq 0 ]] || err "must run as root (use sudo)"
+: "${SPACES_ACCESS_KEY:?SPACES_ACCESS_KEY env var is required}"
+: "${SPACES_SECRET_KEY:?SPACES_SECRET_KEY env var is required}"
+command -v apt-get >/dev/null || err "apt-based distros only"
+
+# ---------- rclone (pinned static binary) ----------
+apt-get update -qq
+apt-get install -y -qq curl ca-certificates unzip >/dev/null
+if ! "$RCLONE_BIN" version 2>/dev/null | grep -q "rclone v$RCLONE_VERSION"; then
+  arch=$(uname -m); case "$arch" in x86_64) ra=amd64;; aarch64) ra=arm64;; *) err "unsupported arch $arch";; esac
+  tmp=$(mktemp -d); trap 'rm -rf "$tmp"' EXIT
+  curl -fsSL "https://downloads.rclone.org/v${RCLONE_VERSION}/rclone-v${RCLONE_VERSION}-linux-${ra}.zip" -o "$tmp/r.zip"
+  unzip -q "$tmp/r.zip" -d "$tmp"
+  install -m 0755 "$tmp"/rclone-v*-linux-*/rclone "$RCLONE_BIN"
+fi
+
+# ---------- service user + dirs ----------
+id -u "$SERVICE_USER" >/dev/null 2>&1 || \
+  useradd --system --no-create-home --shell /usr/sbin/nologin --user-group "$SERVICE_USER"
+mkdir -p "$BACKUP_DIR/current" "$BACKUP_DIR/secrets-deleted"
+chown -R "$SERVICE_USER:$SERVICE_USER" "$BACKUP_DIR"
+chmod -R 0750 "$BACKUP_DIR"
+
+# ---------- rclone config (read-only Spaces key preferred) ----------
+mkdir -p "$(dirname "$RCLONE_CONFIG")"
+umask 077
+cat > "$RCLONE_CONFIG" <<EOF
+[spaces]
+type = s3
+provider = DigitalOcean
+region = $REGION
+endpoint = $REGION.digitaloceanspaces.com
+access_key_id = $SPACES_ACCESS_KEY
+secret_access_key = $SPACES_SECRET_KEY
+acl = private
+EOF
+umask 022
+chgrp "$SERVICE_USER" "$RCLONE_CONFIG"
+chmod 0640 "$RCLONE_CONFIG"
+unset SPACES_ACCESS_KEY SPACES_SECRET_KEY   # scrub env
+
+# ---------- quarantine prune helper ----------
+# Delete secrets-deleted/<date> dirs older than QUARANTINE_DAYS. Mirrors the
+# wal-reconcile WAL_QUARANTINE_DAYS knob: a bounded window to recover a
+# mistaken/hostile delete before the quarantine copy itself ages out.
+install -m 0755 /dev/stdin "$PRUNE_BIN" <<PRUNE
+#!/usr/bin/env bash
+set -euo pipefail
+QDIR="$BACKUP_DIR/secrets-deleted"
+[[ -d "\$QDIR" ]] || exit 0
+find "\$QDIR" -mindepth 1 -maxdepth 1 -type d -mtime +$QUARANTINE_DAYS -print -exec rm -rf {} +
+PRUNE
+
+# ---------- systemd service ----------
+# rclone sync moves any object deleted upstream into a dated quarantine dir
+# instead of deleting it locally; the prune then bounds that dir by age.
+cat > "$SYSTEMD_DIR/$SERVICE_NAME.service" <<UNIT
+[Unit]
+Description=Quarantining mirror of the mycure-secrets-dr Spaces bucket (off-provider DR)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=$SERVICE_USER
+Group=$SERVICE_USER
+Environment=RCLONE_CONFIG=$RCLONE_CONFIG
+ExecStart=$RCLONE_BIN sync spaces:$BUCKET/ $BACKUP_DIR/current/ \\
+  --backup-dir $BACKUP_DIR/secrets-deleted/%i \\
+  --suffix "" \\
+  --transfers 2 \\
+  --checkers 4 \\
+  --log-level INFO \\
+  --stats-one-line
+ExecStartPost=$PRUNE_BIN
+TimeoutStartSec=1h
+Nice=10
+
+[Install]
+WantedBy=multi-user.target
+UNIT
+
+# %i (the instance date) is injected by wrapping the ExecStart date at call
+# time — systemd OnCalendar timers don't expand %i, so we template it via a
+# drop-in that sets the dated backup-dir. Simplest robust form: a wrapper.
+install -m 0755 /dev/stdin /usr/local/sbin/secrets-dr-sync <<SYNC
+#!/usr/bin/env bash
+set -euo pipefail
+export RCLONE_CONFIG=$RCLONE_CONFIG
+DATE=\$(date -u +%Y-%m-%d)
+exec $RCLONE_BIN sync spaces:$BUCKET/ $BACKUP_DIR/current/ \\
+  --backup-dir "$BACKUP_DIR/secrets-deleted/\$DATE" \\
+  --transfers 2 --checkers 4 --log-level INFO --stats-one-line
+SYNC
+
+# Point the unit at the wrapper (clean date handling) + keep the prune.
+cat > "$SYSTEMD_DIR/$SERVICE_NAME.service" <<UNIT
+[Unit]
+Description=Quarantining mirror of the mycure-secrets-dr Spaces bucket (off-provider DR)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=$SERVICE_USER
+Group=$SERVICE_USER
+ExecStart=/usr/local/sbin/secrets-dr-sync
+ExecStartPost=$PRUNE_BIN
+TimeoutStartSec=1h
+Nice=10
+
+[Install]
+WantedBy=multi-user.target
+UNIT
+
+# ---------- systemd timer ----------
+cat > "$SYSTEMD_DIR/$SERVICE_NAME.timer" <<UNIT
+[Unit]
+Description=Daily timer for the secrets-dr quarantining mirror
+
+[Timer]
+OnCalendar=$TIMER_ON_CALENDAR
+Persistent=true
+RandomizedDelaySec=10m
+Unit=$SERVICE_NAME.service
+
+[Install]
+WantedBy=timers.target
+UNIT
+
+# ---------- validate creds + enable ----------
+sudo -u "$SERVICE_USER" RCLONE_CONFIG="$RCLONE_CONFIG" \
+  rclone lsd "spaces:$BUCKET/" >/dev/null 2>&1 || \
+  err "rclone failed to list spaces:$BUCKET — check the read-only Spaces key + bucket name"
+systemctl daemon-reload
+systemctl enable --now "$SERVICE_NAME.timer" >/dev/null
+
+log "setup complete:"
+echo "  bucket        : spaces:$BUCKET ($REGION)"
+echo "  mirror dir    : $BACKUP_DIR/current"
+echo "  quarantine    : $BACKUP_DIR/secrets-deleted/<date> (pruned after ${QUARANTINE_DAYS}d)"
+echo "  timer         : $TIMER_ON_CALENDAR"
+echo "  trigger now   : sudo systemctl start $SERVICE_NAME.service"
+```
+
+> **Note on the two `.service` heredocs above:** the first (with an inline `%i` `--backup-dir`) is shown then immediately *replaced* by the wrapper-based unit — `%i` is only expanded for templated `@` units, so the production form is the wrapper (`secrets-dr-sync`) which computes `date -u +%Y-%m-%d` at run time. At implementation, keep only the wrapper form; the first block is retained here to explain *why* the wrapper exists. `# ponytail: one unit, one wrapper — don't template a @.service just for a date.`
+
+- [ ] **Step 2: Runbook + commit**
+
+Add a "niflheim quarantine mirror" section to `docs/operations/SECRETS_DR.md`: how to (re)run the setup (`sudo SPACES_ACCESS_KEY=… SPACES_SECRET_KEY=… scripts/secrets-dr-mirror-setup.sh`), where the quarantine lives (`/var/backups/mycure-secrets-dr/secrets-deleted/<date>`), and how to recover an object a Spaces delete moved into quarantine.
+```bash
+git add scripts/secrets-dr-mirror-setup.sh docs/operations/SECRETS_DR.md
+git commit -m "feat(secrets-dr): niflheim quarantining Spaces mirror (host-side, monobase-mycure#3882)"
+```
+
+---
+
 ## Self-Review
 
-**Spec coverage:** off-provider requirement → Spaces+niflheim, offline age key (Task 2/5). All 115 secrets → `gcloud secrets list` loop (Task 2). Break-glass restore → Task 5. Provider-specific alternative researched + documented (Vault import / HCP / Akeyless / Infisical) → Task 5, not built (Option A priority). Minimal surface → read-only SA + public-key encryption + tmpfs (Global Constraints). ✅
+**Spec coverage:** off-provider requirement → in-cluster upload (Task 2) + niflheim quarantining mirror (Task 6), offline age key (Task 2/5). All 115 secrets → `gcloud secrets list` loop (Task 2). Failure/staleness alerting → Task 4.5. Quarantine (delete can't destroy the DR copy) → Task 6 `rclone sync --backup-dir` + age prune. Break-glass restore → Task 5 (restore surfaces only the `latest` value — no history/labels/replication, documented). Provider-specific alternative researched + documented (Vault import / HCP / Akeyless / Infisical) → Task 5, not built (Option A priority). Minimal surface → read-only SA + public-key encryption + tmpfs (Global Constraints). ✅
+
+**Host/cluster split:** the CronJob (Tasks 1–2, in-cluster `mycure-production`) and the quarantine (Task 6, off-cluster niflheim) meet ONLY through the Spaces bucket. The quarantine is a `scripts/` host script, NOT a chart template — a chart can't reach niflheim (same split as PRs #400/#402). ✅
 
 **Open items for biz/owner decision (issue #3882):**
 1. **age private-key escrow** — who are the M-of-N custodians and the threshold (recommend 2-of-3)? This is the entire security model.
@@ -427,6 +731,6 @@ git commit -m "docs(secrets-dr): runbook + age-key escrow policy + break-glass d
 3. **Warm standby** — build the provider-specific Vault/Akeyless/Infisical layer now, or defer (plan defers it; Option A only).
 4. **Cadence/retention** — daily export + 90 daily versions OK?
 
-**Placeholder scan:** `<obj>`, `<new>`, `age1...`, `<name/role>` are runtime/escrow fill-ins, not logic gaps. Image needs `sops+age+jq+gcloud+aws` baked (noted in Task 2). No TODO logic.
+**Placeholder scan:** `<obj>`, `<new>`, `age1...`, `<name/role>`, `<date>` are runtime/escrow fill-ins, not logic gaps. Image is `image: ""` by design (fail loud) and needs `sops+age+jq+gcloud+aws` (or rclone) baked — noted in Task 2 + values.yaml. Task 6 ships two `.service` heredocs (inline-`%i` illustrative + wrapper production); keep only the wrapper. No TODO logic.
 
 **Type consistency:** Secret name `secrets-dr-backup` and keys `gcp-sa.json`/`spaces-access-key`/`spaces-secret-key` consistent across externalsecret (Task 1) and cronjob (Task 2); ConfigMap `secrets-dr-backup-script` + `export.sh`/`recipients.txt` consistent between configmap and cronjob mounts. ✅
