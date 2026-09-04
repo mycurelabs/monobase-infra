@@ -22,6 +22,10 @@ const ENVS: Record<string, { api: string; cms: string }> = {
     api: "https://hapihub.preprod.localfirsthealth.com",
     cms: "https://mycure.preprod.localfirsthealth.com",
   },
+  staging: {
+    api: "https://hapihub.staging.localfirsthealth.com",
+    cms: "https://mycure.staging.localfirsthealth.com",
+  },
   production: {
     api: "https://hapihub.localfirsthealth.com",
     cms: "https://mycure.localfirsthealth.com",

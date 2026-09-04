@@ -156,24 +156,137 @@ hapihub-docs:
   enabled: false
 nocodb:
   enabled: false
-# ===== MEDICAL AI: disabled wholesale in staging =====
+# ===== MEDICAL AI: full parity with preprod (mirrored) =====
+# Ollama runs on the vanaheim HOST — the AI services reach it via host.k3d.internal
+# (k3d's host gateway) instead of preprod's ollama.tailscale.svc egress (ollamaEgress
+# stays off here). Otherwise a value-for-value mirror of mycure-preprod.
 medley:
-  enabled: false # no medical-AI stack in lean staging
+  enabled: true
+  image:
+    repository: ghcr.io/mycurelabs/medley
+    tag: "0.1.2"
+    pullPolicy: IfNotPresent
+  replicaCount: 1
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
+  gateway:
+    enabled: false  # ClusterIP only — no public HTTPRoute
+  config:
+    HAPIHUB_URL: "http://hapihub:7500"
+    OLLAMA_URL: "http://host.k3d.internal:11434"
+    MEDGEMMA_URL: "http://medgemma-worker:8940"
+    OPENMED_URL: "http://openmed:8920"
+    MEDLEY_CHAT_MODEL: "qwen3.5:9b"
+    MEDLEY_CORS_ORIGINS: "https://medleyapp.staging.localfirsthealth.com"
+    MEDLEY_MODEL_PRESETS: '[{"id":"onprem-qwen","label":"On-prem Qwen 3.5 9B","provider":"ollama","model":"qwen3.5:9b"},{"id":"openai-gpt4o","label":"OpenAI GPT-4o (your key)","provider":"openai-compatible","model":"gpt-4o","baseUrl":"https://api.openai.com/v1","requiresKey":true},{"id":"anthropic-sonnet","label":"Claude Sonnet 4.6 (your key)","provider":"anthropic","model":"claude-sonnet-4-6","requiresKey":true}]'
+  externalSecrets:
+    enabled: true
+    secretStore: gcp-secretstore
+    secretStoreKind: ClusterSecretStore
+    refreshInterval: 1h
+    secrets:
+    - secretKey: MEDLEY_HISTORY_KEY
+      remoteKey: mycure-staging-medley-history-key
+  podDisruptionBudget:
+    enabled: false
 medleyapp:
-  enabled: false # no medical-AI stack in lean staging
+  enabled: true
+  image:
+    repository: ghcr.io/mycurelabs/medleyapp
+    tag: "0.1.4"
+    pullPolicy: IfNotPresent
+  replicaCount: 1
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 128Mi
+  gateway:
+    hostname: ""  # defaults to medleyapp.staging.localfirsthealth.com
+    sectionName: https-staging-lfh
+  config:
+    API_URL: "https://hapihub.staging.localfirsthealth.com"
+    HAPIHUB_URL: "https://hapihub.staging.localfirsthealth.com"
+  podDisruptionBudget:
+    enabled: false
 medgemmaWorker:
-  enabled: false # no medical-AI stack in lean staging
+  enabled: true
+  image:
+    repository: ghcr.io/mycurelabs/medgemma-worker
+    tag: "0.1.0"
+    pullPolicy: IfNotPresent
+  replicaCount: 1
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
+  gateway:
+    enabled: false  # ClusterIP only
+  config:
+    OLLAMA_URL: "http://host.k3d.internal:11434"
+    MEDGEMMA_MODEL: "hf.co/unsloth/medgemma-4b-it-GGUF:Q4_K_M"
+  podDisruptionBudget:
+    enabled: false
 openmed:
-  enabled: false # no medical-AI stack in lean staging
-# ===== DATABASE: PostgreSQL =====
-# Standalone (single instance), lean: no read replica, small PVC. k3d local.
+  enabled: true
+  image:
+    repository: ghcr.io/mycurelabs/openmed
+    tag: "0.1.3"
+    pullPolicy: IfNotPresent
+  replicaCount: 1
+  resources:
+    requests:
+      cpu: 500m
+      memory: 768Mi
+    limits:
+      cpu: "1"
+      memory: 2Gi
+  gateway:
+    enabled: false  # ClusterIP only
+  config:
+    OPENMED_PRELOAD: "disease,pharma"
+    PYTHONUNBUFFERED: "1"
+  # HuggingFace model preload takes minutes — generous liveness grace so it isn't
+  # killed mid-load (mirrors preprod).
+  livenessProbe:
+    enabled: true
+    initialDelaySeconds: 600
+    periodSeconds: 15
+    failureThreshold: 4
+  persistence:
+    enabled: true
+    size: 3Gi
+    storageClassName: local-path  # k3d CSI (preprod uses do-block-storage)
+  podDisruptionBudget:
+    enabled: false
+# ===== DATABASE: PostgreSQL (HA — 1 primary + 1 read replica) =====
+# Replication for prod parity: the cadence hub's reconcile/serve scan plane reads
+# from the replica (CADENCE_DB_READ_URL). Lean sizing (8Gi PVCs, k3d local-path) —
+# NOT preprod's 215Gi/walg. walg (WAL archiving) stays OFF (ephemeral staging).
 postgresql:
-  architecture: standalone
+  architecture: replication
+  auth:
+    replicationUsername: repl_user
+    secretKeys:
+      replicationPasswordKey: postgres-replication-password
   primary:
-    # max_connections=100 is enough for hapihub without the cadence watcher fan-out.
+    # 300 (not 100): cadence boot opens ~99 per-collection ensure connections
+    # simultaneously on top of hapihub. max_slot_wal_keep_size caps slot-retained
+    # WAL so a dead replica can't fill the primary's small volume.
     extendedConfiguration: |
       shared_preload_libraries = 'pgaudit, pg_stat_statements'
-      max_connections = 100
+      max_connections = 300
+      max_slot_wal_keep_size = 4GB
     persistence:
       size: 8Gi
     resources:
@@ -183,6 +296,38 @@ postgresql:
       limits:
         cpu: 2000m
         memory: 8Gi
+  readReplicas:
+    replicaCount: 1
+    persistence:
+      enabled: true
+      storageClass: ""   # k3d default (local-path)
+      size: 8Gi
+    resources:
+      requests:
+        cpu: 100m
+        memory: 512Mi
+      limits:
+        cpu: 1000m
+        memory: 2Gi
+    extendedConfiguration: |
+      shared_preload_libraries = 'pgaudit, pg_stat_statements'
+      max_connections = 300
+      primary_slot_name = 'pg_read_replica'
+      hot_standby_feedback = on
+      max_standby_streaming_delay = 120s
+    # Gate liveness during the initial pg_basebackup clone (small here, but keep a
+    # grace so the probe can't SIGKILL mid-clone).
+    customStartupProbe:
+      exec:
+        command:
+        - /bin/sh
+        - -c
+        - exec pg_isready -U postgres -d dbname=hapihub -h 127.0.0.1 -p 5432
+      initialDelaySeconds: 30
+      periodSeconds: 15
+      timeoutSeconds: 5
+      failureThreshold: 60
+      successThreshold: 1
   podDisruptionBudget:
     enabled: false
 # ===== CACHE: Valkey (Redis) =====
@@ -210,8 +355,67 @@ mailpit:
   gateway:
     # Public web UI route is intentionally exposed with NO auth (testing convenience).
     hostname: "mail.staging.localfirsthealth.com"
-# ===== BACKUP / SYNC: cadence stack disabled in lean staging =====
+# ===== BACKUP / SYNC: cadence stack (mirrored from preprod) =====
 cadenceRelay:
-  enabled: false
+  enabled: true
+  # ClusterIP on the shared gateway (no own LB). 443 leg via HTTPRoute; QUIC leg via
+  # UDPRoute on the relay-quic-staging listener (added to the gateway in this cluster's
+  # infrastructure.yaml).
+  serviceType: ClusterIP
+  gatewayRoute:
+    enabled: true
+    hostname: cadence-relay.staging.localfirsthealth.com
+    sectionName: https-staging-lfh
+    udpListener: relay-quic-staging
 cadence:
-  enabled: false
+  enabled: true
+  image:
+    tag: "2.1.105"
+  # staging hapihub (11.20.120) already dropped file_links + organization_partners,
+  # so gate those collection entries off or cadence crash-loops (same as preprod).
+  dropUnusedTables: true
+  # no nodePool: k3d nodes are untainted (preprod pins nonprod, which doesn't exist here).
+  nodePool: ""
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: "2"
+      memory: 3Gi
+  # Never co-locate with the PG primary (hashing vs PG execution contend for cores).
+  affinity:
+    podAntiAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+      - labelSelector:
+          matchLabels:
+            app.kubernetes.io/name: postgresql
+            app.kubernetes.io/component: primary
+        topologyKey: kubernetes.io/hostname
+  # <staging gateway tailnet IP>:<cadence-quic-staging port>. NOTE: the gateway IP changes
+  # on cluster rebuild — repoint here + the DNS A record if the cluster is nuked.
+  publicAddr: "100.124.242.71:6473"
+  # n0 public relays (the self-hosted relay's HTTP-upgrade handshake is broken through the
+  # shared gateway — same interim as preprod).
+  relayUrl: ""
+  postgresql:
+    serviceName: postgresql-primary
+    # Read-plane split: reconcile/serve scans read from the replica; writes on primary.
+    readServiceName: postgresql-read
+  gateway:
+    sectionName: https-staging-lfh
+    udpListener: cadence-quic-staging
+    hostnames:
+    - cadence.staging.localfirsthealth.com
+  # hapihub is the sole authorization server — mints box grants AND the hub's own '*' grant.
+  auth:
+    issuerUrl: https://hapihub.staging.localfirsthealth.com
+    grantJwksUri: https://hapihub.staging.localfirsthealth.com/.well-known/jwks.json
+    fleetId: mycure-staging
+    authorizeUrl: https://hapihub.staging.localfirsthealth.com/sync/authorize
+  # Service-account API key (service@mycure.md, non-expiring) minted into hapihub-staging's
+  # better-auth by scripts/seed.ts and stored at mycure-staging-cadence-sa-api-key.
+  externalSecrets:
+    secrets:
+    - secretKey: sa-api-key
+      remoteKey: mycure-staging-cadence-sa-api-key
