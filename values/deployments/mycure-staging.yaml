@@ -180,11 +180,13 @@ nocodb:
 # Ollama runs on the vanaheim HOST — the AI services reach it via host.k3d.internal
 # (k3d's host gateway) instead of preprod's ollama.tailscale.svc egress (ollamaEgress
 # stays off here). Otherwise a value-for-value mirror of mycure-preprod.
+# medley 2.x — the from-scratch governed harness (replaces the 1.x chat app). In-process (no medgemma/openmed
+# dependency for the current surface). Own `medley` database on the shared PG; onprem model via host ollama.
 medley:
   enabled: true
   image:
     repository: ghcr.io/mycurelabs/medley
-    tag: "0.1.2"
+    tag: "2.0.0"           # imported into k3d (ctr) until a Medley Release pushes it to ghcr
     pullPolicy: IfNotPresent
   replicaCount: 1
   resources:
@@ -196,22 +198,16 @@ medley:
       memory: 1Gi
   gateway:
     enabled: false  # ClusterIP only — no public HTTPRoute
-  config:
-    HAPIHUB_URL: "http://hapihub:7500"
-    OLLAMA_URL: "http://host.k3d.internal:11434"
-    MEDGEMMA_URL: "http://medgemma-worker:8940"
-    OPENMED_URL: "http://openmed:8920"
-    MEDLEY_CHAT_MODEL: "qwen3.5:9b"
-    MEDLEY_CORS_ORIGINS: "https://medleyapp.staging.localfirsthealth.com"
-    MEDLEY_MODEL_PRESETS: '[{"id":"onprem-qwen","label":"On-prem Qwen 3.5 9B","provider":"ollama","model":"qwen3.5:9b"},{"id":"openai-gpt4o","label":"OpenAI GPT-4o (your key)","provider":"openai-compatible","model":"gpt-4o","baseUrl":"https://api.openai.com/v1","requiresKey":true},{"id":"anthropic-sonnet","label":"Claude Sonnet 4.6 (your key)","provider":"anthropic","model":"claude-sonnet-4-6","requiresKey":true}]'
-  externalSecrets:
+  # DBOS run-state + clinic-analytics: own database on the shared bitnami Postgres; DATABASE_URL is built in
+  # the chart from the in-cluster `postgresql` secret (password out of git). DBOS auto-creates the `medley` db.
+  postgresql:
     enabled: true
-    secretStore: gcp-secretstore
-    secretStoreKind: ClusterSecretStore
-    refreshInterval: 1h
-    secrets:
-    - secretKey: MEDLEY_HISTORY_KEY
-      remoteKey: mycure-staging-medley-history-key
+  config:
+    OLLAMA_URL: "http://host.k3d.internal:11434/v1"   # host ollama (openai-compatible /v1)
+    MEDLEY_CHAT_MODEL: "qwen2.5:14b-instruct"
+    MEDLEY_SEED_DEMO: "true"                          # seed the synthetic analytics dataset (staging demo)
+  externalSecrets:
+    enabled: false   # 2.x has no MEDLEY_HISTORY_KEY; its only secret (DATABASE_URL) comes via the chart
   podDisruptionBudget:
     enabled: false
 medleyapp:
