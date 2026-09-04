@@ -162,6 +162,8 @@ cmd_uninstall() {
     if [[ -n "$target" && -d "$target" ]]; then
       log "deleting replica data $target ($(du -sh "$target" 2>/dev/null | cut -f1))"
       rm -rf "$target"
+      # tidy the now-empty parent (no-op if other instances' dirs live alongside).
+      rmdir "$(dirname "$target")" 2>/dev/null || true
     else
       warn "no target dir to delete (env missing or already gone): '${target:-?}'"
     fi
