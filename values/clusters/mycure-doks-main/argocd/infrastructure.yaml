@@ -355,6 +355,11 @@ kyverno:
     restrictRegistries:
       enabled: true
       action: audit
+      # mycure's org registries — prepended to the chart's shared third-party
+      # allowlist (charts/kyverno-resources/values.yaml).
+      orgRegistries:
+        - "ghcr.io/mycurelabs/*"
+        - "ghcr.io/monobaselabs/*"
 
 # Velero - Backup and disaster recovery
 velero:
