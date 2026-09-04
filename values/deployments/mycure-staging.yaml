@@ -54,6 +54,12 @@ hapihub:
     enabled: true
   # single replica, no HPA
   replicaCount: 1
+  # Postgres is now HA (architecture: replication) — point the DB host at the
+  # primary service (bitnami renames postgresql -> postgresql-primary). Without
+  # this the chart's DATABASE_URI keeps the standalone 'postgresql' host, which
+  # no longer resolves. Matches preprod.
+  postgresql:
+    serviceName: postgresql-primary
   resources:
     requests:
       memory: 768Mi
@@ -69,8 +75,8 @@ hapihub:
       rpName: "Mycure (staging)"
       rpId: "staging.localfirsthealth.com"
   config:
-    CORS_ORIGINS: "https://hapihub.staging.localfirsthealth.com,https://mycure.staging.localfirsthealth.com,https://mycure-dashboard.staging.localfirsthealth.com,https://mycure-pxp.staging.localfirsthealth.com,https://mycure-pr--*.web.app"
-    # Medical-AI stack (medgemma-worker + openmed + medley) is DISABLED in staging.
+    CORS_ORIGINS: "https://hapihub.staging.localfirsthealth.com,https://mycure.staging.localfirsthealth.com,https://mycure-dashboard.staging.localfirsthealth.com,https://mycure-pxp.staging.localfirsthealth.com,https://medleyapp.staging.localfirsthealth.com,https://mycure-pr--*.web.app"
+    # Medical-AI stack (medgemma-worker + openmed + medley) is ENABLED (preprod parity).
   env:
     - name: BETTER_AUTH_RATE_LIMIT_ENABLED
       value: "true"
@@ -358,6 +364,8 @@ mailpit:
 # ===== BACKUP / SYNC: cadence stack (mirrored from preprod) =====
 cadenceRelay:
   enabled: true
+  # no nodePool: k3d nodes are untainted (preprod pins nonprod, which doesn't exist here).
+  nodePool: ""
   # ClusterIP on the shared gateway (no own LB). 443 leg via HTTPRoute; QUIC leg via
   # UDPRoute on the relay-quic-staging listener (added to the gateway in this cluster's
   # infrastructure.yaml).
