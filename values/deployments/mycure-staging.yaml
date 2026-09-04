@@ -372,6 +372,10 @@ cadenceRelay:
     udpListener: relay-quic-staging
 cadence:
   enabled: true
+  # No Prometheus Operator on this lean k3d cluster — the ServiceMonitor CRD
+  # (monitoring.coreos.com) is absent, so rendering it fails the whole ArgoCD sync.
+  serviceMonitor:
+    enabled: false
   image:
     tag: "2.1.105"
   # staging hapihub (11.20.120) already dropped file_links + organization_partners,
