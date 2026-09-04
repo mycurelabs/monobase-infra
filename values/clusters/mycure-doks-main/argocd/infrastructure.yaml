@@ -412,10 +412,10 @@ velero:
   # Manager — see the issue handover. Enabling = flip enabled + set bucket +
   # endpoint + region (region is the endpoint's middle segment, e.g. us-west-004).
   backblaze:
-    enabled: false
-    bucket: ""                 # B2 bucket, e.g. mycure-b2-backups (Velero BSL + wal mirror share it, distinct prefixes)
-    endpoint: ""               # e.g. s3.us-west-004.backblazeb2.com
-    region: ""                 # endpoint middle segment, e.g. us-west-004
+    enabled: true
+    bucket: "mycure-velero-backblaze-b2-backups"  # Velero BSL + wal mirror share it, distinct prefixes
+    endpoint: "s3.us-east-005.backblazeb2.com"
+    region: "us-east-005"                         # endpoint middle segment
     s3ForcePathStyle: "false"  # B2 S3 supports virtual-hosted style
     walMirror:
       schedule: "*/15 * * * *" # tight cadence -> low secondary WAL RPO
