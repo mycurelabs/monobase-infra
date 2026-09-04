@@ -1,19 +1,22 @@
 {{- /*
-Backblaze B2 off-provider backup mirror.
+Backblaze B2 WAL mirror (wal-g PITR off-provider redundancy, #4007).
 
-WHY ONE CRONJOB COVERS BOTH BACKUP SYSTEMS:
-The DO Spaces bucket `mycure-doks-velero-backups` already holds BOTH Velero
-backups (prefix `infrastructure/`, per-app prefixes) AND the wal-g WAL archive
-(prefix `wal/mycure-production`, from postgresql's WALG_S3_PREFIX). So a single
-S3->S3 mirror of that whole bucket gives every backup an independent-provider
-second copy in one job — no second Velero BackupStorageLocation, no duplicated
-Schedules (which would double every backup run), no separate wal mirror.
+WHY A MIRROR HERE (and only for WAL): wal-g CANNOT dual-write WAL to two object
+stores (upstream #180; its "failover storages" is fallback-only, not redundant),
+so an async S3->S3 mirror of the wal/ prefix is the only way to get WAL onto a
+second provider without changing PITR engines. Velero does NOT go through this
+job — it dual-writes natively via the "backblaze" BSL + duplicate Schedules
+(backup-locations.yaml / schedules-backblaze.yaml). Scoping this mirror to just
+wal/ avoids re-copying the Velero blobs the native path already places in B2.
+The tight default cadence (every 15m) keeps secondary WAL RPO low and keeps B2
+out of PostgreSQL's archive_command critical path. Proper long-term fix
+(wal-g -> pgBackRest repo2 native dual-write) is tracked separately.
 
 Both endpoints are S3-compatible, so rclone needs no B2-native backend — two
 generic s3 remotes wired entirely through RCLONE_CONFIG_* env vars (no config
 file, so the root FS stays read-only). Credentials come from GCP Secret Manager
 via ESO: the DO source key is the same account-wide `monobase-digitalocean-spaces`
-Velero/wal-g already use; the B2 dest key is the sibling `monobase-backblaze-b2`.
+wal-g already uses; the B2 dest key is the sibling `monobase-backblaze-b2`.
 
 No NetworkPolicy: the velero namespace is not under security-baseline's
 default-deny (that targets tenant namespaces only) — Velero's own pods reach
@@ -65,23 +68,23 @@ spec:
 apiVersion: batch/v1
 kind: CronJob
 metadata:
-  name: backblaze-mirror
+  name: backblaze-wal-mirror
   namespace: velero
   labels:
     app.kubernetes.io/name: velero
     app.kubernetes.io/component: backup-mirror
 spec:
-  # After the 3AM infra + 4AM cluster backups have landed. WAL is continuous, so
-  # any time works for it; this window just avoids racing the Velero uploads.
-  schedule: {{ $b.schedule | default "30 5 * * *" | quote }}
+  # Tight cadence: WAL is continuous, so a short interval bounds secondary RPO.
+  # rclone sync is incremental — a run mostly just ships the new WAL segments.
+  schedule: {{ ($b.walMirror).schedule | default "*/15 * * * *" | quote }}
   concurrencyPolicy: Forbid
-  startingDeadlineSeconds: 3600
+  startingDeadlineSeconds: 300
   successfulJobsHistoryLimit: 3
   failedJobsHistoryLimit: 3
   jobTemplate:
     spec:
       backoffLimit: 2
-      activeDeadlineSeconds: {{ $b.activeDeadlineSeconds | default 21600 }}
+      activeDeadlineSeconds: {{ ($b.walMirror).activeDeadlineSeconds | default 3600 }}
       template:
         metadata:
           labels:
@@ -131,17 +134,19 @@ spec:
                   value: {{ $do.bucket | default "mycure-doks-velero-backups" | quote }}
                 - name: DST_BUCKET
                   value: {{ $b.bucket | required "velero.backblaze.bucket is required when velero.backblaze.enabled" | quote }}
+                - name: WAL_PREFIX
+                  value: {{ ($b.walMirror).prefix | default "wal" | quote }}
               command:
                 - /bin/sh
                 - -c
                 - |
                   set -eu
-                  # sync = keep B2 a faithful mirror (propagates Velero/wal-g
-                  # retention prunes; copy-only would retain every expired WAL
-                  # segment forever). ponytail: guard against a source wipe
-                  # propagating to B2 with B2 bucket versioning/object-lock, NOT
-                  # by switching to copy — see PR / issue #4007.
-                  exec rclone sync "src:${SRC_BUCKET}" "dst:${DST_BUCKET}" \
+                  # Mirror ONLY the wal/ prefix (Velero uses its native B2 BSL).
+                  # sync = faithful mirror: propagates wal-g's retention prunes so
+                  # B2 doesn't retain every expired segment forever. ponytail:
+                  # guard a source wipe propagating to B2 with B2 bucket
+                  # versioning/object-lock, NOT by switching to copy — see #4007.
+                  exec rclone sync "src:${SRC_BUCKET}/${WAL_PREFIX}" "dst:${DST_BUCKET}/${WAL_PREFIX}" \
                     --fast-list --transfers 8 --checkers 16 --stats 1m -v
               resources:
                 requests:

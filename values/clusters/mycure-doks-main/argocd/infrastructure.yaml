@@ -394,19 +394,34 @@ velero:
     accessKey: ""  # Via External Secrets
     secretKey: ""  # Via External Secrets
 
-  # Backblaze B2 off-provider mirror (issue #4007).
-  # One rclone S3->S3 CronJob mirrors the whole DO bucket -> B2, covering BOTH
-  # Velero backups AND wal-g WAL (they share mycure-doks-velero-backups).
-  # Disabled until the bucket exists and monobase-backblaze-b2 is in Secret
+  # Backblaze B2 off-provider redundancy (issue #4007).
+  #
+  # Two mechanisms, because the two backup systems differ (researched):
+  #  - Velero  -> NATIVE dual-write: a second BackupStorageLocation "backblaze"
+  #    + duplicate Schedules writing to a DISTINCT B2 bucket. Velero has no
+  #    native mirror and can't multi-write one backup, so duplicate Schedules
+  #    to a distinct bucket is its blessed redundancy path (restorable natively).
+  #  - wal-g   -> ASYNC mirror of the wal/ prefix. wal-g CANNOT dual-write WAL
+  #    (upstream #180; failover-storages is fallback-only), so an rclone S3->S3
+  #    mirror of just wal/ is the only option on wal-g. Tight cadence keeps
+  #    secondary RPO low and keeps B2 out of PostgreSQL's archive_command path.
+  #    The proper long-term fix (wal-g -> pgBackRest repo2 native dual-write) is
+  #    tracked separately.
+  #
+  # Disabled until the B2 bucket exists and monobase-backblaze-b2 is in Secret
   # Manager — see the issue handover. Enabling = flip enabled + set bucket +
-  # endpoint (region is the middle segment of the endpoint, e.g. us-west-004).
+  # endpoint + region (region is the endpoint's middle segment, e.g. us-west-004).
   backblaze:
     enabled: false
-    bucket: ""              # e.g. mycure-b2-backups
-    endpoint: ""            # e.g. s3.us-west-004.backblazeb2.com
-    schedule: "30 5 * * *"  # after the 3AM infra + 4AM cluster backups
-    # remoteKey: monobase-backblaze-b2          # GCP SM key for B2 creds
-    # sourceRemoteKey: monobase-digitalocean-spaces  # GCP SM key for DO creds
+    bucket: ""                 # B2 bucket, e.g. mycure-b2-backups (Velero BSL + wal mirror share it, distinct prefixes)
+    endpoint: ""               # e.g. s3.us-west-004.backblazeb2.com
+    region: ""                 # endpoint middle segment, e.g. us-west-004
+    s3ForcePathStyle: "false"  # B2 S3 supports virtual-hosted style
+    walMirror:
+      schedule: "*/15 * * * *" # tight cadence -> low secondary WAL RPO
+      prefix: wal              # only the wal/ prefix is mirrored (Velero goes native)
+    # remoteKey: monobase-backblaze-b2               # GCP SM key for B2 creds
+    # sourceRemoteKey: monobase-digitalocean-spaces  # GCP SM key for DO creds (wal mirror source)
 
   # MinIO configuration (for K3D/local development)
   minio:
