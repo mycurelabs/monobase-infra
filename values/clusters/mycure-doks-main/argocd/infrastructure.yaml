@@ -393,7 +393,21 @@ velero:
     region: sgp1
     accessKey: ""  # Via External Secrets
     secretKey: ""  # Via External Secrets
-  
+
+  # Backblaze B2 off-provider mirror (issue #4007).
+  # One rclone S3->S3 CronJob mirrors the whole DO bucket -> B2, covering BOTH
+  # Velero backups AND wal-g WAL (they share mycure-doks-velero-backups).
+  # Disabled until the bucket exists and monobase-backblaze-b2 is in Secret
+  # Manager — see the issue handover. Enabling = flip enabled + set bucket +
+  # endpoint (region is the middle segment of the endpoint, e.g. us-west-004).
+  backblaze:
+    enabled: false
+    bucket: ""              # e.g. mycure-b2-backups
+    endpoint: ""            # e.g. s3.us-west-004.backblazeb2.com
+    schedule: "30 5 * * *"  # after the 3AM infra + 4AM cluster backups
+    # remoteKey: monobase-backblaze-b2          # GCP SM key for B2 creds
+    # sourceRemoteKey: monobase-digitalocean-spaces  # GCP SM key for DO creds
+
   # MinIO configuration (for K3D/local development)
   minio:
     bucket: velero-backups

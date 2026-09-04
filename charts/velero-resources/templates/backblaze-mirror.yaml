@@ -1,0 +1,159 @@
+{{- /*
+Backblaze B2 off-provider backup mirror.
+
+WHY ONE CRONJOB COVERS BOTH BACKUP SYSTEMS:
+The DO Spaces bucket `mycure-doks-velero-backups` already holds BOTH Velero
+backups (prefix `infrastructure/`, per-app prefixes) AND the wal-g WAL archive
+(prefix `wal/mycure-production`, from postgresql's WALG_S3_PREFIX). So a single
+S3->S3 mirror of that whole bucket gives every backup an independent-provider
+second copy in one job — no second Velero BackupStorageLocation, no duplicated
+Schedules (which would double every backup run), no separate wal mirror.
+
+Both endpoints are S3-compatible, so rclone needs no B2-native backend — two
+generic s3 remotes wired entirely through RCLONE_CONFIG_* env vars (no config
+file, so the root FS stays read-only). Credentials come from GCP Secret Manager
+via ESO: the DO source key is the same account-wide `monobase-digitalocean-spaces`
+Velero/wal-g already use; the B2 dest key is the sibling `monobase-backblaze-b2`.
+
+No NetworkPolicy: the velero namespace is not under security-baseline's
+default-deny (that targets tenant namespaces only) — Velero's own pods reach
+Spaces from here unrestricted, so this pod reaches Spaces + B2 on 443 too.
+
+Gated on .Values.velero.backblaze.enabled so overlays without B2 render
+byte-identical; enabling requires bucket + endpoint + the monobase-backblaze-b2
+secret to exist first.
+*/ -}}
+{{- if and .Values.velero.enabled .Values.velero.backblaze .Values.velero.backblaze.enabled }}
+{{- $b := .Values.velero.backblaze }}
+{{- $do := .Values.velero.digitalocean }}
+---
+# B2 dest key + DO source key, projected into one secret for the mirror pod.
+apiVersion: external-secrets.io/v1beta1
+kind: ExternalSecret
+metadata:
+  name: backblaze-mirror-credentials
+  namespace: velero
+  labels:
+    app.kubernetes.io/name: velero
+    app.kubernetes.io/component: backup-mirror
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    name: {{ $b.secretStoreName | default "gcp-secretstore" }}
+    kind: ClusterSecretStore
+  target:
+    name: backblaze-mirror-credentials
+    creationPolicy: Owner
+  data:
+    - secretKey: SRC_ACCESS_KEY_ID
+      remoteRef:
+        key: {{ $b.sourceRemoteKey | default "monobase-digitalocean-spaces" }}
+        property: access_key
+    - secretKey: SRC_SECRET_ACCESS_KEY
+      remoteRef:
+        key: {{ $b.sourceRemoteKey | default "monobase-digitalocean-spaces" }}
+        property: secret_key
+    - secretKey: DST_ACCESS_KEY_ID
+      remoteRef:
+        key: {{ $b.remoteKey | default "monobase-backblaze-b2" }}
+        property: access_key
+    - secretKey: DST_SECRET_ACCESS_KEY
+      remoteRef:
+        key: {{ $b.remoteKey | default "monobase-backblaze-b2" }}
+        property: secret_key
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: backblaze-mirror
+  namespace: velero
+  labels:
+    app.kubernetes.io/name: velero
+    app.kubernetes.io/component: backup-mirror
+spec:
+  # After the 3AM infra + 4AM cluster backups have landed. WAL is continuous, so
+  # any time works for it; this window just avoids racing the Velero uploads.
+  schedule: {{ $b.schedule | default "30 5 * * *" | quote }}
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 3600
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      activeDeadlineSeconds: {{ $b.activeDeadlineSeconds | default 21600 }}
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: velero
+            app.kubernetes.io/component: backup-mirror
+        spec:
+          restartPolicy: Never
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: rclone
+              image: {{ $b.image | default "docker.io/rclone/rclone:1.69.1" | quote }}
+              imagePullPolicy: IfNotPresent
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop: ["ALL"]
+              env:
+                - name: HOME
+                  value: /tmp
+                # Two s3 remotes ("src"/"dst") defined purely via env — no config file.
+                - name: RCLONE_CONFIG_SRC_TYPE
+                  value: s3
+                - name: RCLONE_CONFIG_SRC_PROVIDER
+                  value: DigitalOcean
+                - name: RCLONE_CONFIG_SRC_ENDPOINT
+                  value: {{ printf "%s.digitaloceanspaces.com" ($do.region | default "sgp1") | quote }}
+                - name: RCLONE_CONFIG_SRC_ACCESS_KEY_ID
+                  valueFrom: { secretKeyRef: { name: backblaze-mirror-credentials, key: SRC_ACCESS_KEY_ID } }
+                - name: RCLONE_CONFIG_SRC_SECRET_ACCESS_KEY
+                  valueFrom: { secretKeyRef: { name: backblaze-mirror-credentials, key: SRC_SECRET_ACCESS_KEY } }
+                - name: RCLONE_CONFIG_DST_TYPE
+                  value: s3
+                - name: RCLONE_CONFIG_DST_PROVIDER
+                  value: Other
+                - name: RCLONE_CONFIG_DST_ENDPOINT
+                  value: {{ $b.endpoint | required "velero.backblaze.endpoint is required when velero.backblaze.enabled" | quote }}
+                - name: RCLONE_CONFIG_DST_ACCESS_KEY_ID
+                  valueFrom: { secretKeyRef: { name: backblaze-mirror-credentials, key: DST_ACCESS_KEY_ID } }
+                - name: RCLONE_CONFIG_DST_SECRET_ACCESS_KEY
+                  valueFrom: { secretKeyRef: { name: backblaze-mirror-credentials, key: DST_SECRET_ACCESS_KEY } }
+                - name: SRC_BUCKET
+                  value: {{ $do.bucket | default "mycure-doks-velero-backups" | quote }}
+                - name: DST_BUCKET
+                  value: {{ $b.bucket | required "velero.backblaze.bucket is required when velero.backblaze.enabled" | quote }}
+              command:
+                - /bin/sh
+                - -c
+                - |
+                  set -eu
+                  # sync = keep B2 a faithful mirror (propagates Velero/wal-g
+                  # retention prunes; copy-only would retain every expired WAL
+                  # segment forever). ponytail: guard against a source wipe
+                  # propagating to B2 with B2 bucket versioning/object-lock, NOT
+                  # by switching to copy — see PR / issue #4007.
+                  exec rclone sync "src:${SRC_BUCKET}" "dst:${DST_BUCKET}" \
+                    --fast-list --transfers 8 --checkers 16 --stats 1m -v
+              resources:
+                requests:
+                  cpu: 100m
+                  memory: 128Mi
+                limits:
+                  cpu: "1"
+                  memory: 512Mi
+              volumeMounts:
+                - name: tmp
+                  mountPath: /tmp
+          volumes:
+            - name: tmp
+              emptyDir: {}
+{{- end }}
