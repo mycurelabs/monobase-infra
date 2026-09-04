@@ -94,6 +94,15 @@ nginxGatewayResources:
           port: 80
           protocol: HTTP
           hostname: "*.staging.localfirsthealth.com"
+        # QUIC/UDP legs for the cadence stack (box<->hub sync + relay). cadence
+        # advertises <gateway-tailnet-IP>:6473 (publicAddr); the relay's QUIC leg
+        # rides 7842. No DO LB here (tailscale operator), so same-port TCP+UDP is fine.
+        - name: cadence-quic-staging
+          port: 6473
+          protocol: UDP
+        - name: relay-quic-staging
+          port: 7842
+          protocol: UDP
 
   tls:
     certificates:
