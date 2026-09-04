@@ -158,15 +158,22 @@ spec:
                   # versioning/object-lock, NOT by switching to copy — see #4007.
                   # On delete the native b2 backend hides the file (default
                   # hard_delete=false), so locked prior versions survive = air gap.
+                  #
+                  # Memory-bounded flags: NO --fast-list (it buffers the entire
+                  # 10k+ object listing in RAM). Peak upload memory ~= transfers ×
+                  # b2-chunk-size × b2-upload-concurrency = 4 × 32M × 2 = ~256M,
+                  # under the 1Gi limit. The old flags (--fast-list, --transfers 8,
+                  # 96M default chunks) OOMKilled the pod at 512Mi mid-seed.
                   exec rclone sync "src:${SRC_BUCKET}/${WAL_PREFIX}" "dst:${DST_BUCKET}/${WAL_PREFIX}" \
-                    --fast-list --transfers 8 --checkers 16 --stats 1m -v
+                    --transfers 4 --checkers 8 --b2-chunk-size 32M \
+                    --b2-upload-concurrency 2 --stats 1m -v
               resources:
                 requests:
                   cpu: 100m
-                  memory: 128Mi
+                  memory: 256Mi
                 limits:
                   cpu: "1"
-                  memory: 512Mi
+                  memory: 1Gi
               volumeMounts:
                 - name: tmp
                   mountPath: /tmp
