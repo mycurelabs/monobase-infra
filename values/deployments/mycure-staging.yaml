@@ -80,6 +80,21 @@ hapihub:
       value: "300"
     - name: BETTER_AUTH_SESSION_COOKIE_CACHE_ENABLED
       value: "false"
+    # cadence OAuth Authorization Server (#2727): hapihub mints box grants with the
+    # EdDSA CADENCE_ISSUER_KEY (PEM from the externalSecret below); the hub verifies
+    # them against hapihub's JWKS. Same iss/kid used for mint + JWKS = self-consistent.
+    - name: CADENCE_ISSUER_ISS
+      value: "cadence-staging-issuer"
+    - name: CADENCE_ISSUER_KID
+      value: "k1"
+    - name: CADENCE_ISSUER_FLEET_ID
+      value: "mycure-staging"
+    - name: CADENCE_ISSUER_AUTHORIZE_URL
+      value: "https://mycure.staging.localfirsthealth.com/oauth/authorize"
+    - name: CADENCE_ISSUER_SEED_URL
+      value: "https://cadence.staging.localfirsthealth.com"
+    - name: CADENCE_ISSUER_DEVICE_VERIFICATION_URI
+      value: "https://mycure.staging.localfirsthealth.com/oauth/device"
   autoscaling:
     enabled: false
   # Staging's own mycure-staging-* GCP keys. ENC_*/PRIVATE_KEY/PUBLIC_KEY/
@@ -134,6 +149,10 @@ hapihub:
         remoteKey: mycure-staging-auth-secret
       - secretKey: BETTER_AUTH_SECRET
         remoteKey: mycure-staging-better-auth-secret
+      # cadence OAuth AS signing key (#2727) — EdDSA private key, PEM-encoded
+      # (single-line, \n-escaped; hapihub un-escapes). Generated for staging.
+      - secretKey: CADENCE_ISSUER_KEY
+        remoteKey: mycure-staging-cadence-issuer-key-pem
   postgresql:
     # HA replication renames the writer service to postgresql-primary (the read
     # replica is postgresql-read). hapihub writes to the primary.
