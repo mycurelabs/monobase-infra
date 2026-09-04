@@ -393,7 +393,47 @@ velero:
     region: sgp1
     accessKey: ""  # Via External Secrets
     secretKey: ""  # Via External Secrets
-  
+
+  # Backblaze B2 off-provider redundancy (issue #4007).
+  #
+  # Two mechanisms, because the two backup systems differ (researched):
+  #  - Velero  -> NATIVE dual-write: a second BackupStorageLocation "backblaze"
+  #    + duplicate Schedules writing to a DISTINCT B2 bucket. Velero has no
+  #    native mirror and can't multi-write one backup, so duplicate Schedules
+  #    to a distinct bucket is its blessed redundancy path (restorable natively).
+  #  - wal-g   -> ASYNC mirror of the wal/ prefix. wal-g CANNOT dual-write WAL
+  #    (upstream #180; failover-storages is fallback-only), so an rclone S3->S3
+  #    mirror of just wal/ is the only option on wal-g. Tight cadence keeps
+  #    secondary RPO low and keeps B2 out of PostgreSQL's archive_command path.
+  #    The proper long-term fix (wal-g -> pgBackRest repo2 native dual-write) is
+  #    tracked separately.
+  #
+  # AIR GAP: the wal mirror is `rclone sync`, so a delete on the DO wal/ prefix
+  # (mis-scoped wal-g delete, compromised Spaces key, wal-g #636) propagates to
+  # B2 within 15m. That's fine ONLY because the bucket has Object Lock (default
+  # 14d retention) + versioning ("keep all versions"): a sync-delete writes a
+  # hide-marker but the locked version survives 14d, so destroyed data stays
+  # recoverable on B2 for 14 days. VERIFIED live on mycure-velero-backblaze-b2-
+  # backups (2026-09-04). If Object Lock is ever removed, B2 protects against a
+  # DO OUTAGE only, NOT data destruction — do not plan recovery around an air gap
+  # that isn't there. (Object Lock 14d < Velero TTL 30/90d and wal-g ~28d, so
+  # expiry Deletes are never blocked. A B2 lifecycle rule must clear non-current
+  # versions after >=14d or storage grows unbounded.)
+  #
+  # Bucket + monobase-backblaze-b2 (GCP SM, mc-v4-prod) exist and were live-tested.
+  # To change: set bucket + endpoint + region (region = endpoint's middle segment).
+  backblaze:
+    enabled: true
+    bucket: "mycure-velero-backblaze-b2-backups"  # Velero BSL + wal mirror share it, distinct prefixes
+    endpoint: "s3.us-east-005.backblazeb2.com"
+    region: "us-east-005"                         # endpoint middle segment
+    s3ForcePathStyle: "false"  # B2 S3 supports virtual-hosted style
+    walMirror:
+      schedule: "*/15 * * * *"       # tight cadence -> low secondary WAL RPO
+      prefix: wal/mycure-production  # prod PITR only; preprod WAL is disposable
+    # remoteKey: monobase-backblaze-b2               # GCP SM key for B2 creds
+    # sourceRemoteKey: monobase-digitalocean-spaces  # GCP SM key for DO creds (wal mirror source)
+
   # MinIO configuration (for K3D/local development)
   minio:
     bucket: velero-backups

@@ -183,4 +183,68 @@ spec:
     key: cloud
   default: true
 {{- end }}
+
+{{- if and .Values.velero.backblaze .Values.velero.backblaze.enabled }}
+{{- $b := .Values.velero.backblaze }}
+---
+# Backblaze B2 second BackupStorageLocation (off-provider redundancy, #4007).
+# NON-default, additional to whatever primary provider is set above. Velero can't
+# multi-write one backup, so duplicate Schedules (schedules-backblaze.yaml) target
+# this location to get a native, restorable copy in a DISTINCT B2 bucket.
+apiVersion: velero.io/v1
+kind: BackupStorageLocation
+metadata:
+  name: backblaze
+  namespace: velero
+  labels:
+    app.kubernetes.io/name: velero
+    app.kubernetes.io/component: backup-storage
+    backup-scope: off-provider
+spec:
+  provider: aws  # B2 is S3-compatible
+  objectStorage:
+    bucket: {{ $b.bucket | required "velero.backblaze.bucket is required when velero.backblaze.enabled" }}
+    prefix: infrastructure
+  config:
+    region: {{ $b.region | required "velero.backblaze.region is required when velero.backblaze.enabled" }}
+    s3Url: https://{{ $b.endpoint | required "velero.backblaze.endpoint is required when velero.backblaze.enabled" }}
+    s3ForcePathStyle: {{ $b.s3ForcePathStyle | default "false" | quote }}
+  credential:
+    name: velero-credentials-b2
+    key: cloud
+  default: false
+---
+# B2 credentials for the BSL above, in the aws-ini "cloud" format Velero expects.
+apiVersion: external-secrets.io/v1beta1
+kind: ExternalSecret
+metadata:
+  name: velero-credentials-b2
+  namespace: velero
+  labels:
+    app.kubernetes.io/name: velero
+    app.kubernetes.io/component: backup-storage
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    name: {{ $b.secretStoreName | default "gcp-secretstore" }}
+    kind: ClusterSecretStore
+  target:
+    name: velero-credentials-b2
+    creationPolicy: Owner
+    template:
+      data:
+        cloud: |
+          [default]
+          aws_access_key_id={{ `"{{ .accessKey }}"` }}
+          aws_secret_access_key={{ `"{{ .secretKey }}"` }}
+  data:
+    - secretKey: accessKey
+      remoteRef:
+        key: {{ $b.remoteKey | default "monobase-backblaze-b2" }}
+        property: access_key
+    - secretKey: secretKey
+      remoteRef:
+        key: {{ $b.remoteKey | default "monobase-backblaze-b2" }}
+        property: secret_key
+{{- end }}
 {{- end }}
