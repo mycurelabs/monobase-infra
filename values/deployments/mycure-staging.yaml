@@ -54,12 +54,6 @@ hapihub:
     enabled: true
   # single replica, no HPA
   replicaCount: 1
-  # Postgres is now HA (architecture: replication) — point the DB host at the
-  # primary service (bitnami renames postgresql -> postgresql-primary). Without
-  # this the chart's DATABASE_URI keeps the standalone 'postgresql' host, which
-  # no longer resolves. Matches preprod.
-  postgresql:
-    serviceName: postgresql-primary
   resources:
     requests:
       memory: 768Mi
@@ -141,8 +135,9 @@ hapihub:
       - secretKey: BETTER_AUTH_SECRET
         remoteKey: mycure-staging-better-auth-secret
   postgresql:
-    # standalone Bitnami postgres exposes `postgresql` (no `-primary` writer svc)
-    serviceName: postgresql
+    # HA replication renames the writer service to postgresql-primary (the read
+    # replica is postgresql-read). hapihub writes to the primary.
+    serviceName: postgresql-primary
 mycure:
   image:
     tag: "10.25.130"
