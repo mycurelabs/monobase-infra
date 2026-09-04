@@ -32,7 +32,8 @@
 | `values/clusters/mycure-gcs-dr/terraform/main.tf` | Backend, two aliased `google` providers (backup + source), the STS agent data source, source-bucket IAM grant, the transfer job. |
 | `values/clusters/mycure-gcs-dr/terraform/bucket.tf` | Backup bucket: location, storage class, UBLA, public-access-prevention, versioning, lifecycle (30d noncurrent), soft-delete. |
 | `values/clusters/mycure-gcs-dr/terraform/variables.tf` | `backup_project_id`, `source_project_id`, `source_bucket`, `backup_bucket`, `backup_location`, `backup_storage_class`, `schedule_start_date`, `retention_days`. |
-| `values/clusters/mycure-gcs-dr/terraform/outputs.tf` | `backup_bucket_url`, `transfer_job_name`, `sts_service_account`. |
+| `values/clusters/mycure-gcs-dr/terraform/outputs.tf` | `backup_bucket_url`, `transfer_job_name`, `sts_service_account`, `tf_operator_sa`. |
+| `values/clusters/mycure-gcs-dr/terraform/operator.tf` | Least-priv Terraform operator SA + its roles + keyless-impersonation grants (Task 4.8) — so no human keeps standing access. |
 | `values/clusters/mycure-gcs-dr/terraform/terraform.tfvars` | Concrete values (project ids, bucket names, region, dates). No secrets. |
 | `docs/operations/GCS_DR_BACKUP.md` | Operational runbook: manual run, backup verification, restore drill, cost, incident recovery. |
 
@@ -83,6 +84,13 @@ variable "retention_days" {
 }
 variable "schedule_start_date" {
   type = object({ year = number, month = number, day = number })
+}
+variable "tf_operators" {
+  # Principals allowed to IMPERSONATE the Terraform operator SA (keyless) — their
+  # ONLY standing access to this DR system. No direct project/bucket roles.
+  # e.g. ["user:tubig.jlu@gmail.com"] during bootstrap → a small ops group later.
+  type    = list(string)
+  default = []
 }
 ```
 
@@ -377,6 +385,95 @@ git commit -m "feat(dr): STS failure alerting via Pub/Sub (monobase-mycure#3878)
 
 ---
 
+### Task 4.8: Least-privilege operator SA + handoff (no standing human access)
+
+**Goal:** after bootstrap, **no personal account** keeps direct rights on the DR
+system. A dedicated operator SA holds the roles; humans only get keyless
+**impersonation** (`serviceAccountTokenCreator`) on it. Restores + Day-2 changes
+run by impersonating the SA — no key is ever downloaded.
+
+**Files:** Create `values/clusters/mycure-gcs-dr/terraform/operator.tf`
+
+- [ ] **Step 1: Write `operator.tf`**
+
+```hcl
+# Persistent least-privilege Terraform operator SA. Created by the human
+# bootstrap operator on the first apply; thereafter tofu is run by IMPERSONATING
+# this SA (keyless), and the human's direct project/bucket roles are removed.
+resource "google_service_account" "tf_operator" {
+  provider     = google.backup
+  project      = var.backup_project_id
+  account_id   = "gcs-dr-tf-operator"
+  display_name = "GCS DR Terraform operator (least-priv)"
+}
+
+# The operator SA's roles on the backup project = exactly the bootstrap minimum.
+resource "google_project_iam_member" "tf_operator_backup" {
+  provider = google.backup
+  project  = var.backup_project_id
+  for_each = toset([
+    "roles/storage.admin",          # backup bucket + sink IAM
+    "roles/storagetransfer.admin",  # STS job + service-agent
+    "roles/pubsub.admin",           # Task 4.5 alert topic (+ publisher grant)
+  ])
+  role   = each.value
+  member = "serviceAccount:${google_service_account.tf_operator.email}"
+}
+
+# Bucket-scoped on the SOURCE so tofu can reconcile the STS-agent binding on
+# future applies. This is the operator SA's ONLY reach into mc-v4-prod.
+resource "google_storage_bucket_iam_member" "tf_operator_source" {
+  provider = google.source
+  bucket   = var.source_bucket
+  role     = "roles/storage.admin"
+  member   = "serviceAccount:${google_service_account.tf_operator.email}"
+}
+
+# Humans who may RUN tofu / restores: keyless impersonation only — this is their
+# entire standing footprint. No direct storage/transfer/pubsub roles anywhere.
+resource "google_service_account_iam_member" "tf_operator_impersonators" {
+  provider           = google.backup
+  for_each           = toset(var.tf_operators)
+  service_account_id = google_service_account.tf_operator.name
+  role               = "roles/iam.serviceAccountTokenCreator"
+  member             = each.value
+}
+```
+
+Add to `outputs.tf`: `output "tf_operator_sa" { value = google_service_account.tf_operator.email }`
+Set in `terraform.tfvars`: `tf_operators = ["user:tubig.jlu@gmail.com"]` (bootstrap; widen to an ops group later).
+
+- [ ] **Step 2: Bootstrap apply (as the human `tubig.jlu`, holding the temporary setup roles)** — `mise run cluster-apply mycure-gcs-dr`. This creates the operator SA, its roles, and the `tokenCreator` grant for `tubig.jlu`.
+
+- [ ] **Step 3: Switch tofu to keyless impersonation** — the Google provider honors `GOOGLE_IMPERSONATE_SERVICE_ACCOUNT`, so **no code change**:
+
+```bash
+export GOOGLE_IMPERSONATE_SERVICE_ACCOUNT="$(cd values/clusters/mycure-gcs-dr/terraform && tofu output -raw tf_operator_sa)"
+mise run cluster-plan mycure-gcs-dr    # expect: clean / no changes → proves the SA can operate
+```
+
+- [ ] **Step 4: Remove the human's DIRECT roles** (keep ONLY `tokenCreator`, which tofu now manages via `tf_operators`):
+
+```bash
+P=<backup_project_id>
+for R in roles/storage.admin roles/storagetransfer.admin roles/pubsub.admin; do
+  gcloud projects remove-iam-policy-binding "$P" --member="user:tubig.jlu@gmail.com" --role="$R"
+done
+# source bucket — only if tubig.jlu was added just for this DR setup:
+gcloud storage buckets remove-iam-policy-binding gs://mc-v4-prod.appspot.com \
+  --member="user:tubig.jlu@gmail.com" --role="roles/storage.admin"
+```
+From here every tofu run + restore uses `GOOGLE_IMPERSONATE_SERVICE_ACCOUNT` (or `gcloud … --impersonate-service-account`) with an ADC that holds only `tokenCreator`. **No personal account has standing project/bucket access.**
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add values/clusters/mycure-gcs-dr/terraform/operator.tf
+git commit -m "feat(dr): least-priv Terraform operator SA + keyless-impersonation handoff (monobase-mycure#3878)"
+```
+
+---
+
 ### Task 5: Runbook (backup verification + restore drill)
 
 **Files:**
@@ -399,6 +496,18 @@ Last op should be SUCCESS within the last 12h. If ERROR: inspect
 `gcloud transfer operations describe <op>`; common cause = IAM grant on source
 bucket removed by ArgoCD/self-heal or a prod IAM cleanup — re-run
 `mise run cluster-apply mycure-gcs-dr`.
+
+## Operator access (least-priv) — how to run Day-2 changes + restores
+No personal account has standing access. The operator SA `gcs-dr-tf-operator@<backup>`
+holds the roles; you get in by IMPERSONATING it (you need only `serviceAccountTokenCreator`
+on it — you're in `var.tf_operators`). No key is ever downloaded.
+    # Terraform (Day-2 changes):
+    export GOOGLE_IMPERSONATE_SERVICE_ACCOUNT=gcs-dr-tf-operator@<backup>.iam.gserviceaccount.com
+    mise run cluster-plan mycure-gcs-dr   # then cluster-apply
+    # gcloud (restores below): add --impersonate-service-account to each command
+    #   gcloud config set auth/impersonate_service_account gcs-dr-tf-operator@<backup>.iam.gserviceaccount.com
+The SA has storage.admin on both buckets, so it can read the backup + write the
+source for a restore. To add/remove who may impersonate, edit `tf_operators` and apply.
 
 ## Restore a single object (latest)
     gcloud storage cp gs://<backup_bucket>/<path> gs://mc-v4-prod.appspot.com/<path> --project=<backup>
