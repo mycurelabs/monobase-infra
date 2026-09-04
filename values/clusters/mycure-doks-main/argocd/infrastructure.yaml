@@ -418,8 +418,8 @@ velero:
     region: "us-east-005"                         # endpoint middle segment
     s3ForcePathStyle: "false"  # B2 S3 supports virtual-hosted style
     walMirror:
-      schedule: "*/15 * * * *" # tight cadence -> low secondary WAL RPO
-      prefix: wal              # only the wal/ prefix is mirrored (Velero goes native)
+      schedule: "*/15 * * * *"       # tight cadence -> low secondary WAL RPO
+      prefix: wal/mycure-production  # prod PITR only; preprod WAL is disposable
     # remoteKey: monobase-backblaze-b2               # GCP SM key for B2 creds
     # sourceRemoteKey: monobase-digitalocean-spaces  # GCP SM key for DO creds (wal mirror source)
 

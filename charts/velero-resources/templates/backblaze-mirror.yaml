@@ -84,7 +84,9 @@ spec:
   jobTemplate:
     spec:
       backoffLimit: 2
-      activeDeadlineSeconds: {{ ($b.walMirror).activeDeadlineSeconds | default 3600 }}
+      # Generous default: the FIRST run copies the full retained WAL set
+      # (~80GB+) cross-provider; later runs are incremental (a few segments).
+      activeDeadlineSeconds: {{ ($b.walMirror).activeDeadlineSeconds | default 21600 }}
       template:
         metadata:
           labels:
@@ -146,8 +148,11 @@ spec:
                   # B2 doesn't retain every expired segment forever. ponytail:
                   # guard a source wipe propagating to B2 with B2 bucket
                   # versioning/object-lock, NOT by switching to copy — see #4007.
+                  # --s3-no-check-bucket: a bucket-scoped B2 app key is NOT
+                  # entitled to CreateBucket, which rclone attempts on upload by
+                  # default -> 403; skip the check (bucket already exists).
                   exec rclone sync "src:${SRC_BUCKET}/${WAL_PREFIX}" "dst:${DST_BUCKET}/${WAL_PREFIX}" \
-                    --fast-list --transfers 8 --checkers 16 --stats 1m -v
+                    --s3-no-check-bucket --fast-list --transfers 8 --checkers 16 --stats 1m -v
               resources:
                 requests:
                   cpu: 100m
