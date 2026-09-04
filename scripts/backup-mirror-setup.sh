@@ -38,6 +38,8 @@ set -euo pipefail
 
 # ---------- shared defaults ----------
 ROLE=""
+UNINSTALL=""                               # instance NAME to tear down
+DELETE_DATA=0                              # --delete-data: also rm the replica's target dir
 CONFIG_DIR=/etc/backup-mirror
 SYSTEMD_DIR=/etc/systemd/system
 RSYNC_BIN=/usr/bin/rsync
@@ -111,7 +113,79 @@ Replica flags:
   --ssh-key=PATH              private key path              (default: $CONFIG_DIR/<name>.key)
   --notify-on=MODE            both|failure-only|success-only|off (default: $NOTIFY_ON)
   DISCORD_WEBHOOK_URL (env)   optional Discord webhook for notifications
+
+Uninstall (run on the REPLICA host; reverse of --role=replica):
+  sudo $0 --uninstall=NAME [--delete-data]
+  --uninstall=NAME            tear down instance NAME: units (incl -failure),
+                              journald namespace, per-instance config/creds. If it
+                              was the last instance, also removes the shared helper
+                              scripts + the $MIRROR_USER user.
+  --delete-data               also 'rm -rf' the replica's copied data (target dir).
+                              Default: keep the data and print its path.
 EOF
+}
+
+# ---------- uninstall (reverse of the replica install) ----------
+cmd_uninstall() {
+  local name="$1"
+  [[ "$name" =~ ^[a-zA-Z0-9._-]+$ ]] || err "--uninstall requires a valid instance NAME"
+  local svc="backup-mirror-$name" vsvc="backup-mirror-verify-$name"
+  local ns="backup-mirror-$name" envf="$CONFIG_DIR/$name.env"
+  local target=""
+  [[ -r "$envf" ]] && target="$(sed -n 's/^TARGET_DIR=//p' "$envf")"
+
+  log "uninstalling backup-mirror instance '$name'"
+
+  # 1-2. stop + disable + remove all six units (explicit — no glob that would miss
+  #      the -failure siblings), reload, clear failed state.
+  systemctl disable --now "$svc.timer" "$vsvc.timer" >/dev/null 2>&1 || true
+  systemctl stop "$svc.service" "$vsvc.service" \
+                 "$svc-failure.service" "$vsvc-failure.service" >/dev/null 2>&1 || true
+  rm -f "$SYSTEMD_DIR/$svc.service" "$SYSTEMD_DIR/$svc.timer" \
+        "$SYSTEMD_DIR/$vsvc.service" "$SYSTEMD_DIR/$vsvc.timer" \
+        "$SYSTEMD_DIR/$svc-failure.service" "$SYSTEMD_DIR/$vsvc-failure.service"
+  systemctl daemon-reload
+  systemctl reset-failed "$svc.service" "$vsvc.service" \
+                         "$svc-failure.service" "$vsvc-failure.service" >/dev/null 2>&1 || true
+
+  # 3. journald namespace (config + running units + on-disk logs).
+  systemctl stop "systemd-journald@$ns.service" "systemd-journald@$ns.socket" >/dev/null 2>&1 || true
+  rm -f "/etc/systemd/journald@$ns.conf"
+  find /var/log/journal -maxdepth 1 -name "*.$ns" -exec rm -rf {} + 2>/dev/null || true
+  systemctl daemon-reload
+
+  # 4. per-instance config + creds.
+  rm -f "$envf" "$CONFIG_DIR/$name.key" "$CONFIG_DIR/$name.key.pub"
+
+  # 5. data (opt-in — read target BEFORE it was needed; env already removed above).
+  if [[ "$DELETE_DATA" == "1" ]]; then
+    if [[ -n "$target" && -d "$target" ]]; then
+      log "deleting replica data $target ($(du -sh "$target" 2>/dev/null | cut -f1))"
+      rm -rf "$target"
+    else
+      warn "no target dir to delete (env missing or already gone): '${target:-?}'"
+    fi
+  elif [[ -n "$target" ]]; then
+    log "left replica data in place: $target (pass --delete-data to remove)"
+  fi
+
+  # 6. last-instance cleanup: shared helpers + service user, only if no other
+  #    instance's env remains.
+  shopt -s nullglob
+  local remaining=("$CONFIG_DIR"/*.env)
+  shopt -u nullglob
+  if [[ ${#remaining[@]} -eq 0 ]]; then
+    log "no other instances remain — removing shared helpers, known_hosts, and $MIRROR_USER"
+    rm -f "$NOTIFY_BIN" "$RUN_BIN" "$VERIFY_BIN" "$CONFIG_DIR/known_hosts"
+    rmdir "$CONFIG_DIR" 2>/dev/null || true
+    if id -u "$MIRROR_USER" >/dev/null 2>&1; then
+      userdel "$MIRROR_USER" 2>/dev/null || warn "userdel $MIRROR_USER failed (in use?)"
+    fi
+  else
+    log "other instance(s) remain (${#remaining[@]}) — kept shared helpers + $MIRROR_USER"
+  fi
+
+  log "uninstall complete for '$name'"
 }
 
 # ---------- arg parsing ----------
@@ -133,15 +207,25 @@ while [[ $# -gt 0 ]]; do
     --verify-on-calendar=*) VERIFY_TIMER_ON_CALENDAR="${1#*=}"; shift;;
     --ssh-key=*)            SSH_KEY="${1#*=}";            shift;;
     --notify-on=*)          NOTIFY_ON="${1#*=}";          shift;;
+    --uninstall=*)          UNINSTALL="${1#*=}";          shift;;
+    --delete-data)          DELETE_DATA=1;                shift;;
+    --keep-data)            DELETE_DATA=0;                shift;;
     -h|--help)              usage; exit 0;;
     *) err "unknown flag: $1 (see --help)";;
   esac
 done
 
 need_root
+
+# Uninstall takes precedence over the install roles.
+if [[ -n "$UNINSTALL" ]]; then
+  cmd_uninstall "$UNINSTALL"
+  exit 0
+fi
+
 case "$ROLE" in
   source|replica) ;;
-  *) err "--role must be source or replica (see --help)";;
+  *) err "--role must be source or replica, or use --uninstall=NAME (see --help)";;
 esac
 
 # =====================================================================

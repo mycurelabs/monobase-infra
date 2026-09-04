@@ -168,13 +168,35 @@ ending `mirror-replica:<name>`), or delete the user if it was the only replica.
 ### Teardown (on a replica)
 
 ```sh
-sudo systemctl disable --now backup-mirror-<name>.timer backup-mirror-verify-<name>.timer
-sudo rm -f /etc/systemd/system/backup-mirror-<name>.* \
-           /etc/systemd/system/backup-mirror-verify-<name>.* \
-           /etc/backup-mirror/<name>.env /etc/backup-mirror/<name>.key*
-sudo systemctl daemon-reload
-# <target-dir> contents are left in place — remove separately if desired.
+# Reverse of --role=replica. Removes the instance's units (incl. the -failure
+# siblings), journald namespace, and config/creds. Data is KEPT by default.
+sudo scripts/backup-mirror-setup.sh --uninstall=<name>
+
+# ...or also delete the copied data (irreversible):
+sudo scripts/backup-mirror-setup.sh --uninstall=<name> --delete-data
 ```
+
+If `<name>` was the **last** instance on the host, `--uninstall` also removes the
+shared helper scripts (`/usr/local/sbin/backup-mirror-{run,verify,notify}`),
+`known_hosts`, the empty `/etc/backup-mirror/`, and the `backup-mirror` user; other
+instances leave those in place.
+
+> Manual equivalent (only if you can't run the script) — note the
+> `-failure.service` siblings a `backup-mirror-<name>.*` glob silently misses:
+>
+> ```sh
+> sudo systemctl disable --now backup-mirror-<name>.timer backup-mirror-verify-<name>.timer
+> sudo rm -f /etc/systemd/system/backup-mirror-<name>.service \
+>            /etc/systemd/system/backup-mirror-<name>.timer \
+>            /etc/systemd/system/backup-mirror-<name>-failure.service \
+>            /etc/systemd/system/backup-mirror-verify-<name>.service \
+>            /etc/systemd/system/backup-mirror-verify-<name>.timer \
+>            /etc/systemd/system/backup-mirror-verify-<name>-failure.service \
+>            /etc/systemd/journald@backup-mirror-<name>.conf \
+>            /etc/backup-mirror/<name>.env /etc/backup-mirror/<name>.key*
+> sudo systemctl daemon-reload
+> # <target-dir> contents are left in place — remove separately if desired.
+> ```
 
 ---
 
