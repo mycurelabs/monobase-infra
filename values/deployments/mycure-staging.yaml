@@ -156,9 +156,25 @@ hapihub-docs:
   enabled: false
 nocodb:
   enabled: false
-# ===== MEDICAL AI: disabled wholesale in staging =====
+# ===== MEDICAL AI: mostly disabled in lean staging =====
+# EXCEPTION: medley 2.x (the from-scratch governed harness) is enabled here to validate the new service.
+# It runs in-process (no medgemma/openmed dependency for the PoC surface), so it does NOT re-enable the rest
+# of the medical-AI stack. Reuses the shared PG (own `medley` database) + the onprem ollama-egress Service.
 medley:
-  enabled: false # no medical-AI stack in lean staging
+  enabled: true
+  image:
+    tag: "2.0.0"   # requires the Medley Release workflow to have published ghcr.io/mycurelabs/medley:2.0.0
+  # DATABASE_URL (DBOS run-state + analytics) — its own database on the shared bitnami Postgres. Injected via
+  # External Secrets so the password stays out of git; operator adds `medley-database-url` to the SecretStore:
+  #   postgres://postgres:<postgres-password>@postgresql.mycure-staging.svc.cluster.local:5432/medley
+  externalSecrets:
+    secrets:
+      - secretKey: DATABASE_URL
+        remoteKey: medley-database-url
+  config:
+    OLLAMA_URL: "http://ollama.tailscale.svc.cluster.local:11434/v1"   # onprem GPU via the ollama-egress Service
+    MEDLEY_CHAT_MODEL: "qwen2.5:14b-instruct"
+    MEDLEY_SEED_DEMO: "true"   # staging: seed the synthetic analytics dataset so clinic-analytics is demoable
 medleyapp:
   enabled: false # no medical-AI stack in lean staging
 medgemmaWorker:
