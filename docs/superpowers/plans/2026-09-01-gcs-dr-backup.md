@@ -39,7 +39,7 @@
 
 **Human prerequisites (NOT tofu-managed — need org/billing/IAM-admin rights):**
 - **P1.** A **separate GCP org + billing account** exists (or a new project under a separate billing account if standing up a full org is too heavy — note the weaker isolation). Needs Cloud Identity super-admin (org) + billing account creator. → **biz/owner action.**
-- **P2.** A **backup project** exists in that org (e.g. `mycure-dr-backup`), billing linked, `storagetransfer.googleapis.com` + `storage.googleapis.com` APIs enabled.
+- **P2.** A **backup project** exists in that org (e.g. `mycure-dr-backup`), billing linked, `storagetransfer.googleapis.com` + `storage.googleapis.com` + `pubsub.googleapis.com` APIs enabled (`pubsub.googleapis.com` is required for the Task 4.5 alert topic — `google_pubsub_topic.sts_alerts` fails at apply on a fresh project without it).
 - **P3.** The tofu operator has creds (ADC / `GOOGLE_APPLICATION_CREDENTIALS`) with: `roles/storage.admin` (+ `roles/storagetransfer.admin`) on the **backup project**, AND `roles/storage.admin` on the **source bucket** `mc-v4-prod.appspot.com` (to add the STS agent IAM grant).
 
 ---
@@ -357,7 +357,9 @@ STS has no built-in paging — a silently-failing cloud tier is the worst kind. 
 
 **Files:** Modify `values/clusters/mycure-gcs-dr/terraform/main.tf`
 
-- [ ] **Step 1:** Add a topic + the job's `notification_config`:
+**Pub/Sub prerequisites (per GCP STS docs):** the notification only works if (a) `pubsub.googleapis.com` is enabled on the backup project (prereq P2), and (b) the STS service agent holds `roles/pubsub.publisher` on the topic. The agent to grant is `project-<NUM>@storage-transfer-service.iam.gserviceaccount.com` — this is **distinct** from the Cloud Storage service agent; granting the wrong one is a common silent failure. `data.google_storage_transfer_project_service_account.sts` already resolves it. Docs also note a several-second delay between granting the publisher role and it taking effect, so the transfer job must `depends_on` the grant.
+
+- [ ] **Step 1:** Add a topic + the publisher grant + the job's `notification_config`, and add the grant to the job's `depends_on`:
 
 ```hcl
 resource "google_pubsub_topic" "sts_alerts" {
@@ -366,15 +368,30 @@ resource "google_pubsub_topic" "sts_alerts" {
   name     = "gcs-dr-sts-alerts"
 }
 
+# STS agent must be able to publish notifications to the topic.
+resource "google_pubsub_topic_iam_member" "sts_publisher" {
+  provider = google.backup
+  project  = var.backup_project_id
+  topic    = google_pubsub_topic.sts_alerts.name
+  role     = "roles/pubsub.publisher"
+  member   = "serviceAccount:${data.google_storage_transfer_project_service_account.sts.email}"
+}
+
 # add inside resource "google_storage_transfer_job" "dr" { ... }:
   notification_config {
-    pubsub_topic   = google_pubsub_topic.sts_alerts.id
+    pubsub_topic   = google_pubsub_topic.sts_alerts.id # .id renders projects/<p>/topics/<n>
     event_types    = ["TRANSFER_OPERATION_FAILED"]
     payload_format = "JSON"
   }
+
+  depends_on = [
+    google_storage_bucket_iam_member.source_read,
+    google_storage_bucket_iam_member.sink_write,
+    google_pubsub_topic_iam_member.sts_publisher,
+  ]
 ```
 
-- [ ] **Step 2:** Alert off the topic — a Cloud Monitoring alert policy, or a tiny push-subscription → Discord (reuse Tier 2's webhook). Force a failure (e.g. revoke the source IAM briefly) and confirm it pages.
+- [ ] **Step 2:** Alert off the topic — a Cloud Monitoring alert policy, or a tiny push-subscription → Discord (reuse Tier 2's webhook). To prove the wiring without breaking the production DR path, force a failure with a **throwaway/test transfer job pointed at a NONEXISTENT source bucket** (do NOT revoke the live `mc-v4-prod.appspot.com` source IAM) and confirm it pages; delete the throwaway job after.
 
 - [ ] **Step 3: Commit**
 
