@@ -66,7 +66,7 @@ nginxGatewayResources:
         # NOTE: this tailnet IP is assigned by the tailscale operator and CHANGES
         # on cluster nuke+rebootstrap — update it (get: `tailscale status | grep
         # nginx-staging-gateway`) or re-point after a rebuild.
-        external-dns.alpha.kubernetes.io/target: "100.67.121.122"
+        external-dns.alpha.kubernetes.io/target: "100.124.242.71"
       infrastructure:
         annotations:
           tailscale.com/expose: "true"
@@ -144,6 +144,31 @@ externalSecrets:
   enabled: true
   version: 0.9.11
   provider: gcp
+
+  secretStoreName: gcp-secretstore
+
+  # Staging uses cloudflare DNS-01 (cert-manager wildcard) — opt the cluster-scoped
+  # cloudflare-api-token ExternalSecret in so the letsencrypt-mycure-cloudflare-prod
+  # ClusterIssuer's secretRef (mycure-cloudflare-api-token) resolves. No velero here.
+  cloudflare:
+    enabled: true
+  cloudflareSecretName: mycure-cloudflare-api-token
+
+  # ClusterSecretStore for this cluster — GCP Secret Manager (mc-v4-prod) via the
+  # gcpsm-secret SA key (k3d has no Workload Identity). Was missing, so the store was
+  # never created and every ExternalSecret failed (operator-oauth etc.). #3978 recovery.
+  stores:
+    - name: gcp-secretstore
+      provider: gcp
+      gcp:
+        projectId: mc-v4-prod
+        auth:
+          serviceAccountKey:
+            enabled: true
+            secretRef:
+              name: gcpsm-secret
+              key: secret-access-credentials
+              namespace: external-secrets-system
 
   # AWS Secrets Manager configuration
   aws:
