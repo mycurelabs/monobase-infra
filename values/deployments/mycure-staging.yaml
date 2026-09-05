@@ -26,6 +26,8 @@ global:
 securityBaseline:
   strictGatewayIngress: true
 mycure-dashboard:
+  image:
+    tag: "0.14.20-staging.b6e2577"
   resources:
     requests:
       cpu: 50m
@@ -140,7 +142,7 @@ hapihub:
     serviceName: postgresql-primary
 mycure:
   image:
-    tag: "10.25.130"
+    tag: "10.25.133-staging.b6e2577"
   resources:
     requests:
       cpu: 50m
