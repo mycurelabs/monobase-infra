@@ -1,0 +1,114 @@
+{{- /*
+Backblaze B2 dual-write Schedules (off-provider redundancy, #4007).
+
+Velero can't send one backup to two locations, so its blessed redundancy path is
+duplicate Schedules that differ only in storageLocation, writing to a DISTINCT
+bucket (the "backblaze" BSL in backup-locations.yaml). These mirror the primary
+Schedules in schedules.yaml but target B2, giving a native, `velero restore`-able
+second copy.
+
+Kept in a separate file gated on velero.backblaze.enabled so the primary
+schedules.yaml is never touched and overlays without B2 render byte-identical.
+*/ -}}
+{{- if and .Values.velero.enabled .Values.velero.backblaze .Values.velero.backblaze.enabled }}
+---
+apiVersion: velero.io/v1
+kind: Schedule
+metadata:
+  name: infrastructure-daily-backblaze
+  namespace: velero
+  labels:
+    app.kubernetes.io/name: velero
+    app.kubernetes.io/component: backup-schedule
+    backup-tier: infrastructure-daily
+    backup-scope: off-provider
+spec:
+  # Own cron, STAGGERED off the primary (03:00) — running both at once would
+  # double snapshot/upload load on the same PVCs. Redundancy needs both copies
+  # to exist, not to run simultaneously. Override via schedules.*.backblazeSchedule.
+  schedule: {{ .Values.velero.schedules.infrastructure.daily.backblazeSchedule | default "0 7 * * *" | quote }}
+  template:
+    includedNamespaces:
+      - cert-manager
+      - nginx-gateway-system
+      - external-secrets-system
+      - velero
+      - monitoring
+      - kube-system
+      - argocd
+      {{- if .Values.kyverno.enabled }}
+      - kyverno
+      {{- end }}
+      {{- if .Values.falco.enabled }}
+      - falco
+      {{- end }}
+    excludedNamespaces:
+      - default
+      - kube-node-lease
+      - kube-public
+    includeClusterResources: false
+    storageLocation: backblaze
+    ttl: {{ .Values.velero.schedules.infrastructure.daily.retention | default "720h" }}
+    snapshotVolumes: true
+    defaultVolumesToFsBackup: false
+    snapshotMoveData: true
+---
+apiVersion: velero.io/v1
+kind: Schedule
+metadata:
+  name: cluster-resources-weekly-backblaze
+  namespace: velero
+  labels:
+    app.kubernetes.io/name: velero
+    app.kubernetes.io/component: backup-schedule
+    backup-tier: cluster-weekly
+    backup-scope: off-provider
+spec:
+  # Staggered off the primary (Sun 04:00). Override via cluster.weekly.backblazeSchedule.
+  schedule: {{ .Values.velero.schedules.cluster.weekly.backblazeSchedule | default "0 8 * * 0" | quote }}
+  template:
+    includeClusterResources: true
+    includedResources:
+      - customresourcedefinitions
+      - clusterroles
+      - clusterrolebindings
+      - storageclasses
+      - volumesnapshotclasses
+      - ingressclasses
+      - priorityclasses
+      - runtimeclasses
+      - validatingwebhookconfigurations
+      - mutatingwebhookconfigurations
+    storageLocation: backblaze
+    ttl: {{ .Values.velero.schedules.cluster.weekly.retention | default "2160h" }}
+    snapshotVolumes: false
+{{- if .Values.velero.schedules.production.daily.enabled }}
+---
+apiVersion: velero.io/v1
+kind: Schedule
+metadata:
+  name: production-daily-backblaze
+  namespace: velero
+  labels:
+    app.kubernetes.io/name: velero
+    app.kubernetes.io/component: backup-schedule
+    backup-tier: production-daily
+    backup-scope: off-provider
+spec:
+  # Staggered off the primary (02:00) — the prod PVCs are ~382 GiB; two
+  # concurrent snapshotMoveData backups would contend on the PG node. Override
+  # via production.daily.backblazeSchedule.
+  schedule: {{ .Values.velero.schedules.production.daily.backblazeSchedule | default "0 6 * * *" | quote }}
+  template:
+    includedNamespaces:
+      {{- range .Values.velero.schedules.production.daily.namespaces }}
+      - {{ . }}
+      {{- end }}
+    includeClusterResources: false
+    storageLocation: backblaze
+    ttl: {{ .Values.velero.schedules.production.daily.retention | default "720h" }}
+    snapshotVolumes: true
+    defaultVolumesToFsBackup: false
+    snapshotMoveData: true
+{{- end }}
+{{- end }}

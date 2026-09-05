@@ -1,0 +1,176 @@
+{{- /*
+Backblaze B2 WAL mirror (wal-g PITR off-provider redundancy, #4007).
+
+WHY A MIRROR HERE (and only for WAL): wal-g CANNOT dual-write WAL to two object
+stores (upstream #180; its "failover storages" is fallback-only, not redundant),
+so an async S3->S3 mirror of the wal/ prefix is the only way to get WAL onto a
+second provider without changing PITR engines. Velero does NOT go through this
+job — it dual-writes natively via the "backblaze" BSL + duplicate Schedules
+(backup-locations.yaml / schedules-backblaze.yaml). Scoping this mirror to just
+wal/ avoids re-copying the Velero blobs the native path already places in B2.
+The tight default cadence (every 15m) keeps secondary WAL RPO low and keeps B2
+out of PostgreSQL's archive_command critical path. Proper long-term fix
+(wal-g -> pgBackRest repo2 native dual-write) is tracked separately.
+
+SRC is DO Spaces via the s3 backend; DST is B2 via rclone's NATIVE b2 backend
+(the S3 path 400s on Object Lock — see the env block). Both remotes are wired
+through RCLONE_CONFIG_* env vars (no config file, so the root FS stays
+read-only). Credentials come from GCP Secret Manager via ESO: the DO source key
+is the same account-wide `monobase-digitalocean-spaces` wal-g already uses; the
+B2 dest key is the sibling `monobase-backblaze-b2`.
+
+No NetworkPolicy: the velero namespace is not under security-baseline's
+default-deny (that targets tenant namespaces only) — Velero's own pods reach
+Spaces from here unrestricted, so this pod reaches Spaces + B2 on 443 too.
+
+Gated on .Values.velero.backblaze.enabled so overlays without B2 render
+byte-identical; enabling requires bucket + endpoint + the monobase-backblaze-b2
+secret to exist first.
+*/ -}}
+{{- if and .Values.velero.enabled .Values.velero.backblaze .Values.velero.backblaze.enabled }}
+{{- $b := .Values.velero.backblaze }}
+{{- $do := .Values.velero.digitalocean }}
+---
+# B2 dest key + DO source key, projected into one secret for the mirror pod.
+apiVersion: external-secrets.io/v1beta1
+kind: ExternalSecret
+metadata:
+  name: backblaze-mirror-credentials
+  namespace: velero
+  labels:
+    app.kubernetes.io/name: velero
+    app.kubernetes.io/component: backup-mirror
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    name: {{ $b.secretStoreName | default "gcp-secretstore" }}
+    kind: ClusterSecretStore
+  target:
+    name: backblaze-mirror-credentials
+    creationPolicy: Owner
+  data:
+    - secretKey: SRC_ACCESS_KEY_ID
+      remoteRef:
+        key: {{ $b.sourceRemoteKey | default "monobase-digitalocean-spaces" }}
+        property: access_key
+    - secretKey: SRC_SECRET_ACCESS_KEY
+      remoteRef:
+        key: {{ $b.sourceRemoteKey | default "monobase-digitalocean-spaces" }}
+        property: secret_key
+    - secretKey: DST_ACCESS_KEY_ID
+      remoteRef:
+        key: {{ $b.remoteKey | default "monobase-backblaze-b2" }}
+        property: access_key
+    - secretKey: DST_SECRET_ACCESS_KEY
+      remoteRef:
+        key: {{ $b.remoteKey | default "monobase-backblaze-b2" }}
+        property: secret_key
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: backblaze-wal-mirror
+  namespace: velero
+  labels:
+    app.kubernetes.io/name: velero
+    app.kubernetes.io/component: backup-mirror
+spec:
+  # Tight cadence: WAL is continuous, so a short interval bounds secondary RPO.
+  # rclone sync is incremental — a run mostly just ships the new WAL segments.
+  schedule: {{ ($b.walMirror).schedule | default "*/15 * * * *" | quote }}
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 300
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      # Generous default: the FIRST run copies the full retained WAL set
+      # (~80GB+) cross-provider; later runs are incremental (a few segments).
+      activeDeadlineSeconds: {{ ($b.walMirror).activeDeadlineSeconds | default 21600 }}
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: velero
+            app.kubernetes.io/component: backup-mirror
+        spec:
+          restartPolicy: Never
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: rclone
+              image: {{ $b.image | default "docker.io/rclone/rclone:1.69.1" | quote }}
+              imagePullPolicy: IfNotPresent
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop: ["ALL"]
+              env:
+                - name: HOME
+                  value: /tmp
+                # SRC = DO Spaces via s3; DST = B2 via rclone's NATIVE b2 backend
+                # (not s3). WHY NOT s3 for the dest: the bucket has Object Lock,
+                # which requires a Content-MD5 on every PutObject. WAL/base-backup
+                # objects copied from DO have NO source MD5 (Spaces returns
+                # hashes=None for multipart-uploaded objects), so an s3->s3 stream
+                # has nothing to send and B2 rejects the PutObject with 400
+                # InvalidRequest (proven: base-backup part_*.tar.zst all failed).
+                # The native b2 backend computes B2's X-Bz-Content-Sha1 while
+                # streaming, so Object Lock is satisfied regardless of source hash.
+                # All config via env — no config file, root FS stays read-only.
+                - name: RCLONE_CONFIG_SRC_TYPE
+                  value: s3
+                - name: RCLONE_CONFIG_SRC_PROVIDER
+                  value: DigitalOcean
+                - name: RCLONE_CONFIG_SRC_ENDPOINT
+                  value: {{ printf "%s.digitaloceanspaces.com" ($do.region | default "sgp1") | quote }}
+                - name: RCLONE_CONFIG_SRC_ACCESS_KEY_ID
+                  valueFrom: { secretKeyRef: { name: backblaze-mirror-credentials, key: SRC_ACCESS_KEY_ID } }
+                - name: RCLONE_CONFIG_SRC_SECRET_ACCESS_KEY
+                  valueFrom: { secretKeyRef: { name: backblaze-mirror-credentials, key: SRC_SECRET_ACCESS_KEY } }
+                - name: RCLONE_CONFIG_DST_TYPE
+                  value: b2
+                # b2 native auth: ACCOUNT = B2 keyID, KEY = B2 applicationKey
+                # (same values ESO stored as DST_ACCESS_KEY_ID / DST_SECRET_ACCESS_KEY).
+                - name: RCLONE_CONFIG_DST_ACCOUNT
+                  valueFrom: { secretKeyRef: { name: backblaze-mirror-credentials, key: DST_ACCESS_KEY_ID } }
+                - name: RCLONE_CONFIG_DST_KEY
+                  valueFrom: { secretKeyRef: { name: backblaze-mirror-credentials, key: DST_SECRET_ACCESS_KEY } }
+                - name: SRC_BUCKET
+                  value: {{ $do.bucket | default "mycure-doks-velero-backups" | quote }}
+                - name: DST_BUCKET
+                  value: {{ $b.bucket | required "velero.backblaze.bucket is required when velero.backblaze.enabled" | quote }}
+                - name: WAL_PREFIX
+                  value: {{ ($b.walMirror).prefix | default "wal" | quote }}
+              command:
+                - /bin/sh
+                - -c
+                - |
+                  set -eu
+                  # Mirror ONLY the wal/ prefix (Velero uses its native B2 BSL).
+                  # sync = faithful mirror: propagates wal-g's retention prunes so
+                  # B2 doesn't retain every expired segment forever. ponytail:
+                  # guard a source wipe propagating to B2 with B2 bucket
+                  # versioning/object-lock, NOT by switching to copy — see #4007.
+                  # On delete the native b2 backend hides the file (default
+                  # hard_delete=false), so locked prior versions survive = air gap.
+                  exec rclone sync "src:${SRC_BUCKET}/${WAL_PREFIX}" "dst:${DST_BUCKET}/${WAL_PREFIX}" \
+                    --fast-list --transfers 8 --checkers 16 --stats 1m -v
+              resources:
+                requests:
+                  cpu: 100m
+                  memory: 128Mi
+                limits:
+                  cpu: "1"
+                  memory: 512Mi
+              volumeMounts:
+                - name: tmp
+                  mountPath: /tmp
+          volumes:
+            - name: tmp
+              emptyDir: {}
+{{- end }}
