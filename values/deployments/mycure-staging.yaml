@@ -135,8 +135,9 @@ hapihub:
       - secretKey: BETTER_AUTH_SECRET
         remoteKey: mycure-staging-better-auth-secret
   postgresql:
-    # standalone Bitnami postgres exposes `postgresql` (no `-primary` writer svc)
-    serviceName: postgresql
+    # HA replication renames the writer service to postgresql-primary (the read
+    # replica is postgresql-read). hapihub writes to the primary.
+    serviceName: postgresql-primary
 mycure:
   image:
     tag: "10.25.130"
@@ -165,15 +166,25 @@ medgemmaWorker:
   enabled: false # no medical-AI stack in lean staging
 openmed:
   enabled: false # no medical-AI stack in lean staging
-# ===== DATABASE: PostgreSQL =====
-# Standalone (single instance), lean: no read replica, small PVC. k3d local.
+# ===== DATABASE: PostgreSQL (HA — 1 primary + 1 read replica) =====
+# Replication was switched on live on 2026-09-04 (see monobase-infra#407) and the
+# seeded staging data lives on `data-postgresql-primary-0`. Keep the topology so a
+# sync from main does not flip the StatefulSet back to `postgresql` and boot hapihub
+# against the old, empty `data-postgresql-0` volume. Lean sizing (8Gi PVCs, k3d
+# local-path). walg (WAL archiving) stays OFF (ephemeral staging).
 postgresql:
-  architecture: standalone
+  architecture: replication
+  auth:
+    replicationUsername: repl_user
+    secretKeys:
+      replicationPasswordKey: postgres-replication-password
   primary:
-    # max_connections=100 is enough for hapihub without the cadence watcher fan-out.
+    # max_slot_wal_keep_size caps slot-retained WAL so a dead replica can't fill
+    # the primary's small volume.
     extendedConfiguration: |
       shared_preload_libraries = 'pgaudit, pg_stat_statements'
-      max_connections = 100
+      max_connections = 300
+      max_slot_wal_keep_size = 4GB
     persistence:
       size: 8Gi
     resources:
@@ -183,6 +194,38 @@ postgresql:
       limits:
         cpu: 2000m
         memory: 8Gi
+  readReplicas:
+    replicaCount: 1
+    persistence:
+      enabled: true
+      storageClass: ""   # k3d default (local-path)
+      size: 8Gi
+    resources:
+      requests:
+        cpu: 100m
+        memory: 512Mi
+      limits:
+        cpu: 1000m
+        memory: 2Gi
+    extendedConfiguration: |
+      shared_preload_libraries = 'pgaudit, pg_stat_statements'
+      max_connections = 300
+      primary_slot_name = 'pg_read_replica'
+      hot_standby_feedback = on
+      max_standby_streaming_delay = 120s
+    # Gate liveness during the initial pg_basebackup clone (small here, but keep a
+    # grace so the probe can't SIGKILL mid-clone).
+    customStartupProbe:
+      exec:
+        command:
+        - /bin/sh
+        - -c
+        - exec pg_isready -U postgres -d dbname=hapihub -h 127.0.0.1 -p 5432
+      initialDelaySeconds: 30
+      periodSeconds: 15
+      timeoutSeconds: 5
+      failureThreshold: 60
+      successThreshold: 1
   podDisruptionBudget:
     enabled: false
 # ===== CACHE: Valkey (Redis) =====
