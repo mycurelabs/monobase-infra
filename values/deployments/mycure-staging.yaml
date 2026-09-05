@@ -44,7 +44,7 @@ mycure-pxp:
 hapihub:
   # Keep the same image tag as the preprod copy.
   image:
-    tag: "11.20.120-staging.83f3193"
+    tag: "11.20.120-staging.b6e2577"
   cache:
     enabled: true
   # no Prometheus Operator on this lean k3d cluster (monitoring disabled)
@@ -198,7 +198,7 @@ postgresql:
     replicaCount: 1
     persistence:
       enabled: true
-      storageClass: ""   # k3d default (local-path)
+      storageClass: "" # k3d default (local-path)
       size: 8Gi
     resources:
       requests:
@@ -218,9 +218,9 @@ postgresql:
     customStartupProbe:
       exec:
         command:
-        - /bin/sh
-        - -c
-        - exec pg_isready -U postgres -d dbname=hapihub -h 127.0.0.1 -p 5432
+          - /bin/sh
+          - -c
+          - exec pg_isready -U postgres -d dbname=hapihub -h 127.0.0.1 -p 5432
       initialDelaySeconds: 30
       periodSeconds: 15
       timeoutSeconds: 5
