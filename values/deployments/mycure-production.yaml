@@ -656,6 +656,13 @@ cadence:
   # (SnippetsFilter for the upgrade, in preprod). Empty ⇒ n0 relays (chart default).
   relayUrl: ""
   nodePool: "prod-apps"
+  # Match the hub's inline sync manifest to mono services/hapihub/cadence.yaml @ origin/main. Commit
+  # 6dd7c0ef5 (mono #3335/#3350, 2026-08-19) dropped file_links + organization_partners (empty/0-row,
+  # unused) from the manifest; the chart gates both behind dropUnusedTables. Left false the hub kept
+  # the PRE-6dd7c0ef5 manifest, so its SyncConfig fingerprint differed from a current-main box
+  # (2.1.109) and admission refused it ("SCHEMA mismatch"). true = fingerprint parity with main.
+  # FLEET-AFFECTING: coordinate rollout with the fleet (still on the old manifest) before this merges.
+  dropUnusedTables: true
   # Prod cadence 2.1.103: /healthz + /readyz on a DEDICATED OS thread. Root of the exit-137 probe-kills was
   # RUNTIME POLL-STARVATION, not a slow probe query: a 112s cache-wall scan pinned all tokio workers so the
   # trivial healthz future never got polled within the 90s liveness tolerance → SIGKILL. Serving health off
