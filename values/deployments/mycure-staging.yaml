@@ -178,7 +178,8 @@ medley:
       cpu: "1"
       memory: 1Gi
   gateway:
-    enabled: false  # ClusterIP only — no public HTTPRoute
+    enabled: true
+    sectionName: https-staging-lfh  # *.staging.localfirsthealth.com wildcard listener → medley.staging.localfirsthealth.com (tailnet-only)
   # DBOS run-state + clinic-analytics: own database on the shared bitnami Postgres; DATABASE_URL is built in
   # the chart from the in-cluster `postgresql` secret (password out of git). DBOS auto-creates the `medley` db.
   postgresql:
