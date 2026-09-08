@@ -44,6 +44,15 @@ corednsCustom:
   regexRewrites:
     - pattern: (.*)\.preprod\.localfirsthealth\.com
       to: nginx-internal-gateway-nginx.nginx-gateway-system.svc.cluster.local
+  # AAAA suppression (host has no IPv6 egress) — previously baked into the
+  # coredns-custom ConfigMap by the local-k3d module; ArgoCD replaces the CM
+  # data wholesale on sync, so the key must render from this chart or it gets
+  # clobbered (it did, once). Keep in lockstep with the module's copy.
+  extraOverrides:
+    aaaa: |
+      template IN AAAA {
+        rcode NOERROR
+      }
 
 # NGINX Gateway Fabric - primary Gateway API implementation
 nginxGateway:
