@@ -27,13 +27,18 @@ jobs:
 
       - name: Promote pin to platform-root latest.json
         env:
-          # Same MinIO credentials the mono release pipeline publishes with.
-          ARTIFACTS_S3_ACCESS_KEY_ID: ${{ secrets.ARTIFACTS_S3_ACCESS_KEY_ID }}
-          ARTIFACTS_S3_SECRET_ACCESS_KEY: ${{ secrets.ARTIFACTS_S3_SECRET_ACCESS_KEY }}
+          # Dedicated fleet-promoter MinIO user (NOT the CI publisher key):
+          # artifacts-promoter may only PutObject the four platform-root
+          # latest.json fleet pointers. Provisioned by the minio-artifacts
+          # chart (usersExistingSecrets) from the GCP SM secret
+          # {prefix}-minio-artifacts-promoter-password — the repo secret holds
+          # the same value.
+          ARTIFACTS_PROMOTER_ACCESS_KEY_ID: artifacts-promoter
+          ARTIFACTS_PROMOTER_PASSWORD: ${{ secrets.ARTIFACTS_PROMOTER_PASSWORD }}
         run: |
           set -euo pipefail
-          if [ -z "$ARTIFACTS_S3_ACCESS_KEY_ID" ] || [ -z "$ARTIFACTS_S3_SECRET_ACCESS_KEY" ]; then
-            echo "::error::ARTIFACTS_S3_* repo secrets are not set (copy them from monobase-mycure)"; exit 1
+          if [ -z "$ARTIFACTS_PROMOTER_PASSWORD" ]; then
+            echo "::error::ARTIFACTS_PROMOTER_PASSWORD repo secret is not set (value of the minio-artifacts-promoter-password GCP SM secret)"; exit 1
           fi
           PIN=$(yq -r '.version' values/fleet/maestroapp.yaml)
           if [ -z "$PIN" ] || [ "$PIN" = "null" ]; then
@@ -55,7 +60,7 @@ jobs:
               echo "! $dir: v$PIN/latest.json not published"; missing+=("$dir"); continue
             fi
             curl -fsS --aws-sigv4 "aws:amz:us-east-1:s3" \
-              --user "$ARTIFACTS_S3_ACCESS_KEY_ID:$ARTIFACTS_S3_SECRET_ACCESS_KEY" \
+              --user "$ARTIFACTS_PROMOTER_ACCESS_KEY_ID:$ARTIFACTS_PROMOTER_PASSWORD" \
               -H "Content-Type: application/json" \
               --upload-file "/tmp/$dir.json" "$BASE/$dir/latest.json"
             new=$(curl -fsSL "$BASE/$dir/latest.json" | jq -r '.version // empty')
