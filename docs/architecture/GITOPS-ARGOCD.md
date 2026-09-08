@@ -82,14 +82,12 @@ Which git ref a cluster's ArgoCD tracks is a **per-cluster invariant** — exact
 one ref for *everything* on the cluster (ApplicationSet generator + template,
 infrastructure root, every deployment root):
 
-1. **Production / long-lived clusters: `HEAD` only** — regardless of provider
-   (the terraform modules cover aws-eks, azure-aks, gcp-gke, do-doks,
-   on-prem-k3s, local-k3d; today's live example is the DOKS cluster).
-   Environments are value files under `values/deployments/`, never branches.
-   Long-lived env branches drift and rot into cherry-pick hell — the standard
-   ArgoCD guidance applies.
-2. **Dev/iteration clusters — disposable ones you nuke and rebuild (any
-   provider; today's example is the on-prem vanaheim k3d cluster): a single
+1. **Production / long-lived clusters: `HEAD` only** — regardless of
+   provider. Environments are value files under `values/deployments/`, never
+   branches. Long-lived env branches drift and rot into cherry-pick hell —
+   the standard ArgoCD guidance applies.
+2. **Dev/iteration clusters — disposable ones you nuke and rebuild, on any
+   provider: a single
    cluster-tracking branch, `cluster/<name>`.** It carries `main` + whatever
    unmerged work is being tested on that cluster. Set it ONCE in the cluster's
    `values/clusters/<name>/argocd/bootstrap.yaml` (`argocd.targetRevision`) so
