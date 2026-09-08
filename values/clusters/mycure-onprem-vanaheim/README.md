@@ -85,6 +85,7 @@ The `nginx-internal-gateway` is exposed on the tailnet by the tailscale operator
 - **DNS:** `*.staging.localfirsthealth.com` **A records → the gateway's tailnet IP**, in Cloudflare.
 
 Reach it (with Tailscale up), always over **https://**:
+
 - `https://mycure.staging.localfirsthealth.com` (login), `mycure-dashboard`, `mycure-pxp`
 - `https://hapihub.staging.localfirsthealth.com/health`
 
@@ -99,6 +100,7 @@ split-DNS for `localfirsthealth.com` → `1.1.1.1`.
 ```bash
 mise run cluster-destroy mycure-onprem-vanaheim   # or: k3d cluster delete mycure-onprem-vanaheim
 ```
+
 Then re-provision + re-bootstrap. **The gateway's tailnet IP changes on rebuild** — update
 the A records in Cloudflare and the `external-dns.alpha.kubernetes.io/target` annotation in
 `argocd/infrastructure.yaml` to the new IP (`tailscale status | grep nginx-staging-gateway`).

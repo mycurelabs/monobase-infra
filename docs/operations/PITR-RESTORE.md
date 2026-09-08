@@ -113,6 +113,7 @@ production drill.
    max_locks_per_transaction = 64
    max_prepared_transactions = 0
    ```
+
 6. **Bitnami keeps `postgresql.conf` OUTSIDE `PGDATA` too** (in
    `/opt/bitnami/postgresql/conf/`) → `backup-push` never captures it, so
    `backup-fetch` gives a valid data dir **no Postgres can open**:
