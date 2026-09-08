@@ -4,15 +4,22 @@
 # per-version manifest (…/desktop/<platform>/v<version>/latest.json) but never
 # writes the platform-root latest.json the fleet auto-updater and install.sh
 # poll. That root manifest is owned exclusively by this workflow: it copies
-# v<pin>/latest.json → latest.json for each platform whenever
-# values/fleet/maestroapp.yaml changes on main (or on manual dispatch), then
-# verifies the store actually serves the pin. Rollback = revert the pin commit.
+# v<pin>/latest.json → latest.json for each platform whenever the
+# fleet.maestroapp.version pin in a values/deployments/*.yaml changes on main
+# (or on manual dispatch), then verifies the store actually serves the pin.
+# Rollback = revert the pin commit.
+#
+# The path trigger fires on EVERY deployments-values change (image bumps etc.);
+# runs where the pin is already live no-op green in seconds — expected, not
+# noise. The pin lives in the per-environment deployments file so other
+# environments can pin their own fleet later; while there is a single artifacts
+# store, exactly one file may carry the pin (enforced below).
 name: Promote maestroapp fleet version
 
 on:
   push:
     branches: [main]
-    paths: [values/fleet/maestroapp.yaml]
+    paths: [values/deployments/*.yaml]
   workflow_dispatch:
 
 concurrency:
@@ -40,11 +47,19 @@ jobs:
           if [ -z "$ARTIFACTS_PROMOTER_PASSWORD" ]; then
             echo "::error::ARTIFACTS_PROMOTER_PASSWORD repo secret is not set (value of the minio-artifacts-promoter-password GCP SM secret)"; exit 1
           fi
-          PIN=$(yq -r '.version' values/fleet/maestroapp.yaml)
-          if [ -z "$PIN" ] || [ "$PIN" = "null" ]; then
-            echo "::error::no version in values/fleet/maestroapp.yaml"; exit 1
+          PIN=""; PIN_FILE=""
+          for f in values/deployments/*.yaml; do
+            v=$(yq -r '.fleet.maestroapp.version // ""' "$f")
+            [ -n "$v" ] || continue
+            if [ -n "$PIN" ]; then
+              echo "::error::both $PIN_FILE and $f pin fleet.maestroapp.version, but there is a single artifacts store — add a per-env host key + workflow support before pinning a second environment"; exit 1
+            fi
+            PIN="$v"; PIN_FILE="$f"
+          done
+          if [ -z "$PIN" ]; then
+            echo "no fleet.maestroapp.version pin in values/deployments/ — nothing to promote"; exit 0
           fi
-          echo "Promoting maestroapp fleet pin v$PIN"
+          echo "Promoting maestroapp fleet pin v$PIN (from $PIN_FILE)"
 
           # MINIO_DOMAIN-style host: artifacts.localfirsthealth.com IS the bucket
           # host and the path is the object key — same URL for anonymous reads
