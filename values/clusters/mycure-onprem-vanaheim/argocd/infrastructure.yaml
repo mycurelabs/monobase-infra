@@ -215,6 +215,31 @@ externalSecrets:
   version: 0.9.11
   provider: gcp
 
+  # Store the cluster-scoped ExternalSecrets (cert-manager/external-dns) read
+  # from — must match a store below. This block was stale (pre-stores shape)
+  # since #355; the external-secrets-stores app failed to render ("stores is
+  # empty") and the live ClusterSecretStore only existed because bootstrap
+  # hand-seeded it. Mirrors the live object exactly, so adoption is a no-op.
+  secretStoreName: gcp-secretstore
+  cloudflare:
+    enabled: true
+  cloudflareSecretName: mycure-cloudflare-api-token
+
+  stores:
+    - name: gcp-secretstore
+      provider: gcp
+      gcp:
+        projectId: mc-v4-prod
+        # k3d (no Workload Identity) — auth via the gcpsm-secret SA key
+        # (scoped external-secrets-staging SA, seeded at bootstrap).
+        auth:
+          serviceAccountKey:
+            enabled: true
+            secretRef:
+              name: gcpsm-secret
+              key: secret-access-credentials
+              namespace: external-secrets-system
+
   # AWS Secrets Manager configuration
   aws:
     region: us-east-1
