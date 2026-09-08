@@ -69,6 +69,7 @@ sudo journalctl --namespace=mycure-gcs -u mycure-gcs-mirror.service -f
 # 4. Wire the host→host fan-out (#400) to include /mnt/storage/mycure-gcs so
 #    vanaheim pulls the ciphertext (see backup-mirror-setup.sh --role=source).
 ```
+
 If rclone errors on bucket metadata (`storage.buckets.get`), add the fallback
 role: `gcloud storage buckets add-iam-policy-binding gs://mc-v4-prod.appspot.com
 --member=serviceAccount:gcs-dr-onprem-ro@mc-v4-prod.iam.gserviceaccount.com
@@ -88,6 +89,7 @@ sudo GCS_SA_JSON=/root/gcs-dr-ro.json \
      --bucket=mc-v4-prod.appspot.com \
      --backup-dir=/mnt/storage/mycure-gcs        # 1.8T disk; NOT root FS
 ```
+
 Installs pinned rclone, the `[gcs-src]`+`[gcs-crypt]` remotes, a bounded
 `mycure-gcs` journal namespace, a Discord notifier, and the
 `mycure-gcs-mirror`/`mycure-gcs-verify` timers (twice daily ~30m after the STS
@@ -107,6 +109,7 @@ sudo systemctl start mycure-gcs-mirror.service     # trigger a pull now
 sudo journalctl --namespace=mycure-gcs -u mycure-gcs-mirror.service -f
 sudo systemctl start mycure-gcs-verify.service     # rclone cryptcheck vs source
 ```
+
 Encrypted-at-rest check: `file /mnt/storage/mycure-gcs/vault/<name>` → not a
 recognizable image/pdf; contents are readable only *through* `gcs-crypt:`.
 
