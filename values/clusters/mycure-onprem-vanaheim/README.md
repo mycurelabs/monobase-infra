@@ -1,9 +1,10 @@
-# mycure-onprem-vanaheim — on-prem k3d staging cluster
+# mycure-onprem-vanaheim — on-prem k3d cluster (staging + preprod)
 
 A local **k3d** cluster on the vanaheim workstation that hosts the **`mycure-staging`**
-environment, reachable **only over Tailscale**. It runs its **own in-cluster ArgoCD**
-(standalone GitOps — not managed by the DOKS ArgoCD), so it can be nuked and rebuilt
-independently without touching production.
+and **`mycure-preprod`** environments (preprod moved here from DOKS — PR #409
+decommission, mycure#4135 standup), reachable **only over Tailscale**. It runs its
+**own in-cluster ArgoCD** (standalone GitOps — not managed by the DOKS ArgoCD), so it
+can be nuked and rebuilt independently without touching production.
 
 ```
 values/clusters/mycure-onprem-vanaheim/
@@ -12,12 +13,18 @@ values/clusters/mycure-onprem-vanaheim/
                # argocd install values, bootstrap override
 ```
 
-- **Cluster ≠ environment.** Cluster = `mycure-onprem-vanaheim`; app env/namespace = `mycure-staging`.
-- **Footprint:** lean clone of preprod — hapihub + frontends (mycure/dashboard/pxp) +
-  standalone Postgres + valkey + minio + mailpit. AI stack, cadence, and HA Postgres are OFF.
-- **Secrets:** its own `mycure-staging-*` GCP secrets (NOT prod's). Internal ones are
-  generated; **Google OAuth / Stripe / GCS storage are stubs** — those integrations don't
-  function until real staging values are provided.
+- **Cluster ≠ environment.** Cluster = `mycure-onprem-vanaheim`; app envs/namespaces =
+  `mycure-staging` + `mycure-preprod`.
+- **Footprint — staging:** lean — hapihub + frontends (mycure/dashboard/pxp) +
+  HA Postgres + valkey + minio + mailpit. AI stack and cadence are OFF.
+- **Footprint — preprod:** clone of `mycure-production` (HA Postgres + read plane,
+  hapihub API/worker split, cadence hub + relay, HPA, prod image tags) with
+  local-cluster deltas commented in the overlay. Prod-rehearsal + cadence
+  box-testing hub.
+- **Secrets:** each env's own GCP keys (`mycure-staging-*` / `mycure-preprod-*`,
+  NOT prod's), read by the scoped `external-secrets-staging` SA (its IAM condition
+  must cover both prefixes). **Google OAuth / Stripe / GCS storage are stubs** —
+  those integrations don't function until real values are provided.
 
 ## Prerequisites (on the vanaheim host)
 
@@ -73,20 +80,56 @@ helm template argocd-bootstrap charts/argocd-bootstrap \
 ArgoCD then deploys ESO → tailscale-operator → nginx-gateway → cert-manager → the
 `mycure-staging` app stack. Watch: `kubectl --context $KCTX -n argocd get applications`.
 
-> Pre-merge testing: add `argocd.targetRevision: <branch>` to `bootstrap.yaml` so ArgoCD
-> pulls staging from the feature branch. Revert to HEAD after merge.
+## Cluster-tracking branch (IMPORTANT)
+
+This is a **dev cluster**: it may run unmerged work. The convention
+(docs/architecture/GITOPS-ARGOCD.md → "Branch Conventions") is **one ref for the whole
+cluster**, declared in `argocd/bootstrap.yaml` as `argocd.targetRevision:
+cluster/vanaheim` — never ad-hoc `kubectl` pins on individual Applications. Deploy =
+merge your feature branch into `cluster/vanaheim`; promote = PR to `main`; re-merge
+`main` into the cluster branch regularly. Merge-only, no force-push (shared branch).
+
+**Current state (2026-09-08) predates the convention — two live ad-hoc pins:**
+
+| Live object | pinned ref |
+|---|---|
+| `monobase-auto-discover` AppSet (→ `mycure-staging-root`) | `deploy/medley-2.x-staging` (medley 2.x test) |
+| `infrastructure` root + standalone `mycure-preprod-root` | `feat/preprod-on-vanaheim` (infra PR #418) |
+
+Consolidation into a single `cluster/vanaheim` branch is pending: create it from the
+union of both branches, set `argocd.targetRevision` in `bootstrap.yaml` on it, re-apply
+the bootstrap objects, delete the standalone `mycure-preprod-root` (the AppSet takes
+ownership).
+
+**Caveats while any pin exists:**
+
+- **Re-applying the bootstrap objects clobbers ad-hoc pins** (resets AppSet +
+  infra root to the rendered `targetRevision`). `kubectl diff` first, always.
+- The standalone `mycure-preprod-root` (label `managed-by: manual-branch-pin`) is NOT
+  AppSet-owned; it must be deleted (non-cascading) when the AppSet takes over.
+- `main`-only infra changes do NOT reach this cluster until re-merged into the
+  pinned ref(s).
+- Preprod extras still gated on operator steps: ESO SA IAM condition needs the
+  `mycure-preprod-` prefix; `*.preprod.localfirsthealth.com` A records → the gateway
+  tailnet IP; after first DB boot: `mise run seed -- --env preprod` + re-mint
+  `mycure-preprod-cadence-sa-api-key` (the stored key belongs to the old DOKS-era DB).
 
 ## Access (tailnet-only)
 
 The `nginx-internal-gateway` is exposed on the tailnet by the tailscale operator as device
 `nginx-staging-gateway` (a tailnet IP, e.g. `100.67.121.122`). DNS + TLS:
 
-- **TLS:** real Let's Encrypt wildcard cert for `*.staging.localfirsthealth.com` (cert-manager + Cloudflare DNS-01).
-- **DNS:** `*.staging.localfirsthealth.com` **A records → the gateway's tailnet IP**, in Cloudflare.
+- **TLS:** real Let's Encrypt certs for `*.staging.` and `*.preprod.localfirsthealth.com`
+  (+ exact-host certs for the mycure/hapihub anti-coalescing pairs) — cert-manager + Cloudflare DNS-01.
+- **DNS:** `*.staging.` and `*.preprod.localfirsthealth.com` **A records → the gateway's
+  tailnet IP**, in Cloudflare.
 
 Reach it (with Tailscale up), always over **https://**:
 - `https://mycure.staging.localfirsthealth.com` (login), `mycure-dashboard`, `mycure-pxp`
 - `https://hapihub.staging.localfirsthealth.com/health`
+- preprod: same hostnames under `.preprod.localfirsthealth.com` (+ `cadence`,
+  `cadence-relay`, `mail`, `docs`, `minio`); cadence QUIC = UDP 6473, relay UDP 7842
+  on the same gateway IP.
 
 HTTP (port 80) has no app routes (deny-first) → nginx 404; use HTTPS.
 
@@ -100,8 +143,10 @@ split-DNS for `localfirsthealth.com` → `1.1.1.1`.
 mise run cluster-destroy mycure-onprem-vanaheim   # or: k3d cluster delete mycure-onprem-vanaheim
 ```
 Then re-provision + re-bootstrap. **The gateway's tailnet IP changes on rebuild** — update
-the A records in Cloudflare and the `external-dns.alpha.kubernetes.io/target` annotation in
-`argocd/infrastructure.yaml` to the new IP (`tailscale status | grep nginx-staging-gateway`).
+the A records in Cloudflare, the `external-dns.alpha.kubernetes.io/target` annotation in
+`argocd/infrastructure.yaml`, and `cadence.publicAddr` in
+`values/deployments/mycure-preprod.yaml` to the new IP
+(`tailscale status | grep nginx-staging-gateway`).
 
 ## Known caveats / follow-ups
 

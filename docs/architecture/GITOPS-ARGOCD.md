@@ -76,6 +76,39 @@ git push
 # - All synced from Git automatically
 ```
 
+## Branch Conventions (one ref per cluster)
+
+Which git ref a cluster's ArgoCD tracks is a **per-cluster invariant** — exactly
+one ref for *everything* on the cluster (ApplicationSet generator + template,
+infrastructure root, every deployment root):
+
+1. **Production / real clusters (DOKS): `HEAD` only.** Environments are value
+   files under `values/deployments/`, never branches. Long-lived env branches
+   drift and rot into cherry-pick hell — the standard ArgoCD guidance applies.
+2. **Dev/iteration clusters (e.g. the on-prem k3d cluster): a single
+   cluster-tracking branch, `cluster/<name>`.** It carries `main` + whatever
+   unmerged work is being tested on that cluster. Set it ONCE in the cluster's
+   `values/clusters/<name>/argocd/bootstrap.yaml` (`argocd.targetRevision`) so
+   a bootstrap re-apply is deterministic — never as ad-hoc `kubectl` pins on
+   individual Applications, which the next bootstrap re-apply silently
+   clobbers.
+
+Working with a cluster-tracking branch:
+
+- **Deploy** = merge your feature branch *into* `cluster/<name>` and push.
+- **Promote** = PR your feature branch to `main` as usual; the cluster branch
+  absorbs it on the next `main` re-merge.
+- **Merge-only, no force-push** — the branch is shared by every workstream on
+  the cluster.
+- **Re-merge `main` regularly**, otherwise the cluster stops receiving
+  mainline infra changes (that's the cost of the pin).
+- Multiple feature refs pinned across different apps on one cluster is the
+  anti-pattern this convention exists to prevent (it accretes one `kubectl
+  edit` at a time and makes bootstrap re-applies destructive).
+
+Current state and per-cluster caveats live in each cluster's README
+(`values/clusters/<name>/README.md`).
+
 ## Deployment Layers
 
 ### Layer 1: Cluster Infrastructure (Wave 0-1)
