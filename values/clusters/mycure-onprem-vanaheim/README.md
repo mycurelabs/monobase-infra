@@ -89,30 +89,23 @@ cluster/vanaheim` — never ad-hoc `kubectl` pins on individual Applications. De
 merge your feature branch into `cluster/vanaheim`; promote = PR to `main`; re-merge
 `main` into the cluster branch regularly. Merge-only, no force-push (shared branch).
 
-**Current state (2026-09-08) predates the convention — two live ad-hoc pins:**
+**Current state: CONSOLIDATED (2026-09-08).** Everything on the cluster — the
+`monobase-auto-discover` AppSet, `infrastructure` root, `mycure-staging-root`,
+`mycure-preprod-root` (AppSet-owned) — tracks **`cluster/vanaheim`** (union of the
+medley-2.x staging test + the preprod standup, monobase-infra#418). The ref is
+declared in `argocd/bootstrap.yaml` (`argocd.targetRevision`), so bootstrap
+re-applies are deterministic.
 
-| Live object | pinned ref |
-|---|---|
-| `monobase-auto-discover` AppSet (→ `mycure-staging-root`) | `deploy/medley-2.x-staging` (medley 2.x test) |
-| `infrastructure` root + standalone `mycure-preprod-root` | `feat/preprod-on-vanaheim` (infra PR #418) |
+**Caveats:**
 
-Consolidation into a single `cluster/vanaheim` branch is pending: create it from the
-union of both branches, set `argocd.targetRevision` in `bootstrap.yaml` on it, re-apply
-the bootstrap objects, delete the standalone `mycure-preprod-root` (the AppSet takes
-ownership).
-
-**Caveats while any pin exists:**
-
-- **Re-applying the bootstrap objects clobbers ad-hoc pins** (resets AppSet +
-  infra root to the rendered `targetRevision`). `kubectl diff` first, always.
-- The standalone `mycure-preprod-root` (label `managed-by: manual-branch-pin`) is NOT
-  AppSet-owned; it must be deleted (non-cascading) when the AppSet takes over.
-- `main`-only infra changes do NOT reach this cluster until re-merged into the
-  pinned ref(s).
-- Preprod extras still gated on operator steps: ESO SA IAM condition needs the
-  `mycure-preprod-` prefix; `*.preprod.localfirsthealth.com` A records → the gateway
-  tailnet IP; after first DB boot: `mise run seed -- --env preprod` + re-mint
-  `mycure-preprod-cadence-sa-api-key` (the stored key belongs to the old DOKS-era DB).
+- `main`-only changes do NOT reach this cluster until `main` is re-merged into
+  `cluster/vanaheim` (do it regularly; always merge, never force-push).
+- The AppSet controller does not update EXISTING root apps on template change —
+  after changing the tracked ref, patch live roots' `targetRevision` (+ the helm
+  values blob) by hand or recreate them.
+- One-time preprod seeds already done (ESO IAM prefix grant, seed, cadence
+  sa-api-key mint) — on a nuke+rebuild redo: `mise run seed -- --env preprod` +
+  re-mint `mycure-preprod-cadence-sa-api-key` (better-auth keys die with the DB).
 
 ## Access (tailnet-only)
 
