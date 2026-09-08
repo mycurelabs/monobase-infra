@@ -1,0 +1,16 @@
+# Fleet-pinned maestroapp desktop version (mono#4095).
+#
+# Single source of truth for the version the clinic fleet runs. The mono release
+# pipeline publishes artifacts + an immutable per-version manifest
+# (…/desktop/<platform>/v<version>/latest.json) but never touches the
+# platform-root latest.json that the Tauri auto-updater and install.sh poll.
+# Bumping `version` here triggers .github/workflows/promote-maestroapp.yml,
+# which copies v<version>/latest.json → latest.json per platform and verifies it.
+#
+# Rollback = revert the bump commit (the publisher's pruner always protects the
+# version the root latest.json points at, so the pinned build is never pruned).
+#
+# The pinned version must already be published for every platform — a pin whose
+# versioned manifest is missing makes the promote run fail loudly and rolls
+# nothing for that platform.
+version: "2.1.109"

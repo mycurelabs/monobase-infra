@@ -1,0 +1,80 @@
+# Promote the git-pinned maestroapp version to the fleet (mono#4095).
+#
+# The mono release pipeline publishes desktop artifacts + an immutable
+# per-version manifest (…/desktop/<platform>/v<version>/latest.json) but never
+# writes the platform-root latest.json the fleet auto-updater and install.sh
+# poll. That root manifest is owned exclusively by this workflow: it copies
+# v<pin>/latest.json → latest.json for each platform whenever
+# values/fleet/maestroapp.yaml changes on main (or on manual dispatch), then
+# verifies the store actually serves the pin. Rollback = revert the pin commit.
+name: Promote maestroapp fleet version
+
+on:
+  push:
+    branches: [main]
+    paths: [values/fleet/maestroapp.yaml]
+  workflow_dispatch:
+
+concurrency:
+  group: promote-maestroapp
+  cancel-in-progress: false
+
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Promote pin to platform-root latest.json
+        env:
+          # Same MinIO credentials the mono release pipeline publishes with.
+          ARTIFACTS_S3_ACCESS_KEY_ID: ${{ secrets.ARTIFACTS_S3_ACCESS_KEY_ID }}
+          ARTIFACTS_S3_SECRET_ACCESS_KEY: ${{ secrets.ARTIFACTS_S3_SECRET_ACCESS_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -z "$ARTIFACTS_S3_ACCESS_KEY_ID" ] || [ -z "$ARTIFACTS_S3_SECRET_ACCESS_KEY" ]; then
+            echo "::error::ARTIFACTS_S3_* repo secrets are not set (copy them from monobase-mycure)"; exit 1
+          fi
+          PIN=$(yq -r '.version' values/fleet/maestroapp.yaml)
+          if [ -z "$PIN" ] || [ "$PIN" = "null" ]; then
+            echo "::error::no version in values/fleet/maestroapp.yaml"; exit 1
+          fi
+          echo "Promoting maestroapp fleet pin v$PIN"
+
+          # MINIO_DOMAIN-style host: artifacts.localfirsthealth.com IS the bucket
+          # host and the path is the object key — same URL for anonymous reads
+          # and SigV4 writes.
+          BASE="https://artifacts.localfirsthealth.com/maestroapp/desktop"
+          promoted=(); current=(); missing=()
+          for dir in linux_x86_64 darwin_aarch64 windows_x86_64; do
+            cur=$(curl -fsSL "$BASE/$dir/latest.json" 2>/dev/null | jq -r '.version // empty' || true)
+            if [ "$cur" = "$PIN" ]; then
+              echo "= $dir already serves v$PIN"; current+=("$dir"); continue
+            fi
+            if ! curl -fsSL -o "/tmp/$dir.json" "$BASE/$dir/v$PIN/latest.json" 2>/dev/null; then
+              echo "! $dir: v$PIN/latest.json not published"; missing+=("$dir"); continue
+            fi
+            curl -fsS --aws-sigv4 "aws:amz:us-east-1:s3" \
+              --user "$ARTIFACTS_S3_ACCESS_KEY_ID:$ARTIFACTS_S3_SECRET_ACCESS_KEY" \
+              -H "Content-Type: application/json" \
+              --upload-file "/tmp/$dir.json" "$BASE/$dir/latest.json"
+            new=$(curl -fsSL "$BASE/$dir/latest.json" | jq -r '.version // empty')
+            if [ "$new" != "$PIN" ]; then
+              echo "::error::$dir: promoted but store still serves '$new' (want $PIN)"; exit 1
+            fi
+            echo "✓ $dir promoted to v$PIN"; promoted+=("$dir")
+          done
+
+          {
+            echo "## maestroapp fleet promote → v$PIN"
+            echo "- promoted: ${promoted[*]:-none}"
+            echo "- already current: ${current[*]:-none}"
+            echo "- missing versioned manifest: ${missing[*]:-none}"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          # A missing platform means either a typo'd pin (all missing, nothing
+          # promoted) or a partially-published release (fleet now mixed) —
+          # both deserve a red run even though promoted platforms stay live.
+          if [ ${#missing[@]} -gt 0 ]; then
+            echo "::error::v$PIN has no versioned manifest for: ${missing[*]}"; exit 1
+          fi
