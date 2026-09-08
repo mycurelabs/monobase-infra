@@ -82,16 +82,24 @@ Which git ref a cluster's ArgoCD tracks is a **per-cluster invariant** — exact
 one ref for *everything* on the cluster (ApplicationSet generator + template,
 infrastructure root, every deployment root):
 
-1. **Production / real clusters (DOKS): `HEAD` only.** Environments are value
-   files under `values/deployments/`, never branches. Long-lived env branches
-   drift and rot into cherry-pick hell — the standard ArgoCD guidance applies.
-2. **Dev/iteration clusters (e.g. the on-prem k3d cluster): a single
+1. **Production / long-lived clusters: `HEAD` only** — regardless of provider
+   (the terraform modules cover aws-eks, azure-aks, gcp-gke, do-doks,
+   on-prem-k3s, local-k3d; today's live example is the DOKS cluster).
+   Environments are value files under `values/deployments/`, never branches.
+   Long-lived env branches drift and rot into cherry-pick hell — the standard
+   ArgoCD guidance applies.
+2. **Dev/iteration clusters — disposable ones you nuke and rebuild (any
+   provider; today's example is the on-prem vanaheim k3d cluster): a single
    cluster-tracking branch, `cluster/<name>`.** It carries `main` + whatever
    unmerged work is being tested on that cluster. Set it ONCE in the cluster's
    `values/clusters/<name>/argocd/bootstrap.yaml` (`argocd.targetRevision`) so
    a bootstrap re-apply is deterministic — never as ad-hoc `kubectl` pins on
    individual Applications, which the next bootstrap re-apply silently
    clobbers.
+
+The split is by **cluster role** (long-lived vs dev), not by provider or
+location — an on-prem k3s cluster serving real users tracks `HEAD` like any
+production cluster.
 
 Working with a cluster-tracking branch:
 
