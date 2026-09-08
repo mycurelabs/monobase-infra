@@ -119,6 +119,16 @@ nginxGatewayResources:
           port: 80
           protocol: HTTP
           hostname: "*.staging.localfirsthealth.com"
+        # QUIC/UDP legs for the staging cadence stack (box<->hub sync + relay).
+        # cadence advertises <gateway-tailnet-IP>:6474 (publicAddr); the relay's
+        # QUIC leg rides 7843. NOTE: 6473/7842 belong to the preprod legs below —
+        # UDP has no SNI, so each env needs its own port on this shared gateway.
+        - name: cadence-quic-staging
+          port: 6474
+          protocol: UDP
+        - name: relay-quic-staging
+          port: 7843
+          protocol: UDP
         # ---- preprod (mycure#4135, stood up here after the DOKS decommission
         # in PR #409). Exact-hostname listeners for the app<->api pair
         # (anti-HTTP/2-coalescing, mono#2540) + wildcard for the rest. ----
