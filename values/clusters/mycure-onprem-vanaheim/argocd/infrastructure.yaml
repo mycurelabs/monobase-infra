@@ -94,6 +94,37 @@ nginxGatewayResources:
           port: 80
           protocol: HTTP
           hostname: "*.staging.localfirsthealth.com"
+        # ---- preprod (mycure#4135, stood up here after the DOKS decommission
+        # in PR #409). Exact-hostname listeners for the app<->api pair
+        # (anti-HTTP/2-coalescing, mono#2540) + wildcard for the rest. ----
+        - name: https-preprod-mycure
+          port: 443
+          protocol: HTTPS
+          hostname: "mycure.preprod.localfirsthealth.com"
+          tlsSecretName: nginx-gateway-tls-preprod-mycure
+        - name: https-preprod-hapihub
+          port: 443
+          protocol: HTTPS
+          hostname: "hapihub.preprod.localfirsthealth.com"
+          tlsSecretName: nginx-gateway-tls-preprod-hapihub
+        - name: https-preprod-lfh
+          port: 443
+          protocol: HTTPS
+          hostname: "*.preprod.localfirsthealth.com"
+          tlsSecretName: nginx-gateway-tls-preprod
+        - name: http-preprod-lfh
+          port: 80
+          protocol: HTTP
+          hostname: "*.preprod.localfirsthealth.com"
+        # Cadence QUIC (UDPRoute): preprod hub port 6473, preprod relay 7842.
+        # No SNI on UDP — port-demuxed. publicAddr in the deployment values
+        # advertises <this gateway's tailnet IP>:6473.
+        - name: cadence-quic-preprod
+          port: 6473
+          protocol: UDP
+        - name: relay-quic-preprod
+          port: 7842
+          protocol: UDP
 
   tls:
     certificates:
@@ -111,6 +142,20 @@ nginxGatewayResources:
         clusterIssuer: letsencrypt-mycure-cloudflare-prod  # DNS-01, wildcard
         dnsNames:
           - "*.staging.localfirsthealth.com"
+      # preprod (mycure#4135). Exact-name certs MUST stay single-hostname —
+      # extra dnsNames would re-enable HTTP/2 coalescing.
+      - secretName: nginx-gateway-tls-preprod-mycure
+        clusterIssuer: letsencrypt-mycure-cloudflare-prod  # DNS-01
+        dnsNames:
+          - mycure.preprod.localfirsthealth.com
+      - secretName: nginx-gateway-tls-preprod-hapihub
+        clusterIssuer: letsencrypt-mycure-cloudflare-prod  # DNS-01
+        dnsNames:
+          - hapihub.preprod.localfirsthealth.com
+      - secretName: nginx-gateway-tls-preprod
+        clusterIssuer: letsencrypt-mycure-cloudflare-prod  # DNS-01, wildcard
+        dnsNames:
+          - "*.preprod.localfirsthealth.com"
 
   # Cluster-wide SnippetsPolicies for the shared nginx Gateway.
   snippetsPolicies:

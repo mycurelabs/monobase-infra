@@ -1,0 +1,491 @@
+# Preprod overlay; extends: base (values/deployments/base.yaml, helm merge:
+# base first, this file wins per key; arrays replace wholesale).
+# MyCure Pre-Production Configuration
+# Stood back up on the LOCAL vanaheim k3d cluster (mycure#4135) after the DOKS
+# preprod was decommissioned in PR #409. CLONE OF mycure-production: same
+# component shape (HA Postgres + read plane, hapihub worker split, cadence hub,
+# HPA, prod image tags) so major changes rehearse here first. Deltas from prod
+# are local-cluster necessities, each commented in place:
+#   - tailnet-only gateway (inherits base default; prod's public gateway is a
+#     prod-only opt-in), *.preprod.localfirsthealth.com listeners on the
+#     vanaheim nginx-internal-gateway
+#   - preprod-own secrets (mycure-preprod-* GCP keys, #3486 isolation)
+#   - mailpit instead of Postmark, in-cluster MinIO instead of GCS
+#   - no walg/velero/serviceMonitor/nodePools (not present on this cluster)
+#   - nonprod sizing on PG/valkey/cadence (fleet of 1-2 test boxes, not prod load)
+# Data is seeded fresh: `mise run seed -- --env preprod`.
+
+extends: base
+
+global:
+  domain: preprod.localfirsthealth.com
+  namespace: mycure-preprod
+  environment: preprod
+
+  # No global.gateway override: inherit the DENY-FIRST tailnet-only
+  # nginx-internal-gateway from base. Prod's nginx-public-gateway opt-in is
+  # deliberately NOT cloned — preprod is tailnet-only (boxes + devs are members).
+  # No nodePool: k3d nodes are untainted.
+
+  # Preprod-own DB/cache credentials, isolated from prod (#3486). The
+  # database-secrets chart pulls mycure-preprod-* GCP keys for
+  # Postgres/Valkey/Minio; PVCs initialize on these passwords.
+  secretPrefix: "mycure-preprod"
+
+# Prod parity (promoted from the original preprod canary, infra#313).
+securityBaseline:
+  strictGatewayIngress: true
+
+mycure-dashboard:
+  resources:
+    requests:
+      cpu: 10m
+  gateway:
+    sectionName: https-preprod-lfh
+
+  config:
+    API_URL: "https://hapihub.preprod.localfirsthealth.com"
+
+mycure-pxp:
+  resources:
+    requests:
+      cpu: 10m
+  gateway:
+    sectionName: https-preprod-lfh
+
+  config:
+    API_URL: "https://hapihub.preprod.localfirsthealth.com"
+
+hapihub:
+  # Prod parity — same tag as mycure-production.yaml. Bump here first when
+  # rehearsing a promotion.
+  image:
+    tag: "11.20.121"
+  cache:
+    # Prod parity: response cache OFF (the #2839/#2617 bentocache stampede
+    # mitigation). Re-enable here first when re-validating the serve-stale fix.
+    enabled: false
+
+  replicaCount: 3
+
+  resources:
+    requests:
+      memory: 1Gi
+    limits:
+      memory: 4Gi
+
+  # No Prometheus Operator on this cluster (monitoring disabled) — a
+  # ServiceMonitor would fail to apply.
+  serviceMonitor:
+    enabled: false
+  pruneAuditEvents:
+    enabled: true
+
+  gateway:
+    hostnames:
+      # Canonical host. Carries the cadence OAuth AS metadata (token_endpoint/
+      # jwks_uri minted from EXTERNAL_ADDRESS = this host). No hapihub-next
+      # alias in preprod — frontends point at the canonical host directly.
+      - hapihub.preprod.localfirsthealth.com
+    sectionName: https-preprod-hapihub # anti-coalescing exact listener, pairs with mycure block
+    # No mycure.md hostnames — we only route *.preprod.localfirsthealth.com.
+  betterAuth:
+    passkey:
+      rpName: "Mycure (preprod)"
+      rpId: "preprod.localfirsthealth.com"
+
+  config:
+    CORS_ORIGINS: "https://hapihub.preprod.localfirsthealth.com,https://mycure.preprod.localfirsthealth.com,https://mycurelocal.preprod.localfirsthealth.com,https://mycure-myaccount.preprod.localfirsthealth.com,https://mycure-dashboard.preprod.localfirsthealth.com,https://mycure-pxp.preprod.localfirsthealth.com,https://mycure-pr--*.web.app,https://mycure-reconstruct.web.app,https://mycure-reconstruct.firebaseapp.com"
+    # File storage — preprod-own in-cluster MinIO (S3-compatible), isolated
+    # from prod's GCS bucket. Access creds (STORAGE_S3_ACCESS_KEY_ID/SECRET)
+    # come from the minio secret via the externalSecret below; MinIO
+    # auto-creates the bucket.
+    STORAGE_TYPE: "s3"
+    STORAGE_S3_ENDPOINT: "http://minio.mycure-preprod.svc.cluster.local:9000"
+    STORAGE_S3_REGION: "us-east-1"
+    STORAGE_S3_FORCE_PATH_STYLE: "true"
+    STORAGE_BUCKET: "hapihub"
+    # Prod parity (mono#2114): background jobs run in the hapihubWorker release.
+    RUN_WORKERS: "false"
+
+  env:
+      # Prod parity (#2114): cap the JSC heap below the 4Gi container limit.
+    - name: BUN_JSC_forceRAMSize
+      value: "3221225472"
+    - name: BETTER_AUTH_RATE_LIMIT_ENABLED
+      value: "true"
+    - name: BETTER_AUTH_RATE_LIMIT_WINDOW
+      value: "60"
+    - name: BETTER_AUTH_RATE_LIMIT_MAX
+      value: "300"
+    - name: BETTER_AUTH_SESSION_COOKIE_CACHE_ENABLED
+      value: "false"
+      # Email: mailpit, NOT prod's Postmark — preprod must never send real mail,
+      # and there is no mycure-preprod-postmark-api-key. Chart default SMTP
+      # points at the in-namespace mailpit.
+      # cadence OAuth Authorization Server. hapihub is the SOLE AS: it mints box
+      # grants AND the hub's own '*' grant with this EdDSA key. Advertised in
+      # /.well-known/cadence-configuration.json → single-URL box onboarding.
+    - name: CADENCE_ISSUER_ISS
+      value: "cadence-preprod-issuer"
+    - name: CADENCE_ISSUER_KID
+      value: "k1"
+    - name: CADENCE_ISSUER_FLEET_ID
+      value: "mycure-preprod"
+    - name: CADENCE_ISSUER_AUTHORIZE_URL
+      value: "https://mycure.preprod.localfirsthealth.com/oauth/authorize"
+    - name: CADENCE_ISSUER_SEED_URL
+      value: "https://cadence.preprod.localfirsthealth.com"
+      # RFC 8628 device grant (#2992) — fail-closed if unset; preprod is the
+      # testbed for box onboarding, so keep it on.
+    - name: CADENCE_ISSUER_DEVICE_VERIFICATION_URI
+      value: "https://mycure.preprod.localfirsthealth.com/oauth/device"
+      # Read replica for device-telemetry parity recompute (mono#3747). Mirrors
+      # the helper-composed DATABASE_URI, host postgresql-primary -> postgresql-read.
+    - name: DATABASE_READ_URI
+      value: "postgres://$(POSTGRESQL_USER):$(POSTGRESQL_PASSWORD)@postgresql-read.mycure-preprod.svc.cluster.local:5432/hapihub"
+      # AUDIT_SINK_URL dropped: the Tenzir pipeline is disabled on this cluster
+      # (tenzir.enabled=false in the vanaheim infra values).
+
+  # Prod parity: HPA owns replicas (k3s bundles metrics-server, verified).
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 4
+
+  # Preprod-own secrets (mycure-preprod-* GCP keys, all pre-existing from the
+  # #3486 isolation). Dead keys stay dropped: ENC_* (field-encryption unused),
+  # PUBLIC_KEY (derived from PRIVATE_KEY at runtime), STRIPE_SECRET_KEY /
+  # STRIPE_KEY (Stripe creds live in the billing_providers DB row), storage
+  # GCS keys (in-cluster MinIO above), POSTMARK_API_KEY (mailpit).
+  externalSecrets:
+    secrets:
+        # Google OAuth
+      - secretKey: GOOGLE_CLIENT_ID
+        remoteKey: mycure-preprod-google-oauth-client-id
+      - secretKey: GOOGLE_CLIENT_SECRET
+        remoteKey: mycure-preprod-google-oauth-client-secret
+        # JWT/Auth keys (PUBLIC_KEY derived from PRIVATE_KEY at runtime)
+      - secretKey: PRIVATE_KEY
+        remoteKey: mycure-preprod-private-key
+        # cadence issuer EdDSA signing key (PEM, single-line \n-escaped;
+        # hapihub un-escapes) — hapihub mints box + hub grants with it.
+      - secretKey: CADENCE_ISSUER_KEY
+        remoteKey: mycure-preprod-cadence-issuer-key-pem
+        # Storage — in-cluster MinIO (S3) access creds; non-secret S3 config in
+        # `config:` above.
+      - secretKey: STORAGE_S3_ACCESS_KEY_ID
+        remoteKey: mycure-preprod-minio-root-user
+      - secretKey: STORAGE_S3_SECRET_ACCESS_KEY
+        remoteKey: mycure-preprod-minio-root-password
+        # Stripe checkout redirect URLs
+      - secretKey: STRIPE_CHECKOUT_SUCCESS_URL
+        remoteKey: mycure-preprod-stripe-checkout-success-url
+      - secretKey: STRIPE_CHECKOUT_CANCEL_URL
+        remoteKey: mycure-preprod-stripe-checkout-cancel-url
+      - secretKey: AUTH_SECRET
+        remoteKey: mycure-preprod-auth-secret
+      - secretKey: BETTER_AUTH_SECRET
+        remoteKey: mycure-preprod-better-auth-secret
+
+  postgresql:
+    serviceName: postgresql-primary
+
+# Prod parity (mono#2114): background-job consumer split out of the API pods.
+hapihubWorker:
+  enabled: true
+
+  replicaCount: 1
+
+  # Explicit resources — the worker app deep-merges hapihub values; exports/
+  # PDF-Chromium legitimately spike.
+  resources:
+    requests:
+      cpu: 500m
+      memory: 2Gi
+    limits:
+      cpu: "2"
+      memory: 4Gi
+
+  config:
+    RUN_WORKERS: "true"
+
+  # No external traffic: keep the Service (probes) but no routes.
+  gateway:
+    enabled: false
+    storageRoute:
+      enabled: false
+    snippetsPolicy:
+      enabled: false
+
+  # The API release owns the daily session-prune cronjob.
+  pruneExpiredSessions:
+    enabled: false
+
+  autoscaling:
+    enabled: false
+
+  podDisruptionBudget:
+    enabled: false
+
+# ===== HEALTHCARE: Frontend Application =====
+mycure:
+  # Prod parity — moves with hapihub 11.20.121 (0098 medical_records.updated_by).
+  image:
+    tag: "10.25.135"
+  resources:
+    requests:
+      cpu: 10m
+  gateway:
+    sectionName: https-preprod-mycure # anti-coalescing exact listener (exact-name cert kills HTTP/2 cross-host reuse -> 421s)
+
+  config:
+    API_URL: "https://hapihub.preprod.localfirsthealth.com"
+    HAPIHUB_URL: "https://hapihub.preprod.localfirsthealth.com"
+    # No POSTHOG_KEY / GA4_MEASUREMENT_ID: blank outside prod keeps analytics off.
+
+mycurelocal:
+  enabled: true
+
+  resources:
+    requests:
+      cpu: 10m
+  gateway:
+    hostnames:
+      - hostname: mycurelocal.preprod.localfirsthealth.com
+        sectionName: https-preprod-lfh
+    # No find.mycure.md — preprod only routes *.preprod.localfirsthealth.com.
+
+mycure-myaccount:
+  enabled: true
+
+  resources:
+    requests:
+      cpu: 10m
+  gateway:
+    sectionName: https-preprod-lfh
+
+  config:
+    API_URL: "https://hapihub.preprod.localfirsthealth.com"
+    HAPIHUB_URL: "https://hapihub.preprod.localfirsthealth.com"
+
+hapihub-docs:
+  enabled: true
+
+  resources:
+    requests:
+      cpu: 10m
+  gateway:
+    hostname: "docs.preprod.localfirsthealth.com"
+    sectionName: https-preprod-lfh
+
+# ===== MEDICAL AI: disabled — the vanaheim cluster has no Ollama egress
+# (ollamaEgress.enabled=false), and prod runs none of these either. =====
+medley:
+  enabled: false
+medleyapp:
+  enabled: false
+medgemmaWorker:
+  enabled: false
+openmed:
+  enabled: false
+
+# WAL archiving OFF — deviation from prod: no Spaces credential is provisioned
+# for this cluster (the staging-scoped ESO SA can't read the shared
+# monobase-digitalocean-spaces key), and preprod data is seeded/disposable.
+# PITR rehearsals happen against prod's own walg config.
+walg:
+  enabled: false
+
+# ===== DATABASE: PostgreSQL (HA — 1 primary + 1 read replica, prod parity) =====
+# The cadence hub's reconcile/serve scan plane reads from the replica
+# (CADENCE_DB_READ_URL), same read-plane split as prod. Local-path storage
+# (k3d), nonprod sizing; no postgres_exporter sidecar (nothing scrapes here).
+postgresql:
+  architecture: replication
+
+  auth:
+    replicationUsername: repl_user
+    secretKeys:
+      replicationPasswordKey: postgres-replication-password
+
+  primary:
+    # Prod GUCs minus the archive_* block (walg off above). max_connections 300:
+    # cadence boot opens ~99 per-collection ensure connections simultaneously.
+    # max_slot_wal_keep_size 20GB: a dead replica must not fill the volume.
+    extendedConfiguration: |
+      shared_preload_libraries = 'pgaudit, pg_stat_statements'
+      shared_buffers = 2GB
+      effective_cache_size = 5GB
+      work_mem = 16MB
+      maintenance_work_mem = 256MB
+      random_page_cost = 1.1
+      effective_io_concurrency = 200
+      max_connections = 300
+      max_slot_wal_keep_size = 20GB
+      log_min_duration_statement = 1000
+      autovacuum_max_workers = 6
+      autovacuum_vacuum_cost_limit = 2000
+      autovacuum_naptime = 30s
+    persistence:
+      size: 100Gi
+    resources:
+      requests:
+        cpu: 500m
+        memory: 2Gi
+      limits:
+        cpu: 2000m
+        memory: 8Gi
+
+  readReplicas:
+    replicaCount: 1
+    persistence:
+      enabled: true
+      storageClass: "" # k3d default (local-path)
+      size: 100Gi
+    resources:
+      requests:
+        cpu: 100m
+        memory: 1Gi
+      limits:
+        cpu: 1000m
+        memory: 4Gi
+    # In lockstep with the primary; slot pin + standby-conflict tuning as prod
+    # (reconcile scans must not be canceled by WAL replay).
+    extendedConfiguration: |
+      shared_preload_libraries = 'pgaudit, pg_stat_statements'
+      shared_buffers = 2GB
+      effective_cache_size = 5GB
+      work_mem = 16MB
+      maintenance_work_mem = 256MB
+      random_page_cost = 1.1
+      effective_io_concurrency = 200
+      max_connections = 300
+      log_min_duration_statement = 1000
+      autovacuum_max_workers = 6
+      autovacuum_vacuum_cost_limit = 2000
+      autovacuum_naptime = 30s
+      primary_slot_name = 'pg_read_replica'
+      hot_standby_feedback = on
+      max_standby_streaming_delay = 120s
+    # Gate liveness during the initial pg_basebackup clone (small on a fresh
+    # seed, but keep a grace so the probe can't SIGKILL mid-clone).
+    customStartupProbe:
+      exec:
+        command:
+          - /bin/sh
+          - -c
+          - exec pg_isready -U postgres -d dbname=hapihub -h 127.0.0.1 -p 5432
+      initialDelaySeconds: 30
+      periodSeconds: 15
+      timeoutSeconds: 5
+      failureThreshold: 60
+      successThreshold: 1
+
+  podDisruptionBudget:
+    enabled: false
+
+# ===== CACHE: Valkey (Redis) =====
+valkey:
+  master:
+    persistence:
+      size: 4Gi
+    resources:
+      requests:
+        cpu: 100m
+        memory: 1Gi
+      limits:
+        cpu: 500m
+        memory: 2Gi
+    # No --maxmemory cap (prod convention): the container limit is the ceiling.
+
+# ===== STORAGE: MinIO Object Storage =====
+# Deviation from prod (GCS): preprod's file storage backend is this in-cluster
+# MinIO (hapihub STORAGE_TYPE=s3 above).
+minio:
+  enabled: true
+
+  gateway:
+    sectionName: https-preprod-lfh
+
+  # #3484 cold-archive rehearsal bed (WORM object-lock bucket for pruned
+  # audit_events) — preprod-only prep, prod adoption still held for review.
+  auditArchive:
+    enabled: true
+    bucket: audit-archive
+    retention: "6y"
+
+mailpit:
+  enabled: true
+
+  gateway:
+    # Web UI exposed with NO auth — tailnet-only reachability is the fence.
+    # Preprod data is seeded (not prod-cloned), so no real PHI/OTPs land here.
+    hostname: "mail.preprod.localfirsthealth.com"
+
+# ===== cadence-relay — prod parity (shared-gateway consolidation, #328) =====
+cadenceRelay:
+  serviceType: ClusterIP
+  gatewayRoute:
+    enabled: true
+    hostname: cadence-relay.preprod.localfirsthealth.com
+    sectionName: https-preprod-lfh
+    udpListener: relay-quic-preprod
+
+# ===== P2P SYNC: Cadence v2 hub — prod parity =====
+# Watches the LIVE hapihub app DB. Same image/knobs as prod; nonprod memory
+# ceiling (1-2 test boxes, not the fleet).
+cadence:
+  # Vanaheim internal gateway's tailnet device IP + preprod QUIC port (6473,
+  # port-demuxed — UDP has no SNI). NOTE: the tailnet IP is operator-assigned
+  # and CHANGES on cluster nuke+rebootstrap — update alongside the
+  # external-dns target annotation in the vanaheim infrastructure.yaml.
+  publicAddr: "100.67.121.122:6473"
+  # Prod parity: n0 public relays (self-hosted relay path through the gateway
+  # still broken — see prod overlay).
+  relayUrl: ""
+  # Prod parity (#415): manifest fingerprint matches current main (file_links +
+  # organization_partners dropped).
+  dropUnusedTables: true
+  image:
+    tag: "2.1.103"
+  readIdleMs: 600000
+  leafidsGlobalBudget: 150000
+  maxConcurrentServes: 8
+  # base sets serviceMonitor.enabled=true; no Prometheus Operator here.
+  serviceMonitor:
+    enabled: false
+  # Nonprod ceiling: prod's 13Gi is fleet-scale headroom; a 1-2 box fleet fits
+  # in 3Gi (the chart default).
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: "2"
+      memory: 3Gi
+  postgresql:
+    serviceName: postgresql-primary
+    # Read-plane split (prod parity): reconcile/serve scans go to the replica
+    # via CADENCE_DB_READ_URL; writes + LWW admission reads stay on the primary.
+    readServiceName: postgresql-read
+  gateway:
+    sectionName: https-preprod-lfh
+    hostnames:
+      - cadence.preprod.localfirsthealth.com
+    # QUIC via the tailnet gateway (UDPRoute), port-demuxed to 6473.
+    udpListener: cadence-quic-preprod
+  # hapihub is the SOLE AS (mints box grants + the hub's own '*' grant).
+  auth:
+    issuerUrl: https://hapihub.preprod.localfirsthealth.com
+    grantJwksUri: https://hapihub.preprod.localfirsthealth.com/.well-known/jwks.json
+    fleetId: mycure-preprod
+    authorizeUrl: https://hapihub.preprod.localfirsthealth.com/sync/authorize
+  # Service-account API key (better-auth, service@mycure.md, non-expiring) →
+  # secret cadence-secrets. RE-MINT after the fresh seed — the value in GCP SM
+  # belongs to the old (deleted) preprod DB. See the sa-api-key runbook in
+  # the preprod reset notes.
+  externalSecrets:
+    secrets:
+      - secretKey: sa-api-key
+        remoteKey: mycure-preprod-cadence-sa-api-key
