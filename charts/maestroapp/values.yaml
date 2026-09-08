@@ -18,12 +18,14 @@ store:
   # per-environment by construction (each env's Job talks to its own store).
   endpoint: http://minio-artifacts:9000
   bucket: artifacts
-  # Dedicated promoter identity (provisioned by the minio-artifacts chart from
-  # the minio-artifacts-promoter ExternalSecret): may write ONLY the
+  # Dedicated promoter identity (user provisioned by the minio-artifacts chart
+  # from the minio-artifacts-promoter ExternalSecret): may write ONLY the
   # platform-root latest.json fleet pointers. Credentials never leave the
-  # cluster.
+  # cluster. The Job reads the plain-key `-login` twin secret — the
+  # provisioning secret can't carry a plain password key (Bitnami parses every
+  # key of it as a user-definition file).
   username: artifacts-promoter
-  existingSecret: minio-artifacts-promoter
+  existingSecret: minio-artifacts-promoter-login
   existingSecretPasswordKey: password
 
 platforms:
