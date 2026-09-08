@@ -20,9 +20,21 @@ spec:
         app.kubernetes.io/name: maestroapp-promote
     spec:
       restartPolicy: Never
+      # Restricted-PSS compliant (preprod/prod namespaces enforce it). The
+      # bitnami minio image runs as 1001; MC_CONFIG_DIR=/tmp keeps mc happy
+      # without a writable HOME.
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: promote
           image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
           command: [sh, -ec]
           args:
             - |
