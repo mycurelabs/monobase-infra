@@ -1,0 +1,32 @@
+# Pinned fleet version (REQUIRED). The mono release pipeline publishes
+# artifacts + an immutable v<version>/latest.json per platform but never
+# touches the platform-root latest.json — bumping this value re-renders the
+# promote Job (version is in its name), which copies v<version>/latest.json →
+# latest.json per platform and verifies the store serves it. Rollback = revert
+# the bump commit. The pinned version must already be published for every
+# platform or the Job fails loudly (ArgoCD app Degraded), promoting nothing
+# for the missing platform.
+version: ""
+
+# Same image the artifacts store runs — it ships `mc`, which is all the Job needs.
+image:
+  repository: bitnamilegacy/minio
+  tag: "2025.7.23-debian-12-r3"
+
+store:
+  # In-cluster endpoint of the artifacts store in the same namespace —
+  # per-environment by construction (each env's Job talks to its own store).
+  endpoint: http://minio-artifacts:9000
+  bucket: artifacts
+  # Dedicated promoter identity (provisioned by the minio-artifacts chart from
+  # the minio-artifacts-promoter ExternalSecret): may write ONLY the
+  # platform-root latest.json fleet pointers. Credentials never leave the
+  # cluster.
+  username: artifacts-promoter
+  existingSecret: minio-artifacts-promoter
+  existingSecretPasswordKey: password
+
+platforms:
+  - linux_x86_64
+  - darwin_aarch64
+  - windows_x86_64

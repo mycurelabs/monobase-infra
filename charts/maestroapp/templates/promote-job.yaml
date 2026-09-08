@@ -1,0 +1,74 @@
+# Promotion Job (mono#4095). The version is part of the Job name, so a pin
+# bump renders a NEW Job (ArgoCD prunes the old one and runs this) while an
+# unchanged pin stays Synced with the completed Job. No ttlSecondsAfterFinished
+# on purpose: TTL-deleting a completed Job makes ArgoCD see it OutOfSync and
+# re-run it forever. The script is idempotent — platforms already serving the
+# pin are skipped — so selfHeal re-creations are harmless no-ops.
+{{- $ver := .Values.version | required "maestroapp.version is required (the pinned fleet version)" }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: maestroapp-promote-{{ $ver | replace "." "-" }}
+  labels:
+    app.kubernetes.io/name: maestroapp-promote
+    app.kubernetes.io/component: fleet-promotion
+spec:
+  backoffLimit: 2
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: maestroapp-promote
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: promote
+          image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
+          command: [sh, -ec]
+          args:
+            - |
+              export MC_CONFIG_DIR=/tmp/.mc
+              mc alias set store "$STORE_ENDPOINT" "$STORE_USER" "$STORE_PASSWORD" >/dev/null
+              missing=""
+              for dir in $PLATFORMS; do
+                base="store/$BUCKET/maestroapp/desktop/$dir"
+                cur=$(mc cat "$base/latest.json" 2>/dev/null \
+                  | sed -n 's/.*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -n1) || true
+                if [ "$cur" = "$PIN" ]; then echo "= $dir already serves v$PIN"; continue; fi
+                if ! mc stat "$base/v$PIN/latest.json" >/dev/null 2>&1; then
+                  echo "! $dir: v$PIN/latest.json not published"; missing="$missing $dir"; continue
+                fi
+                mc cp "$base/v$PIN/latest.json" "$base/latest.json"
+                new=$(mc cat "$base/latest.json" \
+                  | sed -n 's/.*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -n1)
+                if [ "$new" != "$PIN" ]; then
+                  echo "ERROR: $dir promoted but store serves '$new' (want $PIN)"; exit 1
+                fi
+                echo "OK: $dir promoted to v$PIN"
+              done
+              if [ -n "$missing" ]; then
+                echo "ERROR: v$PIN has no versioned manifest for:$missing (typo'd pin or partial release)"; exit 1
+              fi
+              echo "fleet pin v$PIN reconciled"
+          env:
+            - name: PIN
+              value: {{ $ver | quote }}
+            - name: PLATFORMS
+              value: {{ join " " .Values.platforms | quote }}
+            - name: STORE_ENDPOINT
+              value: {{ .Values.store.endpoint | quote }}
+            - name: BUCKET
+              value: {{ .Values.store.bucket | quote }}
+            - name: STORE_USER
+              value: {{ .Values.store.username | quote }}
+            - name: STORE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.store.existingSecret }}
+                  key: {{ .Values.store.existingSecretPasswordKey }}
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi

@@ -145,14 +145,28 @@ spec:
                       - "s3:DeleteObject"
               # Fleet promoter (mono#4095): the ONLY identity allowed to write
               # the maestroapp platform-root latest.json fleet pointers. Used
-              # exclusively by this repo's promote-maestroapp Job, which copies
+              # exclusively by the charts/maestroapp promotion Job, which copies
               # the pinned v<ver>/latest.json over them. Dedicated user so
               # promotes are attributable in audit and revocable without touching
-              # the CI publisher key. Nothing else — it cannot upload artifacts,
-              # delete, or list (reads are anonymous anyway). Platform list must
-              # match the Deny above + charts/maestroapp/values.yaml `platforms`.
+              # the CI publisher key. It cannot upload artifacts or delete
+              # anything; reads under maestroapp/ are granted because the Job's
+              # authenticated mc calls (stat/cat/copy-source) are evaluated
+              # against THIS policy, not the anonymous-download rule. Platform
+              # list must match the Deny above + charts/maestroapp/values.yaml
+              # `platforms` — three separate lists, no shared source.
               - name: minio-artifacts-promoter
                 statements:
+                  - effect: "Allow"
+                    resources:
+                      - "arn:aws:s3:::artifacts"
+                    actions:
+                      - "s3:ListBucket"
+                      - "s3:GetBucketLocation"
+                  - effect: "Allow"
+                    resources:
+                      - "arn:aws:s3:::artifacts/maestroapp/*"
+                    actions:
+                      - "s3:GetObject"
                   - effect: "Allow"
                     resources:
                       - "arn:aws:s3:::artifacts/maestroapp/desktop/linux_x86_64/latest.json"
