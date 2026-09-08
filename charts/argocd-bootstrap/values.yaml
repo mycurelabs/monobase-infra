@@ -17,8 +17,11 @@ argocd:
   clusterName: mycure-doks-main
 
   # Deployments the auto-discover ApplicationSet picks up (git-generator files).
-  # Default: all env overlays EXCEPT staging (staging is deployed only by its own
-  # on-prem cluster's ArgoCD, which overrides this to include only staging).
+  # Default: all env overlays EXCEPT staging + preprod (both live only on the
+  # on-prem vanaheim cluster, whose ArgoCD overrides this list to exactly those
+  # two). An exclude MUST be applied to the live DOKS ApplicationSet BEFORE the
+  # excluded overlay file lands on main — the git generator globs at HEAD, so a
+  # missing exclude auto-deploys the env onto DOKS.
   deploymentPaths:
     - path: "values/deployments/*.yaml"
     - path: "values/deployments/example-*.yaml"
@@ -26,4 +29,7 @@ argocd:
     - path: "values/deployments/_base/*.yaml"
       exclude: true
     - path: "values/deployments/mycure-staging.yaml"
+      exclude: true
+    # preprod runs on the local vanaheim cluster (mycure#4135), not DOKS (PR #409).
+    - path: "values/deployments/mycure-preprod.yaml"
       exclude: true

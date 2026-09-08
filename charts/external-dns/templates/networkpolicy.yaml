@@ -37,6 +37,12 @@ spec:
     - ports:
         - protocol: TCP
           port: 443
+        # Self-hosted k3s/k3d apiserver listens on 6443 (NetworkPolicy matches
+        # the post-DNAT port, so the 10.43.0.1:443 Service VIP does NOT count
+        # as 443). Managed control planes (DOKS) terminate on 443. Without
+        # this, the informer's first LIST hangs -> fatal cache-sync timeout.
+        - protocol: TCP
+          port: 6443
     
     # Allow HTTP egress for provider APIs that may use HTTP
     - ports:

@@ -31,6 +31,8 @@ spec:
           {{- toYaml (.Values.corednsCustom.exactRewrites | default list) | nindent 10 }}
         regexRewrites:
           {{- toYaml (.Values.corednsCustom.regexRewrites | default list) | nindent 10 }}
+        extraOverrides:
+          {{- toYaml (.Values.corednsCustom.extraOverrides | default dict) | nindent 10 }}
 
   destination:
     server: https://kubernetes.default.svc

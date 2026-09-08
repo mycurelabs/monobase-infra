@@ -26,6 +26,8 @@ global:
 securityBaseline:
   strictGatewayIngress: true
 mycure-dashboard:
+  image:
+    tag: "0.14.20-staging.b6e2577"
   resources:
     requests:
       cpu: 50m
@@ -44,7 +46,7 @@ mycure-pxp:
 hapihub:
   # Keep the same image tag as the preprod copy.
   image:
-    tag: "11.20.120-staging.574e063"
+    tag: "11.20.121-staging.1d1dd49"
   cache:
     enabled: true
   # no Prometheus Operator on this lean k3d cluster (monitoring disabled)
@@ -159,7 +161,7 @@ hapihub:
     serviceName: postgresql-primary
 mycure:
   image:
-    tag: "10.25.130"
+    tag: "10.25.133-staging.b6e2577"
   resources:
     requests:
       cpu: 50m
@@ -197,7 +199,8 @@ medley:
       cpu: "1"
       memory: 1Gi
   gateway:
-    enabled: false  # ClusterIP only — no public HTTPRoute
+    enabled: true
+    sectionName: https-staging-lfh  # *.staging.localfirsthealth.com wildcard listener → medley.staging.localfirsthealth.com (tailnet-only)
   # DBOS run-state + clinic-analytics: own database on the shared bitnami Postgres; DATABASE_URL is built in
   # the chart from the in-cluster `postgresql` secret (password out of git). DBOS auto-creates the `medley` db.
   postgresql:
@@ -287,8 +290,11 @@ openmed:
     enabled: false
 # ===== DATABASE: PostgreSQL (HA — 1 primary + 1 read replica) =====
 # Replication for prod parity: the cadence hub's reconcile/serve scan plane reads
-# from the replica (CADENCE_DB_READ_URL). Lean sizing (8Gi PVCs, k3d local-path) —
-# NOT preprod's 215Gi/walg. walg (WAL archiving) stays OFF (ephemeral staging).
+# from the replica (CADENCE_DB_READ_URL). Switched on LIVE on 2026-09-04 (see
+# monobase-infra#407) — the seeded staging data lives on `data-postgresql-primary-0`;
+# keep the topology so a sync does not flip the StatefulSet back to `postgresql` and
+# boot hapihub against the old, empty `data-postgresql-0` volume. Lean sizing
+# (8Gi PVCs, k3d local-path) — NOT preprod's 215Gi/walg. walg stays OFF.
 postgresql:
   architecture: replication
   auth:
@@ -316,7 +322,7 @@ postgresql:
     replicaCount: 1
     persistence:
       enabled: true
-      storageClass: ""   # k3d default (local-path)
+      storageClass: "" # k3d default (local-path)
       size: 8Gi
     resources:
       requests:
@@ -336,9 +342,9 @@ postgresql:
     customStartupProbe:
       exec:
         command:
-        - /bin/sh
-        - -c
-        - exec pg_isready -U postgres -d dbname=hapihub -h 127.0.0.1 -p 5432
+          - /bin/sh
+          - -c
+          - exec pg_isready -U postgres -d dbname=hapihub -h 127.0.0.1 -p 5432
       initialDelaySeconds: 30
       periodSeconds: 15
       timeoutSeconds: 5
@@ -416,7 +422,7 @@ cadence:
         topologyKey: kubernetes.io/hostname
   # <staging gateway tailnet IP>:<cadence-quic-staging port>. NOTE: the gateway IP changes
   # on cluster rebuild — repoint here + the DNS A record if the cluster is nuked.
-  publicAddr: "100.124.242.71:6473"
+  publicAddr: "100.124.242.71:6474"  # 6473 is preprod's cadence-quic leg on the shared gateway
   # n0 public relays (the self-hosted relay's HTTP-upgrade handshake is broken through the
   # shared gateway — same interim as preprod).
   relayUrl: ""

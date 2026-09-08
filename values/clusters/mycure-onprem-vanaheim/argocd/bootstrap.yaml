@@ -7,9 +7,16 @@
 #     --bootstrap-values values/clusters/mycure-onprem-vanaheim/argocd/bootstrap.yaml
 #
 # Effect: this cluster's own ArgoCD uses the lean per-cluster infra config
-# (clusterName) and its auto-discover ApplicationSet deploys ONLY the staging
-# overlay, in-cluster. The DOKS ArgoCD (default deploymentPaths) excludes staging.
+# (clusterName) and its auto-discover ApplicationSet deploys the staging +
+# preprod overlays, in-cluster. The DOKS ArgoCD (default deploymentPaths)
+# excludes both.
 argocd:
   clusterName: mycure-onprem-vanaheim
+  # One-ref-per-cluster convention (docs/architecture/GITOPS-ARGOCD.md): this
+  # dev cluster tracks its cluster branch, not HEAD. Deploy = merge into
+  # cluster/vanaheim; promote = PR to main; re-merge main regularly.
+  targetRevision: cluster/vanaheim
   deploymentPaths:
     - path: "values/deployments/mycure-staging.yaml"
+    # preprod on the local cluster (mycure#4135), post-PR#409 DOKS decommission.
+    - path: "values/deployments/mycure-preprod.yaml"

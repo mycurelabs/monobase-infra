@@ -64,13 +64,22 @@ hapihub:
     # Moved off the digest pin onto a clean bare tag. The pin existed because the #3403 R4 authnz release
     # RE-USED tag 11.20.102 (re-pushed 2026-08-19 to sha256:d0f4bebd = always-enforce R4), so the bare tag
     # was ambiguous; 11.20.103 is its own untouched tag (sha256:4f5c8f60) and needs no pin.
-    # HOLD-PROD IS STILL IN EFFECT: R4 always-enforce lands in 11.20.105, so 11.20.103 is PRE-R4 and this
-    # bump does NOT promote R4. Do not go >= 11.20.105 on prod until R4 is validated + operator-approved.
+    # HOLD-PROD LIFTED 2026-09-07 by operator approval — this bump PROMOTES R4 (always-enforce
+    # authnz, #3403, re-cut as 11.20.105 in 4cd829c2b). Pre-flight before lifting: 29 enabled API
+    # keys, 0 would fail closed, 0 dangling orgs. Note there was NO soak environment — mycure-preprod
+    # was deleted in PR #409 — so R4 went to prod unsoaked. If authz regressions surface, roll back
+    # to 11.20.104 (pre-R4) first and diagnose from there.
     # NEVER deploy 11.20.62 (mid-response abort/502 storm) or 11.20.44 (stale binary).
+    # SCHEMA PREREQUISITE (done 2026-09-07, before this bump): prod's drizzle ledger carried an orphan
+    # high-water row at 1788021643676 from 0098_reconstruct_inputs on side branch
+    # worktree-reconstruct-stable-base — the branch 11.20.104 was cut from. drizzle's migrator only
+    # compares the newest ledger row, so migrations 0090-0098 were skipped forever, leaving prod
+    # without medical_records.updated_by, which 11.20.121 names in its SELECT and INSERT. Repaired
+    # out-of-band via repair-prod-schema.sql (additive; applied 0090/0092/0093/0096/0098 + ledger
+    # rows 90-94; high-water mark deliberately unchanged). Boot correctly applies 0 migrations now.
     # 11.20.104 = 11.20.103 + the reconstruct_inputs migration that the 11.20.102 journal
-    # reset dropped (the table was missing in prod, so every reconstruct save 500'd). Same
-    # stable 11.20.102 base, still PRE-R4 — the hold above is unaffected.
-    tag: "11.20.104"
+    # reset dropped (the table was missing in prod, so every reconstruct save 500'd).
+    tag: "11.20.121"
   cache:
     # Response cache OFF in prod — interim mitigation for the single-hot-key
     # bentocache stampede that wedged prod (#179, #2839, #2617). The serve-stale
@@ -262,7 +271,9 @@ hapihubWorker:
 # ===== HEALTHCARE: Frontend Application =====
 mycure:
   image:
-    tag: "10.25.120-1"
+    # Ships with hapihub 11.20.121 — 10.25.135 expects an API carrying the 0098
+    # medical_records.updated_by changes, so these two move together.
+    tag: "10.25.135"
   resources:
     requests:
       cpu: 10m
@@ -645,6 +656,13 @@ cadence:
   # (SnippetsFilter for the upgrade, in preprod). Empty ⇒ n0 relays (chart default).
   relayUrl: ""
   nodePool: "prod-apps"
+  # Match the hub's inline sync manifest to mono services/hapihub/cadence.yaml @ origin/main. Commit
+  # 6dd7c0ef5 (mono #3335/#3350, 2026-08-19) dropped file_links + organization_partners (empty/0-row,
+  # unused) from the manifest; the chart gates both behind dropUnusedTables. Left false the hub kept
+  # the PRE-6dd7c0ef5 manifest, so its SyncConfig fingerprint differed from a current-main box
+  # (2.1.109) and admission refused it ("SCHEMA mismatch"). true = fingerprint parity with main.
+  # FLEET-AFFECTING: coordinate rollout with the fleet (still on the old manifest) before this merges.
+  dropUnusedTables: true
   # Prod cadence 2.1.103: /healthz + /readyz on a DEDICATED OS thread. Root of the exit-137 probe-kills was
   # RUNTIME POLL-STARVATION, not a slow probe query: a 112s cache-wall scan pinned all tokio workers so the
   # trivial healthz future never got polled within the 90s liveness tolerance → SIGKILL. Serving health off

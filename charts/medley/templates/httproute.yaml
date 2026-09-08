@@ -10,10 +10,7 @@ spec:
   parentRefs:
     - name: {{ include "medley.gateway.name" . }}
       namespace: {{ include "medley.gateway.namespace" . }}
-      sectionName: https  # Only attach to HTTPS listener
-      {{- if .Values.gateway.sectionName }}
-      # Override: {{ .Values.gateway.sectionName }}
-      {{- end }}
+      sectionName: {{ .Values.gateway.sectionName | default "https" }}  # exact HTTPS listener (anti-coalescing on shared gateways)
   hostnames:
     {{- if .Values.gateway.hostnames }}
     {{- range .Values.gateway.hostnames }}
