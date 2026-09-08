@@ -234,9 +234,16 @@ externalSecrets:
     clusterName: ""
     serviceAccountEmail: ""
 
-# External DNS - Automatic DNS record management from HTTPRoutes
+# External DNS - Automatic DNS record management from HTTPRoutes (full config
+# in external-dns.yaml). Historical note: disabled at PR #355 because the
+# then-current external-dns emitted a flaky CNAME to the gateway's .ts.net
+# status hostname, ignoring the IP target annotation; v0.19.0 honors the
+# Gateway-level `external-dns.alpha.kubernetes.io/target` annotation (set on
+# nginx-internal-gateway above), publishing direct A records. Owner id is
+# cluster-unique (see external-dns.yaml) so this instance can never touch the
+# DOKS instance's records.
 externalDNS:
-  enabled: false  # Automatic DNS via Cloudflare (full config in external-dns.yaml)
+  enabled: true
 
 # Kyverno - Policy engine
 kyverno:
