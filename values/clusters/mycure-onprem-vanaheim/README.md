@@ -121,8 +121,13 @@ The `nginx-internal-gateway` is exposed on the tailnet by the tailscale operator
 
 - **TLS:** real Let's Encrypt certs for `*.staging.` and `*.preprod.localfirsthealth.com`
   (+ exact-host certs for the mycure/hapihub anti-coalescing pairs) — cert-manager + Cloudflare DNS-01.
-- **DNS:** `*.staging.` and `*.preprod.localfirsthealth.com` **A records → the gateway's
-  tailnet IP**, in Cloudflare.
+- **DNS: external-dns (v0.19, enabled 2026-09-08)** publishes every attached route's
+  hostname as a **direct A record → the gateway's tailnet IP** (from the
+  `external-dns.alpha.kubernetes.io/target` annotation on `nginx-internal-gateway`).
+  Owner id is cluster-unique (`mycure-onprem-vanaheim`) so it can never touch the DOKS
+  instance's records. Preprod records are external-dns-owned; the staging A records
+  predate this and are still MANUAL/unowned (external-dns skips them) — migrate by
+  deleting them once and letting external-dns recreate.
 
 Reach it (with Tailscale up), always over **https://**:
 - `https://mycure.staging.localfirsthealth.com` (login), `mycure-dashboard`, `mycure-pxp`
@@ -142,16 +147,23 @@ split-DNS for `localfirsthealth.com` → `1.1.1.1`.
 ```bash
 mise run cluster-destroy mycure-onprem-vanaheim   # or: k3d cluster delete mycure-onprem-vanaheim
 ```
-Then re-provision + re-bootstrap. **The gateway's tailnet IP changes on rebuild** — update
-the A records in Cloudflare, the `external-dns.alpha.kubernetes.io/target` annotation in
-`argocd/infrastructure.yaml`, and `cadence.publicAddr` in
+Then re-provision + re-bootstrap. **The gateway's tailnet IP changes on rebuild** (it also
+changes if the tailscale operator re-creates the proxy device — it did on 2026-09-03,
+appending `-1` to the device name). Update the `external-dns.alpha.kubernetes.io/target`
+annotation in `argocd/infrastructure.yaml` and `cadence.publicAddr` in
 `values/deployments/mycure-preprod.yaml` to the new IP
-(`tailscale status | grep nginx-staging-gateway`).
+(`tailscale status | grep nginx-staging-gateway`); external-dns then re-points all owned
+A records automatically (manual/unowned records must be fixed by hand — or deleted once
+so external-dns takes ownership).
 
 ## Known caveats / follow-ups
 
-- **DNS is manual A records** (external-dns disabled here — with the tailscale-operator gateway
-  it emits a flaky CNAME to the `.ts.net` status address). Re-add A records after a rebuild.
+- **DNS is external-dns-managed** (the old "flaky CNAME to `.ts.net`" disable reason is
+  obsolete — v0.19 honors the Gateway target annotation). Caveats that bit during
+  enablement: the chart NetworkPolicy needed TCP 6443 egress (self-hosted apiserver
+  port, post-DNAT); `txtOwnerId` must be cluster-unique or two sync-policy instances
+  delete each other's records; office/LAN resolvers can cache stale records past
+  deletion.
 - **cert-manager/external-dns node image pulls are slow** (registry egress via a tailnet-routed
   mirror) — `docker pull` on the host + `k3d image import` if a rebuild stalls.
 - **Stub integrations:** Google OAuth, Stripe, GCS storage — provide real staging values to
