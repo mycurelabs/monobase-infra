@@ -12,6 +12,10 @@
 # excludes both.
 argocd:
   clusterName: mycure-onprem-vanaheim
+  # One-ref-per-cluster convention (docs/architecture/GITOPS-ARGOCD.md): this
+  # dev cluster tracks its cluster branch, not HEAD. Deploy = merge into
+  # cluster/vanaheim; promote = PR to main; re-merge main regularly.
+  targetRevision: cluster/vanaheim
   deploymentPaths:
     - path: "values/deployments/mycure-staging.yaml"
     # preprod on the local cluster (mycure#4135), post-PR#409 DOKS decommission.
