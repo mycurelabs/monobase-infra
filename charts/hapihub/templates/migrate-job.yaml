@@ -25,7 +25,13 @@ metadata:
     # HookSucceeded — it destroys migrate logs right when you want them).
     argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
 spec:
-  backoffLimit: {{ .Values.roleSplit.migrateJob.backoffLimit | default 3 }}
+  # default 0, not 3: `hapihub migrate` runs CREATE INDEX CONCURRENTLY; a killed
+  # build leaves an INVALID index whose name the retry collides with, so retries
+  # fail identically and bury the real first error. Fail fast — re-run the sync
+  # after fixing. `| default 0` (not `| default 3`) because sprig `default` treats
+  # 0 as empty, so a plain `| default 3` can never render 0 (same trap as the
+  # `ne … false` job gates); an overlay can still set a non-zero retry count.
+  backoffLimit: {{ .Values.roleSplit.migrateJob.backoffLimit | default 0 }}
   ttlSecondsAfterFinished: 86400
   # Generous: CREATE INDEX CONCURRENTLY on big tables is slow, and killing it
   # mid-build leaves an INVALID index. Still bounded so a missing secret/image

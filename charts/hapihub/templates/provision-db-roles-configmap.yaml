@@ -32,6 +32,14 @@ data:
     \set ON_ERROR_STOP on
 
     -- ── Roles (CREATE ROLE has no IF NOT EXISTS); passwords kept current ──
+    -- The ALTER ROLE … PASSWORD lines are UNCONDITIONAL by design — do NOT move
+    -- them under the WHERE-NOT-EXISTS guard. All three roles authenticate with the
+    -- same ESO-managed `postgresql-app-roles` keys their consumers use, so the
+    -- unconditional reset (a) re-syncs the role after a secret rotation and (b)
+    -- self-heals the first-sync race where a consumer (e.g. cadence) boots and
+    -- tries to auth before this PreSync Job has provisioned its password. Guarding
+    -- them would reintroduce both failure modes. Verified on preprod: cadence
+    -- crash-looped on auth pre-provision, then went stable once this ran.
     SELECT format('CREATE ROLE migrator LOGIN PASSWORD %L', :'migrator_password')
     WHERE NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'migrator') \gexec
     SELECT format('CREATE ROLE app_rw LOGIN PASSWORD %L', :'app_rw_password')
@@ -121,8 +129,11 @@ data:
     SELECT format('GRANT USAGE, SELECT ON SEQUENCE %I TO app_rw, migrator', sequencename)
     FROM pg_sequences WHERE schemaname = 'public' AND sequencename LIKE 'cadence\_%' \gexec
 
-    -- ── Safety timeouts on the runtime role (SECURITY_ROADMAP §H). Watch the
-    --    worker's long exports on first rollout — superuser had no cap. ──
-    ALTER ROLE app_rw SET statement_timeout = '30s';
-    ALTER ROLE app_rw SET idle_in_transaction_session_timeout = '60s';
+    -- ── Safety timeouts on the runtime role (SECURITY_ROADMAP §H). Superuser had
+    --    no cap, so statement_timeout is a HARD error cap the moment roleSplit
+    --    flips: measure prod's heavy reads (medical_records attachment payloads,
+    --    worker exports — both connect as app_rw) against pg_stat_statements and
+    --    raise roleSplit.appRw.statementTimeout in the prod overlay first. ──
+    ALTER ROLE app_rw SET statement_timeout = '{{ (((.Values.roleSplit | default dict).appRw | default dict).statementTimeout) | default "30s" }}';
+    ALTER ROLE app_rw SET idle_in_transaction_session_timeout = '{{ (((.Values.roleSplit | default dict).appRw | default dict).idleInTransactionTimeout) | default "60s" }}';
 {{- end }}
