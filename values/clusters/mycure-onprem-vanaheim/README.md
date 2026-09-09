@@ -1,9 +1,10 @@
-# mycure-onprem-vanaheim — on-prem k3d staging cluster
+# mycure-onprem-vanaheim — on-prem k3d cluster (staging + preprod)
 
 A local **k3d** cluster on the vanaheim workstation that hosts the **`mycure-staging`**
-environment, reachable **only over Tailscale**. It runs its **own in-cluster ArgoCD**
-(standalone GitOps — not managed by the DOKS ArgoCD), so it can be nuked and rebuilt
-independently without touching production.
+and **`mycure-preprod`** environments (preprod moved here from DOKS — PR #409
+decommission, mycure#4135 standup), reachable **only over Tailscale**. It runs its
+**own in-cluster ArgoCD** (standalone GitOps — not managed by the DOKS ArgoCD), so it
+can be nuked and rebuilt independently without touching production.
 
 ```
 values/clusters/mycure-onprem-vanaheim/
@@ -12,12 +13,18 @@ values/clusters/mycure-onprem-vanaheim/
                # argocd install values, bootstrap override
 ```
 
-- **Cluster ≠ environment.** Cluster = `mycure-onprem-vanaheim`; app env/namespace = `mycure-staging`.
-- **Footprint:** lean clone of preprod — hapihub + frontends (mycure/dashboard/pxp) +
-  standalone Postgres + valkey + minio + mailpit. AI stack, cadence, and HA Postgres are OFF.
-- **Secrets:** its own `mycure-staging-*` GCP secrets (NOT prod's). Internal ones are
-  generated; **Google OAuth / Stripe / GCS storage are stubs** — those integrations don't
-  function until real staging values are provided.
+- **Cluster ≠ environment.** Cluster = `mycure-onprem-vanaheim`; app envs/namespaces =
+  `mycure-staging` + `mycure-preprod`.
+- **Footprint — staging:** lean — hapihub + frontends (mycure/dashboard/pxp) +
+  HA Postgres + valkey + minio + mailpit. AI stack and cadence are OFF.
+- **Footprint — preprod:** clone of `mycure-production` (HA Postgres + read plane,
+  hapihub API/worker split, cadence hub + relay, HPA, prod image tags) with
+  local-cluster deltas commented in the overlay. Prod-rehearsal + cadence
+  box-testing hub.
+- **Secrets:** each env's own GCP keys (`mycure-staging-*` / `mycure-preprod-*`,
+  NOT prod's), read by the scoped `external-secrets-staging` SA (its IAM condition
+  must cover both prefixes). **Google OAuth / Stripe / GCS storage are stubs** —
+  those integrations don't function until real values are provided.
 
 ## Prerequisites (on the vanaheim host)
 
@@ -73,21 +80,55 @@ helm template argocd-bootstrap charts/argocd-bootstrap \
 ArgoCD then deploys ESO → tailscale-operator → nginx-gateway → cert-manager → the
 `mycure-staging` app stack. Watch: `kubectl --context $KCTX -n argocd get applications`.
 
-> Pre-merge testing: add `argocd.targetRevision: <branch>` to `bootstrap.yaml` so ArgoCD
-> pulls staging from the feature branch. Revert to HEAD after merge.
+## Cluster-tracking branch (IMPORTANT)
+
+This is a **dev cluster**: it may run unmerged work. The convention
+(docs/architecture/GITOPS-ARGOCD.md → "Branch Conventions") is **one ref for the whole
+cluster**, declared in `argocd/bootstrap.yaml` as `argocd.targetRevision:
+cluster/vanaheim` — never ad-hoc `kubectl` pins on individual Applications. Deploy =
+merge your feature branch into `cluster/vanaheim`; promote = PR to `main`; re-merge
+`main` into the cluster branch regularly. Merge-only, no force-push (shared branch).
+
+**Current state: CONSOLIDATED (2026-09-08).** Everything on the cluster — the
+`monobase-auto-discover` AppSet, `infrastructure` root, `mycure-staging-root`,
+`mycure-preprod-root` (AppSet-owned) — tracks **`cluster/vanaheim`** (union of the
+medley-2.x staging test + the preprod standup, monobase-infra#418). The ref is
+declared in `argocd/bootstrap.yaml` (`argocd.targetRevision`), so bootstrap
+re-applies are deterministic.
+
+**Caveats:**
+
+- `main`-only changes do NOT reach this cluster until `main` is re-merged into
+  `cluster/vanaheim` (do it regularly; always merge, never force-push).
+- The AppSet controller does not update EXISTING root apps on template change —
+  after changing the tracked ref, patch live roots' `targetRevision` (+ the helm
+  values blob) by hand or recreate them.
+- One-time preprod seeds already done (ESO IAM prefix grant, seed, cadence
+  sa-api-key mint) — on a nuke+rebuild redo: `mise run seed -- --env preprod` +
+  re-mint `mycure-preprod-cadence-sa-api-key` (better-auth keys die with the DB).
 
 ## Access (tailnet-only)
 
 The `nginx-internal-gateway` is exposed on the tailnet by the tailscale operator as device
 `nginx-staging-gateway` (a tailnet IP, e.g. `100.67.121.122`). DNS + TLS:
 
-- **TLS:** real Let's Encrypt wildcard cert for `*.staging.localfirsthealth.com` (cert-manager + Cloudflare DNS-01).
-- **DNS:** `*.staging.localfirsthealth.com` **A records → the gateway's tailnet IP**, in Cloudflare.
+- **TLS:** real Let's Encrypt certs for `*.staging.` and `*.preprod.localfirsthealth.com`
+  (+ exact-host certs for the mycure/hapihub anti-coalescing pairs) — cert-manager + Cloudflare DNS-01.
+- **DNS: external-dns (v0.19, enabled 2026-09-08)** publishes every attached route's
+  hostname as a **direct A record → the gateway's tailnet IP** (from the
+  `external-dns.alpha.kubernetes.io/target` annotation on `nginx-internal-gateway`).
+  Owner id is cluster-unique (`mycure-onprem-vanaheim`) so it can never touch the DOKS
+  instance's records. Preprod records are external-dns-owned; the staging A records
+  predate this and are still MANUAL/unowned (external-dns skips them) — migrate by
+  deleting them once and letting external-dns recreate.
 
 Reach it (with Tailscale up), always over **https://**:
 
 - `https://mycure.staging.localfirsthealth.com` (login), `mycure-dashboard`, `mycure-pxp`
 - `https://hapihub.staging.localfirsthealth.com/health`
+- preprod: same hostnames under `.preprod.localfirsthealth.com` (+ `cadence`,
+  `cadence-relay`, `mail`, `docs`, `minio`); cadence QUIC = UDP 6473, relay UDP 7842
+  on the same gateway IP.
 
 HTTP (port 80) has no app routes (deny-first) → nginx 404; use HTTPS.
 
@@ -100,15 +141,23 @@ split-DNS for `localfirsthealth.com` → `1.1.1.1`.
 ```bash
 mise run cluster-destroy mycure-onprem-vanaheim   # or: k3d cluster delete mycure-onprem-vanaheim
 ```
-
-Then re-provision + re-bootstrap. **The gateway's tailnet IP changes on rebuild** — update
-the A records in Cloudflare and the `external-dns.alpha.kubernetes.io/target` annotation in
-`argocd/infrastructure.yaml` to the new IP (`tailscale status | grep nginx-staging-gateway`).
+Then re-provision + re-bootstrap. **The gateway's tailnet IP changes on rebuild** (it also
+changes if the tailscale operator re-creates the proxy device — it did on 2026-09-03,
+appending `-1` to the device name). Update the `external-dns.alpha.kubernetes.io/target`
+annotation in `argocd/infrastructure.yaml` and `cadence.publicAddr` in
+`values/deployments/mycure-preprod.yaml` to the new IP
+(`tailscale status | grep nginx-staging-gateway`); external-dns then re-points all owned
+A records automatically (manual/unowned records must be fixed by hand — or deleted once
+so external-dns takes ownership).
 
 ## Known caveats / follow-ups
 
-- **DNS is manual A records** (external-dns disabled here — with the tailscale-operator gateway
-  it emits a flaky CNAME to the `.ts.net` status address). Re-add A records after a rebuild.
+- **DNS is external-dns-managed** (the old "flaky CNAME to `.ts.net`" disable reason is
+  obsolete — v0.19 honors the Gateway target annotation). Caveats that bit during
+  enablement: the chart NetworkPolicy needed TCP 6443 egress (self-hosted apiserver
+  port, post-DNAT); `txtOwnerId` must be cluster-unique or two sync-policy instances
+  delete each other's records; office/LAN resolvers can cache stale records past
+  deletion.
 - **cert-manager/external-dns node image pulls are slow** (registry egress via a tailnet-routed
   mirror) — `docker pull` on the host + `k3d image import` if a rebuild stalls.
 - **Stub integrations:** Google OAuth, Stripe, GCS storage — provide real staging values to
