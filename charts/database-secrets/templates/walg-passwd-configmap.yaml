@@ -1,0 +1,53 @@
+{{- /*
+/etc/passwd shim for wal-g.
+
+The Bitnami PostgreSQL container runs as uid 1001, but that uid has NO entry in
+the image's /etc/passwd. wal-g is cgo-built, so `wal-g backup-push`,
+`backup-list` and `backup-fetch` call getpwuid(3) and abort with:
+
+    ERROR: user: unknown userid 1001
+
+`wal-g wal-push` does NOT perform the lookup, which is why WAL archiving works
+while every base-backup and restore command fails — i.e. archiving succeeds but
+recovery is impossible. Setting $USER/$HOME does not help (cgo path ignores
+them); verified by reproducing in the image locally.
+
+This mounts the image's own passwd content plus a uid 1001 entry over
+/etc/passwd (subPath, so nothing else in /etc is shadowed). Content is copied
+from bitnamilegacy/postgresql:16.4.0-debian-12-r13; re-check on image upgrade.
+
+Gated on the same walg.enabled toggle as the credentials ExternalSecret.
+*/ -}}
+{{- if .Values.walg }}
+{{- if .Values.walg.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgresql-walg-passwd
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    app.kubernetes.io/name: postgresql-walg-passwd
+    app.kubernetes.io/component: postgresql
+data:
+  passwd: |
+    root:x:0:0:root:/root:/bin/bash
+    daemon:x:1:1:daemon:/usr/sbin:/usr/sbin/nologin
+    bin:x:2:2:bin:/bin:/usr/sbin/nologin
+    sys:x:3:3:sys:/dev:/usr/sbin/nologin
+    sync:x:4:65534:sync:/bin:/bin/sync
+    games:x:5:60:games:/usr/games:/usr/sbin/nologin
+    man:x:6:12:man:/var/cache/man:/usr/sbin/nologin
+    lp:x:7:7:lp:/var/spool/lpd:/usr/sbin/nologin
+    mail:x:8:8:mail:/var/mail:/usr/sbin/nologin
+    news:x:9:9:news:/var/spool/news:/usr/sbin/nologin
+    uucp:x:10:10:uucp:/var/spool/uucp:/usr/sbin/nologin
+    proxy:x:13:13:proxy:/bin:/usr/sbin/nologin
+    www-data:x:33:33:www-data:/var/www:/usr/sbin/nologin
+    backup:x:34:34:backup:/var/backups:/usr/sbin/nologin
+    list:x:38:38:Mailing List Manager:/var/list:/usr/sbin/nologin
+    irc:x:39:39:ircd:/run/ircd:/usr/sbin/nologin
+    _apt:x:42:65534::/nonexistent:/usr/sbin/nologin
+    nobody:x:65534:65534:nobody:/nonexistent:/usr/sbin/nologin
+    postgres:x:1001:1001:PostgreSQL:/bitnami/postgresql:/bin/sh
+{{- end }}
+{{- end }}

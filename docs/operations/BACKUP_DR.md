@@ -22,7 +22,18 @@ Complete backup procedures, restore operations, and disaster recovery plans.
 
 Tier 4 is a pull-only `rclone` mirror of the Velero bucket onto on-prem hosts. Defense-in-depth for "DO sgp1 is unreachable" or "primary backup repo compromised" scenarios. Restore is slower (requires a recovery cluster or `kopia` extraction). See [ONPREM_BACKUP_SETUP.md](ONPREM_BACKUP_SETUP.md) for adding a new mirror host and [RESTORE_FROM_ONPREM.md](RESTORE_FROM_ONPREM.md) for the recovery procedure.
 
+Tier 4b (**peer-host mirrors**) chains further copies off a tier-4 host onto additional servers, read-only and **credential-free** — each replica pulls the already-encrypted blobs over an `rrsync`-jailed, IP-locked SSH forced command, so it holds no DO Spaces key or Kopia password. Supports chaining (host → host → host) and fan-out (one source → many replicas) for redundancy. See [BACKUP_MIRROR_TIERS.md](BACKUP_MIRROR_TIERS.md).
+
+**Off-provider cloud copy (Backblaze B2).** A second *independent cloud provider* copy — defense against "DO Spaces unreachable / account lost or compromised" without needing an on-prem host. Velero backups dual-write natively to a B2 `BackupStorageLocation`; the PostgreSQL WAL archive is mirrored to B2 every 15 min. Object-Lock-protected (14-day air gap). See [BACKBLAZE_B2.md](BACKBLAZE_B2.md).
+
 > The 4 tiers above protect **production data** (Kubernetes PVs / Velero). They do **not** cover source code — see the separate section below.
+
+> **PostgreSQL PITR (RPO ~1 min).** The tiers above are Velero — discrete
+> snapshots, so PostgreSQL's RPO is 24h (Tier 2). Continuous WAL archiving via
+> `wal-g` adds recovery to **any second** on top of these backups (base backup +
+> replayed WAL). Live in `mycure-preprod`, not yet in production. It's the right
+> tool for accidental `DELETE` / bad-migration recovery — see
+> [PITR-RESTORE.md](PITR-RESTORE.md). Velero remains the whole-namespace rebuild.
 
 ---
 

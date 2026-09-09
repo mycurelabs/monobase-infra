@@ -24,7 +24,10 @@ spec:
   namespaceSelector:
     any: true
   endpoints:
-    - port: metrics
+    # Bitnami's postgresql metrics Service names this port `http-metrics`
+    # (chart 16.7.27, templates/primary/metrics-svc.yaml). `metrics` matched
+    # nothing and generated zero targets.
+    - port: http-metrics
       interval: 30s
       path: /metrics
 

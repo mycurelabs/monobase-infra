@@ -1,0 +1,17 @@
+# Accepted Trivy misconfiguration findings, with justification.
+# See trivy.yaml: "Add a root .trivyignore to suppress accepted findings once
+# the first run sets a baseline." docker/wal-g is the repo's first Dockerfile,
+# so this is that baseline.
+
+misconfigurations:
+  - id: DS-0026
+    paths:
+      - "docker/wal-g/Dockerfile"
+    statement: >-
+      No HEALTHCHECK, deliberately. This image is never run as a long-lived
+      service: it is used (1) as an initContainer that copies the wal-g binary
+      onto a shared emptyDir and exits, and (2) as the runner image for
+      `wal-g backup-push` / `wal-g delete` CronJobs, which run to completion.
+      A HEALTHCHECK has nothing to poll in either case. Kubernetes also ignores
+      Docker HEALTHCHECK entirely, using liveness/readiness probes instead, so
+      adding one would satisfy the scanner while changing nothing at runtime.

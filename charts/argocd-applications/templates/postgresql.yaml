@@ -44,6 +44,16 @@ spec:
             {{- end }}
           {{- end }}
         architecture: {{ .Values.postgresql.architecture | default "standalone" }}
+        {{- /*
+          postgres_exporter sidecar + metrics Service. Guarded, so overlays that
+          do not set it render exactly as before. Needed for the WAL-archive
+          alerts: a `postgresql` ServiceMonitor already exists cluster-side but
+          matches nothing until this Service is created.
+        */}}
+        {{- if .Values.postgresql.metrics }}
+        metrics:
+          {{- toYaml .Values.postgresql.metrics | nindent 10 }}
+        {{- end }}
 
         # Primary block — supports both legacy (.Values.postgresql.{persistence,resources})
         # and new (.Values.postgresql.primary.*) value structures
@@ -70,6 +80,31 @@ spec:
           {{- if and .Values.postgresql.primary .Values.postgresql.primary.extendedConfiguration }}
           extendedConfiguration: |
             {{- .Values.postgresql.primary.extendedConfiguration | nindent 12 }}
+          {{- end }}
+          {{- /*
+            Passthrough for sidecar/binary injection (WAL archiving needs wal-g on
+            an emptyDir because the PG container has readOnlyRootFilesystem: true).
+            STRICTLY ADDITIVE: each block is guarded, so an overlay that does not
+            set these keys renders byte-identical to before. Without this
+            passthrough these keys are silently dropped — and pairing
+            `archive_mode = on` in extendedConfiguration with a missing wal-g
+            binary fills pg_wal and halts PostgreSQL.
+          */}}
+          {{- if and .Values.postgresql.primary .Values.postgresql.primary.initContainers }}
+          initContainers:
+            {{- toYaml .Values.postgresql.primary.initContainers | nindent 12 }}
+          {{- end }}
+          {{- if and .Values.postgresql.primary .Values.postgresql.primary.extraVolumes }}
+          extraVolumes:
+            {{- toYaml .Values.postgresql.primary.extraVolumes | nindent 12 }}
+          {{- end }}
+          {{- if and .Values.postgresql.primary .Values.postgresql.primary.extraVolumeMounts }}
+          extraVolumeMounts:
+            {{- toYaml .Values.postgresql.primary.extraVolumeMounts | nindent 12 }}
+          {{- end }}
+          {{- if and .Values.postgresql.primary .Values.postgresql.primary.extraEnvVars }}
+          extraEnvVars:
+            {{- toYaml .Values.postgresql.primary.extraEnvVars | nindent 12 }}
           {{- end }}
           {{- if .Values.postgresql.podDisruptionBudget }}
           podDisruptionBudget:

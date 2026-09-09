@@ -344,6 +344,20 @@ spec:
           annotations:
             summary: "cadence ensure_sync_infra retrying persistently in {{ "{{" }} $labels.namespace }}"
             description: "Some collection cannot complete DDL setup (steady retry at the 15m cap); its data is on the degraded legacy path."
+        - alert: CadenceSchemaMismatchOngoing
+          # Fail-closed signal: the hub is refusing catch-up on a schema-fingerprint mismatch (peer lists
+          # different collections/columns than the hub). Silent by default — only a WARN log, no server-side
+          # denial metric — so alert on the reconcile-side counter, which the hub increments each time it hits
+          # a mismatched peer (schema_mismatch_current is unreliable: it resets to 0 whenever ANY reconcile in
+          # the loop succeeds, e.g. against the matching boxes). EXPECTED to fire during a coordinated manifest
+          # migration (boxes rolling forward) — silence it for the window; its value is catching an UNPLANNED
+          # skew (a future cadence.yaml drift or a stray-version box) that would otherwise go unnoticed.
+          expr: rate(cadence_schema_mismatch_total[15m]) > 0
+          for: 30m
+          labels: {severity: warning}
+          annotations:
+            summary: "cadence hub hitting schema-fingerprint mismatches in {{ "{{" }} $labels.namespace }}"
+            description: "The hub is refusing sync to peer(s) on a schema mismatch (exact-fingerprint gate). Expected during a planned manifest flip + fleet roll; otherwise a version/schema skew — compare the hub's rendered sync manifest vs the fleet's build."
 
 {{- if .Values.kyverno.enabled }}
 ---
@@ -438,3 +452,59 @@ spec:
           annotations:
             summary: "PHI export burst in {{ "{{" }} $labels.namespace }} ({{ "{{" }} $value | humanize }} in 5m)"
             description: "Possible mass PHI exfiltration. Identify the actor via GET /audit/security-events and review whether the export scope is authorized."
+
+---
+# PostgreSQL WAL archiving (PITR) — added with the WAL archiving rollout after
+# the 2026-08-28 data-loss incident.
+#
+# Enabling archive_mode introduces a NEW failure mode: if archive_command fails,
+# PostgreSQL STOPS RECYCLING WAL. pg_wal then grows without bound until the data
+# volume is full, at which point the database halts. These alerts are the safety
+# net for that; the rollout is not complete without them.
+#
+# pg_stat_archiver_* comes from the postgres_exporter sidecar
+# (postgresql.metrics.enabled). The volume alert deliberately uses kubelet
+# volume stats instead, so the last-resort warning still fires even if the
+# exporter is down.
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: postgres-wal-archiving
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: prometheus-rules
+    app.kubernetes.io/component: monitoring
+    prometheus: kube-prometheus
+spec:
+  groups:
+    - name: postgres-wal-archiving
+      rules:
+        - alert: PostgresWALArchiveFailing
+          # Any archive_command failure. Not a warning: sustained failure ends in
+          # a halted database, and it also means PITR coverage has a hole.
+          expr: |
+            increase(pg_stat_archiver_failed_count{namespace=~".+-(preprod|production)"}[15m]) > 0
+          for: 10m
+          labels: {severity: critical}
+          annotations:
+            summary: "WAL archiving failing in {{ "{{" }} $labels.namespace }}"
+            description: "archive_command is failing. pg_wal will grow until the data volume fills and PostgreSQL halts, and PITR coverage is broken from the last successful segment. Check the wal-g credentials (postgresql-walg secret) and Spaces reachability."
+
+        - alert: PostgresWALArchiveStalled
+          # Succeeding but not advancing — e.g. archiver wedged. archive_timeout
+          # is 60s, so >15m without a successful archive is well outside normal.
+          expr: |
+            pg_stat_archiver_last_archive_age{namespace=~".+-(preprod|production)"} > 900
+          for: 10m
+          labels: {severity: critical}
+          annotations:
+            summary: "No WAL archived for >15m in {{ "{{" }} $labels.namespace }}"
+            description: "Last successful archive was {{ "{{" }} $value | humanizeDuration }} ago despite archive_timeout=60s. Every minute stalled is a minute of PITR coverage lost."
+
+        # NOTE: deliberately NO PostgresDataVolume* alerts here. The
+        # storage-health rule in this same chart already covers every PVC at the
+        # identical 80%/90% thresholds (PersistentVolumeFillingUp /
+        # PersistentVolumeCritical), so PG-specific copies would only double-page.
+        # A failing archive_command surfaces as pg_wal growth, which those
+        # existing PV alerts catch; PostgresWALArchiveFailing above catches the
+        # cause directly and much sooner.
