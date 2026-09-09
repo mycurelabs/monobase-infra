@@ -64,6 +64,12 @@ mycure-pxp:
     API_URL: "https://hapihub.preprod.localfirsthealth.com"
 
 hapihub:
+  # Least-privilege DB role split (monobase-mycure#4147) — stage 2: PreSync
+  # provision-db-roles (superuser: roles/adoption/grants) then migrate
+  # (hapihub migrate as migrator); Deployment + worker run as DML-only app_rw
+  # with DATABASE_SKIP_MIGRATIONS=true. Secrets landed in stage 1.
+  roleSplit:
+    enabled: true
   # Prod parity — same tag as mycure-production.yaml. Bump here first when
   # rehearsing a promotion.
   image:
@@ -201,6 +207,15 @@ hapihub:
 # Prod parity (mono#2114): background-job consumer split out of the API pods.
 hapihubWorker:
   enabled: true
+
+  # roleSplit: the worker release deep-merges the hapihub block, so it inherits
+  # app_rw + DATABASE_SKIP_MIGRATIONS. The hook Jobs must render only ONCE (in
+  # the hapihub release) — disable them here or every sync runs them twice.
+  roleSplit:
+    provision:
+      enabled: false
+    migrateJob:
+      enabled: false
 
   replicaCount: 1
 
