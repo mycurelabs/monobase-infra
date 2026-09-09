@@ -538,6 +538,15 @@ cadence:
     # Read-plane split (prod parity): reconcile/serve scans go to the replica
     # via CADENCE_DB_READ_URL; writes + LWW admission reads stay on the primary.
     readServiceName: postgresql-read
+    # Least-privilege split stage 3 (monobase-mycure#4147): the hub runs as the
+    # `cadence` role — DML + CREATE on public (its cadence_* store + capture fn)
+    # + per-table TRIGGER (capture triggers are CREATE OR REPLACE, no ownership).
+    # Provisioned by the hapihub provision-db-roles PreSync Job.
+    auth:
+      database: hapihub
+      username: cadence
+      existingSecret: postgresql-app-roles
+      secretKey: cadence-password
   gateway:
     sectionName: https-preprod-lfh
     hostnames:
