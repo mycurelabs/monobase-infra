@@ -1,4 +1,7 @@
-{{- if and .Values.enabled (.Values.roleSplit | default dict).enabled (((.Values.roleSplit | default dict).provision | default dict).enabled | default true) }}
+{{- /* NOTE: `ne … false`, NOT `| default true` — sprig default treats an
+     explicit false as empty and re-enables the job (bit the worker release,
+     which must disable these; monobase-mycure#4147 stage-2 finding). */ -}}
+{{- if and .Values.enabled (.Values.roleSplit | default dict).enabled (ne (((.Values.roleSplit | default dict).provision | default dict).enabled) false) }}
 # Provision the least-privilege DB roles (monobase-mycure#4147) — PreSync, BEFORE the
 # migrate Job (hook-weight -5 < 0). Idempotent psql run as the in-cluster
 # superuser: creates/refreshes migrator/app_rw/cadence, adopts pre-existing
