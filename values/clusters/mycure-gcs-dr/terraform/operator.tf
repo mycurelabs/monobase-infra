@@ -12,8 +12,13 @@ resource "google_project_iam_member" "tf_operator_backup" {
   provider = google.backup
   project  = var.backup_project_id
   for_each = toset([
+    # storage.admin: tofu manages the backup bucket itself (create/update,
+    # lifecycle, versioning) + its IAM (STS sink grants) — bucket admin is the job.
     "roles/storage.admin",
+    # storagetransfer.admin: tofu manages the STS job + reads the service agent.
     "roles/storagetransfer.admin",
+    # pubsub.admin: tofu manages the alert topic + its IAM (publisher grant);
+    # publisher/subscriber alone can't create topics or set topic IAM.
     "roles/pubsub.admin",
   ])
   role   = each.value
@@ -21,11 +26,19 @@ resource "google_project_iam_member" "tf_operator_backup" {
 }
 
 # Bucket-scoped on the SOURCE so tofu can reconcile the STS-agent binding on
-# future applies. The operator SA's only reach into mc-v4-prod.
+# future applies. The operator SA's only reach into mc-v4-prod, and the only
+# thing tofu does there is manage that one IAM binding — so the role is a
+# custom role carrying ONLY storage.buckets.{get,set}IamPolicy. No predefined
+# role is this narrow (legacyBucketOwner still carries storage.objects.delete);
+# storage.admin here would let one identity destroy both source and DR copy.
+# The custom role is created once by a mc-v4-prod admin (see plan Task 4.8b);
+# tofu references it but does not manage it.
+# NOTE: setIamPolicy is inherently self-escalation-capable (the SA could
+# re-grant itself broader roles) — irreducible while tofu manages this binding.
 resource "google_storage_bucket_iam_member" "tf_operator_source" {
   provider = google.source
   bucket   = var.source_bucket
-  role     = "roles/storage.admin"
+  role     = "projects/${var.source_project_id}/roles/gcsDrBucketIamManager"
   member   = "serviceAccount:${google_service_account.tf_operator.email}"
 }
 

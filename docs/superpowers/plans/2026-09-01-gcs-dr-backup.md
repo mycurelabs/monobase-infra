@@ -40,7 +40,7 @@
 **Human prerequisites (NOT tofu-managed — need org/billing/IAM-admin rights):**
 - **P1.** A **separate GCP org + billing account** exists (or a new project under a separate billing account if standing up a full org is too heavy — note the weaker isolation). Needs Cloud Identity super-admin (org) + billing account creator. → **biz/owner action.**
 - **P2.** A **backup project** exists in that org (e.g. `mycure-dr-backup`), billing linked, `storagetransfer.googleapis.com` + `storage.googleapis.com` + `pubsub.googleapis.com` APIs enabled (`pubsub.googleapis.com` is required for the Task 4.5 alert topic — `google_pubsub_topic.sts_alerts` fails at apply on a fresh project without it).
-- **P3.** The tofu operator has creds (ADC / `GOOGLE_APPLICATION_CREDENTIALS`) with: `roles/storage.admin` (+ `roles/storagetransfer.admin`) on the **backup project**, AND `roles/storage.admin` on the **source bucket** `mc-v4-prod.appspot.com` (to add the STS agent IAM grant).
+- **P3.** The tofu operator has creds (ADC / `GOOGLE_APPLICATION_CREDENTIALS`) with: `roles/storage.admin` (+ `roles/storagetransfer.admin`) on the **backup project**. Reach into the **source bucket** `mc-v4-prod.appspot.com` is the narrow custom role `gcsDrBucketIamManager` (Task 4.8b) — `storage.buckets.{get,set}IamPolicy` only, enough to reconcile the STS-agent grant, no object or bucket delete. The one-time bootstrap grant of that binding is a `mc-v4-prod` admin action.
 
 ---
 
@@ -438,11 +438,17 @@ resource "google_project_iam_member" "tf_operator_backup" {
 }
 
 # Bucket-scoped on the SOURCE so tofu can reconcile the STS-agent binding on
-# future applies. This is the operator SA's ONLY reach into mc-v4-prod.
+# future applies. This is the operator SA's ONLY reach into mc-v4-prod, and the
+# only thing tofu does there is manage that one IAM binding — so the role is a
+# CUSTOM role carrying only storage.buckets.{get,set}IamPolicy (Task 4.8b),
+# NOT storage.admin. storage.admin here would give one identity object-read
+# (PHI), object-delete and bucket-delete on live prod — i.e. the power to
+# destroy both the source and its DR copy. legacyBucketOwner is not a
+# substitute (it still carries storage.objects.delete).
 resource "google_storage_bucket_iam_member" "tf_operator_source" {
   provider = google.source
   bucket   = var.source_bucket
-  role     = "roles/storage.admin"
+  role     = "projects/${var.source_project_id}/roles/gcsDrBucketIamManager"
   member   = "serviceAccount:${google_service_account.tf_operator.email}"
 }
 
@@ -459,6 +465,37 @@ resource "google_service_account_iam_member" "tf_operator_impersonators" {
 
 Add to `outputs.tf`: `output "tf_operator_sa" { value = google_service_account.tf_operator.email }`
 Set in `terraform.tfvars`: `tf_operators = ["user:tubig.jlu@gmail.com"]` (bootstrap; widen to an ops group later).
+
+- [ ] **Step 1b (Task 4.8b): Create the source-bucket custom role — `mc-v4-prod` admin action.**
+  The `tf_operator_source` binding references a custom role that carries only the
+  two IAM-management permissions tofu needs on the prod source bucket. It is NOT
+  managed by this tofu root (that would need broad prod IAM rights in the root);
+  a `mc-v4-prod` project admin creates it once, out-of-band:
+
+  ```bash
+  gcloud iam roles create gcsDrBucketIamManager --project=mc-v4-prod \
+    --title="GCS DR bucket IAM manager (least-priv)" \
+    --description="Manage the STS-agent IAM binding on the DR source bucket. Used only by gcs-dr-tf-operator@mycure-dr-backup." \
+    --permissions=storage.buckets.getIamPolicy,storage.buckets.setIamPolicy \
+    --stage=GA
+  ```
+
+  Then bind it to the operator SA on the bucket (replaces any prior
+  `roles/storage.admin` grant to that SA):
+
+  ```bash
+  gcloud storage buckets add-iam-policy-binding gs://mc-v4-prod.appspot.com \
+    --member="serviceAccount:gcs-dr-tf-operator@mycure-dr-backup.iam.gserviceaccount.com" \
+    --role="projects/mc-v4-prod/roles/gcsDrBucketIamManager"
+  gcloud storage buckets remove-iam-policy-binding gs://mc-v4-prod.appspot.com \
+    --member="serviceAccount:gcs-dr-tf-operator@mycure-dr-backup.iam.gserviceaccount.com" \
+    --role="roles/storage.admin"
+  ```
+
+  After this a `tofu plan` (impersonating the SA) should show no changes on the
+  `tf_operator_source` binding. **Already-applied envs:** the SA currently holds
+  live `roles/storage.admin` on the source bucket — this step is what narrows it;
+  confirm the `storage.admin` binding is gone from the live bucket policy after.
 
 - [ ] **Step 2: Bootstrap apply (as the human `tubig.jlu`, holding the temporary setup roles)** — `mise run cluster-apply mycure-gcs-dr`. This creates the operator SA, its roles, and the `tokenCreator` grant for `tubig.jlu`.
 
@@ -523,10 +560,30 @@ on it — you're in `var.tf_operators`). No key is ever downloaded.
     mise run cluster-plan mycure-gcs-dr   # then cluster-apply
     # gcloud (restores below): add --impersonate-service-account to each command
     #   gcloud config set auth/impersonate_service_account gcs-dr-tf-operator@<backup>.iam.gserviceaccount.com
-The SA has storage.admin on both buckets, so it can read the backup + write the
-source for a restore. To add/remove who may impersonate, edit `tf_operators` and apply.
+The SA has storage.admin on the BACKUP bucket only, so restores can freely read
+the backup copy. On the SOURCE bucket the SA holds only `gcsDrBucketIamManager`
+(IAM-policy management, no object write) — deliberately, so a compromised
+operator cannot write or delete prod objects. A restore that writes back to the
+live source therefore needs a **break-glass grant**: a `mc-v4-prod` admin grants
+the operator (or a human) `roles/storage.objectAdmin` on `gs://mc-v4-prod.appspot.com`
+for the duration of the restore, then removes it. (Alternatively restore into a
+fresh bucket and repoint hapihub `STORAGE_BUCKET` — see Full-bucket restore.)
+To add/remove who may impersonate, edit `tf_operators` and apply.
+
+## Recovery window & semantics — READ THIS
+This is a **replica, not an air gap.** STS runs with `delete_objects_unique_in_sink
+= true`, so a deletion in the source bucket **propagates to this DR copy within
+≤12h** (the next sync). It is NOT immutable storage. What protects you is the
+30-day window: versioning + a `days_since_noncurrent_time = 30` lifecycle keep
+every overwritten/deleted object recoverable for **30 days** after the delete
+propagates (plus a 7-day soft-delete floor). A propagated mass-delete is
+recoverable via "Restore a deleted / previous version" below — for 30 days, then
+it's gone. The deletion-immune, off-Google copy is **Tier 2** (the niflheim
+encrypted rclone mirror, monobase-infra#402) — go there if the 30-day window has
+lapsed or the whole Google account is compromised.
 
 ## Restore a single object (latest)
+_Writing back to the live source needs the break-glass `objectAdmin` grant above._
     gcloud storage cp gs://<backup_bucket>/<path> gs://mc-v4-prod.appspot.com/<path> --project=<backup>
 
 ## Restore a deleted / previous version (within 30 days)
