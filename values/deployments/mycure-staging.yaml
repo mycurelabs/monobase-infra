@@ -188,7 +188,7 @@ medley:
   enabled: true
   image:
     repository: ghcr.io/mycurelabs/medley
-    tag: "2.0.3"           # ghcr (public) — model-router rollout, monobase-mycure#4214 / #4150
+    tag: "2.0.4"           # ghcr (public) — model-router rollout, monobase-mycure#4214 / #4150
     pullPolicy: IfNotPresent
   replicaCount: 1
   resources:
@@ -207,7 +207,13 @@ medley:
     enabled: true
   config:
     OLLAMA_URL: "http://host.k3d.internal:11434/v1"   # host ollama (openai-compatible /v1)
-    MEDLEY_CHAT_MODEL: "qwen2.5:14b-instruct"
+    MEDLEY_CHAT_MODEL: "qwen2.5:14b-instruct"    # legacy default (unused while MEDLEY_MODELS is set)
+    # Model-router registry (monobase-mycure#4150): default = qwen; clinical = MedGemma (already pulled on
+    # the host Ollama for medgemma-worker). host.k3d.internal derives [local] — PHI-admissible.
+    MEDLEY_MODELS: '{"default":{"baseUrl":"http://host.k3d.internal:11434/v1","modelId":"qwen2.5:14b-instruct"},"clinical":{"baseUrl":"http://host.k3d.internal:11434/v1","modelId":"hf.co/unsloth/medgemma-4b-it-GGUF:Q4_K_M","capabilities":["structured-output"],"tier":1}}'
+    # Route chart-summary's cited-output role to MedGemma (qwen keeps the tool loop) — testers exercise
+    # the multi-model path in the staging UI via "Summarise chart".
+    MEDLEY_SKILL_MODELS: '{"chart-summary":{"output":"clinical"}}'
     MEDLEY_SEED_DEMO: "true"                          # seed the synthetic analytics dataset (staging demo)
     MEDLEY_TRANSCRIPT_DIR: "/tmp/medley-transcripts"  # 2.0.1 JSONL run transcripts (ephemeral; staging demo of monobase-mycure#4149)
   externalSecrets:
