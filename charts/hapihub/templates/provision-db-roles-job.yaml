@@ -1,0 +1,91 @@
+{{- if and .Values.enabled (.Values.roleSplit | default dict).enabled (((.Values.roleSplit | default dict).provision | default dict).enabled | default true) }}
+# Provision the least-privilege DB roles (monobase-mycure#4147) — PreSync, BEFORE the
+# migrate Job (hook-weight -5 < 0). Idempotent psql run as the in-cluster
+# superuser: creates/refreshes migrator/app_rw/cadence, adopts pre-existing
+# object ownership, applies grants. Zero-touch: survives cluster reseeds,
+# self-heals role passwords after ESO rotation, re-adopts after a rollback
+# window. SQL lives in the sibling ConfigMap (canonical source: monobase-mycure
+# services/hapihub/scripts/provision-db-roles.sql).
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "hapihub.fullname" . }}-provision-db-roles
+  namespace: {{ include "hapihub.namespace" . }}
+  labels:
+    {{- include "hapihub.labels" . | nindent 4 }}
+    job-type: provision-db-roles
+  annotations:
+    helm.sh/hook: pre-install,pre-upgrade
+    helm.sh/hook-weight: "-5"
+    helm.sh/hook-delete-policy: before-hook-creation
+    argocd.argoproj.io/hook: PreSync
+    # Keep the last Job around for log forensics until the next sync.
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+spec:
+  backoffLimit: {{ .Values.roleSplit.provision.backoffLimit | default 3 }}
+  ttlSecondsAfterFinished: 86400
+  activeDeadlineSeconds: {{ .Values.roleSplit.provision.activeDeadlineSeconds | default 600 }}
+  template:
+    metadata:
+      labels:
+        {{- include "hapihub.selectorLabels" . | nindent 8 }}
+        job-type: provision-db-roles
+    spec:
+      restartPolicy: Never
+      enableServiceLinks: false
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+      - name: provision-db-roles
+        securityContext:
+          {{- toYaml .Values.securityContext | nindent 10 }}
+        # Same image the in-cluster PG statefulset runs — already on nodes.
+        image: {{ .Values.roleSplit.provision.image | default "docker.io/bitnamilegacy/postgresql:16.4.0-debian-12-r13" | quote }}
+        imagePullPolicy: IfNotPresent
+        command: ["/bin/sh", "-ec"]
+        args:
+          - |
+            psql "postgres://postgres:$(POSTGRES_PASSWORD)@{{ include "hapihub.postgresql.host" . }}:5432/{{ include "hapihub.postgresql.database" . }}" \
+              -v ON_ERROR_STOP=1 \
+              -v DBNAME={{ include "hapihub.postgresql.database" . }} \
+              -v migrator_password="$MIGRATOR_PASSWORD" \
+              -v app_rw_password="$APP_RW_PASSWORD" \
+              -v cadence_password="$CADENCE_PASSWORD" \
+              -f /sql/provision.sql
+        env:
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.postgresql.auth.existingSecret | default "postgresql" }}
+              key: postgres-password
+        - name: MIGRATOR_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.roleSplit.secretName | default "postgresql-app-roles" }}
+              key: migrator-password
+        - name: APP_RW_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.roleSplit.secretName | default "postgresql-app-roles" }}
+              key: app-rw-password
+        - name: CADENCE_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.roleSplit.secretName | default "postgresql-app-roles" }}
+              key: cadence-password
+        volumeMounts:
+        - name: sql
+          mountPath: /sql
+          readOnly: true
+        resources:
+          requests:
+            cpu: 25m
+            memory: 32Mi
+          limits:
+            cpu: 100m
+            memory: 128Mi
+      volumes:
+      - name: sql
+        configMap:
+          name: {{ include "hapihub.fullname" . }}-provision-db-roles
+{{- end }}

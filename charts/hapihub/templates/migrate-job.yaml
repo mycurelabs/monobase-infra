@@ -1,0 +1,76 @@
+{{- if and .Values.enabled (.Values.roleSplit | default dict).enabled (((.Values.roleSplit | default dict).migrateJob | default dict).enabled | default true) }}
+# `hapihub migrate` as the DDL-only migrator role (monobase-mycure#4147) — PreSync, after
+# provision-db-roles (weight 0 > -5), BEFORE the Deployment rolls. A failed
+# migration blocks the sync: old pods keep serving the old schema (the runtime
+# app_rw pods boot with DATABASE_SKIP_MIGRATIONS=true and a boot guard that
+# refuses a stale schema, so ordering matters). Uses the same image/tag as the
+# Deployment — migrations stay in lockstep with the code that needs them.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "hapihub.fullname" . }}-migrate
+  namespace: {{ include "hapihub.namespace" . }}
+  labels:
+    {{- include "hapihub.labels" . | nindent 4 }}
+    job-type: migrate
+  annotations:
+    helm.sh/hook: pre-install,pre-upgrade
+    helm.sh/hook-weight: "0"
+    helm.sh/hook-delete-policy: before-hook-creation
+    argocd.argoproj.io/hook: PreSync
+    # Keep the last Job for log forensics until the next sync (never
+    # HookSucceeded — it destroys migrate logs right when you want them).
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+spec:
+  backoffLimit: {{ .Values.roleSplit.migrateJob.backoffLimit | default 3 }}
+  ttlSecondsAfterFinished: 86400
+  # Generous: CREATE INDEX CONCURRENTLY on big tables is slow, and killing it
+  # mid-build leaves an INVALID index. Still bounded so a missing secret/image
+  # fails the sync visibly instead of hanging forever.
+  activeDeadlineSeconds: {{ .Values.roleSplit.migrateJob.activeDeadlineSeconds | default 2400 }}
+  template:
+    metadata:
+      labels:
+        {{- include "hapihub.selectorLabels" . | nindent 8 }}
+        job-type: migrate
+    spec:
+      restartPolicy: Never
+      enableServiceLinks: false
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+      - name: migrate
+        securityContext:
+          {{- toYaml .Values.securityContext | nindent 10 }}
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        args: ["migrate"]
+        env:
+        - name: HOME
+          value: /tmp
+        - name: NODE_ENV
+          value: production
+        - name: MIGRATOR_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.roleSplit.secretName | default "postgresql-app-roles" }}
+              key: migrator-password
+        - name: DATABASE_URI
+          value: "postgres://migrator:$(MIGRATOR_PASSWORD)@{{ include "hapihub.postgresql.host" . }}:5432/{{ include "hapihub.postgresql.database" . }}"
+        - name: DATABASE_WAIT_FOR_READY
+          value: "true"
+        - name: DATABASE_STARTUP_RETRIES
+          value: "10"
+        - name: DATABASE_STARTUP_RETRY_DELAY_MS
+          value: "5000"
+        resources:
+          requests:
+            cpu: 100m
+            memory: 512Mi
+          limits:
+            memory: 2Gi
+{{- end }}
