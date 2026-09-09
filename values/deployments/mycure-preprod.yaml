@@ -77,9 +77,11 @@ hapihub:
       # otherwise adopts an unchanged succeeded hook without re-running it.
       activeDeadlineSeconds: 900
   # Prod parity — same tag as mycure-production.yaml. Bump here first when
-  # rehearsing a promotion.
+  # rehearsing a promotion. Currently one ahead of prod: 11.20.122 carries the
+  # all-scope (*) cadence grant + /sync/scopes (monobase-mycure#4186) needed to
+  # enroll the alfheim backup-appliance test box.
   image:
-    tag: "11.20.121"
+    tag: "11.20.122"
   cache:
     # Prod parity: response cache OFF (the #2839/#2617 bentocache stampede
     # mitigation). Re-enable here first when re-validating the serve-stale fix.
