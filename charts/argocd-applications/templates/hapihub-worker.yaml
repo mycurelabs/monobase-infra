@@ -44,6 +44,20 @@ spec:
         {{- $base := omit .Values.hapihub "minio" "valkey" "mailpit" }}
         {{- $overrides := omit .Values.hapihubWorker "enabled" }}
         {{- $merged := mergeOverwrite (deepCopy $base) $overrides }}
+        {{- /* roleSplit's PreSync Jobs (provision-db-roles, migrate) must run ONCE,
+             from the API release only. The worker is a SECOND release against the
+             SAME database in a SEPARATE, independently-syncing Application, so if an
+             overlay sets hapihub.roleSplit.enabled the worker would arm its own
+             copies — two concurrent `hapihub migrate` runs racing the drizzle ledger
+             (out-of-order rows silently skip migrations, unrecoverable) plus two
+             adoption passes contending on ALTER TABLE OWNER locks. Force them off
+             structurally so no overlay can arm them (mono#4147 stage-2). Explicit
+             false, not key-drop — the templates gate on `ne … false` because sprig
+             `default true` re-enables an absent value. Injected only when roleSplit
+             is on, so prod (no roleSplit) renders byte-identical. */ -}}
+        {{- if (($merged.roleSplit) | default dict).enabled }}
+        {{- $merged = mergeOverwrite $merged (dict "roleSplit" (dict "provision" (dict "enabled" false) "migrateJob" (dict "enabled" false))) }}
+        {{- end }}
         {{- toYaml $merged | nindent 8 }}
         global: {{ .Values.global | toYaml | nindent 10 }}
         minio: {{ mergeOverwrite (deepCopy .Values.minio) (.Values.hapihub.minio | default dict) | toYaml | nindent 10 }}

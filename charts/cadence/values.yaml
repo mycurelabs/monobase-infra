@@ -86,6 +86,10 @@ postgresql:
     database: cadence_v2
     username: postgres
     existingSecret: postgresql
+    # Secret key holding the password for `username`. Default matches the
+    # Bitnami superuser secret; the monobase-mycure#4147 least-privilege split points
+    # this at postgresql-app-roles/cadence-password with username `cadence`.
+    secretKey: postgres-password
 
 # hapihub is the sole AS + grant minter — env-driven per env (the deployment sets CADENCE_ISSUER_URL /
 # CADENCE_GRANT_JWKS_URI / CADENCE_FLEET_ID / CADENCE_AUTH_AUTHORIZE_URL from these; env wins over the

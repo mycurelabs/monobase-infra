@@ -241,6 +241,22 @@ so a scheduled `hapihub backfill` boots with the identical environment.
 {{- if .Values.postgresql.external }}
 # External PostgreSQL — DATABASE_URI from ExternalSecrets
 {{- else }}
+{{- if (.Values.roleSplit | default dict).enabled }}
+# Least-privilege role split (monobase-mycure#4147): runtime is DML-only app_rw — DDL
+# runs in the PreSync hook Jobs (provision-db-roles-job.yaml as superuser,
+# migrate-job.yaml as migrator). Var names unchanged so overlay compositions
+# like DATABASE_READ_URI ($(POSTGRESQL_USER):$(POSTGRESQL_PASSWORD)@…) follow
+# the split automatically.
+- name: POSTGRESQL_USER
+  value: "app_rw"
+- name: POSTGRESQL_PASSWORD
+  valueFrom:
+    secretKeyRef:
+      name: {{ .Values.roleSplit.secretName | default "postgresql-app-roles" }}
+      key: app-rw-password
+- name: DATABASE_SKIP_MIGRATIONS
+  value: "true"
+{{- else }}
 - name: POSTGRESQL_USER
   value: {{ include "hapihub.postgresql.username" . | quote }}
 - name: POSTGRESQL_PASSWORD
@@ -248,6 +264,7 @@ so a scheduled `hapihub backfill` boots with the identical environment.
     secretKeyRef:
       name: {{ .Values.postgresql.auth.existingSecret | default "postgresql" }}
       key: postgres-password
+{{- end }}
 - name: DATABASE_URI
   value: "postgres://$(POSTGRESQL_USER):$(POSTGRESQL_PASSWORD)@{{ include "hapihub.postgresql.host" . }}:5432/{{ include "hapihub.postgresql.database" . }}"
 {{- end }}
