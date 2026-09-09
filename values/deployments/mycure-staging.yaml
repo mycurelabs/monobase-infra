@@ -182,44 +182,9 @@ nocodb:
 # Ollama runs on the vanaheim HOST — the AI services reach it via host.k3d.internal
 # (k3d's host gateway) instead of preprod's ollama.tailscale.svc egress (ollamaEgress
 # stays off here). Otherwise a value-for-value mirror of mycure-preprod.
-# medley 2.x — the from-scratch governed harness (replaces the 1.x chat app). In-process (no medgemma/openmed
-# dependency for the current surface). Own `medley` database on the shared PG; onprem model via host ollama.
+# medley 2.x test setup moved to PREPROD (monobase-mycure#4150) — see mycure-preprod.yaml.
 medley:
-  enabled: true
-  image:
-    repository: ghcr.io/mycurelabs/medley
-    tag: "2.0.5"           # ghcr (public) — model-router rollout, monobase-mycure#4214 / #4150
-    pullPolicy: IfNotPresent
-  replicaCount: 1
-  resources:
-    requests:
-      cpu: 250m
-      memory: 512Mi
-    limits:
-      cpu: "1"
-      memory: 1Gi
-  gateway:
-    enabled: true
-    sectionName: https-staging-lfh  # *.staging.localfirsthealth.com wildcard listener → medley.staging.localfirsthealth.com (tailnet-only)
-  # DBOS run-state + clinic-analytics: own database on the shared bitnami Postgres; DATABASE_URL is built in
-  # the chart from the in-cluster `postgresql` secret (password out of git). DBOS auto-creates the `medley` db.
-  postgresql:
-    enabled: true
-  config:
-    OLLAMA_URL: "http://host.k3d.internal:11434/v1"   # host ollama (openai-compatible /v1)
-    MEDLEY_CHAT_MODEL: "qwen2.5:14b-instruct"    # legacy default (unused while MEDLEY_MODELS is set)
-    # Model-router registry (monobase-mycure#4150): default = qwen; clinical = MedGemma (already pulled on
-    # the host Ollama for medgemma-worker). host.k3d.internal derives [local] — PHI-admissible.
-    MEDLEY_MODELS: '{"default":{"baseUrl":"http://host.k3d.internal:11434/v1","modelId":"qwen2.5:14b-instruct"},"clinical":{"baseUrl":"http://host.k3d.internal:11434/v1","modelId":"hf.co/unsloth/medgemma-4b-it-GGUF:Q4_K_M","capabilities":["structured-output"],"tier":1}}'
-    # Route chart-summary's cited-output role to MedGemma (qwen keeps the tool loop) — testers exercise
-    # the multi-model path in the staging UI via "Summarise chart".
-    MEDLEY_SKILL_MODELS: '{"chart-summary":{"output":"clinical"}}'
-    MEDLEY_SEED_DEMO: "true"                          # seed the synthetic analytics dataset (staging demo)
-    MEDLEY_TRANSCRIPT_DIR: "/tmp/medley-transcripts"  # 2.0.1 JSONL run transcripts (ephemeral; staging demo of monobase-mycure#4149)
-  externalSecrets:
-    enabled: false   # 2.x has no MEDLEY_HISTORY_KEY; its only secret (DATABASE_URL) comes via the chart
-  podDisruptionBudget:
-    enabled: false
+  enabled: false
 medleyapp:
   enabled: true
   image:
