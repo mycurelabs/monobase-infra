@@ -1,0 +1,139 @@
+{{- /* NOTE: `ne … false`, NOT `| default true` — sprig default treats an
+     explicit false as empty and re-enables the job (bit the worker release,
+     which must disable these; monobase-mycure#4147 stage-2 finding). */ -}}
+{{- if and .Values.enabled (.Values.roleSplit | default dict).enabled (ne (((.Values.roleSplit | default dict).provision | default dict).enabled) false) }}
+# SQL for the provision-db-roles PreSync Job (monobase-mycure#4147 least-privilege split).
+# CANONICAL SOURCE: monobase-mycure services/hapihub/scripts/provision-db-roles.sql
+# (the operator path for external PGs) — keep the role/grant contract in lockstep.
+# This copy adds the idempotent ADOPTION pass (per-object ALTER OWNER, filtered so
+# a converged database runs zero DDL) because this cluster's objects were created
+# by the postgres superuser, and because any rollback window recreates
+# superuser-owned objects that need re-adoption on the next enable.
+#
+# Hook-annotated PreSync at a LOWER weight than the Job: PreSync hooks run before
+# the main sync applies resources, so a plain ConfigMap would not exist yet on the
+# first enabling sync.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "hapihub.fullname" . }}-provision-db-roles
+  namespace: {{ include "hapihub.namespace" . }}
+  labels:
+    {{- include "hapihub.labels" . | nindent 4 }}
+    job-type: provision-db-roles
+  annotations:
+    helm.sh/hook: pre-install,pre-upgrade
+    helm.sh/hook-weight: "-6"
+    helm.sh/hook-delete-policy: before-hook-creation
+    argocd.argoproj.io/hook: PreSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+data:
+  provision.sql: |
+    \set ON_ERROR_STOP on
+
+    -- ── Roles (CREATE ROLE has no IF NOT EXISTS); passwords kept current ──
+    -- The ALTER ROLE … PASSWORD lines are UNCONDITIONAL by design — do NOT move
+    -- them under the WHERE-NOT-EXISTS guard. All three roles authenticate with the
+    -- same ESO-managed `postgresql-app-roles` keys their consumers use, so the
+    -- unconditional reset (a) re-syncs the role after a secret rotation and (b)
+    -- self-heals the first-sync race where a consumer (e.g. cadence) boots and
+    -- tries to auth before this PreSync Job has provisioned its password. Guarding
+    -- them would reintroduce both failure modes. Verified on preprod: cadence
+    -- crash-looped on auth pre-provision, then went stable once this ran.
+    SELECT format('CREATE ROLE migrator LOGIN PASSWORD %L', :'migrator_password')
+    WHERE NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'migrator') \gexec
+    SELECT format('CREATE ROLE app_rw LOGIN PASSWORD %L', :'app_rw_password')
+    WHERE NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'app_rw') \gexec
+    SELECT format('CREATE ROLE cadence LOGIN PASSWORD %L', :'cadence_password')
+    WHERE NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'cadence') \gexec
+    SELECT format('ALTER ROLE migrator PASSWORD %L', :'migrator_password') \gexec
+    SELECT format('ALTER ROLE app_rw PASSWORD %L', :'app_rw_password') \gexec
+    SELECT format('ALTER ROLE cadence PASSWORD %L', :'cadence_password') \gexec
+
+    -- ── Schemas (exist before adoption/grants; drizzle is also created by the
+    --    first migrate, pgboss by pg-boss — create here so ownership is right
+    --    from the start) ──
+    SELECT 'CREATE SCHEMA drizzle'
+    WHERE NOT EXISTS (SELECT FROM pg_namespace WHERE nspname = 'drizzle') \gexec
+    SELECT 'CREATE SCHEMA pgboss'
+    WHERE NOT EXISTS (SELECT FROM pg_namespace WHERE nspname = 'pgboss') \gexec
+
+    -- ── ADOPTION: move pre-existing (superuser-created) objects to the role
+    --    that must manage them. Filtered — converged DB emits nothing.
+    --    cadence_* → cadence; pgboss → app_rw; everything else → migrator. ──
+    SELECT format('ALTER SCHEMA drizzle OWNER TO migrator')
+    WHERE (SELECT nspowner::regrole::text FROM pg_namespace WHERE nspname='drizzle') <> 'migrator' \gexec
+    SELECT format('ALTER SCHEMA pgboss OWNER TO app_rw')
+    WHERE (SELECT nspowner::regrole::text FROM pg_namespace WHERE nspname='pgboss') <> 'app_rw' \gexec
+    SELECT format('ALTER TABLE %I.%I OWNER TO %I', schemaname, tablename,
+      CASE WHEN tablename LIKE 'cadence\_%' THEN 'cadence'
+           WHEN schemaname = 'pgboss' THEN 'app_rw' ELSE 'migrator' END)
+    FROM pg_tables
+    WHERE schemaname IN ('public','drizzle','pgboss')
+      AND tableowner <> CASE WHEN tablename LIKE 'cadence\_%' THEN 'cadence'
+                             WHEN schemaname = 'pgboss' THEN 'app_rw' ELSE 'migrator' END \gexec
+    SELECT format('ALTER SEQUENCE %I.%I OWNER TO %I', schemaname, sequencename,
+      CASE WHEN sequencename LIKE 'cadence\_%' THEN 'cadence'
+           WHEN schemaname = 'pgboss' THEN 'app_rw' ELSE 'migrator' END)
+    FROM pg_sequences
+    WHERE schemaname IN ('public','drizzle','pgboss')
+      AND sequenceowner <> CASE WHEN sequencename LIKE 'cadence\_%' THEN 'cadence'
+                                WHEN schemaname = 'pgboss' THEN 'app_rw' ELSE 'migrator' END \gexec
+    SELECT format('ALTER FUNCTION %I.%I(%s) OWNER TO %I', n.nspname, p.proname,
+      pg_get_function_identity_arguments(p.oid),
+      CASE WHEN p.proname = 'cadence_capture' THEN 'cadence' ELSE 'migrator' END)
+    FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+    WHERE n.nspname = 'public'
+      AND p.proowner::regrole::text <> CASE WHEN p.proname = 'cadence_capture' THEN 'cadence' ELSE 'migrator' END \gexec
+
+    -- ── migrator: DDL ──
+    GRANT CONNECT, CREATE, TEMPORARY ON DATABASE :"DBNAME" TO migrator;
+    GRANT CREATE, USAGE ON SCHEMA public TO migrator;
+
+    -- ── app_rw: DML on public. CREATE on the DATABASE because pg-boss runs
+    --    CREATE SCHEMA IF NOT EXISTS and PG acl-checks before the existence
+    --    check (new schemas only — cannot touch migrator-owned tables). ──
+    GRANT CONNECT, CREATE, TEMPORARY ON DATABASE :"DBNAME" TO app_rw;
+    GRANT USAGE ON SCHEMA public TO app_rw;
+    REVOKE CREATE ON SCHEMA public FROM app_rw;
+    GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO app_rw;
+    GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO app_rw;
+    ALTER DEFAULT PRIVILEGES FOR ROLE migrator IN SCHEMA public
+      GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO app_rw;
+    ALTER DEFAULT PRIVILEGES FOR ROLE migrator IN SCHEMA public
+      GRANT USAGE, SELECT ON SEQUENCES TO app_rw;
+    GRANT USAGE ON SCHEMA drizzle TO app_rw;
+    GRANT SELECT ON ALL TABLES IN SCHEMA drizzle TO app_rw;
+    ALTER DEFAULT PRIVILEGES FOR ROLE migrator IN SCHEMA drizzle
+      GRANT SELECT ON TABLES TO app_rw;
+
+    -- ── cadence: DML + bounded DDL (its cadence_* store + capture function via
+    --    CREATE on public; capture triggers via the grantable TRIGGER privilege
+    --    — CREATE OR REPLACE TRIGGER, no ownership needed). ──
+    GRANT CONNECT, TEMPORARY ON DATABASE :"DBNAME" TO cadence;
+    GRANT USAGE, CREATE ON SCHEMA public TO cadence;
+    GRANT SELECT, INSERT, UPDATE, DELETE, TRIGGER ON ALL TABLES IN SCHEMA public TO cadence;
+    GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO cadence;
+    ALTER DEFAULT PRIVILEGES FOR ROLE migrator IN SCHEMA public
+      GRANT SELECT, INSERT, UPDATE, DELETE, TRIGGER ON TABLES TO cadence;
+    ALTER DEFAULT PRIVILEGES FOR ROLE migrator IN SCHEMA public
+      GRANT USAGE, SELECT ON SEQUENCES TO cadence;
+    -- capture trigger runs as the INVOKING user (plain plpgsql): hapihub/migration
+    -- writes fire it into cadence-owned outbox objects — both need DML there.
+    ALTER DEFAULT PRIVILEGES FOR ROLE cadence IN SCHEMA public
+      GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO app_rw, migrator;
+    ALTER DEFAULT PRIVILEGES FOR ROLE cadence IN SCHEMA public
+      GRANT USAGE, SELECT ON SEQUENCES TO app_rw, migrator;
+    SELECT format('GRANT SELECT, INSERT, UPDATE, DELETE ON %I TO app_rw, migrator', tablename)
+    FROM pg_tables WHERE schemaname = 'public' AND tablename LIKE 'cadence\_%' \gexec
+    SELECT format('GRANT USAGE, SELECT ON SEQUENCE %I TO app_rw, migrator', sequencename)
+    FROM pg_sequences WHERE schemaname = 'public' AND sequencename LIKE 'cadence\_%' \gexec
+
+    -- ── Safety timeouts on the runtime role (SECURITY_ROADMAP §H). Superuser had
+    --    no cap, so statement_timeout is a HARD error cap the moment roleSplit
+    --    flips: measure prod's heavy reads (medical_records attachment payloads,
+    --    worker exports — both connect as app_rw) against pg_stat_statements and
+    --    raise roleSplit.appRw.statementTimeout in the prod overlay first. ──
+    ALTER ROLE app_rw SET statement_timeout = '{{ (((.Values.roleSplit | default dict).appRw | default dict).statementTimeout) | default "30s" }}';
+    ALTER ROLE app_rw SET idle_in_transaction_session_timeout = '{{ (((.Values.roleSplit | default dict).appRw | default dict).idleInTransactionTimeout) | default "60s" }}';
+{{- end }}

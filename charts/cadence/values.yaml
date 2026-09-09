@@ -36,11 +36,17 @@ leafidsGlobalBudget: ""
 # concurrent fat-*_history payload and prevent a live-set OOM (boxes queue instead of OOM-resetting).
 maxConcurrentServes: ""
 
-# Drop the collection entries in files/cadence.yaml for tables hapihub #3335 removed (file_links,
-# organization_partners) — cadence installs a capture trigger per collection and crash-loops if the table
-# is gone ("collection 'X' has no table"). false (default) ⇒ hub still captures them (correct where hapihub
-# < 11.20.106 and the tables still exist, e.g. prod on 11.20.102). Set true where hapihub >= 11.20.106 has
-# dropped them (preprod). Flip prod → true when prod hapihub promotes to 11.20.106 (R4-promotion checklist).
+# Omit the file_links + organization_partners collection ENTRIES from the rendered sync manifest
+# (files/cadence.yaml). This does NOT drop any DB table — it only removes them from the SyncConfig, so
+# the sole real effect is the schema fingerprint: cadence gates catch-up admission on an EXACT fingerprint
+# match (hash of the SyncConfig + the listed tables' columns), so the hub must list the same collections as
+# the boxes it syncs with. mono #3335 (6dd7c0ef5) removed both from services/hapihub/cadence.yaml, so a
+# from-main box (maestroapp 2.1.109 / hapihub 11.20.121) fingerprints WITHOUT them; a hub still listing them
+# fingerprints differently and refuses the box ("SCHEMA mismatch"). Set true so the hub matches main.
+# Note: on prod (hapihub 11.20.121) both tables still EXIST at 0 rows — the #3335 drop-migration did not run
+# there — so there is no "table gone → crash" risk in either state; the flag here is purely fingerprint parity.
+# FLEET-AFFECTING: flipping changes the hub fingerprint, so boxes on the old fingerprint sync-pause until they
+# roll to the matching build. Coordinate the rollout (see the mycure-production overlay's cadence block).
 dropUnusedTables: false
 
 # Override the MAIN container's args. Default (empty) = the stock sync engine
@@ -80,6 +86,10 @@ postgresql:
     database: cadence_v2
     username: postgres
     existingSecret: postgresql
+    # Secret key holding the password for `username`. Default matches the
+    # Bitnami superuser secret; the monobase-mycure#4147 least-privilege split points
+    # this at postgresql-app-roles/cadence-password with username `cadence`.
+    secretKey: postgres-password
 
 # hapihub is the sole AS + grant minter — env-driven per env (the deployment sets CADENCE_ISSUER_URL /
 # CADENCE_GRANT_JWKS_URI / CADENCE_FLEET_ID / CADENCE_AUTH_AUTHORIZE_URL from these; env wins over the
