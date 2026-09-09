@@ -240,3 +240,26 @@ pruneAuditEvents:
     limits:
       cpu: 100m
       memory: 128Mi
+
+# Least-privilege DB role split (monobase-mycure#4147). When enabled: the Deployment
+# (and the worker release, which deep-merges this block) runs as DML-only
+# app_rw with DATABASE_SKIP_MIGRATIONS=true; two PreSync hook Jobs run first —
+# provision-db-roles (superuser: roles/adoption/grants, idempotent) then
+# migrate (hapihub migrate as migrator). Requires the postgresql-app-roles
+# secret (database-secrets chart, roleSplit.enabled) synced from GCP SM keys
+# {secretPrefix}-postgresql-{migrator,app-rw,cadence}-password (hex-only —
+# DATABASE_URI does no urlencoding). The worker overlay must disable both Jobs
+# (roleSplit.provision.enabled/migrateJob.enabled: false) or they render twice.
+# Canonical SQL contract: monobase-mycure services/hapihub/scripts/provision-db-roles.sql
+roleSplit:
+  enabled: false
+  secretName: postgresql-app-roles
+  provision:
+    enabled: true
+    # image: override the psql client image (defaults to the in-cluster PG image)
+    backoffLimit: 3
+    activeDeadlineSeconds: 600
+  migrateJob:
+    enabled: true
+    backoffLimit: 3
+    activeDeadlineSeconds: 2400
