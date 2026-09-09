@@ -51,6 +51,42 @@ argocd/
         └── account.yaml                  # Frontend (Wave 3)
 ```
 
+## Which branch a cluster tracks (one-ref-per-cluster)
+
+**A cluster does not necessarily track `main`.** Each ArgoCD instance follows exactly
+one git ref, set by `argocd.targetRevision` in that cluster's
+`values/clusters/<cluster>/argocd/bootstrap.yaml`. Everything downstream inherits it —
+the `monobase-auto-discover` ApplicationSet, the per-env root Application, and every
+Application it generates — because all of them template the same value.
+
+| Cluster | Tracks | Set in |
+|---|---|---|
+| `mycure-doks-main` | `HEAD` (i.e. `main`) | chart default, `charts/argocd-bootstrap/values.yaml` |
+| `mycure-onprem-vanaheim` | `cluster/vanaheim` | `values/clusters/mycure-onprem-vanaheim/argocd/bootstrap.yaml` |
+
+For a cluster on its own branch the flow is:
+
+- **Deploy** — merge into that cluster's branch (`cluster/vanaheim`). This is what the
+  cluster reads, so this is the only thing that changes what is running.
+- **Promote** — PR the change from the cluster branch to `main`.
+- **Keep current** — re-merge `main` into the cluster branch regularly, so the two do
+  not drift into a conflicted mess.
+
+> **⚠️ Anything that writes an image tag must target the cluster's branch, not `main`.**
+> A bump pushed to `main` for a cluster tracking `cluster/vanaheim` is a **silent
+> no-op**: the commit lands, CI goes green, ArgoCD still reports `Synced` (the cluster
+> genuinely matches the branch it reads), the pod keeps serving the old image, and
+> nothing anywhere reports a failure. The only visible symptom is the running image tag
+> not matching what you just built.
+>
+> This is not hypothetical — it is exactly what happened to
+> `monobase-mycure`'s `hapihub-staging-deploy.yml` between 2026-09-08 and 2026-09-09.
+> `cluster/vanaheim` was cut in `931ec45` and the cluster repointed at it the same
+> minute, but that workflow kept pushing its tag bump to `main`. Two hapihub staging
+> builds were published to ghcr and never deployed before anyone noticed
+> (monobase-mycure#4192). Automation that bumps a tag here should read the branch from
+> the cluster's `bootstrap.yaml` rather than hardcoding a branch name.
+
 ## Bootstrap Workflow
 
 ```bash
