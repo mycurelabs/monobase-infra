@@ -28,7 +28,9 @@ mycure-dashboard:
 
   image:
     repository: ghcr.io/mycurelabs/dashboard
-    tag: "0.14.18"
+    # base.yaml is shared by every overlay, but mycure-staging pins its own
+    # dashboard tag, so this lands on production only.
+    tag: "0.14.22"
     pullPolicy: IfNotPresent
 
   replicaCount: 1

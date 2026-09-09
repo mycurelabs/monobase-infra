@@ -29,7 +29,11 @@ spec:
       labels:
         {{- include "cadence.labels" . | nindent 8 }}
       annotations:
-        checksum/config: {{ .Files.Get "files/cadence.yaml" | sha256sum }}
+        # Hash the RENDERED ConfigMap, not the raw template file: the sync manifest is gated by values
+        # (e.g. dropUnusedTables), so hashing files/cadence.yaml alone misses value-only changes and the
+        # pod never rolls — the new fingerprint would then land unattended on the next restart. Rendering
+        # the configmap template here makes any value that changes the manifest trigger a controlled roll.
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
     spec:
       serviceAccountName: {{ include "cadence.serviceAccountName" . }}
       securityContext:

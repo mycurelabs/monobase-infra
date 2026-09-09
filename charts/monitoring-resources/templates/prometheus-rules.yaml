@@ -344,6 +344,20 @@ spec:
           annotations:
             summary: "cadence ensure_sync_infra retrying persistently in {{ "{{" }} $labels.namespace }}"
             description: "Some collection cannot complete DDL setup (steady retry at the 15m cap); its data is on the degraded legacy path."
+        - alert: CadenceSchemaMismatchOngoing
+          # Fail-closed signal: the hub is refusing catch-up on a schema-fingerprint mismatch (peer lists
+          # different collections/columns than the hub). Silent by default — only a WARN log, no server-side
+          # denial metric — so alert on the reconcile-side counter, which the hub increments each time it hits
+          # a mismatched peer (schema_mismatch_current is unreliable: it resets to 0 whenever ANY reconcile in
+          # the loop succeeds, e.g. against the matching boxes). EXPECTED to fire during a coordinated manifest
+          # migration (boxes rolling forward) — silence it for the window; its value is catching an UNPLANNED
+          # skew (a future cadence.yaml drift or a stray-version box) that would otherwise go unnoticed.
+          expr: rate(cadence_schema_mismatch_total[15m]) > 0
+          for: 30m
+          labels: {severity: warning}
+          annotations:
+            summary: "cadence hub hitting schema-fingerprint mismatches in {{ "{{" }} $labels.namespace }}"
+            description: "The hub is refusing sync to peer(s) on a schema mismatch (exact-fingerprint gate). Expected during a planned manifest flip + fleet roll; otherwise a version/schema skew — compare the hub's rendered sync manifest vs the fleet's build."
 
 {{- if .Values.kyverno.enabled }}
 ---
