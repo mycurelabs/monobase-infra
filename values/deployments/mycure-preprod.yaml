@@ -70,6 +70,12 @@ hapihub:
   # with DATABASE_SKIP_MIGRATIONS=true. Secrets landed in stage 1.
   roleSplit:
     enabled: true
+    provision:
+      # 900 (was chart-default 600): any spec change forces BeforeHookCreation to
+      # recreate the completed hook Job, so ALTER ROLE re-applies the rotated
+      # migrator password (2026-09-09 rotation, monobase-mycure#4147). ArgoCD
+      # otherwise adopts an unchanged succeeded hook without re-running it.
+      activeDeadlineSeconds: 900
   # Prod parity — same tag as mycure-production.yaml. Bump here first when
   # rehearsing a promotion.
   image:
