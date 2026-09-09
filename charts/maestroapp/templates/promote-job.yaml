@@ -39,7 +39,22 @@ spec:
           args:
             - |
               export MC_CONFIG_DIR=/tmp/.mc
-              mc alias set store "$STORE_ENDPOINT" "$STORE_USER" "$STORE_PASSWORD" >/dev/null
+              # First-sync ordering race: the minio provisioning hook
+              # (post-install/upgrade) creates the artifacts-promoter user, but
+              # this Job is sync-wave 3 and the parent app can read minio-artifacts'
+              # STALE Healthy status and reach wave 3 before the hook finishes. A
+              # bare `mc alias set` would then hard-fail, exhaust backoffLimit, and
+              # leave a Failed Job that selfHeal won't re-run (manifest unchanged).
+              # Retry auth for ~5min so the user has time to appear; a genuinely
+              # bad credential still fails loudly after the ceiling.
+              n=0
+              until mc alias set store "$STORE_ENDPOINT" "$STORE_USER" "$STORE_PASSWORD" >/dev/null 2>&1; do
+                n=$((n+1))
+                if [ "$n" -ge 30 ]; then
+                  echo "ERROR: store auth failed after $n attempts (promoter user not provisioned yet?)"; exit 1
+                fi
+                echo "waiting for store auth (attempt $n)…"; sleep 10
+              done
               missing=""
               for dir in $PLATFORMS; do
                 base="store/$BUCKET/maestroapp/desktop/$dir"
