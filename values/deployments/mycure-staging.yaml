@@ -188,7 +188,7 @@ medley:
   enabled: true
   image:
     repository: ghcr.io/mycurelabs/medley
-    tag: "2.0.4"           # ghcr (public) — model-router rollout, monobase-mycure#4214 / #4150
+    tag: "2.0.5"           # ghcr (public) — model-router rollout, monobase-mycure#4214 / #4150
     pullPolicy: IfNotPresent
   replicaCount: 1
   resources:
