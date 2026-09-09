@@ -32,6 +32,13 @@ global:
   # Postgres/Valkey/Minio; PVCs initialize on these passwords.
   secretPrefix: "mycure-preprod"
 
+# Least-privilege DB role split (monobase-mycure#4147) — stage 1: sync the
+# postgresql-app-roles secret (migrator/app_rw/cadence passwords, GCP keys
+# mycure-preprod-postgresql-{migrator,app-rw,cadence}-password, hex-only).
+# hapihub.roleSplit.enabled flips the workloads in the next PR.
+roleSplit:
+  enabled: true
+
 # Prod parity (promoted from the original preprod canary, infra#313).
 securityBaseline:
   strictGatewayIngress: true
