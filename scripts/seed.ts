@@ -8430,6 +8430,15 @@ async function findOrCreateBookingEvent(
     description: ev.description,
     ...(owner ? { owner } : {}),
     organization,
+    // The DEPARTMENT tag, and it is load-bearing. mycure's appointment picker
+    // (BookingCreateForm) queries `booking/events?tags=registration`, and the
+    // public-website booking flow sends the same tag on the booking it creates.
+    // An untagged schedule is created fine, is listed fine in Settings →
+    // Booking → Schedules, and is INVISIBLE in the appointment picker — which
+    // reads as "the clinic has no schedules". See apps/mycure/src/constants/
+    // booking.ts (DEPARTMENT_TAGS) for the full set; a demo that wants
+    // per-department schedules can add 'laboratory'/'imaging' alongside this.
+    tags: ["registration"],
     timezone: "Asia/Manila",
     status: "active",
     locationTypes: ev.locationTypes,
