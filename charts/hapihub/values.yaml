@@ -240,3 +240,41 @@ pruneAuditEvents:
     limits:
       cpu: 100m
       memory: 128Mi
+
+# Least-privilege DB role split (monobase-mycure#4147). When enabled: the Deployment
+# (and the worker release, which deep-merges this block) runs as DML-only
+# app_rw with DATABASE_SKIP_MIGRATIONS=true; two PreSync hook Jobs run first —
+# provision-db-roles (superuser: roles/adoption/grants, idempotent) then
+# migrate (hapihub migrate as migrator). Requires the postgresql-app-roles
+# secret (database-secrets chart, roleSplit.enabled) synced from GCP SM keys
+# {secretPrefix}-postgresql-{migrator,app-rw,cadence}-password (hex-only —
+# DATABASE_URI does no urlencoding). The worker overlay must disable both Jobs
+# (roleSplit.provision.enabled/migrateJob.enabled: false) or they render twice.
+# Canonical SQL contract: monobase-mycure services/hapihub/scripts/provision-db-roles.sql
+roleSplit:
+  enabled: false
+  secretName: postgresql-app-roles
+  provision:
+    enabled: true
+    # image: override the psql client image (defaults to the in-cluster PG image)
+    backoffLimit: 3
+    activeDeadlineSeconds: 600
+  migrateJob:
+    enabled: true
+    # 0, not a retry count: `hapihub migrate` runs CREATE INDEX CONCURRENTLY, and a
+    # killed build leaves an INVALID index whose name the retry then collides with —
+    # so retries fail identically and just bury the real first error. Fail fast and
+    # legible; re-running the sync after fixing is the recovery path.
+    backoffLimit: 0
+    activeDeadlineSeconds: 2400
+  # Runtime-role safety caps applied to app_rw by the provision SQL (the superuser
+  # had none). statementTimeout is a HARD error cap: any app_rw query exceeding it
+  # gets `57014 canceling statement due to statement timeout`. Known heavy read
+  # paths (e.g. medical_records inline-attachment payloads) can approach/exceed 30s
+  # on prod-scale data — MEASURE against pg_stat_statements and raise this in the
+  # prod overlay BEFORE flipping roleSplit on prod, or those reads flip from slow to
+  # erroring. Both API and worker connect as app_rw, so this cap covers the worker's
+  # long exports too. Default matches the canonical contract (monobase-mycure).
+  appRw:
+    statementTimeout: "30s"
+    idleInTransactionTimeout: "60s"

@@ -69,7 +69,7 @@ spec:
           valueFrom:
             secretKeyRef:
               name: {{ .Values.postgresql.auth.existingSecret | default "postgresql" }}
-              key: postgres-password
+              key: {{ .Values.postgresql.auth.secretKey | default "postgres-password" }}
         - name: CADENCE_DB
           value: {{ $db | quote }}
         - name: CADENCE_ISSUER_URL
@@ -115,7 +115,7 @@ spec:
           valueFrom:
             secretKeyRef:
               name: {{ .Values.postgresql.auth.existingSecret | default "postgresql" }}
-              key: postgres-password
+              key: {{ .Values.postgresql.auth.secretKey | default "postgres-password" }}
         - name: CADENCE_DB
           value: {{ $db | quote }}
         {{- if $dbRead }}

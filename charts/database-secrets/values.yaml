@@ -18,6 +18,12 @@ global:
 minio:
   enabled: false
 
+# Least-privilege DB role split toggle (monobase-mycure#4147). Forwarded from the
+# deployment values. Default off: the postgresql-app-roles secret is only
+# synced where the split is enabled (the GCP keys don't exist elsewhere).
+roleSplit:
+  enabled: false
+
 # DB/cache credential ExternalSecrets, rendered by templates/externalsecret.yaml.
 # secretName + k8sKey are the CONTRACT the Bitnami charts + app consumers read by
 # name (e.g. postgresql.auth.existingSecret: postgresql, key postgres-password) —
@@ -37,3 +43,13 @@ databases:
     fields:
       - {var: minioRootUser, k8sKey: root-user, remoteSuffix: minio-root-user}
       - {var: minioRootPassword, k8sKey: root-password, remoteSuffix: minio-root-password}
+  # monobase-mycure#4147 least-privilege split roles. Separate entry (NOT fields on
+  # `postgresql`): the databases array is chart-global, and adding keys there
+  # would make every env's postgresql ExternalSecret fail on the missing GCP
+  # keys. Passwords must be URL-safe (hex) — DATABASE_URI does no urlencoding.
+  - secretName: postgresql-app-roles
+    enabledFrom: roleSplit   # gated on .Values.roleSplit.enabled
+    fields:
+      - {var: migratorPassword, k8sKey: migrator-password, remoteSuffix: postgresql-migrator-password}
+      - {var: appRwPassword, k8sKey: app-rw-password, remoteSuffix: postgresql-app-rw-password}
+      - {var: cadencePassword, k8sKey: cadence-password, remoteSuffix: postgresql-cadence-password}
