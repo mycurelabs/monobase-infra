@@ -188,7 +188,7 @@ medley:
   enabled: true
   image:
     repository: ghcr.io/mycurelabs/medley
-    tag: "2.0.0"           # imported into k3d (ctr) until a Medley Release pushes it to ghcr
+    tag: "2.0.1"           # ghcr (public) — pi-patterns rollout, monobase-mycure#4212 / #4149
     pullPolicy: IfNotPresent
   replicaCount: 1
   resources:
@@ -209,6 +209,7 @@ medley:
     OLLAMA_URL: "http://host.k3d.internal:11434/v1"   # host ollama (openai-compatible /v1)
     MEDLEY_CHAT_MODEL: "qwen2.5:14b-instruct"
     MEDLEY_SEED_DEMO: "true"                          # seed the synthetic analytics dataset (staging demo)
+    MEDLEY_TRANSCRIPT_DIR: "/tmp/medley-transcripts"  # 2.0.1 JSONL run transcripts (ephemeral; staging demo of monobase-mycure#4149)
   externalSecrets:
     enabled: false   # 2.x has no MEDLEY_HISTORY_KEY; its only secret (DATABASE_URL) comes via the chart
   podDisruptionBudget:
