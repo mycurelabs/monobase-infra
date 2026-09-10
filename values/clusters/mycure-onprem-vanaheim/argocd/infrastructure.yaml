@@ -313,7 +313,13 @@ ollamaEgress:
 tailscaleOperator:
   enabled: true
 
-# Tenzir security detection pipeline — off on this lean staging cluster (the key
-# must exist: templates/tenzir.yaml gates on .Values.tenzir.enabled directly).
+# Tenzir security detection pipeline — ENABLED on preprod to re-test the #357/#359a/#360
+# rollout end-to-end before prod (PR monobase-infra#428). Ingests mycure-preprod's
+# hapihub-worker audit sink over HTTP, runs the detections, routes findings to
+# Alertmanager. geoip stays OFF: the geo signals (unusual_country/impossible_travel)
+# are prod-meaningful only — preprod clients are tailnet (100.x), not geolocatable,
+# and there's no MaxMind key here. Mirrors the doks-main tenzir block.
 tenzir:
-  enabled: false
+  enabled: true
+  geoip:
+    enabled: false

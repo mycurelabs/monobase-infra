@@ -77,11 +77,13 @@ hapihub:
       # otherwise adopts an unchanged succeeded hook without re-running it.
       activeDeadlineSeconds: 900
   # Prod parity — same tag as mycure-production.yaml. Bump here first when
-  # rehearsing a promotion. Currently one ahead of prod: 11.20.122 carries the
-  # all-scope (*) cadence grant + /sync/scopes (monobase-mycure#4186) needed to
-  # enroll the alfheim backup-appliance test box.
+  # rehearsing a promotion. Currently one ahead of prod (prod: 11.20.122):
+  # 11.20.123 carries the X-Real-IP audit-client-IP fix (monobase-mycure#4279)
+  # — getClientIp now reads X-Real-IP (gateway-overwritten $remote_addr) instead
+  # of the spoofable leftmost X-Forwarded-For, so audit_events.ip is the real
+  # client. Being re-tested here with the Tenzir rollout before it promotes to prod.
   image:
-    tag: "11.20.122"
+    tag: "11.20.123"
   cache:
     # Prod parity: response cache OFF (the #2839/#2617 bentocache stampede
     # mitigation). Re-enable here first when re-validating the serve-stale fix.
@@ -208,6 +210,15 @@ hapihub:
         remoteKey: mycure-preprod-auth-secret
       - secretKey: BETTER_AUTH_SECRET
         remoteKey: mycure-preprod-better-auth-secret
+        # Tenzir audit-sink HMAC key (monobase-infra#357, re-test on preprod).
+        # SHARED infra secret (not env-prefixed) — the same infrastructure-tenzir-ingest-hmac
+        # that tenzir's own ESO consumes; resolves via the mc-v4-prod gcp-secretstore.
+        # On the SHARED hapihub block (NOT the worker override): hapihubWorker deep-merges
+        # via mergeOverwrite which REPLACES lists, so a worker-only override would drop the
+        # inherited secrets. The worker inherits it; only the worker emits (AUDIT_SINK_URL +
+        # RUN_WORKERS=true below); the API has the key but no URL so its sink never starts.
+      - secretKey: AUDIT_SINK_SECRET
+        remoteKey: infrastructure-tenzir-ingest-hmac
 
   postgresql:
     serviceName: postgresql-primary
@@ -239,6 +250,12 @@ hapihubWorker:
 
   config:
     RUN_WORKERS: "true"
+    # monobase-infra#357 (re-test on preprod): the worker is the SOLE audit-sink
+    # deliverer. Sink starts on boot when AUDIT_SINK_URL is set, signs each POST
+    # with AUDIT_SINK_SECRET (inherited from the shared hapihub block), and pushes
+    # every audit_events INSERT to the cluster-internal Tenzir ingest in the
+    # security ns. (Re-added — was dropped when tenzir was disabled on this cluster.)
+    AUDIT_SINK_URL: "http://tenzir-ingest.security.svc.cluster.local:8080/ingest/audit-events"
 
   # No external traffic: keep the Service (probes) but no routes.
   gateway:
