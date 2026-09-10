@@ -169,6 +169,11 @@ hapihub:
     value: "https://mycure.localfirsthealth.com/oauth/authorize"
   - name: CADENCE_ISSUER_SEED_URL
     value: "https://cadence.localfirsthealth.com"
+    # RFC 8628 device authorization ("Sign in with MYCURE"). Unset → hapihub drops
+    # device_authorization_endpoint from OAuth discovery + 404s the device endpoints
+    # (oauth.ts deviceEnabled gate). Mirrors preprod/staging; host matches AUTHORIZE_URL.
+  - name: CADENCE_ISSUER_DEVICE_VERIFICATION_URI
+    value: "https://mycure.localfirsthealth.com/oauth/device"
 
   autoscaling:
     enabled: true
