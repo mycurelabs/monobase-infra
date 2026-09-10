@@ -22,6 +22,47 @@ global:
     provider: ""
     className: ""
 
+# App registry for the argocd-applications pass-through factory (generic-app.yaml).
+# Tenant app identity lives HERE, not in the shared engine. Each entry maps a
+# deployment-values key to charts/<chart|name>; `chart` defaults to `name`.
+# Order is preserved in the rendered Applications. Bespoke-wired apps (postgresql,
+# valkey, minio, minio-artifacts, mailpit, hapihub, hapihub-worker, namespace,
+# security-baseline, database-secrets) keep dedicated templates — not listed here.
+appRegistry:
+  - name: cadence
+    key: cadence
+  - name: cadence-relay
+    key: cadenceRelay
+  - name: hapihub-docs
+    key: hapihub-docs
+    chart: app
+  - name: medgemma-worker
+    key: medgemmaWorker
+  - name: medley
+    key: medley
+  - name: medleyapp
+    key: medleyapp
+    chart: app
+  - name: mycure
+    key: mycure
+    chart: app
+  - name: mycure-dashboard
+    key: mycure-dashboard
+    chart: app
+  - name: mycurelocal
+    key: mycurelocal
+    chart: app
+  - name: mycure-myaccount
+    key: mycure-myaccount
+    chart: app
+  - name: mycure-pxp
+    key: mycure-pxp
+    chart: app
+  - name: nocodb
+    key: nocodb
+  - name: openmed
+    key: openmed
+
 # ===== HEALTHCARE: MyCure Dashboard (operator/admin web UI) =====
 mycure-dashboard:
   enabled: true
