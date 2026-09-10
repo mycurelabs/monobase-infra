@@ -116,4 +116,6 @@ externalSecrets:
   enabled: false
 persistence:
   enabled: false
-partOf: mycureapp
+# app.kubernetes.io/part-of label. Empty => inherit global.partOf (set by the
+# tenant in values/), falling back to "platform". Tenant identity lives in values/.
+partOf: ""

@@ -32,7 +32,7 @@ helm.sh/chart: {{ include "nocodb.chart" . }}
 app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
 {{- end }}
 app.kubernetes.io/managed-by: {{ .Release.Service }}
-app.kubernetes.io/part-of: mycureapp
+app.kubernetes.io/part-of: {{ .Values.global.partOf | default "platform" }}
 {{- end }}
 
 {{- define "nocodb.selectorLabels" -}}

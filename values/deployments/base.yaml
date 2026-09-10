@@ -22,6 +22,10 @@ global:
     provider: ""
     className: ""
 
+  # app.kubernetes.io/part-of label for all mycure workloads. Tenant identity —
+  # lives here, not baked into the chart engine (app/nocodb read global.partOf).
+  partOf: mycureapp
+
 # App registry for the argocd-applications pass-through factory (generic-app.yaml).
 # Tenant app identity lives HERE, not in the shared engine. Each entry maps a
 # deployment-values key to charts/<chart|name>; `chart` defaults to `name`.

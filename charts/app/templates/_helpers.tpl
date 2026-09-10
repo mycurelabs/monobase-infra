@@ -38,7 +38,7 @@ helm.sh/chart: {{ include "app.chart" . }}
 app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
 {{- end }}
 app.kubernetes.io/managed-by: {{ .Release.Service }}
-app.kubernetes.io/part-of: {{ .Values.partOf | default "mycureapp" }}
+app.kubernetes.io/part-of: {{ .Values.partOf | default .Values.global.partOf | default "platform" }}
 {{- end }}
 
 {{/*
