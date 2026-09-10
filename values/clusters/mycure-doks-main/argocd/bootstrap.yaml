@@ -1,0 +1,32 @@
+# argocd-bootstrap override for the DOKS production cluster.
+#
+# Makes prod's bootstrap identity EXPLICIT — previously DOKS relied on the
+# argocd-bootstrap chart's mycure-branded defaults (clusterName mycure-doks-main,
+# the mycure-staging/preprod deploymentPaths excludes). Those engine defaults are
+# now genericized to aws-main, so prod must declare its own values here.
+#
+# Bootstrap / re-bootstrap this cluster with:
+#   bun scripts/bootstrap.ts \
+#     --context do-sgp1-mycure-doks-main \
+#     --cluster-name mycure-doks-main \
+#     --bootstrap-values values/clusters/mycure-doks-main/argocd/bootstrap.yaml
+#
+# Values below reproduce the live DOKS infrastructure root + auto-discover
+# ApplicationSet exactly (verified against the running cluster).
+argocd:
+  clusterName: mycure-doks-main
+  repoURL: https://github.com/mycurelabs/monobase-infra.git
+  targetRevision: HEAD
+  # DOKS prod discovers all env overlays EXCEPT the example reference set, the
+  # _base parents, and staging + preprod (those deploy only on their own
+  # clusters' ArgoCD — one-ref-per-cluster, docs/architecture/GITOPS-ARGOCD.md).
+  deploymentPaths:
+    - path: "values/deployments/*.yaml"
+    - path: "values/deployments/example-*.yaml"
+      exclude: true
+    - path: "values/deployments/_base/*.yaml"
+      exclude: true
+    - path: "values/deployments/mycure-staging.yaml"
+      exclude: true
+    - path: "values/deployments/mycure-preprod.yaml"
+      exclude: true
