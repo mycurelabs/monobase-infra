@@ -14,7 +14,7 @@ argocd:
 
   # Which cluster this bootstrap seeds. Selects the per-cluster infra config
   # under values/clusters/<clusterName>/argocd/. Override per cluster at bootstrap.
-  clusterName: mycure-doks-main
+  clusterName: aws-main
 
   # Deployments the auto-discover ApplicationSet picks up (git-generator files).
   # Default: all env overlays EXCEPT staging (staging is deployed only by its own
