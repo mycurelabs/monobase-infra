@@ -46,7 +46,7 @@ mycure-pxp:
 hapihub:
   # Keep the same image tag as the preprod copy.
   image:
-    tag: "11.20.122-staging.60f91f1"
+    tag: "11.20.125-staging.b16b8d8"
   cache:
     enabled: true
   # no Prometheus Operator on this lean k3d cluster (monitoring disabled)
@@ -200,7 +200,7 @@ medleyapp:
       cpu: 200m
       memory: 128Mi
   gateway:
-    hostname: ""  # defaults to medleyapp.staging.localfirsthealth.com
+    hostname: "" # defaults to medleyapp.staging.localfirsthealth.com
     sectionName: https-staging-lfh
   config:
     API_URL: "https://hapihub.staging.localfirsthealth.com"
@@ -222,7 +222,7 @@ medgemmaWorker:
       cpu: "1"
       memory: 1Gi
   gateway:
-    enabled: false  # ClusterIP only
+    enabled: false # ClusterIP only
   config:
     OLLAMA_URL: "http://host.k3d.internal:11434"
     MEDGEMMA_MODEL: "hf.co/unsloth/medgemma-4b-it-GGUF:Q4_K_M"
@@ -243,7 +243,7 @@ openmed:
       cpu: "1"
       memory: 2Gi
   gateway:
-    enabled: false  # ClusterIP only
+    enabled: false # ClusterIP only
   config:
     OPENMED_PRELOAD: "disease,pharma"
     PYTHONUNBUFFERED: "1"
@@ -257,7 +257,7 @@ openmed:
   persistence:
     enabled: true
     size: 3Gi
-    storageClassName: local-path  # k3d CSI (preprod uses do-block-storage)
+    storageClassName: local-path # k3d CSI (preprod uses do-block-storage)
   podDisruptionBudget:
     enabled: false
 # ===== DATABASE: PostgreSQL (HA — 1 primary + 1 read replica) =====
@@ -387,14 +387,14 @@ cadence:
   affinity:
     podAntiAffinity:
       requiredDuringSchedulingIgnoredDuringExecution:
-      - labelSelector:
-          matchLabels:
-            app.kubernetes.io/name: postgresql
-            app.kubernetes.io/component: primary
-        topologyKey: kubernetes.io/hostname
+        - labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: postgresql
+              app.kubernetes.io/component: primary
+          topologyKey: kubernetes.io/hostname
   # <staging gateway tailnet IP>:<cadence-quic-staging port>. NOTE: the gateway IP changes
   # on cluster rebuild — repoint here + the DNS A record if the cluster is nuked.
-  publicAddr: "100.124.242.71:6474"  # 6473 is preprod's cadence-quic leg on the shared gateway
+  publicAddr: "100.124.242.71:6474" # 6473 is preprod's cadence-quic leg on the shared gateway
   # n0 public relays (the self-hosted relay's HTTP-upgrade handshake is broken through the
   # shared gateway — same interim as preprod).
   relayUrl: ""
@@ -406,7 +406,7 @@ cadence:
     sectionName: https-staging-lfh
     udpListener: cadence-quic-staging
     hostnames:
-    - cadence.staging.localfirsthealth.com
+      - cadence.staging.localfirsthealth.com
   # hapihub is the sole authorization server — mints box grants AND the hub's own '*' grant.
   auth:
     issuerUrl: https://hapihub.staging.localfirsthealth.com
@@ -417,5 +417,5 @@ cadence:
   # better-auth by scripts/seed.ts and stored at mycure-staging-cadence-sa-api-key.
   externalSecrets:
     secrets:
-    - secretKey: sa-api-key
-      remoteKey: mycure-staging-cadence-sa-api-key
+      - secretKey: sa-api-key
+        remoteKey: mycure-staging-cadence-sa-api-key
