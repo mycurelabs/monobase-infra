@@ -233,6 +233,17 @@ hapihub:
       # Email (Postmark) — OTP, magic links, verification, password resets
     - secretKey: POSTMARK_API_KEY
       remoteKey: mycure-production-postmark-api-key
+      # Security detection pipeline (mono#3708, infra#357): HMAC key the audit
+      # sink signs its POSTs to tenzir-ingest with (standard-webhooks). Placed on
+      # the SHARED hapihub block — NOT the worker override — on purpose: the
+      # hapihubWorker release deep-merges these values with mergeOverwrite, which
+      # REPLACES (not appends) the secrets list, so a worker-only override would
+      # drop every inherited secret (CADENCE/GOOGLE/ENC_*/STORAGE/...). Inheriting
+      # from here gives the worker the key with zero duplication. The API release
+      # also syncs the key but never emits — it has RUN_WORKERS=false and no
+      # AUDIT_SINK_URL, so its sink never starts. Only the worker (below) emits.
+    - secretKey: AUDIT_SINK_SECRET
+      remoteKey: infrastructure-tenzir-ingest-hmac
 
   postgresql:
     serviceName: postgresql-primary
@@ -254,6 +265,12 @@ hapihubWorker:
 
   config:
     RUN_WORKERS: "true"
+    # infra#357: the worker is the SOLE audit-sink deliverer (single emitter —
+    # RUN_WORKERS=true + this URL; the API release has neither). The sink starts
+    # on boot when AUDIT_SINK_URL is set, signs each POST with AUDIT_SINK_SECRET
+    # (inherited from the shared hapihub block above), and pushes every
+    # audit_events INSERT (all orgs) to the cluster-internal Tenzir ingest.
+    AUDIT_SINK_URL: "http://tenzir-ingest.security.svc.cluster.local:8080/ingest/audit-events"
 
   # No external traffic: keep the Service (probes) but no routes.
   gateway:
