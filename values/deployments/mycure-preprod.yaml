@@ -77,13 +77,15 @@ hapihub:
       # otherwise adopts an unchanged succeeded hook without re-running it.
       activeDeadlineSeconds: 900
   # Prod parity — same tag as mycure-production.yaml. Bump here first when
-  # rehearsing a promotion. Currently one ahead of prod (prod: 11.20.122):
-  # 11.20.123 carries the X-Real-IP audit-client-IP fix (monobase-mycure#4279)
-  # — getClientIp now reads X-Real-IP (gateway-overwritten $remote_addr) instead
-  # of the spoofable leftmost X-Forwarded-For, so audit_events.ip is the real
-  # client. Being re-tested here with the Tenzir rollout before it promotes to prod.
+  # rehearsing a promotion. Currently ahead of prod (prod: 11.20.122):
+  # 11.20.124 carries (a) the X-Real-IP audit-client-IP fix (monobase-mycure#4279)
+  # — getClientIp reads X-Real-IP not the spoofable leftmost XFF — and (b) the
+  # audit-sink role-split fix (monobase-mycure#4291): the pg_notify trigger is now
+  # created in the MIGRATION (privileged migrator) instead of at sink.start(), and
+  # sink.start() is LISTEN-only, so app_rw (DML-only under #4147) needs no DDL.
+  # Being re-tested here with the Tenzir rollout before it promotes to prod.
   image:
-    tag: "11.20.123"
+    tag: "11.20.124"
   cache:
     # Prod parity: response cache OFF (the #2839/#2617 bentocache stampede
     # mitigation). Re-enable here first when re-validating the serve-stale fix.
