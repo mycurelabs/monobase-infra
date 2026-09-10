@@ -211,14 +211,16 @@ hapihub:
       - secretKey: BETTER_AUTH_SECRET
         remoteKey: mycure-preprod-better-auth-secret
         # Tenzir audit-sink HMAC key (monobase-infra#357, re-test on preprod).
-        # SHARED infra secret (not env-prefixed) — the same infrastructure-tenzir-ingest-hmac
-        # that tenzir's own ESO consumes; resolves via the mc-v4-prod gcp-secretstore.
+        # PREPROD-SPECIFIC secret (Option B) — mycure-preprod-tenzir-ingest-hmac, readable
+        # by the staging ESO SA via its mycure-preprod-* name-prefix grant (the prod-shared
+        # infrastructure-tenzir-ingest-hmac is NOT accessible to that SA). Same secret the
+        # tenzir chart's hmac-key ExternalSecret reads on this cluster, so both sides match.
         # On the SHARED hapihub block (NOT the worker override): hapihubWorker deep-merges
         # via mergeOverwrite which REPLACES lists, so a worker-only override would drop the
         # inherited secrets. The worker inherits it; only the worker emits (AUDIT_SINK_URL +
         # RUN_WORKERS=true below); the API has the key but no URL so its sink never starts.
       - secretKey: AUDIT_SINK_SECRET
-        remoteKey: infrastructure-tenzir-ingest-hmac
+        remoteKey: mycure-preprod-tenzir-ingest-hmac
 
   postgresql:
     serviceName: postgresql-primary

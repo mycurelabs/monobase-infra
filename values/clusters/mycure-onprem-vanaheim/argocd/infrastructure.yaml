@@ -323,3 +323,13 @@ tenzir:
   enabled: true
   geoip:
     enabled: false
+  # Preprod-specific HMAC secret (Option B isolation): overrides the chart default
+  # remoteKey (infrastructure-tenzir-ingest-hmac, prod-shared) so the staging ESO SA
+  # — which only has a name-prefix grant on mycure-preprod-* — can read it without
+  # touching the prod-shared secret. Same secret the preprod hapihub audit sink signs
+  # with (values/deployments/mycure-preprod.yaml AUDIT_SINK_SECRET), so they match if
+  # verifyHmac is ever flipped on. This list REPLACES the chart default (helm list-merge).
+  externalSecrets:
+    secrets:
+      - secretKey: hmac-key
+        remoteKey: mycure-preprod-tenzir-ingest-hmac
