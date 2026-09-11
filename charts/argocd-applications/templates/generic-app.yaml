@@ -4,24 +4,13 @@
 # templates: postgresql, valkey, minio, minio-artifacts, mailpit, hapihub,
 # hapihub-worker, namespace, security-baseline, database-secrets.
 #
-# The registry is code, not config — template-local so a deployment values
-# file cannot override it.
-{{- $apps := list
-  (dict "name" "cadence"          "key" "cadence")
-  (dict "name" "cadence-relay"    "key" "cadenceRelay")
-  (dict "name" "hapihub-docs"     "key" "hapihub-docs" "chart" "app")
-  (dict "name" "medgemma-worker"  "key" "medgemmaWorker")
-  (dict "name" "medley"           "key" "medley")
-  (dict "name" "medleyapp"        "key" "medleyapp" "chart" "app")
-  (dict "name" "mycure"           "key" "mycure" "chart" "app")
-  (dict "name" "mycure-dashboard" "key" "mycure-dashboard" "chart" "app")
-  (dict "name" "mycurelocal"      "key" "mycurelocal" "chart" "app")
-  (dict "name" "mycure-myaccount" "key" "mycure-myaccount" "chart" "app")
-  (dict "name" "mycure-pxp"       "key" "mycure-pxp" "chart" "app")
-  (dict "name" "nocodb"           "key" "nocodb")
-  (dict "name" "openmed"          "key" "openmed")
-}}
+# The registry is values-driven so a values-only fork lists its OWN apps (tenant
+# app identity lives in values/, not the shared engine). Set `appRegistry` in
+# values/deployments/base.yaml; each entry: {name, key, [chart]}. `chart` falls
+# back to the app name. Apps with bespoke value wiring keep dedicated templates
+# (listed above) and are NOT registry entries.
 {{- $root := . }}
+{{- $apps := $root.Values.appRegistry | default list }}
 {{- range $app := $apps }}
 {{- $vals := index $root.Values $app.key | default dict }}
 {{- if $vals.enabled }}
