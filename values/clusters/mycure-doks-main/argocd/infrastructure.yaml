@@ -641,10 +641,23 @@ signoz:
 # off (no MaxMind key yet) so unusual_country/impossible_travel stay dormant.
 tenzir:
   enabled: true
-  # geoip stays off until the MaxMind license key is provisioned — the two geo
-  # signals (unusual_country, impossible_travel) stay dormant; the other five run.
+  # geoip ENABLED (infra#358): arms 20-unusual-country + 21-impossible-travel and
+  # the geoip-city context; the init container downloads GeoLite2-City using the
+  # MaxMind license from infrastructure-tenzir-maxmind-license (infra#3744 — verified
+  # to exist in mc-v4-prod and readable by the prod ESO SA external-secrets@, which
+  # holds an unconditional project secretAccessor). Client-IP trust is already in
+  # place on prod: public gateway ETP:Local + X-Real-IP overwrite + hapihub's #4279
+  # X-Real-IP fix → audit_events.ip is the real client, so geoip resolves a real country.
+  #
+  # ⚠️ DO NOT MERGE until (1) PR monobase-infra#428 is prod-live and (2) audit_events are
+  # actually flowing to Tenzir with real client IPs (verify the sink delivering + a real
+  # audit_events.ip). Flipping geoip before data flows just arms two dormant pipelines.
+  # PREPROD-UNVERIFIABLE: vanaheim is tailnet-only (100.x/10.42.x) → GeoLite2 returns
+  # country=null → both geo pipelines filter everything out (zero signals). So this flip
+  # is PROD-ONLY and was NOT exercised on preprod; the non-geo pipeline + client-IP path
+  # were validated on preprod, the geoip enrichment itself is validated by config review.
   geoip:
-    enabled: false
+    enabled: true
 
 # Tailscale egress to the vanaheim workstation Ollama (medical-AI preprod inference)
 ollamaEgress:
