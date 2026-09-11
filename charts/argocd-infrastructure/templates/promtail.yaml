@@ -1,0 +1,83 @@
+{{- if .Values.loki.enabled }}
+# ArgoCD Application: Promtail — per-node log collector shipping to Loki.
+# Sync Wave 1 - after the monitoring stack (wave 0).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: promtail
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+
+  source:
+    chart: promtail
+    repoURL: https://grafana.github.io/helm-charts
+    targetRevision: {{ .Values.loki.promtail.version | default "6.16.6" }}
+    helm:
+      releaseName: promtail
+      valuesObject:
+        config:
+          clients:
+            - url: http://loki.monitoring.svc:3100/loki/api/v1/push
+          snippets:
+            pipelineStages:
+              - cri: {}
+              - json:
+                  expressions:
+                    level: level
+                    msg: msg
+                    timestamp: timestamp
+              - labels:
+                  level:
+              # Drop health-check noise.
+              - drop:
+                  source: msg
+                  expression: "^(GET|HEAD) /(livez|readyz|healthz)"
+
+        resources:
+          requests:
+            cpu: 50m
+            memory: 64Mi
+          limits:
+            cpu: 200m
+            memory: 128Mi
+
+        containerSecurityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+              - ALL
+          readOnlyRootFilesystem: true
+
+        tolerations:
+          - effect: NoSchedule
+            key: node-role.kubernetes.io/master
+            operator: Exists
+          - effect: NoSchedule
+            key: node-role.kubernetes.io/control-plane
+            operator: Exists
+
+        serviceMonitor:
+          enabled: false
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 10s
+        maxDuration: 5m
+{{- end }}
