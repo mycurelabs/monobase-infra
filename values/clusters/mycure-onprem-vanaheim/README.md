@@ -123,6 +123,7 @@ The `nginx-internal-gateway` is exposed on the tailnet by the tailscale operator
   deleting them once and letting external-dns recreate.
 
 Reach it (with Tailscale up), always over **https://**:
+
 - `https://mycure.staging.localfirsthealth.com` (login), `mycure-dashboard`, `mycure-pxp`
 - `https://hapihub.staging.localfirsthealth.com/health`
 - preprod: same hostnames under `.preprod.localfirsthealth.com` (+ `cadence`,

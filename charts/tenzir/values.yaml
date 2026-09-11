@@ -33,6 +33,11 @@ geoip:
   enabled: false
   # Countries treated as normal for unusual_country (ISO-3166 alpha-2).
   allowedCountries: ["PH", "US"]
+  # GCP Secret Manager name for the MaxMind license (synced only when geoip.enabled).
+  # Overridable per-cluster: prod uses the shared infrastructure-tenzir-maxmind-license;
+  # a cluster whose ESO SA can't read that (e.g. vanaheim's prefix-scoped staging SA)
+  # points this at a mycure-preprod-* secret it can read. Default = the prod-shared key.
+  maxmindRemoteKey: infrastructure-tenzir-maxmind-license
 
 # Detection tunables (kept here so ops can tune thresholds without touching TQL).
 detect:
@@ -42,7 +47,7 @@ detect:
   massExport:
     window: "10min"
     threshold: 50
-  bulkView:            # phase 2 (needs access logs OR phi.record_accessed volume)
+  bulkView:            # 15-bulk-view: phi.record_accessed volume (infra#360)
     window: "10min"
     threshold: 100
   lateNight:           # local-hour bucket flagged as "late night" (UTC+8 clinic tz baked as offset)

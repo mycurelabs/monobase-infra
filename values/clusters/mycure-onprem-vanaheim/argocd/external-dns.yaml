@@ -18,6 +18,11 @@ instances:
     enabled: true
     provider: cloudflare
 
+    # UNIQUE owner id — the DOKS cluster's instance is `external-dns-primary`
+    # (chart default); sharing it would make the two sync-policy instances
+    # delete each other's records.
+    txtOwnerId: mycure-onprem-vanaheim
+
     # Manage DNS subdomains across all namespaces
     domainFilters:
       - localfirsthealth.com

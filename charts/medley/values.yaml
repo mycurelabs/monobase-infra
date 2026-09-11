@@ -124,6 +124,19 @@ config:
   MEDLEY_CHAT_MODEL: ""
   MEDLEY_CORS_ORIGINS: ""
 
+# Shared PostgreSQL (medley 2.x): its own `medley` database on the shared bitnami instance. When enabled,
+# DATABASE_URL is built in the Deployment from the in-cluster postgres secret (password stays out of git),
+# mirroring the cadence/hapihub pattern. medley 1.x (sqlite) leaves this disabled → no DATABASE_URL env.
+postgresql:
+  enabled: false
+  serviceName: postgresql-primary
+  port: 5432
+  auth:
+    username: postgres
+    database: medley
+    existingSecret: postgresql
+    secretKey: postgres-password
+
 # External Secrets — MEDLEY_HISTORY_KEY pulled from GCP Secret Manager
 externalSecrets:
   enabled: true

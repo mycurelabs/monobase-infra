@@ -49,10 +49,14 @@ spec:
         args:
           - |
             set -eu
+            # readOnlyRootFilesystem:true makes / (incl. /tmp) read-only — download and
+            # extract into the writable /geoip emptyDir, not /tmp (else curl exits 23,
+            # "failed writing received data", and the init container crash-loops).
             url="https://download.maxmind.com/app/geoip_download?edition_id=GeoLite2-City&license_key=${MAXMIND_LICENSE}&suffix=tar.gz"
-            curl -fsSL "$url" -o /tmp/geoip.tar.gz
-            tar -xzf /tmp/geoip.tar.gz -C /tmp
-            cp /tmp/GeoLite2-City_*/GeoLite2-City.mmdb /geoip/GeoLite2-City.mmdb
+            curl -fsSL "$url" -o /geoip/geoip.tar.gz
+            tar -xzf /geoip/geoip.tar.gz -C /geoip
+            cp /geoip/GeoLite2-City_*/GeoLite2-City.mmdb /geoip/GeoLite2-City.mmdb
+            rm -rf /geoip/geoip.tar.gz /geoip/GeoLite2-City_*/
             echo "GeoLite2-City.mmdb ready"
         env:
         - name: MAXMIND_LICENSE

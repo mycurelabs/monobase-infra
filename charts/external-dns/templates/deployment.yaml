@@ -74,7 +74,10 @@ spec:
         # Registry
         - --registry={{ $root.Values.global.registry }}
         - --txt-prefix={{ $root.Values.global.txtPrefix }}
-        - --txt-owner-id={{ $root.Release.Namespace }}-{{ $instance.name }}
+        # Owner id MUST be unique per cluster: two sync-policy instances
+        # sharing an owner id (e.g. one per cluster, same namespace+instance
+        # name) treat each other's records as their own and delete them.
+        - --txt-owner-id={{ $instance.txtOwnerId | default (printf "%s-%s" $root.Release.Namespace $instance.name) }}
 
         # Logging
         - --log-level={{ $root.Values.global.logLevel }}

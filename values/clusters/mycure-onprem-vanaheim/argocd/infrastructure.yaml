@@ -25,9 +25,34 @@ certManagerIssuers:
         dnsZones:
           - localfirsthealth.com
 
-# CoreDNS overrides (DOKS coredns-custom hook) — cadence-relay hairpin rewrites.
+# CoreDNS overrides — in-cluster hairpin for *.preprod (mycure#4135). k3s
+# CoreDNS imports /etc/coredns/custom/*.override from the same coredns-custom
+# ConfigMap the DOKS hook uses (verified on the live cluster). Without this,
+# pods resolve the PUBLIC *.preprod A records (tailnet IPs unreachable from
+# pods) and cadence enroll/JWKS against hapihub.preprod hangs.
+# NOTE: the k3s Corefile has no `reload` plugin — `kubectl -n kube-system
+# rollout restart deploy/coredns` after changing these rewrites.
 corednsCustom:
-  enabled: false  # disabled on k3d/vanaheim
+  enabled: true
+  # Exact hairpin first: relay hostname -> relay Service (must win over the
+  # wildcard, matching the DOKS ordering).
+  exactRewrites:
+    - from: cadence-relay.preprod.localfirsthealth.com
+      to: cadence-relay.mycure-preprod.svc.cluster.local
+  # Wildcard hairpin: *.preprod -> the internal gateway data plane (same
+  # listeners/certs, so cadence->hapihub auth/JWKS https keeps working).
+  regexRewrites:
+    - pattern: (.*)\.preprod\.localfirsthealth\.com
+      to: nginx-internal-gateway-nginx.nginx-gateway-system.svc.cluster.local
+  # AAAA suppression (host has no IPv6 egress) — previously baked into the
+  # coredns-custom ConfigMap by the local-k3d module; ArgoCD replaces the CM
+  # data wholesale on sync, so the key must render from this chart or it gets
+  # clobbered (it did, once). Keep in lockstep with the module's copy.
+  extraOverrides:
+    aaaa: |
+      template IN AAAA {
+        rcode NOERROR
+      }
 
 # NGINX Gateway Fabric - primary Gateway API implementation
 nginxGateway:
@@ -66,7 +91,7 @@ nginxGatewayResources:
         # NOTE: this tailnet IP is assigned by the tailscale operator and CHANGES
         # on cluster nuke+rebootstrap — update it (get: `tailscale status | grep
         # nginx-staging-gateway`) or re-point after a rebuild.
-        external-dns.alpha.kubernetes.io/target: "100.67.121.122"
+        external-dns.alpha.kubernetes.io/target: "100.124.242.71"
       infrastructure:
         annotations:
           tailscale.com/expose: "true"
@@ -94,6 +119,47 @@ nginxGatewayResources:
           port: 80
           protocol: HTTP
           hostname: "*.staging.localfirsthealth.com"
+        # QUIC/UDP legs for the staging cadence stack (box<->hub sync + relay).
+        # cadence advertises <gateway-tailnet-IP>:6474 (publicAddr); the relay's
+        # QUIC leg rides 7843. NOTE: 6473/7842 belong to the preprod legs below —
+        # UDP has no SNI, so each env needs its own port on this shared gateway.
+        - name: cadence-quic-staging
+          port: 6474
+          protocol: UDP
+        - name: relay-quic-staging
+          port: 7843
+          protocol: UDP
+        # ---- preprod (mycure#4135, stood up here after the DOKS decommission
+        # in PR #409). Exact-hostname listeners for the app<->api pair
+        # (anti-HTTP/2-coalescing, mono#2540) + wildcard for the rest. ----
+        - name: https-preprod-mycure
+          port: 443
+          protocol: HTTPS
+          hostname: "mycure.preprod.localfirsthealth.com"
+          tlsSecretName: nginx-gateway-tls-preprod-mycure
+        - name: https-preprod-hapihub
+          port: 443
+          protocol: HTTPS
+          hostname: "hapihub.preprod.localfirsthealth.com"
+          tlsSecretName: nginx-gateway-tls-preprod-hapihub
+        - name: https-preprod-lfh
+          port: 443
+          protocol: HTTPS
+          hostname: "*.preprod.localfirsthealth.com"
+          tlsSecretName: nginx-gateway-tls-preprod
+        - name: http-preprod-lfh
+          port: 80
+          protocol: HTTP
+          hostname: "*.preprod.localfirsthealth.com"
+        # Cadence QUIC (UDPRoute): preprod hub port 6473, preprod relay 7842.
+        # No SNI on UDP — port-demuxed. publicAddr in the deployment values
+        # advertises <this gateway's tailnet IP>:6473.
+        - name: cadence-quic-preprod
+          port: 6473
+          protocol: UDP
+        - name: relay-quic-preprod
+          port: 7842
+          protocol: UDP
 
   tls:
     certificates:
@@ -111,6 +177,20 @@ nginxGatewayResources:
         clusterIssuer: letsencrypt-mycure-cloudflare-prod  # DNS-01, wildcard
         dnsNames:
           - "*.staging.localfirsthealth.com"
+      # preprod (mycure#4135). Exact-name certs MUST stay single-hostname —
+      # extra dnsNames would re-enable HTTP/2 coalescing.
+      - secretName: nginx-gateway-tls-preprod-mycure
+        clusterIssuer: letsencrypt-mycure-cloudflare-prod  # DNS-01
+        dnsNames:
+          - mycure.preprod.localfirsthealth.com
+      - secretName: nginx-gateway-tls-preprod-hapihub
+        clusterIssuer: letsencrypt-mycure-cloudflare-prod  # DNS-01
+        dnsNames:
+          - hapihub.preprod.localfirsthealth.com
+      - secretName: nginx-gateway-tls-preprod
+        clusterIssuer: letsencrypt-mycure-cloudflare-prod  # DNS-01, wildcard
+        dnsNames:
+          - "*.preprod.localfirsthealth.com"
 
   # Cluster-wide SnippetsPolicies for the shared nginx Gateway.
   snippetsPolicies:
@@ -131,8 +211,8 @@ nginxGatewayResources:
           value: |
             js_header_filter securityHeaders.clearServer;
 
-# Gateway metadata consumed by the grafana/signoz Application templates.
-# Both grafana and signoz are disabled on this cluster — these values are inert.
+# Gateway metadata consumed by the grafana Application template.
+# Grafana is disabled on this cluster — these values are inert.
 gateway:
   domain: staging.localfirsthealth.com
   gateway:
@@ -144,6 +224,31 @@ externalSecrets:
   enabled: true
   version: 0.9.11
   provider: gcp
+
+  # Store the cluster-scoped ExternalSecrets (cert-manager/external-dns) read
+  # from — must match a store below. This block was stale (pre-stores shape)
+  # since #355; the external-secrets-stores app failed to render ("stores is
+  # empty") and the live ClusterSecretStore only existed because bootstrap
+  # hand-seeded it. Mirrors the live object exactly, so adoption is a no-op.
+  secretStoreName: gcp-secretstore
+  cloudflare:
+    enabled: true
+  cloudflareSecretName: mycure-cloudflare-api-token
+
+  stores:
+    - name: gcp-secretstore
+      provider: gcp
+      gcp:
+        projectId: mc-v4-prod
+        # k3d (no Workload Identity) — auth via the gcpsm-secret SA key
+        # (scoped external-secrets-staging SA, seeded at bootstrap).
+        auth:
+          serviceAccountKey:
+            enabled: true
+            secretRef:
+              name: gcpsm-secret
+              key: secret-access-credentials
+              namespace: external-secrets-system
 
   # AWS Secrets Manager configuration
   aws:
@@ -164,9 +269,16 @@ externalSecrets:
     clusterName: ""
     serviceAccountEmail: ""
 
-# External DNS - Automatic DNS record management from HTTPRoutes
+# External DNS - Automatic DNS record management from HTTPRoutes (full config
+# in external-dns.yaml). Historical note: disabled at PR #355 because the
+# then-current external-dns emitted a flaky CNAME to the gateway's .ts.net
+# status hostname, ignoring the IP target annotation; v0.19.0 honors the
+# Gateway-level `external-dns.alpha.kubernetes.io/target` annotation (set on
+# nginx-internal-gateway above), publishing direct A records. Owner id is
+# cluster-unique (see external-dns.yaml) so this instance can never touch the
+# DOKS instance's records.
 externalDNS:
-  enabled: false  # Automatic DNS via Cloudflare (full config in external-dns.yaml)
+  enabled: true
 
 # Kyverno - Policy engine
 kyverno:
@@ -188,9 +300,16 @@ monitoring:
   grafana:
     enabled: false
 
-# SigNoz - unified observability platform
-signoz:
-  enabled: false  # disabled on k3d/vanaheim
+# Loki + Promtail - standard log-aggregation pipeline (grafana helm charts).
+# Deployed via the loki.yaml + promtail.yaml Applications; grafana auto-provisions
+# a Loki datasource. Enabled here to prove the stack on vanaheim before DOKS.
+loki:
+  enabled: true
+  version: "6.24.0"
+  storageSize: "20Gi"   # vanaheim is a small k3d cluster
+  retention: "14d"
+  promtail:
+    version: "6.16.6"
 
 # Tailscale egress to the vanaheim workstation Ollama
 ollamaEgress:
@@ -201,7 +320,31 @@ ollamaEgress:
 tailscaleOperator:
   enabled: true
 
-# Tenzir security detection pipeline — off on this lean staging cluster (the key
-# must exist: templates/tenzir.yaml gates on .Values.tenzir.enabled directly).
+# Tenzir security detection pipeline — ENABLED on preprod to re-test the #357/#359a/#360
+# rollout end-to-end before prod (PR monobase-infra#428). Ingests mycure-preprod's
+# hapihub-worker audit sink over HTTP, runs the detections, routes findings to
+# Alertmanager. geoip stays OFF: the geo signals (unusual_country/impossible_travel)
+# are prod-meaningful only — preprod clients are tailnet (100.x), not geolocatable,
+# and there's no MaxMind key here. Mirrors the doks-main tenzir block.
 tenzir:
-  enabled: false
+  enabled: true
+  # geoip ENABLED on preprod to TEST the geoip enrichment (infra#358) on this
+  # semi-permanent test env. Organic preprod traffic is tailnet (100.x) → GeoLite2
+  # country=null → the two geo signals stay dormant for real traffic; they're
+  # exercised by injecting synthetic auth.sign_in events with PUBLIC IPs. maxmindRemoteKey
+  # points at a preprod-scoped secret (mycure-preprod-tenzir-maxmind-license, same license
+  # value as the prod key) so the staging ESO SA's mycure-preprod-* prefix grant can read
+  # it — the prod-shared infrastructure-tenzir-maxmind-license is NOT accessible to it.
+  geoip:
+    enabled: true
+    maxmindRemoteKey: mycure-preprod-tenzir-maxmind-license
+  # Preprod-specific HMAC secret (Option B isolation): overrides the chart default
+  # remoteKey (infrastructure-tenzir-ingest-hmac, prod-shared) so the staging ESO SA
+  # — which only has a name-prefix grant on mycure-preprod-* — can read it without
+  # touching the prod-shared secret. Same secret the preprod hapihub audit sink signs
+  # with (values/deployments/mycure-preprod.yaml AUDIT_SINK_SECRET), so they match if
+  # verifyHmac is ever flipped on. This list REPLACES the chart default (helm list-merge).
+  externalSecrets:
+    secrets:
+      - secretKey: hmac-key
+        remoteKey: mycure-preprod-tenzir-ingest-hmac
