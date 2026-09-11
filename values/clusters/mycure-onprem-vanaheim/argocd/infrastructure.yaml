@@ -211,8 +211,8 @@ nginxGatewayResources:
           value: |
             js_header_filter securityHeaders.clearServer;
 
-# Gateway metadata consumed by the grafana/signoz Application templates.
-# Both grafana and signoz are disabled on this cluster — these values are inert.
+# Gateway metadata consumed by the grafana Application template.
+# Grafana is disabled on this cluster — these values are inert.
 gateway:
   domain: staging.localfirsthealth.com
   gateway:
@@ -300,9 +300,16 @@ monitoring:
   grafana:
     enabled: false
 
-# SigNoz - unified observability platform
-signoz:
-  enabled: false  # disabled on k3d/vanaheim
+# Loki + Promtail - standard log-aggregation pipeline (grafana helm charts).
+# Deployed via the loki.yaml + promtail.yaml Applications; grafana auto-provisions
+# a Loki datasource. Enabled here to prove the stack on vanaheim before DOKS.
+loki:
+  enabled: true
+  version: "6.24.0"
+  storageSize: "20Gi"   # vanaheim is a small k3d cluster
+  retention: "14d"
+  promtail:
+    version: "6.16.6"
 
 # Tailscale egress to the vanaheim workstation Ollama
 ollamaEgress:
