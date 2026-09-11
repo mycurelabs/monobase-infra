@@ -115,8 +115,68 @@ spec:
                       - "s3:DeleteObject"
                       {{- end }}
                   {{- end }}
+                  # The maestroapp platform-root latest.json files are the FLEET
+                  # POINTERS (mono#4095): the clinic auto-updater + install.sh
+                  # poll them, and only the promote-maestroapp Job (the
+                  # artifacts-promoter user below, driven by the git pin in
+                  # values/deployments/mycure-production.yaml) may write them.
+                  # Explicit Deny so the publisher key — including a re-run of an
+                  # OLD release workflow whose publish.ts still wrote root
+                  # latest.json — cannot roll the fleet. This Deny sits AFTER the
+                  # publishers range above (which grants maestroapp PutObject on
+                  # artifacts/maestroapp/*); MinIO evaluates Deny over Allow
+                  # regardless of order, so the root pointers stay carved out of
+                  # the publisher's write scope. Literal keys, not a wildcard: S3
+                  # policy `*` crosses `/`, so desktop/*/latest.json would also
+                  # match the versioned v<ver>/latest.json manifests the
+                  # publisher MUST keep writing. The pruner never touches root
+                  # latest.json, so denying delete here is free.
+                  # Platforms MUST match charts/maestroapp/values.yaml `platforms`
+                  # and the promoter Allow below — three separate lists, no shared
+                  # source, so they drift silently. linux_aarch64 is intentionally
+                  # absent: the mono release matrix ships only these three.
+                  - effect: "Deny"
+                    resources:
+                      - "arn:aws:s3:::artifacts/maestroapp/desktop/linux_x86_64/latest.json"
+                      - "arn:aws:s3:::artifacts/maestroapp/desktop/darwin_aarch64/latest.json"
+                      - "arn:aws:s3:::artifacts/maestroapp/desktop/windows_x86_64/latest.json"
+                    actions:
+                      - "s3:PutObject"
+                      - "s3:DeleteObject"
+              # Fleet promoter (mono#4095): the ONLY identity allowed to write
+              # the maestroapp platform-root latest.json fleet pointers. Used
+              # exclusively by the charts/maestroapp promotion Job, which copies
+              # the pinned v<ver>/latest.json over them. Dedicated user so
+              # promotes are attributable in audit and revocable without touching
+              # the CI publisher key. It cannot upload artifacts or delete
+              # anything; reads under maestroapp/ are granted because the Job's
+              # authenticated mc calls (stat/cat/copy-source) are evaluated
+              # against THIS policy, not the anonymous-download rule. Platform
+              # list must match the Deny above + charts/maestroapp/values.yaml
+              # `platforms` — three separate lists, no shared source.
+              - name: minio-artifacts-promoter
+                statements:
+                  - effect: "Allow"
+                    resources:
+                      - "arn:aws:s3:::artifacts"
+                    actions:
+                      - "s3:ListBucket"
+                      - "s3:GetBucketLocation"
+                  - effect: "Allow"
+                    resources:
+                      - "arn:aws:s3:::artifacts/maestroapp/*"
+                    actions:
+                      - "s3:GetObject"
+                  - effect: "Allow"
+                    resources:
+                      - "arn:aws:s3:::artifacts/maestroapp/desktop/linux_x86_64/latest.json"
+                      - "arn:aws:s3:::artifacts/maestroapp/desktop/darwin_aarch64/latest.json"
+                      - "arn:aws:s3:::artifacts/maestroapp/desktop/windows_x86_64/latest.json"
+                    actions:
+                      - "s3:PutObject"
             usersExistingSecrets:
               - minio-artifacts-ci
+              - minio-artifacts-promoter
           persistence:
             enabled: true
             storageClass: {{ (index .Values "minio-artifacts").persistence.storageClass | default "" }}

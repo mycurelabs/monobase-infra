@@ -635,6 +635,24 @@ minio-artifacts:
     hostname: ""  # defaults to artifacts.localfirsthealth.com
     sectionName: https-lfh
 
+# ===== FLEET: maestroapp desktop version pin (mono#4095) =====
+# Single source of truth for the maestroapp version this environment's clinic
+# fleet runs. Not a k8s deployment of the app (the fleet runs on clinic
+# boxes): charts/maestroapp renders a promotion Job that copies the immutable
+# v<version>/latest.json → the platform-root latest.json fleet pointers on the
+# minio-artifacts store above (what the Tauri auto-updater and install.sh
+# poll), then verifies the store serves the pin. The mono release pipeline
+# publishes artifacts + versioned manifests but never touches the root
+# pointers.
+# Rollback = revert the bump commit (the publisher's pruner always protects the
+# version the root latest.json points at, so the pinned build is never pruned).
+# The pinned version must already be published for every platform — a missing
+# versioned manifest fails the Job loudly (app Degraded), rolling nothing for
+# that platform.
+maestroapp:
+  enabled: true
+  version: "2.1.109"
+
 # ===== EMAIL TESTING: Mailpit =====
 mailpit:
   enabled: false
