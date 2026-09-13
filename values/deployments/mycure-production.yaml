@@ -79,14 +79,14 @@ hapihub:
     # rows 90-94; high-water mark deliberately unchanged). Boot applied 0 migrations through 11.20.121.
     # 11.20.104 = 11.20.103 + the reconstruct_inputs migration that the 11.20.102 journal
     # reset dropped (the table was missing in prod, so every reconstruct save 500'd).
-    # 11.20.122 BREAKS the "0 migrations at boot" invariant above: 0099_admin_role_backfill has
-    # when=1788703081618 (2026-09-06), ABOVE the 1788021643676 high-water mark, so it is the first
-    # migration to run since the repair. It is `UPDATE "user" SET role='owner' WHERE role='admin'`
-    # — 2 rows in prod (of 270 users; 256 null / 12 user / 2 admin), no DELETE, but irreversible:
-    # there is no down-migration and the prior value is not recorded. 0096/0097/0098 stay below the
-    # mark and remain skipped; harmless, since the repair already applied their effects out-of-band
-    # (medical_records.updated_by present; _pg_changelog already absent, so 0097's DROP is moot).
-    tag: "11.20.122"
+    # Prod has applied through 0099_admin_role_backfill (95 ledger rows; high-water
+    # 1788703081618). 11.20.126 applies four newer, additive migrations: 0100 adds nullable
+    # billing_items.taxes (2,459,879 existing rows; no default/table rewrite), 0101 adds nullable
+    # public_profiles.background, and 0102/0103 create developer_apps and api_usage_counters.
+    # Preflight confirmed both columns and both tables are absent, so the bare ALTER/CREATE
+    # statements will not collide with schema drift. No migration contains DROP or DELETE; as with
+    # all forward-only migrations, rollback leaves these additive schema objects in place.
+    tag: "11.20.126"
   cache:
     # Response cache OFF in prod — interim mitigation for the single-hot-key
     # bentocache stampede that wedged prod (#179, #2839, #2617). The serve-stale
@@ -283,9 +283,9 @@ hapihubWorker:
 # ===== HEALTHCARE: Frontend Application =====
 mycure:
   image:
-    # Ships with hapihub 11.20.122 — expects an API carrying the 0098
+    # Ships with hapihub 11.20.126 — expects an API carrying the 0098
     # medical_records.updated_by changes, so these two move together.
-    tag: "10.25.136"
+    tag: "10.25.137"
   resources:
     requests:
       cpu: 10m
