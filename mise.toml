@@ -90,6 +90,7 @@ description = "Lint Helm charts (render every app-of-apps tree with real values)
 run = """
 echo "Rendering app-of-apps trees (validates every chart in use)..."
 helm template lint charts/argocd-applications -f values/deployments/base.yaml -f values/deployments/mycure-production.yaml --set argocd.repoURL=lint --set argocd.targetRevision=lint > /dev/null
+helm template lint charts/argocd-applications -f values/deployments/base.yaml -f values/deployments/mycure-staging.yaml --set argocd.repoURL=lint --set argocd.targetRevision=lint > /dev/null
 helm template lint charts/argocd-applications -f values/deployments/base.yaml -f values/deployments/mycure-preprod.yaml --set argocd.repoURL=lint --set argocd.targetRevision=lint > /dev/null
 helm template lint charts/argocd-infrastructure -f values/clusters/mycure-doks-main/argocd/infrastructure.yaml --set argocd.repoURL=lint --set argocd.targetRevision=lint > /dev/null
 helm template lint charts/argocd-bootstrap > /dev/null
@@ -97,8 +98,15 @@ helm template lint charts/argocd-bootstrap > /dev/null
 # app-of-apps trees — render them directly or template bugs reach main green.
 helm template lint charts/database-secrets --set global.namespace=lint --set walg.enabled=true > /dev/null
 helm template lint charts/monitoring-resources --set global.namespace=lint > /dev/null
+# App-registry guards a plain render (rc=0) can't catch: (a) appRegistry
+# re-declared outside base.yaml, (b) a generic-app Application disappearing.
+./scripts/lint-app-registry.sh
 echo "✓ All trees render"
 """
+
+[tasks.lint-app-registry]
+description = "Guard the argocd-applications app registry (base-only + no-app-disappears)"
+run = "./scripts/lint-app-registry.sh"
 
 [tasks.lint]
 description = "Run all linters"

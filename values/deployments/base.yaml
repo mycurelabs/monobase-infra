@@ -27,44 +27,55 @@ global:
   partOf: mycureapp
 
 # App registry for the argocd-applications pass-through factory (generic-app.yaml).
-# Tenant app identity lives HERE, not in the shared engine. Each entry maps a
-# deployment-values key to charts/<chart|name>; `chart` defaults to `name`.
-# Order is preserved in the rendered Applications. Bespoke-wired apps (postgresql,
-# valkey, minio, minio-artifacts, mailpit, hapihub, hapihub-worker, namespace,
-# security-baseline, database-secrets) keep dedicated templates — not listed here.
+# Tenant app identity lives HERE, not in the shared engine.
+#
+# MAP-KEYED (NOT a list): the map key IS the Application name; the value carries
+# `key` (deployment-values key holding this app's config) and optional `chart`
+# (charts/<chart>; defaults to the map key). It is a MAP on purpose — Helm REPLACES
+# arrays across value files but DEEP-MERGES maps, so an overlay that adds one app
+# ADDS it instead of dropping every other app. To REMOVE an app, set its
+# `<key>.enabled: false` (or delete the entry in THIS base file) — do NOT null the
+# entry: the generic-app.yaml guard FAILS the render on a null/mis-shaped entry
+# rather than silently pruning. `appRegistry` must appear ONLY here (base); an
+# overlay must never re-declare it (scripts/lint-app-registry.sh enforces this).
+# Bespoke-wired apps (postgresql, valkey, minio, minio-artifacts, mailpit, hapihub,
+# hapihub-worker, namespace, security-baseline, database-secrets) keep dedicated
+# templates — not listed here.
 appRegistry:
-  - name: cadence
+  cadence:
     key: cadence
-  - name: cadence-relay
+  cadence-relay:
     key: cadenceRelay
-  - name: hapihub-docs
+  hapihub-docs:
     key: hapihub-docs
     chart: app
-  - name: medgemma-worker
+  maestroapp:
+    key: maestroapp
+  medgemma-worker:
     key: medgemmaWorker
-  - name: medley
+  medley:
     key: medley
-  - name: medleyapp
+  medleyapp:
     key: medleyapp
     chart: app
-  - name: mycure
+  mycure:
     key: mycure
     chart: app
-  - name: mycure-dashboard
+  mycure-dashboard:
     key: mycure-dashboard
     chart: app
-  - name: mycurelocal
+  mycurelocal:
     key: mycurelocal
     chart: app
-  - name: mycure-myaccount
+  mycure-myaccount:
     key: mycure-myaccount
     chart: app
-  - name: mycure-pxp
+  mycure-pxp:
     key: mycure-pxp
     chart: app
-  - name: nocodb
+  nocodb:
     key: nocodb
-  - name: openmed
+  openmed:
     key: openmed
 
 # ===== HEALTHCARE: MyCure Dashboard (operator/admin web UI) =====

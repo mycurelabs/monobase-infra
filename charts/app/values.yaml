@@ -117,5 +117,7 @@ externalSecrets:
 persistence:
   enabled: false
 # app.kubernetes.io/part-of label. Empty => inherit global.partOf (set by the
-# tenant in values/), falling back to "platform". Tenant identity lives in values/.
+# tenant in values/); the standalone-chart default is still "mycureapp" so a child
+# that syncs before the root injects global.partOf renders the SAME label (no flip,
+# no double roll). Genericizing the default to "platform" is a separate later change.
 partOf: ""

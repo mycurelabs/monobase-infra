@@ -6,19 +6,39 @@
 #
 # The registry is values-driven so a values-only fork lists its OWN apps (tenant
 # app identity lives in values/, not the shared engine). Set `appRegistry` in
-# values/deployments/base.yaml; each entry: {name, key, [chart]}. `chart` falls
-# back to the app name. Apps with bespoke value wiring keep dedicated templates
-# (listed above) and are NOT registry entries.
+# values/deployments/base.yaml as a MAP: `<appName>: {key, [chart]}`. The map key
+# is the Application name; `key` is the deployment-values key holding the app's
+# config; `chart` falls back to the app name. It is a MAP (not a list) so overlays
+# DEEP-MERGE into it — a list would REPLACE the whole registry, silently dropping
+# every other app (helm rc=0), the root would then prune them + finalizers cascade.
+# Apps with bespoke value wiring keep dedicated templates (listed above) and are
+# NOT registry entries.
 {{- $root := . }}
-{{- $apps := $root.Values.appRegistry | default list }}
-{{- range $app := $apps }}
+{{- /*
+  Fail-closed guard: a missing / empty / mis-shaped (list/scalar) appRegistry
+  MUST abort the render, never render zero Applications. Rendering nothing is the
+  exact silent-prune failure mode we are defending against on prod.
+*/}}
+{{- if or (not $root.Values.appRegistry) (kindIs "invalid" $root.Values.appRegistry) (not (kindIs "map" $root.Values.appRegistry)) }}
+{{- fail "appRegistry missing/empty/not a map: expected values/deployments/base.yaml to define `appRegistry` as a MAP of <appName>: {key, [chart]}. Refusing to render zero Applications (that would prune every generic app on sync)." }}
+{{- end }}
+{{- range $name, $app := $root.Values.appRegistry }}
+{{- if kindIs "invalid" $app }}
+{{- fail (printf "appRegistry entry %q is null. To remove an app set `<key>.enabled: false` or delete the entry in base.yaml — a null entry is refused (it would silently drop the Application)." $name) }}
+{{- end }}
+{{- if not (kindIs "map" $app) }}
+{{- fail (printf "appRegistry entry %q must be a map {key, [chart]}, got %s." $name (kindOf $app)) }}
+{{- end }}
+{{- if not $app.key }}
+{{- fail (printf "appRegistry entry %q is missing required `key` (the deployment-values key holding its config)." $name) }}
+{{- end }}
 {{- $vals := index $root.Values $app.key | default dict }}
 {{- if $vals.enabled }}
 ---
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: {{ $root.Values.global.namespace }}-{{ $app.name }}
+  name: {{ $root.Values.global.namespace }}-{{ $name }}
   namespace: argocd
   annotations:
     argocd.argoproj.io/sync-wave: "3"
@@ -27,11 +47,11 @@ metadata:
 spec:
   project: default
   source:
-    path: charts/{{ $vals.chart | default $app.chart | default $app.name }}
+    path: charts/{{ $vals.chart | default $app.chart | default $name }}
     repoURL: {{ $root.Values.argocd.repoURL }}
     targetRevision: {{ $root.Values.argocd.targetRevision | default "main" }}
     helm:
-      releaseName: {{ $app.name }}
+      releaseName: {{ $name }}
       valuesObject:
         {{- toYaml $vals | nindent 8 }}
         global: {{ $root.Values.global | toYaml | nindent 10 }}
