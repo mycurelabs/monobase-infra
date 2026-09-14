@@ -30,6 +30,13 @@ data:
   provision.sql: |
     \set ON_ERROR_STOP on
 
+    -- NOTE: the target db name arrives as psql var `:target_database` (NOT
+    -- `:DBNAME`). `DBNAME` is a psql RESERVED connection variable that psql
+    -- OVERWRITES to the actually-connected db on connect — since the Job
+    -- connects to `postgres`, a `-v DBNAME=medley` flag would be clobbered to
+    -- `postgres` and every statement below would target the WRONG database.
+    -- A non-reserved name is immune to that.
+
     -- ══ PHASE 1: run against the `postgres` MAINTENANCE db (role + database
     --    live in the shared catalog / can't be created from inside the target
     --    db). The Job connects here first. ══
@@ -45,19 +52,19 @@ data:
     -- ── Database: create it owned by medley if missing (reseed-safe — a fresh
     --    cluster has no `medley` db yet; DBOS would otherwise create it as the
     --    superuser at first boot). Guarded — converged = no-op. ──
-    SELECT format('CREATE DATABASE %I OWNER medley', :'DBNAME')
-    WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = :'DBNAME') \gexec
+    SELECT format('CREATE DATABASE %I OWNER medley', :'target_database')
+    WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = :'target_database') \gexec
 
     -- ── Ownership of an EXISTING database moves to medley (the vanaheim case:
     --    the db was created earlier by the superuser). Guarded. ──
-    SELECT format('ALTER DATABASE %I OWNER TO medley', :'DBNAME')
-    WHERE (SELECT pg_catalog.pg_get_userbyid(datdba) FROM pg_database WHERE datname = :'DBNAME') <> 'medley' \gexec
+    SELECT format('ALTER DATABASE %I OWNER TO medley', :'target_database')
+    WHERE (SELECT pg_catalog.pg_get_userbyid(datdba) FROM pg_database WHERE datname = :'target_database') <> 'medley' \gexec
 
-    GRANT CONNECT, CREATE, TEMPORARY ON DATABASE :"DBNAME" TO medley;
+    GRANT CONNECT, CREATE, TEMPORARY ON DATABASE :"target_database" TO medley;
 
     -- ══ PHASE 2: reconnect INTO the target db for schema/object ownership
     --    (these catalogs are per-database). \c reuses the same superuser conn. ══
-    \c :DBNAME
+    \c :target_database
 
     SELECT 'ALTER SCHEMA public OWNER TO medley'
     WHERE (SELECT nspowner::regrole::text FROM pg_namespace WHERE nspname='public') <> 'medley' \gexec

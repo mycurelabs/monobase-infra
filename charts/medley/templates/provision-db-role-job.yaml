@@ -47,7 +47,7 @@ spec:
             # role + database here (phase 1) then \c into the target db (phase 2).
             psql "postgres://postgres:$(POSTGRES_PASSWORD)@{{ .Values.postgresql.serviceName | default "postgresql-primary" }}.{{ include "medley.namespace" . }}.svc.cluster.local:{{ .Values.postgresql.port | default 5432 }}/postgres" \
               -v ON_ERROR_STOP=1 \
-              -v DBNAME={{ .Values.postgresql.auth.database | default "medley" }} \
+              -v target_database={{ .Values.postgresql.auth.database | default "medley" }} \
               -v medley_password="$MEDLEY_PASSWORD" \
               -f /sql/provision.sql
         env:
