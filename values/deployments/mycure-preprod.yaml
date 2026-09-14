@@ -32,11 +32,19 @@ global:
   # Postgres/Valkey/Minio; PVCs initialize on these passwords.
   secretPrefix: "mycure-preprod"
 
-# Least-privilege DB role split (monobase-mycure#4147) — stage 1: sync the
-# postgresql-app-roles secret (migrator/app_rw/cadence passwords, GCP keys
-# mycure-preprod-postgresql-{migrator,app-rw,cadence}-password, hex-only).
-# hapihub.roleSplit.enabled flips the workloads in the next PR.
+# Least-privilege DB role split (monobase-mycure#4147) — this (database-secrets)
+# toggle syncs the postgresql-app-roles secret (migrator/app_rw/cadence passwords,
+# GCP keys mycure-preprod-postgresql-{migrator,app-rw,cadence}-password, hex-only).
+# The workload flip (hapihub.roleSplit.enabled) is ALSO on in this file (see the
+# hapihub block below) — the split is fully LIVE here, merged via monobase-infra#421.
 roleSplit:
+  enabled: true
+
+# Medley's dedicated non-superuser DB role secret (monobase-infra#420 item 7).
+# Forwarded to the database-secrets chart so it syncs the mycure-preprod-medley-db
+# ExternalSecret (GCP key mycure-preprod-medley-db-password) that medley's scoped
+# role authenticates with. See the medley.postgresql block below.
+medleyDb:
   enabled: true
 
 # Prod parity (promoted from the original preprod canary, infra#313).
@@ -169,8 +177,10 @@ hapihub:
       # the helper-composed DATABASE_URI, host postgresql-primary -> postgresql-read.
     - name: DATABASE_READ_URI
       value: "postgres://$(POSTGRESQL_USER):$(POSTGRESQL_PASSWORD)@postgresql-read.mycure-preprod.svc.cluster.local:5432/hapihub"
-      # AUDIT_SINK_URL dropped: the Tenzir pipeline is disabled on this cluster
-      # (tenzir.enabled=false in the vanaheim infra values).
+      # NOTE: AUDIT_SINK_URL is NOT set on the API block — it is set on the
+      # worker block below (only the worker emits the audit sink). Tenzir IS
+      # enabled on this cluster now (tenzir.enabled=true in the vanaheim infra
+      # values), so the sink is live; see the worker's AUDIT_SINK_URL below.
 
   # Prod parity: HPA owns replicas (k3s bundles metrics-server, verified).
   autoscaling:
@@ -352,10 +362,21 @@ medley:
   gateway:
     enabled: true
     sectionName: https-preprod-lfh  # *.preprod.localfirsthealth.com wildcard listener → medley.preprod.localfirsthealth.com (tailnet-only)
-  # DBOS run-state + clinic-analytics: own database on the shared bitnami Postgres; DATABASE_URL is built in
-  # the chart from the in-cluster `postgresql` secret (password out of git). DBOS auto-creates the `medley` db.
+  # DBOS run-state + clinic-analytics: own `medley` database on the shared bitnami Postgres.
+  # SCOPED, NON-SUPERUSER role (monobase-infra#420 item 7): a PreSync provision Job creates a
+  # dedicated `medley` login role that OWNS the `medley` database + public schema, and the runtime
+  # DATABASE_URL is built from that role's password (mycure-preprod-medley-db secret, synced by ESO
+  # from GCP key mycure-preprod-medley-db-password) — no longer the postgres superuser DSN. DBOS
+  # creates its tables as the owning `medley` role. Password stays out of git (ESO).
   postgresql:
     enabled: true
+    provisionRole:
+      enabled: true
+    auth:
+      username: medley
+      database: medley
+      existingSecret: mycure-preprod-medley-db
+      secretKey: medley-db-password
   config:
     OLLAMA_URL: "http://host.k3d.internal:11434/v1"   # host ollama (openai-compatible /v1)
     MEDLEY_CHAT_MODEL: "qwen2.5:14b-instruct"    # legacy default (unused while MEDLEY_MODELS is set)

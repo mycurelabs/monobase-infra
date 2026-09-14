@@ -112,6 +112,22 @@ git push
 # - All synced from Git automatically
 ```
 
+> ⚠️ **`charts/argocd-bootstrap` and `values/clusters/<cluster>/argocd/bootstrap.yaml`
+> changes only take effect on RE-BOOTSTRAP — they are NOT under continuous
+> GitOps reconciliation.** These render the top-level primitives (`mise run
+> bootstrap` installs the infrastructure-root Application and the
+> `monobase-auto-discover` ApplicationSet). Nothing in-cluster watches this
+> chart, so a merge to `main`/`cluster/vanaheim` that edits the bootstrap chart
+> or a cluster's `bootstrap.yaml` (e.g. `argocd.targetRevision`, the AppSet
+> generator/excludes) **does NOT self-apply** — the live cluster keeps the
+> primitives from the last `mise run bootstrap`. Additionally the
+> ApplicationSet is **create-only** (it does not update or delete existing
+> Applications). To realise such a change you must re-run `mise run bootstrap`
+> (re-applies the root + AppSet) and, for AppSet template/values changes,
+> patch or delete the affected Applications by hand. Changes UNDER the roots
+> (`charts/argocd-infrastructure`, `values/deployments/*`, `values/clusters/*/argocd/*`
+> other than `bootstrap.yaml`) DO reconcile continuously via the roots.
+
 ## Branch Conventions (one ref per cluster)
 
 Which git ref a cluster's ArgoCD tracks is a **per-cluster invariant** — exactly
