@@ -651,7 +651,7 @@ minio-artifacts:
 # that platform.
 maestroapp:
   enabled: true
-  version: "2.1.109"
+  version: "2.1.110"
 
 # ===== EMAIL TESTING: Mailpit =====
 mailpit:
