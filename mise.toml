@@ -115,14 +115,20 @@ tmp=$(mktemp)
 # each target file exists on disk. clusterName is now `required` in the
 # velero-resources/external-dns templates, so a cluster whose infrastructure.yaml
 # forgot the clusterName line fails the render here (helm errors -> non-zero).
+render=$(mktemp)
 for dir in values/clusters/*/; do
   cluster=$(basename "$dir")
   infra="values/clusters/${cluster}/argocd/infrastructure.yaml"
   [ -f "$infra" ] || continue
+  # Render to a file so helm's exit status is checked DIRECTLY (set -e), instead
+  # of being masked by a `helm | grep || true` pipeline. A real render/template
+  # error (e.g. a missing `required` clusterName) must fail this task; only the
+  # benign "grep found zero dangling paths" case is allowed to be non-fatal.
   helm template lint charts/argocd-infrastructure -f "$infra" \\
-    --set argocd.repoURL=lint --set argocd.targetRevision=lint \\
-    | grep -oE '\\.\\./\\.\\./values/clusters/[^/]+/argocd/[A-Za-z0-9._-]+\\.yaml' >> "$tmp" || true
+    --set argocd.repoURL=lint --set argocd.targetRevision=lint > "$render"
+  grep -oE '\\.\\./\\.\\./values/clusters/[^/]+/argocd/[A-Za-z0-9._-]+\\.yaml' "$render" >> "$tmp" || true
 done
+rm -f "$render"
 sort -u "$tmp" > "${tmp}.u" && mv "${tmp}.u" "$tmp"
 missing=0
 while read -r ref; do

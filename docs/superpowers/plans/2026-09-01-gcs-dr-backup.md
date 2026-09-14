@@ -5,6 +5,7 @@
 **Goal:** Give the prod patient-file bucket `gs://mc-v4-prod.appspot.com` an automated, isolated, point-in-time-recoverable DR backup (issue [monobase-mycure#3878](https://github.com/mycurelabs/monobase-mycure/issues/3878)).
 
 **Architecture:** Two **additive** DR tiers (both built — not either/or), same defense-in-depth as PG (Spaces → niflheim → vanaheim):
+
 - **Tier 1 — cloud (STS → separate GCP org):** a Storage Transfer Service job in a **separate GCP org/project** mirrors the source bucket into a hardened backup bucket twice daily (00:00 & 12:00 PHT), with **versioning + 30-day noncurrent lifecycle + soft-delete** (rolling 30-day point-in-time). Isolated from a `mc-v4-prod` compromise, **$0 STS service fee**, fully managed, no exported creds. (Egress is *not* $0 at the default `us-central1` location — ~$6 one-time inter-region on the initial copy, ~$0/mo after; it's $0 only if `backup_location = US` multi-region — see the cost section + open item #2.) **Fast RTO, but still on Google.**
 - **Tier 2 — on-prem (GCS → niflheim → vanaheim), NEW:** the existing `onprem-backup-setup.sh` pattern gains a `--source=gcs` mode — rclone pulls the bucket from GCS (read-only SA) through an **rclone `crypt`** remote so objects land **encrypted at rest** on `hel.niflheim`, then the generic host→host mirror (#400) fans the ciphertext niflheim→vanaheim for free. **Fully off-Google** (survives total Google loss / billing termination / org-wide compromise). Costs GCS egress on the pull; on-prem storage is ~free. Verified end-to-end on the same niflheim (backup) + vanaheim (dev) boxes #400 was proven on.
 
@@ -38,6 +39,7 @@
 | `docs/operations/GCS_DR_BACKUP.md` | Operational runbook: manual run, backup verification, restore drill, cost, incident recovery. |
 
 **Human prerequisites (NOT tofu-managed — need org/billing/IAM-admin rights):**
+
 - **P1.** A **separate GCP org + billing account** exists (or a new project under a separate billing account if standing up a full org is too heavy — note the weaker isolation). Needs Cloud Identity super-admin (org) + billing account creator. → **biz/owner action.**
 - **P2.** A **backup project** exists in that org (e.g. `mycure-dr-backup`), billing linked, `storagetransfer.googleapis.com` + `storage.googleapis.com` + `pubsub.googleapis.com` APIs enabled (`pubsub.googleapis.com` is required for the Task 4.5 alert topic — `google_pubsub_topic.sts_alerts` fails at apply on a fresh project without it).
 - **P3.** The tofu operator has creds (ADC / `GOOGLE_APPLICATION_CREDENTIALS`) with: `roles/storage.admin` (+ `roles/storagetransfer.admin`) on the **backup project**. Reach into the **source bucket** `mc-v4-prod.appspot.com` is the narrow custom role `gcsDrBucketIamManager` (Task 4.8b) — `storage.buckets.{get,set}IamPolicy` only, enough to reconcile the STS-agent grant, no object or bucket delete. The one-time bootstrap grant of that binding is a `mc-v4-prod` admin action.
@@ -47,11 +49,13 @@
 ### Task 1: Scaffold the OpenTofu root + backend + providers
 
 **Files:**
+
 - Create: `values/clusters/mycure-gcs-dr/terraform/main.tf`
 - Create: `values/clusters/mycure-gcs-dr/terraform/variables.tf`
 - Create: `values/clusters/mycure-gcs-dr/terraform/terraform.tfvars`
 
 **Interfaces:**
+
 - Consumes: DO Spaces S3-backend creds (`AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY` = Spaces key pair, from `.env.local` via mise), Google ADC.
 - Produces: initialized root usable by `mise run cluster-init mycure-gcs-dr`; two providers `google.backup` and `google.source`.
 
@@ -239,9 +243,11 @@ git commit -m "feat(dr): scaffold GCS DR backup OpenTofu root (monobase-mycure#3
 ### Task 2: Define the hardened backup bucket
 
 **Files:**
+
 - Create: `values/clusters/mycure-gcs-dr/terraform/bucket.tf`
 
 **Interfaces:**
+
 - Consumes: `var.backup_*`, `var.retention_days`, `provider google.backup`.
 - Produces: `google_storage_bucket.backup` (referenced by `main.tf`'s job + sink IAM).
 
@@ -340,6 +346,7 @@ Expected: an operation starts.
 gcloud transfer operations list --job-names=<job> --project=<backup> --format='value(metadata.status,counters.objectsCopiedToSink,counters.bytesCopiedToSink)'
 gcloud storage du -s gs://<backup_bucket>
 ```
+
 Expected: status `SUCCESS`; sink byte/object counts ≈ source (`gcloud storage du -s gs://mc-v4-prod.appspot.com`).
 
 - [ ] **Step 4: Commit the lockfile**
@@ -517,6 +524,7 @@ done
 gcloud storage buckets remove-iam-policy-binding gs://mc-v4-prod.appspot.com \
   --member="user:tubig.jlu@gmail.com" --role="roles/storage.admin"
 ```
+
 From here every tofu run + restore uses `GOOGLE_IMPERSONATE_SERVICE_ACCOUNT` (or `gcloud … --impersonate-service-account`) with an ADC that holds only `tokenCreator`. **No personal account has standing project/bucket access.**
 
 - [ ] **Step 5: Commit**
@@ -531,6 +539,7 @@ git commit -m "feat(dr): least-priv Terraform operator SA + keyless-impersonatio
 ### Task 5: Runbook (backup verification + restore drill)
 
 **Files:**
+
 - Create: `docs/operations/GCS_DR_BACKUP.md`
 
 - [ ] **Step 1: Write the runbook** with these sections (fill the `<...>` at implementation time):
@@ -638,9 +647,11 @@ git commit -m "docs(dr): GCS DR backup runbook + restore drill (monobase-mycure#
 > of truth (and adds the `RequiresMountsFor` guard + crypt-pw idempotency guard).
 
 **Files:**
+
 - Ship: `scripts/gcs-onprem-mirror.sh` (separate script — NOT a branch of `onprem-backup-setup.sh`)
 
 **Interfaces:**
+
 - Consumes: read-only GCS SA (prereq P5 below), an rclone `crypt` password (held like `KOPIA_PASSWORD`, supplied out-of-band).
 - Produces: an encrypted-at-rest mirror at `<backup-dir>/gcs/mc-v4-prod.appspot.com` on niflheim + a systemd pull timer — a backup dir shaped exactly like the Kopia mirror so **#400 stacks it unchanged**.
 
@@ -682,6 +693,7 @@ password = <obscured crypt password>    # rclone obscure; real pw escrowed offli
 - [ ] **Step 4: shellcheck + commit**
 
 Run: `shellcheck scripts/onprem-backup-setup.sh`
+
 ```bash
 git add scripts/onprem-backup-setup.sh
 git commit -m "feat(onprem-backup): --source=gcs encrypted mirror of the uploads bucket (monobase-mycure#3878)"
@@ -692,6 +704,7 @@ git commit -m "feat(onprem-backup): --source=gcs encrypted mirror of the uploads
 ### Task 7: Stack host→host (#400) + verify/restore drill on niflheim + vanaheim
 
 **Files:**
+
 - Modify: `docs/operations/GCS_DR_BACKUP.md` (add the on-prem tier + the drill)
 
 This tier is **host-side only** (both boxes are off-cluster) — no GitOps changes, same as #400. It must be **testable on the same niflheim (backup) + vanaheim (dev) setup** #400 was proven on.
@@ -699,21 +712,25 @@ This tier is **host-side only** (both boxes are off-cluster) — no GitOps chang
 - [ ] **Step 1: Fan-out is free** — the encrypted `gcs/` mirror dir is just more blobs under the backup root, so the existing `backup-mirror-setup.sh` (#400) replica on vanaheim already pulls it. Confirm it lands: `ls /mnt/hdd/backup-mirror/niflheim/.../gcs/` on vanaheim.
 
 - [ ] **Step 2: Verify encrypted-at-rest** — on niflheim, confirm files under `/mnt/storage/mycure/gcs/...` are **ciphertext** (not viewable), and that decryption needs the crypt password:
+
 ```bash
 file /mnt/storage/mycure/gcs/<obscured-name>      # not a recognizable image/pdf
 rclone --config /etc/rclone/rclone.conf ls gcs-crypt: | head   # readable only WITH the crypt remote
 ```
 
 - [ ] **Step 3: Restore drill (on the dev box, vanaheim)** — the whole point of "local = testable":
+
 ```bash
 # On vanaheim, using ONLY the replica's blobs + the crypt password (supplied at
 # restore, like Kopia): decrypt one object and checksum it against the source.
 rclone --config <cfg-with-crypt> copy gcs-crypt:<path> /tmp/restore/
 gcloud storage hash gs://mc-v4-prod.appspot.com/<path>   # compare md5/crc32c
 ```
+
 Expected: checksum matches source. Record the drill result on #3878 (mirrors #400's live-host verification + the PG restore-drill precedent [[pg-backup-restore-drill]]).
 
 - [ ] **Step 4: Document + commit** the on-prem tier section in `GCS_DR_BACKUP.md` (mechanism, crypt-password escrow, the drill above, capacity note).
+
 ```bash
 git add docs/operations/GCS_DR_BACKUP.md
 git commit -m "docs(dr): on-prem GCS tier + niflheim/vanaheim restore drill"
@@ -726,6 +743,7 @@ git commit -m "docs(dr): on-prem GCS tier + niflheim/vanaheim restore drill"
 **Spec coverage — Tier 1 (cloud):** twice-daily schedule → Task 1. 30-day retention → Task 2. Separate-org isolation → prereqs P1/P2 + separate provider. STS mechanism → Task 1 job. Runbook → Task 5. Verification/restore → Tasks 4–5. **Tier 2 (on-prem):** GCS→niflheim encrypted mirror → Task 6 (`--source=gcs` + rclone crypt); host→host fan-out + local restore drill on niflheim/vanaheim → Task 7. ✅
 
 **Open items for biz/owner decision (issue #3878):**
+
 1. Approve standing up a **separate GCP org + billing account** (P1) — the isolation Tier 1 depends on. Lighter fallback = new project under a separate billing account (weaker: shares org-level admins).
 2. `backup_location`: `us-central1` regional Nearline (cheapest storage, small delta egress) **vs** `US` multi-region Nearline ($0 egress, ~1.5× storage). Decide against measured bucket size.
 3. Confirm "6hrs interval" in the issue really means twice-daily (00:00/12:00) — plan uses 12h; switch `repeat_interval` to `21600s` for true 6h if they want tighter RPO.

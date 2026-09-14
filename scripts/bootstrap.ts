@@ -96,6 +96,10 @@ class Bootstrap {
     }
 
     await this.validatePrerequisites();
+    // Validate cluster identity + referenced cluster paths BEFORE any mutation
+    // (GitHub App secret storage, ArgoCD install, bootstrap apply). An incomplete
+    // --bootstrap-values override must fail here, not after Argo CD is installed.
+    await this.validateBootstrapValues();
     await this.selectContext();
     await this.setupGithubApp();
     
@@ -496,6 +500,71 @@ spec:
       `The argocd-bootstrap chart default clusterName is the generic "aws-main" ` +
       `reference — bootstrapping without a per-cluster file would seed the infra ` +
       `root + ApplicationSet at a non-existent cluster path.`
+    );
+  }
+
+  // Fail-fast validation of the resolved argocd-bootstrap values file. MUST run
+  // BEFORE any cluster mutation (ArgoCD install / bootstrap apply) so an
+  // incomplete --bootstrap-values override can never seed the infra root +
+  // ApplicationSet at the generic `aws-main` chart default. Asserts:
+  //   1. argocd.clusterName is present and NOT the generic `aws-main` reference.
+  //   2. The cluster paths the argocd-bootstrap chart resolves from clusterName
+  //      exist on disk (values/clusters/<clusterName>/argocd/{bootstrap,infrastructure}.yaml).
+  async validateBootstrapValues() {
+    const valuesPath = await this.resolveBootstrapValues();
+
+    if (!(await Bun.file(valuesPath).exists())) {
+      throw new Error(`Bootstrap values file not found: ${valuesPath}`);
+    }
+
+    let parsed: any;
+    try {
+      parsed = Bun.YAML.parse(await Bun.file(valuesPath).text());
+    } catch (error) {
+      throw new Error(
+        `Bootstrap values file ${valuesPath} is not valid YAML: ` +
+        `${error instanceof Error ? error.message : error}`
+      );
+    }
+
+    const clusterName: unknown = parsed?.argocd?.clusterName;
+    if (typeof clusterName !== 'string' || clusterName.trim() === '') {
+      throw new Error(
+        `Bootstrap values file ${valuesPath} is missing argocd.clusterName. ` +
+        `Without it the argocd-bootstrap chart falls back to the generic ` +
+        `"aws-main" default and seeds the infra root + ApplicationSet at a ` +
+        `non-existent cluster path. Set argocd.clusterName to the real cluster.`
+      );
+    }
+    if (clusterName === 'aws-main') {
+      throw new Error(
+        `Bootstrap values file ${valuesPath} sets the generic reference ` +
+        `argocd.clusterName: "aws-main". That is the chart's placeholder default, ` +
+        `not a real cluster in this repo — set it to the target cluster (e.g. ` +
+        `mycure-doks-main) so the roots point at an existing values/clusters/<x>/ dir.`
+      );
+    }
+
+    // The infra root template resolves ../../values/clusters/<clusterName>/argocd/
+    // infrastructure.yaml; the convention bootstrap file lives alongside it.
+    // Both must exist or the seeded Applications hit a silent ComparisonError.
+    const referenced = [
+      `values/clusters/${clusterName}/argocd/bootstrap.yaml`,
+      `values/clusters/${clusterName}/argocd/infrastructure.yaml`,
+    ];
+    for (const ref of referenced) {
+      if (!(await Bun.file(ref).exists())) {
+        throw new Error(
+          `Bootstrap values file ${valuesPath} declares argocd.clusterName ` +
+          `"${clusterName}", but the referenced cluster path ${ref} does not ` +
+          `exist. Create the per-cluster values/clusters/${clusterName}/argocd/ ` +
+          `files before bootstrapping, or correct argocd.clusterName.`
+        );
+      }
+    }
+
+    console.log(
+      chalk.green(`✓ Bootstrap values validated (cluster: ${clusterName}, file: ${valuesPath})`)
     );
   }
 

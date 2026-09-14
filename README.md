@@ -51,8 +51,10 @@ Everything is GitOps — push to `main` and ArgoCD syncs:
    `mise run bootstrap -- --cluster-name <cluster>` (e.g. `mycure-doks-main`) —
    installs ArgoCD and the root apps; everything else flows from Git. The
    `--cluster-name` loads `values/clusters/<cluster>/argocd/bootstrap.yaml`; a
-   bare `mise run bootstrap` falls back to the generic `aws-main` chart default
-   and mis-seeds the roots at a non-existent cluster path.
+   bare `mise run bootstrap` defaults `--cluster-name` to `mycure-doks-main`
+   (seeds DOKS prod), so always pass `--cluster-name` for any other cluster.
+   Bootstrap validates the resolved values (real, non-generic `argocd.clusterName`
+   + existing cluster paths) and aborts before touching the cluster if incomplete.
 
 Direct `kubectl` changes are reverted by ArgoCD self-heal.
 
@@ -76,29 +78,29 @@ Domains: `*.mycureapp.com`, `*.localfirsthealth.com`, `*.stg.localfirsthealth.co
 
 Index: [docs/README.md](docs/README.md)
 
-- [System Architecture](docs/architecture/ARCHITECTURE.md)
-- [GitOps with ArgoCD](docs/architecture/GITOPS-ARGOCD.md)
-- [Gateway API](docs/architecture/GATEWAY-API.md) — NGINX Gateway Fabric, HTTPRoutes
-- [Multi-Domain Gateway](docs/architecture/MULTI-DOMAIN-GATEWAY.md)
-- [Cluster Provisioning](docs/getting-started/CLUSTER-PROVISIONING.md)
-- [Client Onboarding](docs/getting-started/CLIENT-ONBOARDING.md)
-- [Backup & DR](docs/operations/BACKUP_DR.md) · [DR Runbooks](docs/operations/DISASTER_RECOVERY_RUNBOOKS.md)
-- [Scaling Guide](docs/operations/SCALING-GUIDE.md) · [Troubleshooting](docs/operations/TROUBLESHOOTING.md)
-- [Security Hardening](docs/security/SECURITY-HARDENING.md) · [Compliance](docs/security/SECURITY_COMPLIANCE.md) (HIPAA, SOC2, GDPR)
++ [System Architecture](docs/architecture/ARCHITECTURE.md)
++ [GitOps with ArgoCD](docs/architecture/GITOPS-ARGOCD.md)
++ [Gateway API](docs/architecture/GATEWAY-API.md) — NGINX Gateway Fabric, HTTPRoutes
++ [Multi-Domain Gateway](docs/architecture/MULTI-DOMAIN-GATEWAY.md)
++ [Cluster Provisioning](docs/getting-started/CLUSTER-PROVISIONING.md)
++ [Client Onboarding](docs/getting-started/CLIENT-ONBOARDING.md)
++ [Backup & DR](docs/operations/BACKUP_DR.md) · [DR Runbooks](docs/operations/DISASTER_RECOVERY_RUNBOOKS.md)
++ [Scaling Guide](docs/operations/SCALING-GUIDE.md) · [Troubleshooting](docs/operations/TROUBLESHOOTING.md)
++ [Security Hardening](docs/security/SECURITY-HARDENING.md) · [Compliance](docs/security/SECURITY_COMPLIANCE.md) (HIPAA, SOC2, GDPR)
 
 ## Security & Compliance
 
-- NetworkPolicies — default-deny, allow-specific (see `charts/security-baseline`)
-- Pod Security Standards — restricted profile enforced per namespace
-- TLS everywhere via cert-manager; secrets only via External Secrets + GCP SM
-- Internal-by-default ingress — routes land on the tailnet gateway unless a
++ NetworkPolicies — default-deny, allow-specific (see `charts/security-baseline`)
++ Pod Security Standards — restricted profile enforced per namespace
++ TLS everywhere via cert-manager; secrets only via External Secrets + GCP SM
++ Internal-by-default ingress — routes land on the tailnet gateway unless a
   deployment explicitly opts into the public gateway
 
 ## Conventions
 
-- Namespaces: `{client}-{environment}` (e.g. `mycure-production`)
-- Deployment files: `values/deployments/{client}-{environment}.yaml`
-- Node pools (DOKS): `prod-db`, `prod-apps`, `infra`, `nonprod` — tainted
++ Namespaces: `{client}-{environment}` (e.g. `mycure-production`)
++ Deployment files: `values/deployments/{client}-{environment}.yaml`
++ Node pools (DOKS): `prod-db`, `prod-apps`, `infra`, `nonprod` — tainted
   `node-pool=<name>:NoSchedule` except `nonprod` (see [Scaling Guide](docs/operations/SCALING-GUIDE.md))
-- Conventional commits: `feat:`, `fix:`, `chore:`, `docs:`, `refactor:`
-- See [CONTRIBUTING.md](CONTRIBUTING.md)
++ Conventional commits: `feat:`, `fix:`, `chore:`, `docs:`, `refactor:`
++ See [CONTRIBUTING.md](CONTRIBUTING.md)

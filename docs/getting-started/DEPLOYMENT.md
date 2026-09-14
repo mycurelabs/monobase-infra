@@ -81,7 +81,9 @@ workloads) straight from the repo.
 # Select the target kubectl context first (bootstrap.ts always uses the current
 # context), then pass --cluster-name so it loads the per-cluster bootstrap values
 # (values/clusters/<cluster>/argocd/bootstrap.yaml). A bare `mise run bootstrap`
-# falls back to the generic `aws-main` chart default and mis-seeds the roots.
+# defaults --cluster-name to mycure-doks-main (seeds DOKS prod) — always pass
+# --cluster-name for any other cluster. Bootstrap validates the resolved values
+# (real, non-generic argocd.clusterName + existing paths) before touching the cluster.
 kubectl config use-context <your-context>
 mise run bootstrap -- --cluster-name <cluster>   # e.g. mycure-doks-main
 ```
