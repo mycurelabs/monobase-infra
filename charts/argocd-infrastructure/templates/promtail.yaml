@@ -1,4 +1,4 @@
-{{- if .Values.loki.enabled }}
+{{- if (.Values.loki | default dict).enabled }}
 # ArgoCD Application: Promtail — per-node log collector shipping to Loki.
 # Sync Wave 1 - after the monitoring stack (wave 0).
 apiVersion: argoproj.io/v1alpha1
@@ -16,7 +16,7 @@ spec:
   source:
     chart: promtail
     repoURL: https://grafana.github.io/helm-charts
-    targetRevision: {{ .Values.loki.promtail.version | default "6.16.6" }}
+    targetRevision: {{ (.Values.loki.promtail | default dict).version | default "6.16.6" }}
     helm:
       releaseName: promtail
       valuesObject:

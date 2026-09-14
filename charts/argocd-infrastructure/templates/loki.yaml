@@ -1,4 +1,4 @@
-{{- if .Values.loki.enabled }}
+{{- if (.Values.loki | default dict).enabled }}
 # ArgoCD Application: Loki — log aggregation (the platform's standard log store).
 # Sync Wave 1 - after the monitoring stack (wave 0).
 apiVersion: argoproj.io/v1alpha1
@@ -74,13 +74,28 @@ spec:
           limits_config:
             retention_period: {{ .Values.loki.retention | default "30d" }}
             max_query_lookback: {{ .Values.loki.retention | default "30d" }}
-            ingestion_rate_mb: 10
-            ingestion_burst_size_mb: 20
+            # Rate cap doubles as a disk-footprint bound. The persistence volume
+            # is local-path (chunks: {{ .Values.loki.storageSize | default "50Gi" }}) which does NOT enforce its
+            # size — on vanaheim it's carved from the SAME host disk as the
+            # preprod + staging Postgres, so an unbounded log burst could fill
+            # the shared disk and take PG down. ingestionRateMb (default 4MB/s)
+            # × retention is the worst-case chunk footprint the compactor prunes
+            # back to; vanaheim sets both low. Tune loki.ingestionRateMb /
+            # loki.retention in the cluster values, never the code default up.
+            ingestion_rate_mb: {{ .Values.loki.ingestionRateMb | default 4 }}
+            ingestion_burst_size_mb: {{ .Values.loki.ingestionBurstMb | default 8 }}
+            per_stream_rate_limit: {{ .Values.loki.perStreamRateLimit | default "2MB" | quote }}
+            per_stream_rate_limit_burst: {{ .Values.loki.perStreamRateLimitBurst | default "6MB" | quote }}
             max_streams_per_user: 10000
           compactor:
             working_directory: /var/loki/compactor
             retention_enabled: true
             delete_request_store: filesystem
+            # Compact + apply retention aggressively so deleted chunks free disk
+            # quickly (default delete_delay is 2h) — a shared-volume safety valve.
+            compaction_interval: {{ .Values.loki.compactionInterval | default "10m" }}
+            retention_delete_delay: {{ .Values.loki.retentionDeleteDelay | default "1h" }}
+            retention_delete_worker_count: 50
           commonConfig:
             replication_factor: 1
 
@@ -101,6 +116,25 @@ spec:
             enabled: false
           lokiCanary:
             enabled: false
+
+        # Sidecar rules OFF. The chart default (sidecar.rules.enabled: true)
+        # creates `loki-clusterrole` with cluster-wide get/list/watch on
+        # Secrets/ConfigMaps and binds it to the loki ServiceAccount — a
+        # standing cluster-wide Secret-read grant on an unauthenticated log
+        # store. We ship no rules via ConfigMaps, so disabling it drops the
+        # ClusterRole to `rules: []`. (SECURITY_ROADMAP: least privilege.)
+        sidecar:
+          rules:
+            enabled: false
+
+        # Caches OFF — memcached is memory-hungry (chunks-cache defaults to
+        # ~9.6Gi, results-cache ~1Gi) and the vanaheim host can't spare ~11Gi
+        # for a single-binary preprod log store. SingleBinary reads straight
+        # from the filesystem store; a cache in front is pure overhead here.
+        chunksCache:
+          enabled: false
+        resultsCache:
+          enabled: false
 
   destination:
     server: https://kubernetes.default.svc

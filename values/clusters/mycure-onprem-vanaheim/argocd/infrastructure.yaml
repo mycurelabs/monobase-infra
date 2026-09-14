@@ -307,7 +307,15 @@ loki:
   enabled: true
   version: "6.24.0"
   storageSize: "20Gi"   # vanaheim is a small k3d cluster
-  retention: "14d"
+  # Retention is TIME-based; the levers below add a SIZE bound so a log burst
+  # can't fill the local-path volume shared with the preprod+staging Postgres.
+  # Worst case ≈ ingestionRateMb × retention. At 2MB/s × 7d that is well inside
+  # 20Gi even before compaction, and real preprod log volume is far lower.
+  retention: "7d"          # was 14d — halved; preprod logs are disposable
+  ingestionRateMb: 2       # 2MB/s cap (was code-default 10) — this k3d host is small
+  ingestionBurstMb: 4
+  perStreamRateLimit: "1MB"
+  perStreamRateLimitBurst: "3MB"
   promtail:
     version: "6.16.6"
 
@@ -323,9 +331,10 @@ tailscaleOperator:
 # Tenzir security detection pipeline — ENABLED on preprod to re-test the #357/#359a/#360
 # rollout end-to-end before prod (PR monobase-infra#428). Ingests mycure-preprod's
 # hapihub-worker audit sink over HTTP, runs the detections, routes findings to
-# Alertmanager. geoip stays OFF: the geo signals (unusual_country/impossible_travel)
-# are prod-meaningful only — preprod clients are tailnet (100.x), not geolocatable,
-# and there's no MaxMind key here. Mirrors the doks-main tenzir block.
+# Alertmanager. geoip is ENABLED here too (see the geoip block below) so the geo
+# enrichment (infra#358) itself is exercised — organic tailnet (100.x) traffic
+# geolocates to null, so the geo signals are driven by injected synthetic
+# public-IP auth events. Mirrors the doks-main tenzir block.
 tenzir:
   enabled: true
   # geoip ENABLED on preprod to TEST the geoip enrichment (infra#358) on this

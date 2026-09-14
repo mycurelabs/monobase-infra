@@ -17,3 +17,12 @@
 infra:
   nodeSelector: {}
   tolerations: []
+
+# Loki + promtail log stack. OFF by default — only vanaheim enables it (DOKS
+# ships logs elsewhere). Kept here so charts/argocd-infrastructure renders on a
+# cluster whose values omit `loki:` entirely (DOKS): the loki.yaml/promtail.yaml
+# templates guard on this key, so without a default they'd nil-pointer.
+loki:
+  enabled: false
+  promtail:
+    enabled: false
