@@ -24,8 +24,19 @@ spec:
     jsonPointers:
     - /secrets
     - /imagePullSecrets
+  # ConfigMap `.data` ignore is NAME-SCOPED to `minio-artifacts` (the Bitnami
+  # chart's main config ConfigMap) and deliberately EXCLUDES
+  # `minio-artifacts-provisioning`. The provisioning ConfigMap carries the
+  # promoter/publisher policy + user definitions (mono#4095): if its `.data`
+  # were ignored, every sync with RespectIgnoreDifferences=true copies the live
+  # `.data` back into target, so the app never goes OutOfSync, auto-sync never
+  # fires, the provisioning PostSync hook never re-runs, and the promoter user +
+  # publisher Deny are never created. Comparing its `.data` lets a policy change
+  # flip the app OutOfSync → sync → re-run provisioning. The main config
+  # ConfigMap still needs the ignore (MinIO mutates it at runtime).
   - group: ""
     kind: ConfigMap
+    name: minio-artifacts
     jqPathExpressions:
     - .data
 

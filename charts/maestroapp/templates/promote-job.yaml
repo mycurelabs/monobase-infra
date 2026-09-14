@@ -12,6 +12,15 @@ metadata:
   labels:
     app.kubernetes.io/name: maestroapp-promote
     app.kubernetes.io/component: fleet-promotion
+  annotations:
+    # A Job's pod template is immutable. The version is in the Job name, so a
+    # PIN bump renders a new Job (no conflict). But any OTHER spec change (image
+    # bump, hardening tweak) at an UNCHANGED pin would leave the app in
+    # SyncError — ArgoCD can't patch an immutable Job in place. Force+Replace
+    # makes ArgoCD delete-and-recreate the Job on such a change. Harmless at
+    # steady state (identical spec → nothing to replace) and the script is
+    # idempotent, so a recreate re-runs a no-op reconcile.
+    argocd.argoproj.io/sync-options: Force=true,Replace=true
 spec:
   backoffLimit: 2
   template:
@@ -20,21 +29,45 @@ spec:
         app.kubernetes.io/name: maestroapp-promote
     spec:
       restartPolicy: Never
+      # The Job talks only to the in-cluster store with creds from a mounted
+      # secret env — it never calls the k8s API, so drop its SA token.
+      automountServiceAccountToken: false
       # Restricted-PSS compliant (preprod/prod namespaces enforce it). The
       # bitnami minio image runs as 1001; MC_CONFIG_DIR=/tmp keeps mc happy
-      # without a writable HOME.
+      # without a writable HOME (readOnlyRootFilesystem + emptyDir /tmp below).
       securityContext:
         runAsNonRoot: true
         runAsUser: 1001
         seccompProfile:
           type: RuntimeDefault
+      {{- if .Values.global.nodePool }}
+      # Land on the environment's app pool, not the default nonprod nodes
+      # (prod pools are tainted node-pool=<name>:NoSchedule).
+      nodeSelector:
+        node-pool: {{ .Values.global.nodePool }}
+      tolerations:
+        - key: "node-pool"
+          operator: "Equal"
+          value: {{ .Values.global.nodePool | quote }}
+          effect: "NoSchedule"
+      {{- end }}
+      volumes:
+        - name: tmp
+          emptyDir: {}
       containers:
         - name: promote
+          # Registry-qualified: a bare `bitnamilegacy/minio` fails the
+          # restrict-registries admission allowlist (docker.io/ required).
           image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
           securityContext:
+            runAsNonRoot: true
+            readOnlyRootFilesystem: true
             allowPrivilegeEscalation: false
             capabilities:
               drop: [ALL]
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
           command: [sh, -ec]
           args:
             - |

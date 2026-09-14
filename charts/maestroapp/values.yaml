@@ -2,15 +2,24 @@
 # artifacts + an immutable v<version>/latest.json per platform but never
 # touches the platform-root latest.json — bumping this value re-renders the
 # promote Job (version is in its name), which copies v<version>/latest.json →
-# latest.json per platform and verifies the store serves it. Rollback = revert
-# the bump commit. The pinned version must already be published for every
-# platform or the Job fails loudly (ArgoCD app Degraded), promoting nothing
-# for the missing platform.
+# latest.json per platform and verifies the store serves it. The pinned version
+# must already be published for every platform or the Job fails loudly (ArgoCD
+# app Degraded), promoting nothing for the missing platform.
+#
+# ROLLBACK: a pin bump is a fleet-wide rollout, and reverting the bump only
+# HALTS an in-flight one — it does NOT downgrade boxes. Auto-updaters never move
+# a box to a LOWER version, only the publisher's newest-5 window + the live pin
+# survive on the store, and only v<pin> has a versioned manifest to promote. So
+# a revert stops NEW boxes from picking up the bumped pin (root latest.json goes
+# back to the prior version); boxes already updated stay put. Genuine downgrade
+# = publish + pin an older version that's still within the retained window.
 version: ""
 
-# Same image the artifacts store runs — it ships `mc`, which is all the Job needs.
+# Same image the artifacts store runs — it ships `mc`, which is all the Job
+# needs. Registry-qualified (docker.io/): a bare `bitnamilegacy/minio` fails the
+# cluster's restrict-registries admission allowlist.
 image:
-  repository: bitnamilegacy/minio
+  repository: docker.io/bitnamilegacy/minio
   tag: "2025.7.23-debian-12-r3"
 
 store:
