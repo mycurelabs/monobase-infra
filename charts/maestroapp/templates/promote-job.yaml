@@ -2,11 +2,24 @@
 # bump renders a NEW Job (ArgoCD prunes the old one and runs this) while an
 # unchanged pin stays Synced with the completed Job. No ttlSecondsAfterFinished
 # on purpose: TTL-deleting a completed Job makes ArgoCD see it OutOfSync and
-# re-run it forever. The script is idempotent and ATOMIC: it validates every
-# platform's v<PIN> manifest BEFORE writing any root pointer (all-or-nothing,
-# never a partial fleet promotion) and re-asserts the pin over any drifted root
-# pointer on each run — so selfHeal / Force+Replace re-creations reconcile drift
-# and are harmless no-ops at steady state.
+# re-run it forever.
+#
+# The script (charts/maestroapp/templates/_helpers.tpl → maestroapp.promoteScript,
+# shared verbatim with the optional periodic reconcile CronJob) is an
+# eventually-consistent RECONCILE, NOT an atomic commit — three independent S3
+# object copies cannot flip as one, so we do not claim atomicity. Instead it
+# STRUCTURALLY validates every platform's v<PIN> manifest with jq BEFORE writing
+# any root pointer (never a half-fleet promotion on a bad pin), then reconciles
+# each platform-root to the pinned bytes by CONTENT HASH (fixes same-version
+# content drift too), and on a mid-phase copy failure finishes the rest and
+# exits non-zero so the next run self-heals the stragglers. selfHeal /
+# Force+Replace re-creations are harmless no-ops at steady state.
+#
+# This Job is the EVENT-driven trigger (fires on a pin bump / re-sync). A
+# COMPLETED Job does not observe drift that happens afterward — that gap is
+# covered by the values-gated reconcile CronJob (reconcile.schedule), which
+# re-asserts the same script on a schedule. ArgoCD's periodic app sync
+# (Force+Replace) is a secondary re-trigger of this Job.
 {{- $ver := .Values.version | required "maestroapp.version is required (the pinned fleet version)" }}
 apiVersion: batch/v1
 kind: Job
@@ -38,148 +51,4 @@ spec:
       labels:
         app.kubernetes.io/name: maestroapp-promote
     spec:
-      restartPolicy: Never
-      # The Job talks only to the in-cluster store with creds from a mounted
-      # secret env — it never calls the k8s API, so drop its SA token.
-      automountServiceAccountToken: false
-      # Restricted-PSS compliant (preprod/prod namespaces enforce it). The
-      # bitnami minio image runs as 1001; MC_CONFIG_DIR=/tmp keeps mc happy
-      # without a writable HOME (readOnlyRootFilesystem + emptyDir /tmp below).
-      securityContext:
-        runAsNonRoot: true
-        runAsUser: 1001
-        seccompProfile:
-          type: RuntimeDefault
-      {{- if .Values.global.nodePool }}
-      # Land on the environment's app pool, not the default nonprod nodes
-      # (prod pools are tainted node-pool=<name>:NoSchedule).
-      nodeSelector:
-        node-pool: {{ .Values.global.nodePool }}
-      tolerations:
-        - key: "node-pool"
-          operator: "Equal"
-          value: {{ .Values.global.nodePool | quote }}
-          effect: "NoSchedule"
-      {{- end }}
-      volumes:
-        - name: tmp
-          emptyDir: {}
-      containers:
-        - name: promote
-          # Registry-qualified: a bare `bitnamilegacy/minio` fails the
-          # restrict-registries admission allowlist (docker.io/ required).
-          image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
-          securityContext:
-            runAsNonRoot: true
-            readOnlyRootFilesystem: true
-            allowPrivilegeEscalation: false
-            capabilities:
-              drop: [ALL]
-          volumeMounts:
-            - name: tmp
-              mountPath: /tmp
-          command: [sh, -ec]
-          args:
-            - |
-              export MC_CONFIG_DIR=/tmp/.mc
-              # First-sync ordering race: the minio provisioning hook
-              # (post-install/upgrade) creates the artifacts-promoter user, but
-              # this Job is sync-wave 3 and the parent app can read minio-artifacts'
-              # STALE Healthy status and reach wave 3 before the hook finishes. A
-              # bare `mc alias set` would then hard-fail, exhaust backoffLimit, and
-              # leave a Failed Job that selfHeal won't re-run (manifest unchanged).
-              # Retry auth for ~5min so the user has time to appear; a genuinely
-              # bad credential still fails loudly after the ceiling.
-              n=0
-              until mc alias set store "$STORE_ENDPOINT" "$STORE_USER" "$STORE_PASSWORD" >/dev/null 2>&1; do
-                n=$((n+1))
-                if [ "$n" -ge 30 ]; then
-                  echo "ERROR: store auth failed after $n attempts (promoter user not provisioned yet?)"; exit 1
-                fi
-                echo "waiting for store auth (attempt $n)…"; sleep 10
-              done
-              # ATOMIC (all-or-nothing) two-phase promotion. The old design
-              # checked+copied each platform before checking the next, and
-              # validated content AFTER publishing — so a missing Darwin
-              # manifest could leave Linux/Windows root pointers already moved
-              # before the Job failed (a partial fleet promotion). Instead:
-              #
-              #   Phase A — validate EVERY required platform's v<PIN>/latest.json
-              #     (existence + the manifest's own "version" field == PIN).
-              #     No root pointer is written in this phase. If ANY platform is
-              #     missing/invalid we retry the whole validation (bounded) so a
-              #     transient partial-release recovers without manual Job
-              #     deletion; on exhaustion we exit non-zero having written
-              #     NOTHING.
-              #   Phase B — only once ALL platforms validate, copy each
-              #     v<PIN>/latest.json over its platform-root latest.json. The
-              #     first write happens only after full validation, so the store
-              #     is never left half-promoted on a bad pin.
-              #
-              # Idempotent DRIFT RECONCILE: a platform whose root already serves
-              # PIN is still re-asserted from the validated v<PIN> manifest on
-              # every run, so a drifted root pointer is pulled back to the pin
-              # (steady state = a cheap no-op re-copy).
-              #
-              # ~5min bounded (30 * 10s) mirrors the auth-retry ceiling.
-              vattempt=0
-              while :; do
-                missing=""
-                for dir in $PLATFORMS; do
-                  base="store/$BUCKET/maestroapp/desktop/$dir"
-                  src="$base/v$PIN/latest.json"
-                  if ! mc stat "$src" >/dev/null 2>&1; then
-                    echo "! $dir: v$PIN/latest.json not published"; missing="$missing $dir"; continue
-                  fi
-                  mver=$(mc cat "$src" 2>/dev/null \
-                    | sed -n 's/.*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -n1) || true
-                  if [ "$mver" != "$PIN" ]; then
-                    echo "! $dir: v$PIN/latest.json invalid (manifest version='$mver', want $PIN)"; missing="$missing $dir"; continue
-                  fi
-                  echo "validated $dir v$PIN"
-                done
-                [ -z "$missing" ] && break
-                vattempt=$((vattempt+1))
-                if [ "$vattempt" -ge 30 ]; then
-                  echo "ERROR: v$PIN not fully published after $vattempt attempts — missing/invalid:$missing (typo'd pin or partial release); NO root pointer written"; exit 1
-                fi
-                echo "waiting for v$PIN artifacts (attempt $vattempt) — missing:$missing"; sleep 10
-              done
-              # Phase B — every platform validated; safe to write root pointers.
-              for dir in $PLATFORMS; do
-                base="store/$BUCKET/maestroapp/desktop/$dir"
-                cur=$(mc cat "$base/latest.json" 2>/dev/null \
-                  | sed -n 's/.*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -n1) || true
-                if [ "$cur" = "$PIN" ]; then echo "= $dir already serves v$PIN"; continue; fi
-                mc cp "$base/v$PIN/latest.json" "$base/latest.json"
-                new=$(mc cat "$base/latest.json" \
-                  | sed -n 's/.*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -n1)
-                if [ "$new" != "$PIN" ]; then
-                  echo "ERROR: $dir promoted but store serves '$new' (want $PIN)"; exit 1
-                fi
-                echo "OK: $dir promoted to v$PIN"
-              done
-              echo "fleet pin v$PIN reconciled"
-          env:
-            - name: PIN
-              value: {{ $ver | quote }}
-            - name: PLATFORMS
-              value: {{ join " " .Values.platforms | quote }}
-            - name: STORE_ENDPOINT
-              value: {{ .Values.store.endpoint | quote }}
-            - name: BUCKET
-              value: {{ .Values.store.bucket | quote }}
-            - name: STORE_USER
-              value: {{ .Values.store.username | quote }}
-            - name: STORE_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: {{ .Values.store.existingSecret }}
-                  key: {{ .Values.store.existingSecretPasswordKey }}
-          resources:
-            requests:
-              cpu: 10m
-              memory: 32Mi
-            limits:
-              cpu: 100m
-              memory: 64Mi
+      {{- include "maestroapp.promotePodSpec" . | nindent 6 }}

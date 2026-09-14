@@ -1,0 +1,42 @@
+{{- if .Values.reconcile.enabled }}
+# Post-completion drift guard (mono#4095, PR #417 review round 3, item 4).
+#
+# The event-driven promote Job reconciles only when a pin bump / re-sync re-runs
+# it. A COMPLETED Job never observes drift that happens AFTERWARD (an old root
+# re-copied out of band, a rotted manifest). This CronJob re-asserts the SAME
+# reconcile script (maestroapp.promoteScript) on a schedule, so any drift is
+# corrected within one interval without waiting for the next pin bump. It is a
+# lazy self-healing FLOOR — not a substitute for the event-driven Job, which
+# still gives the fast path on an intentional bump.
+#
+# Justification for CronJob over "rely on ArgoCD periodic sync + Force/Replace":
+# ArgoCD's app sync only re-runs the Job when it decides to re-create it, on the
+# app's sync interval and only under Force+Replace; it also churns the Job object
+# each time and its cadence is an app-wide setting, not a per-pin knob. A tiny
+# dedicated CronJob makes the drift-correction interval explicit and independent,
+# runs the exact same idempotent script, and is trivially values-gated off where
+# it isn't wanted. concurrencyPolicy=Forbid + successful-history=1 keep it cheap.
+{{- $ver := .Values.version | required "maestroapp.version is required (the pinned fleet version)" }}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: maestroapp-reconcile
+  labels:
+    app.kubernetes.io/name: maestroapp-reconcile
+    app.kubernetes.io/component: fleet-promotion
+spec:
+  schedule: {{ .Values.reconcile.schedule | quote }}
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 120
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: maestroapp-reconcile
+        spec:
+          {{- include "maestroapp.promotePodSpec" . | nindent 10 }}
+{{- end }}

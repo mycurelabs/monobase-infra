@@ -41,3 +41,16 @@ platforms:
   - linux_x86_64
   - darwin_aarch64
   - windows_x86_64
+
+# Post-completion drift guard. The event-driven promote Job only reconciles when
+# a pin bump / re-sync re-runs it; a COMPLETED Job never observes drift that
+# happens AFTERWARD (someone re-copies an old root, a manifest rots). This
+# optional CronJob re-asserts the SAME reconcile script (maestroapp.promoteScript)
+# on a schedule so any drift is corrected within one interval. Disabled by
+# default — event-driven Job + ArgoCD's periodic Force+Replace sync suffice for
+# most envs; enable per environment where a self-healing floor matters (prod).
+# concurrencyPolicy=Forbid + the idempotent script make overlapping/backed-up
+# runs safe no-ops at steady state.
+reconcile:
+  enabled: false
+  schedule: "*/30 * * * *"
