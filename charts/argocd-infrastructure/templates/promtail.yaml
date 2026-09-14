@@ -64,9 +64,16 @@ spec:
               - ALL
           readOnlyRootFilesystem: true
 
-        # NO tolerations — nonprod-only by design (see the SCOPE note above).
-        # The old master/control-plane tolerations were inert on DOKS (managed
-        # worker nodes carry no such taint) and were removed.
+        # NONPROD-ONLY, enforced by BOTH mechanisms (see the SCOPE note above):
+        #   1. nodeSelector pins pods to the untainted nonprod pool. This is the
+        #      durable positive boundary — empty tolerations alone are not, since
+        #      a newly untainted node or a changed prod taint could otherwise let
+        #      this privileged host-log collector land on a PROD node and ship
+        #      PHI-bearing logs to Loki (auth_enabled:false).
+        #   2. NO tolerations — the old master/control-plane tolerations were
+        #      inert on DOKS (managed worker nodes carry no such taint), removed.
+        nodeSelector:
+          node-pool: nonprod
         tolerations: []
 
         serviceMonitor:
