@@ -99,15 +99,21 @@ spec:
             # `ingestion_rate_mb` is a hard reject (429) — it bounds bytes/sec
             # ADMITTED regardless of how much promtail pushes — and the compactor
             # deletes everything past `retention_period`. Together they give a
-            # provable upper bound the operator sizes UNDER the volume. Pick
-            # loki.retention / loki.ingestionRateMb in each cluster's values so
-            # rate x retention (with the ~5-10x tsdb chunk compression as margin)
-            # stays well below loki.storageSize; NEVER raise the code default up.
-            #   e.g. vanaheim: 2 MiB/s x 7d ~= 1.18 TiB RAW, but real preprod
-            #   ingest is a tiny fraction of the cap and chunks compress ~10x, so
-            #   steady-state sits in low single-digit GiB inside the 20Gi vol; a
-            #   sustained pathological burst is throttled at 2 MiB/s (429) rather
-            #   than being allowed to fill the shared disk unbounded.
+            # provable upper bound the operator sizes UNDER the volume:
+            #
+            #   worst-case on-disk = rate_MiBps x 86400 x retention_days
+            #                        / ~10 (tsdb gzip) x 1.2 (index+WAL margin)
+            #
+            # Pick loki.retention / loki.ingestionRateMb in each cluster's values
+            # so that worst-case fits UNDER loki.storageSize WITH HEADROOM; NEVER
+            # raise the code default up.
+            #   e.g. vanaheim (20Gi vol): rate=1 MiB/s, retention=24h ->
+            #   1 x 86400 x 1 = 86400 MiB ~= 84.4 GiB raw; /10 x 1.2 ~= 10.1 GiB
+            #   worst-case on disk ~= 51% of 20Gi (~9.9 GiB headroom). A sustained
+            #   pathological push held at the 1 MiB/s cap for a whole retention
+            #   window still lands ~10 GiB — provably inside the vol, not merely
+            #   "small in practice". (At 3d retention this was ~253 GiB raw /10
+            #   ~= 25 GiB > 20Gi — did NOT fit; that's why vanaheim uses 24h.)
             # BACKSTOP alerting (where monitoring runs — DOKS): the
             # monitoring-resources storage-alerts fire PersistentVolumeFillingUp
             # (>80%) / PersistentVolumeCritical (>90%) on this PVC and
@@ -148,8 +154,67 @@ spec:
         monitoring:
           selfMonitoring:
             enabled: false
-          lokiCanary:
-            enabled: false
+
+        # loki-canary OFF. The canary is a synthetic-probe DaemonSet (one pod
+        # per node, continuously push+query round-trips against Loki) used to
+        # measure ingestion latency — pure overhead on a size-constrained
+        # single-binary preprod store. In grafana/loki 6.24.0 the EFFECTIVE key
+        # is the TOP-LEVEL `lokiCanary.enabled` (NOT `monitoring.lokiCanary.*`,
+        # which the chart no longer reads — round-2 set the dead path so the
+        # DaemonSet + its Service/ServiceAccount kept rendering). `test.enabled`
+        # must also go OFF: templates/validate.yaml `fail`s the render when the
+        # canary is disabled while the helm-test hook is enabled. Verified by
+        # rendering the chart with this valuesObject: 0 loki-canary resources.
+        lokiCanary:
+          enabled: false
+        test:
+          enabled: false
+
+        # ── NetworkPolicy: scope the UNAUTHENTICATED (auth_enabled:false) log
+        #    store so ONLY the monitoring-namespace log clients can push/query.
+        #    The chart's built-in networkPolicy.* is authored for the
+        #    read/write/backend DISTRIBUTED topology (its ingress rule selects
+        #    `component In (read,write)`), so it does NOT cover our
+        #    `component: single-binary` pod — we ship an explicit policy via
+        #    extraObjects instead. Ingress to :3100 (http push+query) and :9095
+        #    (grpc) is allowed ONLY from pods in the `monitoring` namespace
+        #    (promtail ships logs, grafana queries, loki itself) selected by the
+        #    auto-applied `kubernetes.io/metadata.name` namespace label; :7946
+        #    (memberlist) is allowed loki→loki for gossip. Everything else in the
+        #    cluster is denied — no arbitrary workload can ingest or read logs.
+        extraObjects:
+          - apiVersion: networking.k8s.io/v1
+            kind: NetworkPolicy
+            metadata:
+              name: loki-scoped-ingress
+              namespace: monitoring
+            spec:
+              podSelector:
+                matchLabels:
+                  app.kubernetes.io/name: loki
+                  app.kubernetes.io/instance: loki
+              policyTypes:
+                - Ingress
+              ingress:
+                # Log push (promtail) + query (grafana) — monitoring ns only.
+                - from:
+                    - namespaceSelector:
+                        matchLabels:
+                          kubernetes.io/metadata.name: monitoring
+                  ports:
+                    - protocol: TCP
+                      port: 3100
+                    - protocol: TCP
+                      port: 9095
+                # memberlist gossip — loki pod(s) to loki pod(s).
+                - from:
+                    - podSelector:
+                        matchLabels:
+                          app.kubernetes.io/name: loki
+                          app.kubernetes.io/instance: loki
+                  ports:
+                    - protocol: TCP
+                      port: 7946
 
         # Sidecar rules OFF. The chart default (sidecar.rules.enabled: true)
         # creates `loki-clusterrole` with cluster-wide get/list/watch on

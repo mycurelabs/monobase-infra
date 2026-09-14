@@ -306,18 +306,29 @@ monitoring:
 loki:
   enabled: true
   version: "6.24.0"
-  storageSize: "20Gi"   # vanaheim is a small k3d cluster
-  # ENFORCED disk bound (Loki 3.3.2 has NO byte cap — see loki.yaml). The bound
-  # is the server-side-enforced ingestion rate limiter × time retention, sized
-  # under the 20Gi vol. Cut HARD here because this local-path vol shares the
-  # vanaheim host disk with the preprod+staging Postgres: a runaway log stream
-  # is 429-throttled at the rate cap rather than filling that shared disk.
-  #   raw worst case = 1 MiB/s × 3d ≈ 253 GiB, but real preprod ingest is a tiny
-  #   fraction of the cap and tsdb chunks compress ~10×, so steady-state sits
-  #   sub-GiB in the 20Gi vol and even a sustained burst is metered to 1 MiB/s.
-  #   vanaheim runs no Prometheus, so k3s kubelet nodefs eviction is the only
-  #   automated backstop — which is exactly why the cap + retention are tight.
-  retention: "3d"          # preprod logs are disposable; short window bounds disk
+  storageSize: "20Gi"   # vanaheim is a small k3d cluster (local-path vol)
+  # ── ENFORCED disk bound (PROVABLY fits 20Gi) ──────────────────────────────
+  # Loki 3.3.2 has NO byte/free-space cap for the filesystem store (see
+  # loki.yaml); the only server-side ceiling is `ingestion_rate_mb` (a hard 429
+  # per tenant) × the compactor's time `retention`. This local-path vol is
+  # carved from the SAME vanaheim host disk as the preprod + staging Postgres,
+  # so the WORST-CASE ADMITTED footprint must fit UNDER 20Gi with headroom —
+  # NOT rely on "real ingest is small". Arithmetic (rate=1 MiB/s, retention=1d):
+  #
+  #   raw admitted  = 1 MiB/s × 86,400 s/d × 1 d      = 86,400 MiB ≈ 84.4 GiB/d
+  #   on-disk       = raw ÷ ~10 (tsdb chunk gzip) × 1.2 (index+WAL margin)
+  #                 = 84.4 GiB ÷ 10 × 1.2            ≈ 10.1 GiB worst-case
+  #   fit           = 10.1 GiB / 20 GiB              ≈ 51 %  → ~9.9 GiB headroom
+  #
+  # So even a SUSTAINED pathological push held at the 1 MiB/s cap for a full
+  # retention window lands ~10 GiB on disk — provably inside 20Gi. (At the old
+  # 3d retention this was 1 MiB/s × 3d ≈ 253 GiB raw ÷ 10 ≈ 25 GiB > 20Gi,
+  # i.e. it did NOT fit before index/WAL — that's why retention is cut to 24h.)
+  # Real preprod ingest is a tiny fraction of the cap, so steady-state sits
+  # sub-GiB; the bound above is the guaranteed ceiling, not the expectation.
+  # vanaheim runs no Prometheus, so k3s kubelet nodefs eviction is the only
+  # automated backstop — hence the deliberately tight cap + short retention.
+  retention: "24h"         # was 3d — 24h makes the worst-case admitted bound fit
   ingestionRateMb: 1       # 1 MiB/s sustained cap (429 above) — small shared host
   ingestionBurstMb: 2
   perStreamRateLimit: "512KB"
