@@ -640,13 +640,16 @@ signoz:
 # (see values/deployments/mycure-preprod.yaml hapihub AUDIT_SINK_*).
 tenzir:
   enabled: true
-  # geoip ENABLED (infra#358): arms 20-unusual-country + 21-impossible-travel and
-  # the geoip-city context; the init container downloads GeoLite2-City using the
-  # MaxMind license from infrastructure-tenzir-maxmind-license (infra#3744 — verified
-  # to exist in mc-v4-prod and readable by the prod ESO SA external-secrets@, which
-  # holds an unconditional project secretAccessor).
+  # geoip HELD DISABLED (infra#358): the machinery is READY — flipping this to
+  # true arms 20-unusual-country + 21-impossible-travel and the geoip-city
+  # context; the init container downloads GeoLite2-City using the MaxMind license
+  # from infrastructure-tenzir-maxmind-license (infra#3744 — verified to exist in
+  # mc-v4-prod and readable by the prod ESO SA external-secrets@, which holds an
+  # unconditional project secretAccessor). Merging this PR deploys the DISABLED
+  # machinery only — it is NOT an active geoip rollout. The real client-IP audit
+  # flow is NOT yet verified/proven in prod; do not enable until it is.
   #
-  # ⚠️ STAGED — DO NOT MERGE until ALL of:
+  # ⚠️ Keep DISABLED — do NOT set enabled: true until ALL of:
   #  (1) PR #428 is prod-live (audit-sink emitter + pipeline), AND
   #  (2) prod hapihub is on a PROVEN-ELIGIBLE release — a future hapihub version
   #      that (a) is ≥ the X-Real-IP fix, (b) carries the fail-safe audit trigger,
@@ -676,7 +679,10 @@ tenzir:
   # but if the quota is ever hit both clusters' init containers fail together
   # (fail-open → both boot no-geo). Split the key if that ever becomes a concern.
   geoip:
-    enabled: true
+    # READY but HELD — do not enable until (a) #428 emitter armed on an eligible
+    # hapihub release [NOT 11.20.124/125], and (b) real client-IP audit flow
+    # demonstrated. Merging this deploys the disabled machinery only.
+    enabled: false
 
 # Tailscale egress to the vanaheim workstation Ollama (medical-AI preprod inference)
 ollamaEgress:
