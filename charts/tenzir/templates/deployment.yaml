@@ -79,6 +79,16 @@ spec:
             # only writable emptyDir, so download+extract there, not /tmp).
             rm -rf /geoip/GeoLite2-City_*/ /geoip/geoip.tar.gz /geoip/curl.cfg /geoip/GeoLite2-City.mmdb
 
+            # secretKeyRef is optional:true, so MAXMIND_LICENSE may be UNSET if the
+            # Secret/key is absent. Under `set -u` a bare ${MAXMIND_LICENSE} would
+            # abort the script before the fail-open path runs, so guard with :- and
+            # skip the download when empty — the main container then boots the
+            # no-geo config (same fail-open outcome as a failed download).
+            if [ -z "${MAXMIND_LICENSE:-}" ]; then
+              echo "geoip-download: no MaxMind license present — failing OPEN (node boots no-geo config)"
+              exit 0
+            fi
+
             # Keep the license key out of argv AND the URL query in the process
             # table: write it into a curl -K config file (0600, in the writable
             # emptyDir) and delete it right after. --get + --data-urlencode make
@@ -88,7 +98,7 @@ spec:
             printf '%s\n' \
               'url = "https://download.maxmind.com/app/geoip_download?edition_id=GeoLite2-City&suffix=tar.gz"' \
               'get' \
-              "data-urlencode = \"license_key=${MAXMIND_LICENSE}\"" \
+              "data-urlencode = \"license_key=${MAXMIND_LICENSE:-}\"" \
               'output = "/geoip/geoip.tar.gz"' \
               'fail' 'silent' 'show-error' 'location' > /geoip/curl.cfg
 
@@ -100,9 +110,13 @@ spec:
             [ -s /geoip/GeoLite2-City.mmdb ] || fail "mmdb empty"
             echo "GeoLite2-City.mmdb ready"
         env:
+        # optional:true — if the Secret/key is absent Kubernetes still STARTS the
+        # init container (a mandatory ref would block it from starting, so the
+        # fail-open script would never run). The script guards the unset var under
+        # `set -u` and exits 0, letting the main container pick the no-geo config.
         - name: MAXMIND_LICENSE
           valueFrom:
-            secretKeyRef: { name: tenzir-maxmind-license, key: maxmind-license }
+            secretKeyRef: { name: tenzir-maxmind-license, key: maxmind-license, optional: true }
         volumeMounts:
         - { name: geoip, mountPath: /geoip }
       {{- end }}

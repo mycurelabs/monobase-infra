@@ -210,9 +210,13 @@ tenzir:
     90-route:
       name: "route: findings -> Alertmanager (Discord + email)"
       # Alertmanager v2 POST /api/v2/alerts wants a JSON *array* of alerts.
-      # Tenzir events are records and write_json emits NDJSON, so build the
-      # array body as a string (print_json + bracket-wrap) and send it raw
-      # via write_lines inside the to_http body subpipeline.
+      # The body subpipeline reshapes each finding into an alert record and
+      # encodes the whole batch with `write_json arrays_of_objects=true`, which
+      # emits ONE valid JSON array per request (all findings in a to_http batch
+      # in a single `[ {...}, {...} ]` body). The earlier approach — building a
+      # per-event `"[" + print_json(alert) + "]"` string and `write_lines` —
+      # produced ADJACENT arrays (`[{...}]\n[{...}]`) when >1 finding landed in
+      # one batch, which is not a valid single request body.
       #
       # EGRESS NOTE (geo findings): unusual_country/impossible_travel put actor,
       # ip and country into the finding `description`/`entity`, which this route
@@ -230,7 +234,7 @@ tenzir:
       # `actor` label here if per-entity notifications are needed later.
       definition: |
         subscribe "findings"
-        alert = {
+        this = {
           labels: {
             alertname: f"security_{signal}",
             severity: severity,
@@ -244,21 +248,24 @@ tenzir:
           },
           startsAt: time,
         }
-        body = "[" + print_json(alert) + "]"
         to_http "{{ $.Values.alertmanager.url }}", method="POST", headers={"Content-Type": "application/json"} {
-          select body
-          write_lines
+          write_json arrays_of_objects=true
         }
       restart-on-error: 30s
 {{- if .geo }}
 
-# GeoIP context loaded from the MaxMind DB the init container fetched. Only
-# present in the geo variant — a context pointing at a missing db crashes the
-# node (v6.13.0 exits 139), so the no-geo variant must omit it entirely.
-contexts:
-  geoip-city:
-    type: geoip
-    arguments:
-      db-path: /geoip/GeoLite2-City.mmdb
+  # GeoIP context loaded from the MaxMind DB the init container fetched. Only
+  # present in the geo variant — a context pointing at a missing db crashes the
+  # node (v6.13.0 exits 139), so the no-geo variant must omit it entirely.
+  #
+  # MUST be nested under `tenzir:` (as `tenzir.contexts.<name>`): tenzir parses
+  # contexts from the `tenzir.contexts` config section, not a document-root
+  # `contexts` key. Rendered at document root the context is silently ignored and
+  # GeoIP enrichment is never configured.
+  contexts:
+    geoip-city:
+      type: geoip
+      arguments:
+        db-path: /geoip/GeoLite2-City.mmdb
 {{- end }}
 {{- end }}

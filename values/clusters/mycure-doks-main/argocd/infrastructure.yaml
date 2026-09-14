@@ -648,13 +648,16 @@ tenzir:
   #
   # ⚠️ STAGED — DO NOT MERGE until ALL of:
   #  (1) PR #428 is prod-live (audit-sink emitter + pipeline), AND
-  #  (2) prod hapihub is on a release that has BOTH the X-Real-IP fix AND the
-  #      fail-safe audit trigger (see #428). These ship in hapihub 11.20.124+;
-  #      prod currently runs 11.20.122, so the real client IP is NOT yet landing
-  #      in audit_events.ip. Until that release is live, geoip would enrich the
-  #      gateway/proxy IP, not the client — resolving the wrong country. Do NOT
-  #      infer this is satisfied from a proxy/gateway config alone; gate on the
-  #      hapihub VERSION.
+  #  (2) prod hapihub is on a PROVEN-ELIGIBLE release — a future hapihub version
+  #      that (a) is ≥ the X-Real-IP fix, (b) carries the fail-safe audit trigger,
+  #      and (c) is NOT 11.20.124 or 11.20.125 (both are explicitly PROHIBITED by
+  #      #428, which is now disarmed and does NOT prove audit delivery). The exact
+  #      eligible version is TBD — pin it here once hapihub ships the fix. Prod
+  #      currently runs 11.20.122, so the real client IP is NOT yet landing in
+  #      audit_events.ip; until an eligible release is live, geoip would enrich
+  #      the gateway/proxy IP, not the client — resolving the wrong country. Do
+  #      NOT infer this is satisfied from a proxy/gateway config alone, and do NOT
+  #      treat 11.20.124/125 as eligible; gate on the hapihub VERSION.
   #  (3) audit_events are actually flowing to Tenzir with real client IPs (verify
   #      the sink delivering + a real audit_events.ip).
   # Flipping geoip before all three just arms two pipelines that enrich garbage.
