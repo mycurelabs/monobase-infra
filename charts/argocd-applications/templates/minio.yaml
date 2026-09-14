@@ -31,7 +31,7 @@ spec:
     - chart: minio
       # Bitnami OCI-only since 2025; pull from the OCI registry, pinned.
       repoURL: {{ .Values.minio.chartRepo | default "registry-1.docker.io/bitnamicharts" }}
-      targetRevision: {{ .Values.minio.chartVersion | default "14.10.5" }}
+      targetRevision: {{ .Values.minio.chartVersion | default "14.10.5" | quote }}
       helm:
         releaseName: minio
         valuesObject:

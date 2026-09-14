@@ -19,7 +19,7 @@ spec:
     # Bitnami deprecated the HTTPS catalog (OCI-only since 2025); pull from the OCI
     # registry, PINNED — a floating 16.x.x silently drifts the prod DB chart.
     repoURL: {{ .Values.postgresql.chartRepo | default "registry-1.docker.io/bitnamicharts" }}
-    targetRevision: {{ .Values.postgresql.chartVersion | default "16.7.27" }}
+    targetRevision: {{ .Values.postgresql.chartVersion | default "16.7.27" | quote }}
     helm:
       releaseName: postgresql
       valuesObject:

@@ -16,8 +16,8 @@ spec:
 
   source:
     chart: valkey
-    # Bitnami OCI-only since 2025; pull from the OCI registry, pinned to the
-    # current 2.4.7 (floating 2.x.x drifts the cache).
+    # Bitnami OCI-only since 2025 (charts.bitnami.com deprecated); pull from the OCI
+    # registry, pinned to the current 2.4.7 (floating 2.x.x drifts the cache).
     repoURL: {{ .Values.valkey.chartRepo | default "registry-1.docker.io/bitnamicharts" }}
     targetRevision: {{ .Values.valkey.chartVersion | default "2.4.7" }}
     helm:
