@@ -307,15 +307,21 @@ loki:
   enabled: true
   version: "6.24.0"
   storageSize: "20Gi"   # vanaheim is a small k3d cluster
-  # Retention is TIME-based; the levers below add a SIZE bound so a log burst
-  # can't fill the local-path volume shared with the preprod+staging Postgres.
-  # Worst case ≈ ingestionRateMb × retention. At 2MB/s × 7d that is well inside
-  # 20Gi even before compaction, and real preprod log volume is far lower.
-  retention: "7d"          # was 14d — halved; preprod logs are disposable
-  ingestionRateMb: 2       # 2MB/s cap (was code-default 10) — this k3d host is small
-  ingestionBurstMb: 4
-  perStreamRateLimit: "1MB"
-  perStreamRateLimitBurst: "3MB"
+  # ENFORCED disk bound (Loki 3.3.2 has NO byte cap — see loki.yaml). The bound
+  # is the server-side-enforced ingestion rate limiter × time retention, sized
+  # under the 20Gi vol. Cut HARD here because this local-path vol shares the
+  # vanaheim host disk with the preprod+staging Postgres: a runaway log stream
+  # is 429-throttled at the rate cap rather than filling that shared disk.
+  #   raw worst case = 1 MiB/s × 3d ≈ 253 GiB, but real preprod ingest is a tiny
+  #   fraction of the cap and tsdb chunks compress ~10×, so steady-state sits
+  #   sub-GiB in the 20Gi vol and even a sustained burst is metered to 1 MiB/s.
+  #   vanaheim runs no Prometheus, so k3s kubelet nodefs eviction is the only
+  #   automated backstop — which is exactly why the cap + retention are tight.
+  retention: "3d"          # preprod logs are disposable; short window bounds disk
+  ingestionRateMb: 1       # 1 MiB/s sustained cap (429 above) — small shared host
+  ingestionBurstMb: 2
+  perStreamRateLimit: "512KB"
+  perStreamRateLimitBurst: "1MB"
   promtail:
     version: "6.16.6"
 

@@ -37,6 +37,17 @@ spec:
             enabled: true
             storageClass: ""
             size: {{ .Values.loki.storageSize | default "50Gi" }}
+            # KEEP the PVC when the StatefulSet is deleted or scaled to 0.
+            # The loki 6.24.0 single-binary STS DEFAULTS this to `true`, which
+            # renders `persistentVolumeClaimRetentionPolicy: {whenDeleted:
+            # Delete, whenScaled: Delete}` — an ArgoCD prune or a scale-to-0
+            # would then destroy the log volume. Setting it `false` OMITS the
+            # retention-policy block entirely, so K8s falls back to its default
+            # `Retain` for both cases (verified by rendering the chart:
+            # persistentVolumeClaimRetentionPolicy is absent → Retain).
+            # (Round-1 set this on the WRONG path; the correct key for the
+            #  single-binary STS is singleBinary.persistence.*, here.)
+            enableStatefulSetAutoDeletePVC: false
           extraArgs:
             - -config.expand-env=true
           securityContext:
@@ -72,16 +83,39 @@ spec:
                   prefix: loki_index_
                   period: 24h
           limits_config:
-            retention_period: {{ .Values.loki.retention | default "30d" }}
-            max_query_lookback: {{ .Values.loki.retention | default "30d" }}
-            # Rate cap doubles as a disk-footprint bound. The persistence volume
-            # is local-path (chunks: {{ .Values.loki.storageSize | default "50Gi" }}) which does NOT enforce its
-            # size — on vanaheim it's carved from the SAME host disk as the
-            # preprod + staging Postgres, so an unbounded log burst could fill
-            # the shared disk and take PG down. ingestionRateMb (default 4MB/s)
-            # × retention is the worst-case chunk footprint the compactor prunes
-            # back to; vanaheim sets both low. Tune loki.ingestionRateMb /
-            # loki.retention in the cluster values, never the code default up.
+            # ── ENFORCED disk ceiling ────────────────────────────────────────
+            # OSS Loki 3.3.2 (this chart's appVersion) has NO byte/disk-usage
+            # cap for the filesystem store — it deletes chunks STRICTLY by the
+            # compactor's time retention, never by free space (the WAL
+            # `disk_full_threshold` throttle only exists in Loki >= 3.7). The
+            # persistence volume is local-path, which does NOT enforce its
+            # nominal `size`, and on vanaheim it is carved from the SAME host
+            # disk as the preprod + staging Postgres. So the ceiling must come
+            # from Loki's OWN admission control, which IS enforced server-side:
+            #
+            #   worst-case on-disk bytes  <=  ingestion_rate_mb (hard-rejected
+            #   above this, per tenant)  x  retention_period  /  chunk compression
+            #
+            # `ingestion_rate_mb` is a hard reject (429) — it bounds bytes/sec
+            # ADMITTED regardless of how much promtail pushes — and the compactor
+            # deletes everything past `retention_period`. Together they give a
+            # provable upper bound the operator sizes UNDER the volume. Pick
+            # loki.retention / loki.ingestionRateMb in each cluster's values so
+            # rate x retention (with the ~5-10x tsdb chunk compression as margin)
+            # stays well below loki.storageSize; NEVER raise the code default up.
+            #   e.g. vanaheim: 2 MiB/s x 7d ~= 1.18 TiB RAW, but real preprod
+            #   ingest is a tiny fraction of the cap and chunks compress ~10x, so
+            #   steady-state sits in low single-digit GiB inside the 20Gi vol; a
+            #   sustained pathological burst is throttled at 2 MiB/s (429) rather
+            #   than being allowed to fill the shared disk unbounded.
+            # BACKSTOP alerting (where monitoring runs — DOKS): the
+            # monitoring-resources storage-alerts fire PersistentVolumeFillingUp
+            # (>80%) / PersistentVolumeCritical (>90%) on this PVC and
+            # NodeFilesystem* (>80/90%) on the shared host disk. vanaheim runs no
+            # Prometheus, so there the k3s kubelet nodefs eviction is the last
+            # line — hence the deliberately low rate cap + short retention.
+            retention_period: {{ .Values.loki.retention | default "14d" }}
+            max_query_lookback: {{ .Values.loki.retention | default "14d" }}
             ingestion_rate_mb: {{ .Values.loki.ingestionRateMb | default 4 }}
             ingestion_burst_size_mb: {{ .Values.loki.ingestionBurstMb | default 8 }}
             per_stream_rate_limit: {{ .Values.loki.perStreamRateLimit | default "2MB" | quote }}
