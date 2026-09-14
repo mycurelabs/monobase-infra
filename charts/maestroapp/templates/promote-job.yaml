@@ -2,8 +2,11 @@
 # bump renders a NEW Job (ArgoCD prunes the old one and runs this) while an
 # unchanged pin stays Synced with the completed Job. No ttlSecondsAfterFinished
 # on purpose: TTL-deleting a completed Job makes ArgoCD see it OutOfSync and
-# re-run it forever. The script is idempotent — platforms already serving the
-# pin are skipped — so selfHeal re-creations are harmless no-ops.
+# re-run it forever. The script is idempotent and ATOMIC: it validates every
+# platform's v<PIN> manifest BEFORE writing any root pointer (all-or-nothing,
+# never a partial fleet promotion) and re-asserts the pin over any drifted root
+# pointer on each run — so selfHeal / Force+Replace re-creations reconcile drift
+# and are harmless no-ops at steady state.
 {{- $ver := .Values.version | required "maestroapp.version is required (the pinned fleet version)" }}
 apiVersion: batch/v1
 kind: Job
@@ -22,6 +25,13 @@ metadata:
     # idempotent, so a recreate re-runs a no-op reconcile.
     argocd.argoproj.io/sync-options: Force=true,Replace=true
 spec:
+  # backoffLimit is a second safety net only. The primary transient-recovery
+  # path is the in-script bounded validate-retry loop (below): a Failed Job
+  # whose manifest is unchanged (same pin) is NOT re-run by ArgoCD selfHeal, so
+  # a transient "artifact not published yet" must recover WITHIN a single Job
+  # run or it strands until manual deletion. The loop waits for the missing
+  # v<PIN> manifests to appear (bounded), then promotes; backoffLimit=2 only
+  # covers a mid-run pod eviction.
   backoffLimit: 2
   template:
     metadata:
@@ -88,15 +98,59 @@ spec:
                 fi
                 echo "waiting for store auth (attempt $n)…"; sleep 10
               done
-              missing=""
+              # ATOMIC (all-or-nothing) two-phase promotion. The old design
+              # checked+copied each platform before checking the next, and
+              # validated content AFTER publishing — so a missing Darwin
+              # manifest could leave Linux/Windows root pointers already moved
+              # before the Job failed (a partial fleet promotion). Instead:
+              #
+              #   Phase A — validate EVERY required platform's v<PIN>/latest.json
+              #     (existence + the manifest's own "version" field == PIN).
+              #     No root pointer is written in this phase. If ANY platform is
+              #     missing/invalid we retry the whole validation (bounded) so a
+              #     transient partial-release recovers without manual Job
+              #     deletion; on exhaustion we exit non-zero having written
+              #     NOTHING.
+              #   Phase B — only once ALL platforms validate, copy each
+              #     v<PIN>/latest.json over its platform-root latest.json. The
+              #     first write happens only after full validation, so the store
+              #     is never left half-promoted on a bad pin.
+              #
+              # Idempotent DRIFT RECONCILE: a platform whose root already serves
+              # PIN is still re-asserted from the validated v<PIN> manifest on
+              # every run, so a drifted root pointer is pulled back to the pin
+              # (steady state = a cheap no-op re-copy).
+              #
+              # ~5min bounded (30 * 10s) mirrors the auth-retry ceiling.
+              vattempt=0
+              while :; do
+                missing=""
+                for dir in $PLATFORMS; do
+                  base="store/$BUCKET/maestroapp/desktop/$dir"
+                  src="$base/v$PIN/latest.json"
+                  if ! mc stat "$src" >/dev/null 2>&1; then
+                    echo "! $dir: v$PIN/latest.json not published"; missing="$missing $dir"; continue
+                  fi
+                  mver=$(mc cat "$src" 2>/dev/null \
+                    | sed -n 's/.*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -n1) || true
+                  if [ "$mver" != "$PIN" ]; then
+                    echo "! $dir: v$PIN/latest.json invalid (manifest version='$mver', want $PIN)"; missing="$missing $dir"; continue
+                  fi
+                  echo "validated $dir v$PIN"
+                done
+                [ -z "$missing" ] && break
+                vattempt=$((vattempt+1))
+                if [ "$vattempt" -ge 30 ]; then
+                  echo "ERROR: v$PIN not fully published after $vattempt attempts — missing/invalid:$missing (typo'd pin or partial release); NO root pointer written"; exit 1
+                fi
+                echo "waiting for v$PIN artifacts (attempt $vattempt) — missing:$missing"; sleep 10
+              done
+              # Phase B — every platform validated; safe to write root pointers.
               for dir in $PLATFORMS; do
                 base="store/$BUCKET/maestroapp/desktop/$dir"
                 cur=$(mc cat "$base/latest.json" 2>/dev/null \
                   | sed -n 's/.*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -n1) || true
                 if [ "$cur" = "$PIN" ]; then echo "= $dir already serves v$PIN"; continue; fi
-                if ! mc stat "$base/v$PIN/latest.json" >/dev/null 2>&1; then
-                  echo "! $dir: v$PIN/latest.json not published"; missing="$missing $dir"; continue
-                fi
                 mc cp "$base/v$PIN/latest.json" "$base/latest.json"
                 new=$(mc cat "$base/latest.json" \
                   | sed -n 's/.*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -n1)
@@ -105,9 +159,6 @@ spec:
                 fi
                 echo "OK: $dir promoted to v$PIN"
               done
-              if [ -n "$missing" ]; then
-                echo "ERROR: v$PIN has no versioned manifest for:$missing (typo'd pin or partial release)"; exit 1
-              fi
               echo "fleet pin v$PIN reconciled"
           env:
             - name: PIN
