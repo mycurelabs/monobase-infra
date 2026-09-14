@@ -349,7 +349,7 @@ medley:
   enabled: true
   image:
     repository: ghcr.io/mycurelabs/medley
-    tag: "2.0.5"           # ghcr (public) — model-router rollout, monobase-mycure#4214 / #4150
+    tag: "2.0.6"           # ghcr (public) — Longitudinal Clinical Intelligence skills (monobase-mycure#4356) + clinic-analytics UX fixes (monobase-mycure#4385)
     pullPolicy: IfNotPresent
   replicaCount: 1
   resources:
