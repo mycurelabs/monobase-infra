@@ -1,0 +1,92 @@
+{{- if and .Values.enabled .Values.postgresql.enabled (((.Values.postgresql).provisionRole | default dict).enabled) }}
+# SQL for the medley provision-db-role PreSync Job (monobase-infra#420 review item 7):
+# give medley a DEDICATED non-superuser role that owns its own `medley` database,
+# so the runtime DATABASE_URL is no longer the postgres superuser DSN.
+#
+# Idempotent, run as the in-cluster superuser against the `medley` database:
+#   1. create/refresh the `medley` LOGIN role (password from ESO-synced secret);
+#   2. make it own the database + the `public` schema;
+#   3. ADOPT any pre-existing (superuser-created, DBOS-bootstrapped) objects
+#      — filtered, so a converged database emits ZERO DDL;
+#   4. safety timeouts on the runtime role.
+#
+# Hook-annotated PreSync at a LOWER weight than the Job (ConfigMap must exist
+# before the Job hook runs).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "medley.fullname" . }}-provision-db-role
+  namespace: {{ include "medley.namespace" . }}
+  labels:
+    {{- include "medley.labels" . | nindent 4 }}
+    job-type: provision-db-role
+  annotations:
+    helm.sh/hook: pre-install,pre-upgrade
+    helm.sh/hook-weight: "-6"
+    helm.sh/hook-delete-policy: before-hook-creation
+    argocd.argoproj.io/hook: PreSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+data:
+  provision.sql: |
+    \set ON_ERROR_STOP on
+
+    -- ══ PHASE 1: run against the `postgres` MAINTENANCE db (role + database
+    --    live in the shared catalog / can't be created from inside the target
+    --    db). The Job connects here first. ══
+
+    -- ── Role (CREATE ROLE has no IF NOT EXISTS; password kept current) ──
+    -- The ALTER ROLE … PASSWORD is UNCONDITIONAL by design: it re-syncs the
+    -- role after an ESO secret rotation and self-heals the first-sync race
+    -- where medley boots and tries to auth before this PreSync Job has run.
+    SELECT format('CREATE ROLE medley LOGIN PASSWORD %L', :'medley_password')
+    WHERE NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'medley') \gexec
+    SELECT format('ALTER ROLE medley PASSWORD %L', :'medley_password') \gexec
+
+    -- ── Database: create it owned by medley if missing (reseed-safe — a fresh
+    --    cluster has no `medley` db yet; DBOS would otherwise create it as the
+    --    superuser at first boot). Guarded — converged = no-op. ──
+    SELECT format('CREATE DATABASE %I OWNER medley', :'DBNAME')
+    WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = :'DBNAME') \gexec
+
+    -- ── Ownership of an EXISTING database moves to medley (the vanaheim case:
+    --    the db was created earlier by the superuser). Guarded. ──
+    SELECT format('ALTER DATABASE %I OWNER TO medley', :'DBNAME')
+    WHERE (SELECT pg_catalog.pg_get_userbyid(datdba) FROM pg_database WHERE datname = :'DBNAME') <> 'medley' \gexec
+
+    GRANT CONNECT, CREATE, TEMPORARY ON DATABASE :"DBNAME" TO medley;
+
+    -- ══ PHASE 2: reconnect INTO the target db for schema/object ownership
+    --    (these catalogs are per-database). \c reuses the same superuser conn. ══
+    \c :DBNAME
+
+    SELECT 'ALTER SCHEMA public OWNER TO medley'
+    WHERE (SELECT nspowner::regrole::text FROM pg_namespace WHERE nspname='public') <> 'medley' \gexec
+
+    -- ── ADOPTION: move pre-existing (superuser-created) objects in THIS
+    --    database to medley. Filtered so a converged DB emits nothing. ──
+    SELECT format('ALTER SCHEMA %I OWNER TO medley', nspname)
+    FROM pg_namespace
+    WHERE nspname NOT IN ('pg_catalog','information_schema','pg_toast')
+      AND nspname NOT LIKE 'pg_temp%' AND nspname NOT LIKE 'pg_toast_temp%'
+      AND nspowner::regrole::text <> 'medley' \gexec
+    SELECT format('ALTER TABLE %I.%I OWNER TO medley', schemaname, tablename)
+    FROM pg_tables
+    WHERE schemaname NOT IN ('pg_catalog','information_schema')
+      AND tableowner <> 'medley' \gexec
+    SELECT format('ALTER SEQUENCE %I.%I OWNER TO medley', schemaname, sequencename)
+    FROM pg_sequences
+    WHERE schemaname NOT IN ('pg_catalog','information_schema')
+      AND sequenceowner <> 'medley' \gexec
+    SELECT format('ALTER VIEW %I.%I OWNER TO medley', schemaname, viewname)
+    FROM pg_views
+    WHERE schemaname NOT IN ('pg_catalog','information_schema')
+      AND viewowner <> 'medley' \gexec
+
+    -- ── Grants on public: medley owns its objects; CREATE/USAGE let DBOS
+    --    create tables/schemas. (DB-level grant applied in phase 1.) ──
+    GRANT CREATE, USAGE ON SCHEMA public TO medley;
+
+    -- ── Safety timeouts on the runtime role (SECURITY_ROADMAP §H). ──
+    ALTER ROLE medley SET statement_timeout = '{{ (((.Values.postgresql).provisionRole | default dict).statementTimeout) | default "60s" }}';
+    ALTER ROLE medley SET idle_in_transaction_session_timeout = '{{ (((.Values.postgresql).provisionRole | default dict).idleInTransactionTimeout) | default "120s" }}';
+{{- end }}

@@ -136,6 +136,23 @@ postgresql:
     database: medley
     existingSecret: postgresql
     secretKey: postgres-password
+  # Dedicated non-superuser role provisioning (monobase-infra#420 item 7). When
+  # enabled, a PreSync Job creates/owns the `medley` role + database and the
+  # runtime DATABASE_URL points at it (set auth.username: medley + the scoped
+  # secret). Default OFF: the chart still works with the plain superuser DSN
+  # where a scoped role hasn't been provisioned. Runs as the in-cluster
+  # superuser (superuserSecret), never with the runtime medley credentials.
+  provisionRole:
+    enabled: false
+    # superuserSecret/superuserSecretKey: the in-cluster PG superuser used to
+    # CREATE ROLE + reassign ownership (NOT the runtime medley DSN).
+    superuserSecret: postgresql
+    superuserSecretKey: postgres-password
+    # statementTimeout / idleInTransactionTimeout: safety caps on the runtime role.
+    statementTimeout: "60s"
+    idleInTransactionTimeout: "120s"
+    backoffLimit: 3
+    activeDeadlineSeconds: 600
 
 # External Secrets — MEDLEY_HISTORY_KEY pulled from GCP Secret Manager
 externalSecrets:
