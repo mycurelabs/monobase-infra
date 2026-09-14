@@ -54,17 +54,27 @@ apps_for() {
     | sort -u
 }
 
-declare -A BASELINE=(
-  [mycure-production]="mycure-production-cadence mycure-production-cadence-relay mycure-production-hapihub-docs mycure-production-mycure mycure-production-mycure-dashboard mycure-production-mycure-myaccount mycure-production-mycure-pxp mycure-production-mycurelocal"
-  [mycure-staging]="mycure-staging-cadence mycure-staging-cadence-relay mycure-staging-medgemma-worker mycure-staging-medleyapp mycure-staging-mycure mycure-staging-mycure-dashboard mycure-staging-mycure-pxp mycure-staging-openmed"
-  [mycure-preprod]="mycure-preprod-cadence mycure-preprod-cadence-relay mycure-preprod-hapihub-docs mycure-preprod-medley mycure-preprod-mycure mycure-preprod-mycure-dashboard mycure-preprod-mycure-myaccount mycure-preprod-mycure-pxp mycure-preprod-mycurelocal"
-)
+# Baseline sets, keyed by overlay. Kept as a function (not `declare -A`) so the
+# script runs on the repo host's default macOS Bash 3.2 — associative arrays are
+# Bash 4+ only, and this target branch has no CI to catch the breakage.
+baseline_for() {
+  case "$1" in
+    mycure-production)
+      echo "mycure-production-cadence mycure-production-cadence-relay mycure-production-hapihub-docs mycure-production-mycure mycure-production-mycure-dashboard mycure-production-mycure-myaccount mycure-production-mycure-pxp mycure-production-mycurelocal" ;;
+    mycure-staging)
+      echo "mycure-staging-cadence mycure-staging-cadence-relay mycure-staging-medgemma-worker mycure-staging-medleyapp mycure-staging-mycure mycure-staging-mycure-dashboard mycure-staging-mycure-pxp mycure-staging-openmed" ;;
+    mycure-preprod)
+      echo "mycure-preprod-cadence mycure-preprod-cadence-relay mycure-preprod-hapihub-docs mycure-preprod-medley mycure-preprod-mycure mycure-preprod-mycure-dashboard mycure-preprod-mycure-myaccount mycure-preprod-mycure-pxp mycure-preprod-mycurelocal" ;;
+    *)
+      echo "[app-registry] no baseline defined for overlay '$1'" >&2; return 1 ;;
+  esac
+}
 
 echo "[app-registry] check (b): no generic-app Application disappears per overlay"
 for ov in "${OVERLAYS[@]}"; do
   rendered=$(apps_for "${ov}")
   missing=""
-  for expected in ${BASELINE[$ov]}; do
+  for expected in $(baseline_for "${ov}"); do
     grep -qx "${expected}" <<<"${rendered}" || missing+=" ${expected}"
   done
   if [[ -n "${missing}" ]]; then

@@ -8,7 +8,9 @@
 # app identity lives in values/, not the shared engine). Set `appRegistry` in
 # values/deployments/base.yaml as a MAP: `<appName>: {key, [chart]}`. The map key
 # is the Application name; `key` is the deployment-values key holding the app's
-# config; `chart` falls back to the app name. It is a MAP (not a list) so overlays
+# config (which MUST exist as a map in base.yaml — at minimum `<key>.enabled:
+# false` for an app that is off everywhere; a dangling/typo key fails the render);
+# `chart` falls back to the app name. It is a MAP (not a list) so overlays
 # DEEP-MERGE into it — a list would REPLACE the whole registry, silently dropping
 # every other app (helm rc=0), the root would then prune them + finalizers cascade.
 # Apps with bespoke value wiring keep dedicated templates (listed above) and are
@@ -32,7 +34,22 @@
 {{- if not $app.key }}
 {{- fail (printf "appRegistry entry %q is missing required `key` (the deployment-values key holding its config)." $name) }}
 {{- end }}
-{{- $vals := index $root.Values $app.key | default dict }}
+{{- /*
+  Fail-closed on a DANGLING key. A misspelled / nonexistent `key` used to resolve
+  to an empty dict (`| default dict`) → `enabled` falsy → the Application was
+  SILENTLY SKIPPED, and with root prune + child finalizers that cascade-deletes
+  the app's live resources. So the config value MUST exist and be a map: every
+  registry entry's `key` has a config block in values/deployments/base.yaml (at
+  minimum `<key>.enabled: false` for an app that is off everywhere). A typo now
+  ABORTS the render instead of dropping an app.
+*/}}
+{{- if not (hasKey $root.Values $app.key) }}
+{{- fail (printf "appRegistry entry %q references config key %q, but no such value exists (typo? every registry `key` must have a block in values/deployments/base.yaml — set `%s.enabled: false` for an app that is off). Refusing to silently drop the Application." $name $app.key $app.key) }}
+{{- end }}
+{{- $vals := index $root.Values $app.key }}
+{{- if not (kindIs "map" $vals) }}
+{{- fail (printf "appRegistry entry %q references config key %q, which is %s, not a map. Expected a config block like `%s: {enabled: ...}`." $name $app.key (kindOf $vals) $app.key) }}
+{{- end }}
 {{- if $vals.enabled }}
 ---
 apiVersion: argoproj.io/v1alpha1
