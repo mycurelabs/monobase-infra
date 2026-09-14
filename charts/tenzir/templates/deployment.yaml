@@ -9,10 +9,22 @@ metadata:
 spec:
   replicas: 1
   # Single node holds the in-memory correlation state (concurrent_sessions,
-  # impossible_travel windows). Roll one-at-a-time — a brief gap loses only the
-  # open windows, not durable data (alert-only, no PVC in phase 1).
+  # impossible_travel windows) — alert-only, no PVC in phase 1, so a brief gap
+  # loses only the open windows, not durable data.
+  #
+  # RollingUpdate (surge 1, unavailable 0) — NOT Recreate: the geoip init
+  # container (MaxMind download) can fail on a bad key / no egress / MaxMind
+  # outage. Recreate would tear down the running node BEFORE the replacement's
+  # init succeeds, leaving 0 tenzir pods (ingest drops on the floor). Surging
+  # first means a pod that can't init never replaces a healthy running one — the
+  # old pod keeps serving until the new one is Ready. (Ingest is a fresh HTTP
+  # push each event, so momentarily running two nodes only double-counts open
+  # correlation windows for one roll — acceptable for alert-only phase 1.)
   strategy:
-    type: Recreate
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
   selector:
     matchLabels:
       {{- include "tenzir.selectorLabels" . | nindent 6 }}
@@ -36,11 +48,22 @@ spec:
       {{- if .Values.geoip.enabled }}
       # Fetch GeoLite2-City.mmdb once at startup with the MaxMind license key.
       # Kept out of the image so the DB refreshes on pod restart and the license
-      # never bakes into a layer. If this fails (bad key / no egress) the geo
-      # signals stay dormant; the node still starts.
+      # never bakes into a layer.
+      #
+      # FAILS OPEN (exit 0 on any error): a bad key / no egress / MaxMind outage
+      # must NOT crash-loop the init container and block the whole node. On
+      # failure we leave /geoip empty and exit 0; the main container's startup
+      # wrapper then selects the NO-GEO config (tenzir.yaml) — the five non-geo
+      # detections keep running. Combined with RollingUpdate(maxUnavailable:0),
+      # a failed download never takes tenzir to 0 pods. This is why the geoip
+      # context lives in a SEPARATE config variant: tenzir-node v6.13.0 exits
+      # 139 if a configured geoip context's db is missing, so "optional init"
+      # alone is not enough — the config it boots must also omit the context.
       initContainers:
       - name: geoip-download
-        image: curlimages/curl:8.11.0
+        # Digest-pinned: restrict-registries admission does NOT evaluate
+        # initContainers, so pin here explicitly. Tag kept for readability.
+        image: curlimages/curl:8.11.0@sha256:83a505ba2ba62f208ed6e410c268b7b9aa48f0f7b403c8108b9773b44199dbba
         securityContext:
           allowPrivilegeEscalation: false
           readOnlyRootFilesystem: true
@@ -48,20 +71,38 @@ spec:
         command: ["/bin/sh", "-c"]
         args:
           - |
-            set -eu
-            # readOnlyRootFilesystem:true makes / (incl. /tmp) read-only — download and
-            # extract into the writable /geoip emptyDir, not /tmp (else curl exits 23,
-            # "failed writing received data", and the init container crash-loops).
-            url="https://download.maxmind.com/app/geoip_download?edition_id=GeoLite2-City&license_key=${MAXMIND_LICENSE}&suffix=tar.gz"
-            curl -fsSL "$url" -o /geoip/geoip.tar.gz
-            tar -xzf /geoip/geoip.tar.gz -C /geoip
-            cp /geoip/GeoLite2-City_*/GeoLite2-City.mmdb /geoip/GeoLite2-City.mmdb
+            set -u
+            fail() { echo "geoip-download: $1 — failing OPEN (node boots no-geo config)"; rm -f /geoip/curl.cfg; exit 0; }
+
+            # Self-healing: clear any partial/stale artifacts from a prior failed
+            # run first (readOnlyRootFilesystem makes / read-only; /geoip is the
+            # only writable emptyDir, so download+extract there, not /tmp).
+            rm -rf /geoip/GeoLite2-City_*/ /geoip/geoip.tar.gz /geoip/curl.cfg /geoip/GeoLite2-City.mmdb
+
+            # Keep the license key out of argv AND the URL query in the process
+            # table: write it into a curl -K config file (0600, in the writable
+            # emptyDir) and delete it right after. --get + --data-urlencode make
+            # curl append the encoded license_key as a query param at request
+            # time — it never appears in `ps`, and the config file is removed.
+            umask 077
+            printf '%s\n' \
+              'url = "https://download.maxmind.com/app/geoip_download?edition_id=GeoLite2-City&suffix=tar.gz"' \
+              'get' \
+              "data-urlencode = \"license_key=${MAXMIND_LICENSE}\"" \
+              'output = "/geoip/geoip.tar.gz"' \
+              'fail' 'silent' 'show-error' 'location' > /geoip/curl.cfg
+
+            curl -K /geoip/curl.cfg || fail "download failed"
+            rm -f /geoip/curl.cfg
+            tar -xzf /geoip/geoip.tar.gz -C /geoip || fail "extract failed"
+            mv /geoip/GeoLite2-City_*/GeoLite2-City.mmdb /geoip/GeoLite2-City.mmdb || fail "mmdb not found in archive"
             rm -rf /geoip/geoip.tar.gz /geoip/GeoLite2-City_*/
+            [ -s /geoip/GeoLite2-City.mmdb ] || fail "mmdb empty"
             echo "GeoLite2-City.mmdb ready"
         env:
         - name: MAXMIND_LICENSE
           valueFrom:
-            secretKeyRef: { name: tenzir-secrets, key: maxmind-license }
+            secretKeyRef: { name: tenzir-maxmind-license, key: maxmind-license }
         volumeMounts:
         - { name: geoip, mountPath: /geoip }
       {{- end }}
@@ -74,10 +115,29 @@ spec:
           readOnlyRootFilesystem: true
           capabilities: { drop: ["ALL"] }
         # Run a Tenzir node from the mounted config. The `tenzir.pipelines` block
-        # in tenzir.yaml auto-starts the ingest/enrich/detect/route pipelines.
-        # (Image entrypoint is `tenzir` — the pipeline CLI — so run the node binary.)
+        # auto-starts the ingest/enrich/detect/route pipelines. (Image entrypoint
+        # is `tenzir` — the pipeline CLI — so run the node binary.)
+        {{- if .Values.geoip.enabled }}
+        # FAIL-OPEN config selection: boot the GEO config ONLY when the MaxMind
+        # mmdb is present and non-empty (the init container fetched it). If the
+        # download failed the file is absent, so fall back to the NO-GEO config —
+        # a geoip-city context pointing at a missing db makes tenzir-node v6.13.0
+        # exit 139, which would crash-loop the whole node. This is the piece that
+        # makes the init container's "exit 0 on failure" actually fail OPEN.
+        command: ["/bin/sh", "-c"]
+        args:
+          - |
+            if [ -s /geoip/GeoLite2-City.mmdb ]; then
+              echo "geoip mmdb present — starting GEO config"
+              exec tenzir-node --config=/etc/tenzir/tenzir-geoip.yaml
+            else
+              echo "geoip mmdb absent/empty — starting NO-GEO config (fail-open)"
+              exec tenzir-node --config=/etc/tenzir/tenzir.yaml
+            fi
+        {{- else }}
         command: ["tenzir-node"]
         args: ["--config=/etc/tenzir/tenzir.yaml"]
+        {{- end }}
         env:
         - name: TENZIR_STATE_DIRECTORY
           value: /var/lib/tenzir
