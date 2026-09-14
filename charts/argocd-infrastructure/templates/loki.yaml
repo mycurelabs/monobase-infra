@@ -1,4 +1,4 @@
-{{- if .Values.loki.enabled }}
+{{- if (.Values.loki | default dict).enabled }}
 # ArgoCD Application: Loki — log aggregation (the platform's standard log store).
 # Sync Wave 1 - after the monitoring stack (wave 0).
 apiVersion: argoproj.io/v1alpha1
@@ -37,23 +37,37 @@ spec:
             enabled: true
             storageClass: ""
             size: {{ .Values.loki.storageSize | default "50Gi" }}
+            # Keep the PVC when the StatefulSet is scaled/deleted. The default
+            # storage class is Delete-reclaim, so letting the chart auto-delete
+            # the PVC on StatefulSet teardown would destroy the log volume on
+            # any Recreate. Retain the claim; deletion is a deliberate manual op.
+            enableStatefulSetAutoDeletePVC: false
           extraArgs:
             - -config.expand-env=true
-          securityContext:
+
+        # Pod/container hardening. chart 6.24.0 reads these under loki.* (below)
+        # — singleBinary.securityContext / .containerSecurityContext are NOT
+        # consumed by the single-binary StatefulSet, so they live on loki.*.
+
+        loki:
+          auth_enabled: false  # single-tenant mode
+          # Pod- and container-level hardening (restricted PSA baseline). These
+          # are the keys chart 6.24.0 actually reads for the loki pods.
+          podSecurityContext:
             runAsNonRoot: true
             runAsUser: 10001
+            runAsGroup: 10001
             fsGroup: 10001
             seccompProfile:
               type: RuntimeDefault
           containerSecurityContext:
             allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
             capabilities:
               drop:
                 - ALL
-            readOnlyRootFilesystem: true
-
-        loki:
-          auth_enabled: false  # single-tenant mode
+            seccompProfile:
+              type: RuntimeDefault
           # Filesystem storage — the chart still requires bucketNames defined
           # even when type=filesystem (dummy names below).
           storage:
@@ -84,6 +98,26 @@ spec:
           commonConfig:
             replication_factor: 1
 
+        # Disable the rules sidecar. Its default (sidecar.rules.enabled: true)
+        # makes the chart mint `loki-clusterrole` with CLUSTER-WIDE
+        # get/list/watch on Secrets + ConfigMaps, bound to the automounted Loki
+        # SA. On DOKS that reach includes mycure-production DB + hapihub Secrets.
+        # We ship no Loki ruler rules, so the sidecar is pure attack surface.
+        # Verify: rendered `loki-clusterrole` has `rules: []`.
+        sidecar:
+          rules:
+            enabled: false
+
+        # memcached caches OFF. The chunks-cache requests 9830Mi (request AND
+        # limit) with no tolerations — it can never schedule on DOKS (every pool
+        # but nonprod is tainted; nonprod nodes are 8GiB), so the `loki` app would
+        # stay Progressing forever. Single-binary at this ingest volume does not
+        # need them.
+        chunksCache:
+          enabled: false
+        resultsCache:
+          enabled: false
+
         # Not needed in single-binary mode.
         backend:
           replicas: 0
@@ -96,11 +130,64 @@ spec:
         gateway:
           enabled: false
 
+        # Canary + helm test pods off — not read under monitoring.* in 6.24.0.
+        lokiCanary:
+          enabled: false
+        test:
+          enabled: false
+
         monitoring:
           selfMonitoring:
             enabled: false
           lokiCanary:
             enabled: false
+
+        # NetworkPolicy applied into the monitoring ns alongside Loki (the chart
+        # renders extraObjects into its own release namespace). Loki runs
+        # auth_enabled:false AND the compactor delete API is enabled, so an
+        # unauthenticated in-cluster caller could read/delete logs — restrict who
+        # can reach it. Ports:
+        #   3100 (HTTP API)   <- promtail (push) + grafana (query) only
+        #   9095 (gRPC)       <- loki only (single-binary intra-pod)
+        #   7946 (memberlist) <- loki only
+        extraObjects:
+          - apiVersion: networking.k8s.io/v1
+            kind: NetworkPolicy
+            metadata:
+              name: loki-allow
+              labels:
+                app.kubernetes.io/name: loki
+                app.kubernetes.io/component: network-policy
+            spec:
+              podSelector:
+                matchLabels:
+                  app.kubernetes.io/name: loki
+              policyTypes:
+                - Ingress
+              ingress:
+                # HTTP API (3100): promtail push + grafana query.
+                - from:
+                    - podSelector:
+                        matchLabels:
+                          app.kubernetes.io/name: promtail
+                    - podSelector:
+                        matchLabels:
+                          app.kubernetes.io/name: grafana
+                  ports:
+                    - protocol: TCP
+                      port: 3100
+                # gRPC (9095) + memberlist (7946): loki-internal only.
+                - from:
+                    - podSelector:
+                        matchLabels:
+                          app.kubernetes.io/name: loki
+                  ports:
+                    - protocol: TCP
+                      port: 9095
+                    - protocol: TCP
+                      port: 7946
+                    - protocol: UDP
+                      port: 7946
 
   destination:
     server: https://kubernetes.default.svc

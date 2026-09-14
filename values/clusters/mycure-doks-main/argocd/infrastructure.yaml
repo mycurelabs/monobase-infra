@@ -486,8 +486,10 @@ velero:
 
 # Falco - Runtime security monitoring.
 # Operator + custom rulesets from charts/falco-resources (api, database).
-# Passive — Falco alerts, never blocks. Emits to stdout (collected by promtail
-# into Loki; route to Discord separately).
+# Passive — Falco alerts, never blocks. Emits to stdout. NOTE: Falco runs
+# fleet-wide but promtail is nonprod-only (see the loki block), so Falco's
+# prod-node stdout is NOT collected into Loki today; route Falco to Discord
+# separately (its own sidekick/output), not via this promtail.
 falco:
   enabled: true
   # Chart 4.6.1 (Falco 0.38.1) hits a libscap/modern-BPF scap_init bug on
@@ -585,9 +587,18 @@ monitoring:
   alertmanager:
     enabled: true
 
-# Loki + Promtail - standard log-aggregation pipeline (grafana helm charts).
+# Loki + Promtail - NONPROD-ONLY log-aggregation pipeline (grafana helm charts).
 # Deployed via the loki.yaml + promtail.yaml Applications; grafana auto-provisions
 # a Loki datasource. Proven on vanaheim (monobase-infra cluster/vanaheim) first.
+#
+# SCOPE: nonprod only. Promtail (DaemonSet) carries no node-pool tolerations, so
+# it collects logs from the untainted `nonprod` pool only — NOT prod-db /
+# prod-apps / infra (those pools are tainted). Loki runs auth_enabled:false, so
+# putting prod (PHI-bearing) logs here needs an explicit PHI/retention sign-off
+# first; until then this is a nonprod log stack. Loki hardening applied per
+# review of #437: sidecar.rules.enabled=false (no cluster-wide Secrets RBAC),
+# memcached caches off (unschedulable on DOKS), PVC retained on StatefulSet
+# delete, restricted-PSA security contexts, and an ingress NetworkPolicy.
 loki:
   enabled: true
   version: "6.24.0"

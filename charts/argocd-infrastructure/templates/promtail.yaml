@@ -1,6 +1,17 @@
-{{- if .Values.loki.enabled }}
+{{- if (.Values.loki | default dict).enabled }}
 # ArgoCD Application: Promtail — per-node log collector shipping to Loki.
 # Sync Wave 1 - after the monitoring stack (wave 0).
+#
+# SCOPE: NONPROD-ONLY on DOKS. Promtail is a DaemonSet and carries NO
+# node-pool tolerations, so it schedules only on untainted nodes. On DOKS every
+# pool except `nonprod` is tainted (node-pool=<pool>:NoSchedule: prod-db,
+# prod-apps, infra), so promtail runs on the nonprod pool only and collects
+# nothing from prod-apps / prod-db / infra. This is DELIBERATE: full-fleet
+# collection would put prod (PHI-bearing) container logs into Loki, which runs
+# auth_enabled:false — that needs an explicit PHI/retention sign-off plus the
+# Loki NetworkPolicy (see loki.yaml) before adding node-pool tolerations here.
+# Until then Loki/Promtail is a nonprod log stack, NOT a prod log stack, and
+# Falco's prod alerts (falco runs fleet-wide) are NOT collected by this promtail.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -16,7 +27,7 @@ spec:
   source:
     chart: promtail
     repoURL: https://grafana.github.io/helm-charts
-    targetRevision: {{ .Values.loki.promtail.version | default "6.16.6" }}
+    targetRevision: {{ (.Values.loki.promtail | default dict).version | default "6.16.6" }}
     helm:
       releaseName: promtail
       valuesObject:
@@ -53,13 +64,10 @@ spec:
               - ALL
           readOnlyRootFilesystem: true
 
-        tolerations:
-          - effect: NoSchedule
-            key: node-role.kubernetes.io/master
-            operator: Exists
-          - effect: NoSchedule
-            key: node-role.kubernetes.io/control-plane
-            operator: Exists
+        # NO tolerations — nonprod-only by design (see the SCOPE note above).
+        # The old master/control-plane tolerations were inert on DOKS (managed
+        # worker nodes carry no such taint) and were removed.
+        tolerations: []
 
         serviceMonitor:
           enabled: false
