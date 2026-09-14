@@ -1,0 +1,51 @@
+{{- if and .Values.enabled .Values.provisionRole.enabled }}
+# SQL for the pg-logical-backup provision-role PreSync Job (monobase-mycure#4320).
+# Provisions a DEDICATED, read-only `dumper` LOGIN role for the nightly logical
+# dump — least privilege, NOT the postgres superuser.
+#
+# Idempotent, run as the in-cluster superuser against the `postgres` maintenance
+# db on the PRIMARY (roles are cluster-global and replicate to the standby via
+# WAL — you cannot CREATE ROLE on a read-only replica):
+#   1. create/refresh the `dumper` LOGIN role (password from the ESO-synced secret);
+#   2. GRANT pg_read_all_data (PG14+ predefined role — SELECT on every table/view/
+#      sequence + USAGE on every schema, cluster-wide: exactly what pg_dump needs);
+#   3. GRANT CONNECT on the target database;
+#   4. disable statement/idle timeouts for this role (a full dump is one long
+#      repeatable-read snapshot and must not be cancelled mid-run).
+#
+# The ALTER ROLE ... PASSWORD is UNCONDITIONAL: it re-syncs the role after an ESO
+# secret rotation. `target_database` is a NON-RESERVED psql var (never `DBNAME`,
+# which psql clobbers to the connected db — see monobase-infra#420 / commit 4a237d9).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "pgLogicalBackup.fullname" . }}-provision-role
+  namespace: {{ include "pgLogicalBackup.namespace" . }}
+  labels:
+    {{- include "pgLogicalBackup.labels" . | nindent 4 }}
+    job-type: provision-role
+  annotations:
+    helm.sh/hook: pre-install,pre-upgrade
+    helm.sh/hook-weight: "-6"
+    helm.sh/hook-delete-policy: before-hook-creation
+    argocd.argoproj.io/hook: PreSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+data:
+  provision.sql: |
+    \set ON_ERROR_STOP on
+
+    -- ── Role (CREATE ROLE has no IF NOT EXISTS; password kept current) ──
+    SELECT format('CREATE ROLE %I LOGIN PASSWORD %L', :'dump_role', :'dumper_password')
+    WHERE NOT EXISTS (SELECT FROM pg_roles WHERE rolname = :'dump_role') \gexec
+    SELECT format('ALTER ROLE %I PASSWORD %L', :'dump_role', :'dumper_password') \gexec
+
+    -- ── Read-only, cluster-wide data access (PG14+ predefined role) ──
+    SELECT format('GRANT pg_read_all_data TO %I', :'dump_role') \gexec
+
+    -- ── CONNECT on the target database ──
+    SELECT format('GRANT CONNECT ON DATABASE %I TO %I', :'target_database', :'dump_role') \gexec
+
+    -- ── No timeouts on the dump role (long single snapshot). ──
+    SELECT format('ALTER ROLE %I SET statement_timeout = 0', :'dump_role') \gexec
+    SELECT format('ALTER ROLE %I SET idle_in_transaction_session_timeout = 0', :'dump_role') \gexec
+{{- end }}

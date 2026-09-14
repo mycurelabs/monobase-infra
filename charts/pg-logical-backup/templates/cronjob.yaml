@@ -1,0 +1,142 @@
+{{- if .Values.enabled }}
+# Nightly logical pg_dump DR tier (monobase-mycure#4320).
+#
+# Two ordered steps in one pod, sharing an ephemeral `work` volume:
+#   1. initContainer `dump`   (postgres image) — pg_dumpall globals + pg_dump -Fc
+#      of the app DB against the READ REPLICA, then a pg_restore --list integrity
+#      gate. A corrupt/truncated dump fails the pod here, before anything ships.
+#   2. container     `upload` (rclone image)   — rclone copy to a `crypt` remote
+#      (plaintext PHI never rests off-cluster), then a time-based retention prune.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "pgLogicalBackup.fullname" . }}
+  namespace: {{ include "pgLogicalBackup.namespace" . }}
+  labels:
+    {{- include "pgLogicalBackup.labels" . | nindent 4 }}
+spec:
+  schedule: {{ .Values.schedule | quote }}
+  {{- with .Values.timeZone }}
+  timeZone: {{ . | quote }}
+  {{- end }}
+  concurrencyPolicy: {{ .Values.concurrencyPolicy }}
+  startingDeadlineSeconds: {{ .Values.startingDeadlineSeconds }}
+  successfulJobsHistoryLimit: {{ .Values.successfulJobsHistoryLimit }}
+  failedJobsHistoryLimit: {{ .Values.failedJobsHistoryLimit }}
+  suspend: {{ .Values.suspend }}
+  jobTemplate:
+    metadata:
+      labels:
+        {{- include "pgLogicalBackup.labels" . | nindent 8 }}
+    spec:
+      backoffLimit: {{ .Values.backoffLimit }}
+      activeDeadlineSeconds: {{ .Values.activeDeadlineSeconds }}
+      ttlSecondsAfterFinished: 86400
+      template:
+        metadata:
+          labels:
+            {{- include "pgLogicalBackup.selectorLabels" . | nindent 12 }}
+        spec:
+          restartPolicy: Never
+          enableServiceLinks: false
+          serviceAccountName: {{ include "pgLogicalBackup.serviceAccountName" . }}
+          securityContext:
+            {{- toYaml .Values.podSecurityContext | nindent 12 }}
+          initContainers:
+          - name: dump
+            image: {{ .Values.image.postgres | quote }}
+            imagePullPolicy: IfNotPresent
+            securityContext:
+              {{- toYaml .Values.securityContext | nindent 14 }}
+            command: ["/bin/sh", "-ec"]
+            args:
+              - |
+                TS=$(date -u +%Y%m%dT%H%M%SZ)
+                echo "$TS" > /work/.run-id
+                HOST="{{ .Values.database.readService }}.{{ include "pgLogicalBackup.namespace" . }}.svc.cluster.local"
+                # Password via PGPASSWORD (env), never on the command line.
+                export PGPASSWORD="$DUMPER_PASSWORD"
+                BASE="postgresql://{{ .Values.database.dumpRole }}@${HOST}:{{ .Values.database.port }}"
+                {{- if .Values.dump.globals }}
+                echo "[dump] pg_dumpall --globals-only"
+                pg_dumpall --globals-only --no-role-passwords -d "${BASE}/{{ .Values.database.name }}" \
+                  > "/work/globals-${TS}.sql"
+                {{- end }}
+                echo "[dump] pg_dump -Fc {{ .Values.database.name }}"
+                pg_dump -Fc -Z {{ .Values.dump.compressLevel }} \
+                  -d "${BASE}/{{ .Values.database.name }}" \
+                  -f "/work/{{ .Values.database.name }}-${TS}.dump"
+                {{- if .Values.dump.verify }}
+                echo "[dump] verify — pg_restore --list"
+                pg_restore --list "/work/{{ .Values.database.name }}-${TS}.dump" > /dev/null
+                {{- end }}
+                echo "[dump] done: $(ls -lh /work | grep "${TS}")"
+            env:
+            - name: DUMPER_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.database.existingSecret }}
+                  key: {{ .Values.database.passwordKey }}
+            - name: HOME
+              value: /tmp
+            volumeMounts:
+            - name: work
+              mountPath: /work
+            - name: tmp
+              mountPath: /tmp
+            resources:
+              {{- toYaml .Values.resources.dump | nindent 14 }}
+          containers:
+          - name: upload
+            image: {{ .Values.image.rclone | quote }}
+            imagePullPolicy: IfNotPresent
+            securityContext:
+              {{- toYaml .Values.securityContext | nindent 14 }}
+            command: ["/bin/sh", "-ec"]
+            args:
+              - |
+                TS=$(cat /work/.run-id)
+                DEST="{{ .Values.destination.rcloneRemote }}:{{ .Values.destination.path }}/${TS}"
+                echo "[upload] rclone copy -> ${DEST}"
+                rclone copy /work "${DEST}" \
+                  --include "*.dump" --include "*.sql" \
+                  --transfers 2 --retries 3 --stats-one-line
+                echo "[upload] retention prune — keep < {{ .Values.destination.retentionDays }}d"
+                rclone delete "{{ .Values.destination.rcloneRemote }}:{{ .Values.destination.path }}" \
+                  --min-age {{ .Values.destination.retentionDays }}d --rmdirs || true
+                echo "[upload] done"
+            env:
+            - name: RCLONE_CONFIG
+              value: /config/rclone/rclone.conf
+            - name: HOME
+              value: /tmp
+            volumeMounts:
+            - name: work
+              mountPath: /work
+              readOnly: true
+            - name: rclone-config
+              mountPath: /config/rclone
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+            resources:
+              {{- toYaml .Values.resources.upload | nindent 14 }}
+          volumes:
+          - name: work
+            {{- if eq .Values.work.type "pvc" }}
+            persistentVolumeClaim:
+              claimName: {{ include "pgLogicalBackup.fullname" . }}-work
+            {{- else }}
+            emptyDir:
+              sizeLimit: {{ .Values.work.sizeLimit }}
+            {{- end }}
+          - name: tmp
+            emptyDir:
+              sizeLimit: 128Mi
+          - name: rclone-config
+            secret:
+              secretName: {{ .Values.database.existingSecret }}
+              items:
+              - key: rclone.conf
+                path: rclone.conf
+{{- end }}

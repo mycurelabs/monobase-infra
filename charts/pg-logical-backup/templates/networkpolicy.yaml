@@ -1,0 +1,40 @@
+{{- if and .Values.enabled .Values.networkPolicy.enabled }}
+# Egress-only: the backup pod initiates connections, accepts none.
+#   - DNS (kube-dns)
+#   - the in-cluster PG replica (5432)
+#   - extraEgress: the off-cloud upload target (niflheim tailnet /32, or the
+#     object-store endpoint) — supplied per-deployment.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "pgLogicalBackup.fullname" . }}
+  namespace: {{ include "pgLogicalBackup.namespace" . }}
+  labels:
+    {{- include "pgLogicalBackup.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "pgLogicalBackup.selectorLabels" . | nindent 6 }}
+  policyTypes:
+    - Egress
+  egress:
+    # DNS
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    # In-cluster PostgreSQL (primary for role provision, replica for the dump)
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: postgresql
+      ports:
+        - protocol: TCP
+          port: {{ .Values.database.port }}
+    {{- with .Values.networkPolicy.extraEgress }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+{{- end }}

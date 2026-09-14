@@ -1,0 +1,36 @@
+pg-logical-backup ({{ .Chart.Version }}) — logical pg_dump DR tier (monobase-mycure#4320)
+
+Namespace : {{ include "pgLogicalBackup.namespace" . }}
+Enabled   : {{ .Values.enabled }}
+Schedule  : {{ .Values.schedule }}{{ with .Values.timeZone }} ({{ . }}){{ end }}
+Dump      : pg_dump -Fc {{ .Values.database.name }} @ {{ .Values.database.readService }} (REPLICA)
+Ship to   : {{ .Values.destination.rcloneRemote }}:{{ .Values.destination.path }}  (keep < {{ .Values.destination.retentionDays }}d)
+
+ACTIVATION PREREQUISITES (out-of-band — do these before setting enabled: true / suspend: false):
+
+  1. Seed GCP Secret Manager (handoff — Joff / IAM):
+       {{- range .Values.externalSecrets.secrets }}
+       - {{ .remoteKey }}
+       {{- end }}
+     • dumper-db-password : a strong random password for the read-only `dumper` role.
+     • rclone.conf        : an rclone config with a `crypt` remote named
+                            "{{ .Values.destination.rcloneRemote }}" wrapping the backend
+                            niflheim pulls from (sftp to niflheim, or an object-store
+                            prefix). The crypt password lives ONLY here.
+
+  2. niflheim receive/pull side — configure niflheim's existing rclone timer to
+     pull (or receive) {{ .Values.destination.path }}/ into /mnt/storage/mycure/pgdump/.
+
+  3. Flip on: set pgLogicalBackup.enabled: true (and suspend: false) in the
+     deployment overlay. The PreSync hook provisions the `dumper` role; the
+     CronJob runs at {{ .Values.schedule }}.
+
+RESTORE (documented in docs/operations/):
+  rclone copy {{ .Values.destination.rcloneRemote }}:{{ .Values.destination.path }}/<TS> .   # decrypts on pull
+  psql -f globals-<TS>.sql            # roles/grants first (reset passwords after)
+  pg_restore -j4 -d <target-db> {{ .Values.database.name }}-<TS>.dump
+
+VERIFY a run:
+  kubectl -n {{ include "pgLogicalBackup.namespace" . }} get cronjob,job -l app.kubernetes.io/name=pg-logical-backup
+  kubectl -n {{ include "pgLogicalBackup.namespace" . }} logs job/<job-name> -c dump
+  kubectl -n {{ include "pgLogicalBackup.namespace" . }} logs job/<job-name> -c upload

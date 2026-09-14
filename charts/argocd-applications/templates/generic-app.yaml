@@ -20,6 +20,7 @@
   (dict "name" "mycure-pxp"       "key" "mycure-pxp" "chart" "app")
   (dict "name" "nocodb"           "key" "nocodb")
   (dict "name" "openmed"          "key" "openmed")
+  (dict "name" "pg-logical-backup" "key" "pgLogicalBackup")
 }}
 {{- $root := . }}
 {{- range $app := $apps }}

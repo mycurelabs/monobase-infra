@@ -1,0 +1,84 @@
+{{- if and .Values.enabled .Values.provisionRole.enabled }}
+# Provision the read-only `dumper` DB role — PreSync, BEFORE the CronJob's first
+# run. Idempotent psql run as the in-cluster superuser against the PRIMARY. SQL
+# lives in the sibling ConfigMap.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "pgLogicalBackup.fullname" . }}-provision-role
+  namespace: {{ include "pgLogicalBackup.namespace" . }}
+  labels:
+    {{- include "pgLogicalBackup.labels" . | nindent 4 }}
+    job-type: provision-role
+  annotations:
+    helm.sh/hook: pre-install,pre-upgrade
+    helm.sh/hook-weight: "-5"
+    helm.sh/hook-delete-policy: before-hook-creation
+    argocd.argoproj.io/hook: PreSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+spec:
+  backoffLimit: {{ .Values.provisionRole.backoffLimit | default 3 }}
+  ttlSecondsAfterFinished: 86400
+  activeDeadlineSeconds: {{ .Values.provisionRole.activeDeadlineSeconds | default 300 }}
+  template:
+    metadata:
+      labels:
+        {{- include "pgLogicalBackup.selectorLabels" . | nindent 8 }}
+        job-type: provision-role
+    spec:
+      restartPolicy: Never
+      enableServiceLinks: false
+      serviceAccountName: {{ include "pgLogicalBackup.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+      - name: provision-role
+        securityContext:
+          {{- toYaml .Values.securityContext | nindent 10 }}
+        image: {{ .Values.provisionRole.image | quote }}
+        imagePullPolicy: IfNotPresent
+        command: ["/bin/sh", "-ec"]
+        args:
+          - |
+            # Connect to the `postgres` maintenance db on the PRIMARY — the role
+            # is created here and replicates to the standby that the CronJob dumps.
+            psql "postgres://postgres:$(POSTGRES_PASSWORD)@{{ .Values.database.primaryService }}.{{ include "pgLogicalBackup.namespace" . }}.svc.cluster.local:{{ .Values.database.port }}/postgres" \
+              -v ON_ERROR_STOP=1 \
+              -v target_database={{ .Values.database.name }} \
+              -v dump_role={{ .Values.database.dumpRole }} \
+              -v dumper_password="$DUMPER_PASSWORD" \
+              -f /sql/provision.sql
+        env:
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.provisionRole.superuserSecret }}
+              key: {{ .Values.provisionRole.superuserSecretKey }}
+        - name: DUMPER_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.database.existingSecret }}
+              key: {{ .Values.database.passwordKey }}
+        - name: HOME
+          value: /tmp
+        volumeMounts:
+        - name: sql
+          mountPath: /sql
+          readOnly: true
+        - name: tmp
+          mountPath: /tmp
+        resources:
+          requests:
+            cpu: 25m
+            memory: 32Mi
+          limits:
+            cpu: 100m
+            memory: 128Mi
+      volumes:
+      - name: sql
+        configMap:
+          name: {{ include "pgLogicalBackup.fullname" . }}-provision-role
+      - name: tmp
+        emptyDir:
+          sizeLimit: 64Mi
+{{- end }}

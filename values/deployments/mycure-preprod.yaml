@@ -406,6 +406,23 @@ openmed:
 walg:
   enabled: false
 
+# ===== LOGICAL BACKUP: nightly pg_dump DR tier (monobase-mycure#4320) =====
+# Portable pg_dump -Fc of the hapihub DB (the logical tier the physical backups
+# — Velero/Kopia, wal-g PITR — don't provide), dumped from the READ REPLICA,
+# verified, crypt-encrypted, shipped off-cloud to niflheim. Staged here disabled;
+# activation is gated on two GCP Secret Manager keys + niflheim's rclone receive
+# (see charts/pg-logical-backup NOTES.txt). Flip enabled+suspend to go live.
+pgLogicalBackup:
+  enabled: false
+  # suspend: true    # uncomment to land the app + provision the role without running yet
+  database:
+    name: hapihub
+    readService: postgresql-read
+    primaryService: postgresql-primary
+  destination:
+    path: pgdump-preprod
+    retentionDays: 7
+
 # ===== DATABASE: PostgreSQL (HA — 1 primary + 1 read replica, prod parity) =====
 # The cadence hub's reconcile/serve scan plane reads from the replica
 # (CADENCE_DB_READ_URL), same read-plane split as prod. Local-path storage
