@@ -22,7 +22,7 @@ spec:
     helm:
       releaseName: velero-resources
       valueFiles:
-        - ../../values/clusters/{{ .Values.clusterName | default "aws-main" }}/argocd/infrastructure.yaml
+        - ../../values/clusters/{{ required "clusterName is required — set it in values/clusters/<cluster>/argocd/infrastructure.yaml (the infra root injects it; there is deliberately NO default so a missing value hard-fails instead of silently retargeting a non-existent cluster dir)" .Values.clusterName }}/argocd/infrastructure.yaml
 
   destination:
     server: https://kubernetes.default.svc

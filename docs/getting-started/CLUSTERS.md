@@ -58,8 +58,13 @@ The script automatically:
 ### 4. Bootstrap GitOps
 
 ```bash
-# Install ArgoCD and enable auto-discovery (one-time)
-mise run bootstrap
+# Install ArgoCD and enable auto-discovery (one-time).
+# Select the target kubectl context first (bootstrap.ts always uses the current
+# context), then pass --cluster-name so it loads the per-cluster bootstrap
+# values (values/clusters/<cluster>/argocd/bootstrap.yaml). A bare
+# `mise run bootstrap` falls back to the generic `aws-main` chart default.
+kubectl config use-context <your-context>
+mise run bootstrap -- --cluster-name <cluster>   # e.g. mycure-doks-main
 ```
 
 ## Configuration Options
@@ -208,7 +213,11 @@ kubectl get nodes
 ### 2. Bootstrap GitOps
 
 ```bash
-mise run bootstrap
+# Select the target context first; --cluster-name loads the per-cluster
+# values/clusters/<cluster>/argocd/bootstrap.yaml (a bare `mise run bootstrap`
+# falls back to the generic `aws-main` chart default and mis-seeds the roots).
+kubectl config use-context <your-context>
+mise run bootstrap -- --cluster-name <cluster>   # e.g. mycure-doks-main
 ```
 
 This installs:

@@ -47,8 +47,12 @@ Everything is GitOps — push to `main` and ArgoCD syncs:
    (gateway listeners, cert issuers, snippets policies, ...).
 3. **Cluster itself** (node pools, k8s version): `values/cluster` +
    `mise run cluster-plan` / `mise run cluster-apply` (OpenTofu).
-4. **Bootstrap** (new/empty cluster): `mise run bootstrap` — installs ArgoCD
-   and the root apps; everything else flows from Git.
+4. **Bootstrap** (new/empty cluster): select the target kubectl context, then
+   `mise run bootstrap -- --cluster-name <cluster>` (e.g. `mycure-doks-main`) —
+   installs ArgoCD and the root apps; everything else flows from Git. The
+   `--cluster-name` loads `values/clusters/<cluster>/argocd/bootstrap.yaml`; a
+   bare `mise run bootstrap` falls back to the generic `aws-main` chart default
+   and mis-seeds the roots at a non-existent cluster path.
 
 Direct `kubectl` changes are reverted by ArgoCD self-heal.
 

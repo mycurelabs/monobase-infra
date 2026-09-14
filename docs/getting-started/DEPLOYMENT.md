@@ -78,7 +78,12 @@ cert-manager, External Secrets Operator, monitoring, velero, and all app
 workloads) straight from the repo.
 
 ```bash
-mise run bootstrap
+# Select the target kubectl context first (bootstrap.ts always uses the current
+# context), then pass --cluster-name so it loads the per-cluster bootstrap values
+# (values/clusters/<cluster>/argocd/bootstrap.yaml). A bare `mise run bootstrap`
+# falls back to the generic `aws-main` chart default and mis-seeds the roots.
+kubectl config use-context <your-context>
+mise run bootstrap -- --cluster-name <cluster>   # e.g. mycure-doks-main
 ```
 
 Prerequisites:

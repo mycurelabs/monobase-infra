@@ -2,6 +2,16 @@
 # These control cluster-wide infrastructure components
 # Note: argocd.repoURL is injected from infrastructure-root.yaml bootstrap file
 
+# Which cluster this infra config belongs to. The infrastructure root injects
+# this same value down at bootstrap; declaring it here too makes the child
+# Applications that read it directly from THIS file — velero-resources and
+# external-dns, which resolve their own per-cluster valueFiles path from
+# `.Values.clusterName` — independent of the root injection. Their templates
+# now `required` it (no `aws-main` fallback), so this line is load-bearing:
+# if it goes missing those two Applications hard-fail to render instead of
+# silently retargeting a non-existent `aws-main` directory.
+clusterName: mycure-doks-main
+
 # Ops-plane placement — pin the infrastructure operators (cert-manager,
 # external-secrets, nginx-gateway control+data plane) to the tainted infra pool,
 # away from the prod/preprod app pools and the noisy nonprod ops jobs. Consumed

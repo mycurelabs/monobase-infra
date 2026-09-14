@@ -452,17 +452,51 @@ spec:
 
     try {
       // kubectl, not helm install: the live objects are kubectl-owned.
-      // Per-cluster override (e.g. clusterName + deploymentPaths) via --bootstrap-values.
-      const extraValues = this.config.bootstrapValues ? ['-f', this.config.bootstrapValues] : [];
+      //
+      // Per-cluster bootstrap values (clusterName + deploymentPaths + repoURL)
+      // are auto-loaded from values/clusters/<clusterName>/argocd/bootstrap.yaml.
+      // The chart default clusterName is the generic reference `aws-main` (NOT a
+      // real dir in this repo), so a bare `mise run bootstrap` MUST pick up the
+      // per-cluster file — otherwise it would seed the infra root + AppSet
+      // pointing at a non-existent cluster path (silent ComparisonError; no infra
+      // apps ever created on a fresh DR). An explicit --bootstrap-values still
+      // wins as an override.
+      const bootstrapValues = await this.resolveBootstrapValues();
+      const extraValues = ['-f', bootstrapValues];
       const rendered = await $`helm template argocd-bootstrap charts/argocd-bootstrap ${extraValues}`.text();
       await $`kubectl apply -f - < ${new Response(rendered)}`.quiet();
-      spinner.succeed('ArgoCD bootstrap deployed');
+      spinner.succeed(`ArgoCD bootstrap deployed (values: ${bootstrapValues})`);
     } catch (error) {
       spinner.fail('ArgoCD bootstrap deployment failed');
       throw error;
     }
 
     console.log(chalk.green('\n✓ Bootstrap complete'));
+  }
+
+  // Resolve the argocd-bootstrap values file for this cluster.
+  // Precedence: explicit --bootstrap-values > per-cluster convention file.
+  // The convention file (values/clusters/<clusterName>/argocd/bootstrap.yaml)
+  // is REQUIRED when no explicit override is given — the chart's own default
+  // clusterName is the generic `aws-main` reference, which resolves to no real
+  // directory, so falling through to it would silently mis-seed the cluster.
+  async resolveBootstrapValues(): Promise<string> {
+    if (this.config.bootstrapValues) {
+      return this.config.bootstrapValues;
+    }
+
+    const conventionPath = `values/clusters/${this.config.clusterName}/argocd/bootstrap.yaml`;
+    if (await Bun.file(conventionPath).exists()) {
+      return conventionPath;
+    }
+
+    throw new Error(
+      `No bootstrap values for cluster "${this.config.clusterName}": ` +
+      `expected ${conventionPath} (or pass --bootstrap-values <file>). ` +
+      `The argocd-bootstrap chart default clusterName is the generic "aws-main" ` +
+      `reference — bootstrapping without a per-cluster file would seed the infra ` +
+      `root + ApplicationSet at a non-existent cluster path.`
+    );
   }
 
   // ===== Wait for Sync =====
