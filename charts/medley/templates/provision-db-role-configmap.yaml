@@ -30,6 +30,14 @@ data:
   provision.sql: |
     \set ON_ERROR_STOP on
 
+    -- Pull the medley role password from the MEDLEY_PASSWORD env var into a
+    -- psql variable WITHOUT exposing it in argv. `\getenv` (psql >= 16) reads an
+    -- environment variable into a psql var; the value never appears on the
+    -- command line (unlike `-v medley_password=...`, which `ps` would show).
+    -- The superuser password reaches libpq via PGPASSWORD (set on the Job), so
+    -- no password is in the connection string either.
+    \getenv medley_password MEDLEY_PASSWORD
+
     -- NOTE: the target db name arrives as psql var `:target_database` (NOT
     -- `:DBNAME`). `DBNAME` is a psql RESERVED connection variable that psql
     -- OVERWRITES to the actually-connected db on connect — since the Job
