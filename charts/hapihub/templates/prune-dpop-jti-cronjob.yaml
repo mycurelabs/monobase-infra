@@ -1,0 +1,128 @@
+{{- if and .Values.enabled .Values.pruneExpiredDpopJti.enabled }}
+# Hourly prune of expired DPoP (RFC 9449) replay-guard rows. The developer
+# platform (monobase-mycure#4393) stores each accepted DPoP proof jti in
+# `dpop_jti_seen` (jti TEXT PK, expires_at) purely for replay detection; a row is
+# only meaningful until expires_at (proof iat + validity window) but hapihub never
+# deletes it, so the table grows unbounded.
+#
+# SAFETY (PR #451 review — the table is created only by the UNRELEASED migration
+# monobase-mycure#0106_oauth_dpop, so this must be a clean no-op until it ships):
+#  - Absence guard: `to_regclass('public.dpop_jti_seen')` — if NULL, exit 0. Absent
+#    table is an intentional no-op (success), never a failed Job.
+#  - Least-privilege: connects as the dedicated `dpop_pruner` role (CONNECT + schema
+#    USAGE + SELECT/DELETE on dpop_jti_seen only), NOT the postgres superuser. The
+#    role + (expires_at) index + grants are provisioned by the superuser PreSync Job
+#    (provision-dpop-pruner-*.yaml).
+#  - Bounded batched DELETE: `ctid IN (SELECT … LIMIT :batch)` looped until 0 rows,
+#    with per-statement SET lock_timeout / SET statement_timeout (activeDeadlineSeconds
+#    is a Job cap, NOT a DB lock/statement timeout). Avoids the unbounded single-txn
+#    DELETE that would seq-scan and burst WAL/dead-tuples on a backlog.
+#  - No argv creds: PGHOST/PGPORT/PGUSER/PGDATABASE/PGPASSWORD env, no URI/password
+#    on the command line (invisible to `ps`).
+#
+# Assumes in-cluster PostgreSQL (postgresql.external: false), like prune-sessions.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "hapihub.fullname" . }}-prune-dpop-jti
+  namespace: {{ include "hapihub.namespace" . }}
+  labels:
+    {{- include "hapihub.labels" . | nindent 4 }}
+    job-type: prune-dpop-jti
+spec:
+  schedule: {{ .Values.pruneExpiredDpopJti.schedule | default "0 * * * *" | quote }}
+  timeZone: {{ .Values.pruneExpiredDpopJti.timeZone | default "Etc/UTC" | quote }}
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: {{ .Values.pruneExpiredDpopJti.successfulJobsHistoryLimit | default 3 }}
+  failedJobsHistoryLimit: {{ .Values.pruneExpiredDpopJti.failedJobsHistoryLimit | default 3 }}
+  startingDeadlineSeconds: 3600
+  jobTemplate:
+    spec:
+      backoffLimit: {{ .Values.pruneExpiredDpopJti.backoffLimit | default 1 }}
+      ttlSecondsAfterFinished: {{ .Values.pruneExpiredDpopJti.ttlSecondsAfterFinished | default 86400 }}
+      activeDeadlineSeconds: {{ .Values.pruneExpiredDpopJti.activeDeadlineSeconds | default 600 }}
+      template:
+        metadata:
+          {{- with .Values.podAnnotations }}
+          annotations:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          labels:
+            {{- include "hapihub.selectorLabels" . | nindent 12 }}
+            job-type: prune-dpop-jti
+        spec:
+          {{- with .Values.imagePullSecrets }}
+          imagePullSecrets:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          serviceAccountName: {{ include "hapihub.serviceAccountName" . }}
+          enableServiceLinks: false
+          restartPolicy: Never
+          {{- $nodePool := include "hapihub.nodePool" . -}}
+          {{- if or $nodePool .Values.nodeSelector }}
+          nodeSelector:
+            {{- if $nodePool }}
+            node-pool: {{ $nodePool }}
+            {{- end }}
+            {{- with .Values.nodeSelector }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          {{- end }}
+          {{- if or $nodePool .Values.tolerations }}
+          tolerations:
+            {{- if $nodePool }}
+            - key: "node-pool"
+              operator: "Equal"
+              value: {{ $nodePool | quote }}
+              effect: "NoSchedule"
+            {{- end }}
+            {{- with .Values.tolerations }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          {{- end }}
+          securityContext:
+            {{- toYaml .Values.podSecurityContext | nindent 12 }}
+          containers:
+          - name: {{ .Chart.Name }}-prune-dpop-jti
+            securityContext:
+              {{- toYaml .Values.securityContext | nindent 14 }}
+            # Same image the in-cluster PG statefulset runs — already on nodes.
+            image: {{ .Values.pruneExpiredDpopJti.image | default "docker.io/bitnamilegacy/postgresql:16.4.0-debian-12-r13" | quote }}
+            imagePullPolicy: IfNotPresent
+            command: ["/bin/sh", "-ec"]
+            # Absence-guarded, batched, timeout-bounded prune. SQL is the single
+            # source of truth in the sibling ConfigMap (also exercised by the
+            # self-check test tests/prune-dpop-jti.test.sh — keep them in lockstep).
+            args:
+              - |
+                psql -v ON_ERROR_STOP=1 \
+                  -v batch={{ .Values.pruneExpiredDpopJti.batchSize | default 10000 }} \
+                  -v lock_timeout={{ .Values.pruneExpiredDpopJti.lockTimeout | default "5s" | quote }} \
+                  -v statement_timeout={{ .Values.pruneExpiredDpopJti.statementTimeout | default "60s" | quote }} \
+                  -f /sql/prune.sql
+            resources:
+              {{- toYaml .Values.pruneExpiredDpopJti.resources | nindent 14 }}
+            env:
+            # Least-privilege role connection via env — NO password in argv/URI.
+            - name: PGHOST
+              value: {{ include "hapihub.postgresql.host" . | quote }}
+            - name: PGPORT
+              value: "5432"
+            - name: PGUSER
+              value: {{ (.Values.pruneExpiredDpopJti.provision | default dict).role | default "dpop_pruner" | quote }}
+            - name: PGDATABASE
+              value: {{ include "hapihub.postgresql.database" . | quote }}
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ (.Values.pruneExpiredDpopJti.provision | default dict).secretName | default "postgresql-dpop-pruner" }}
+                  key: dpop-pruner-password
+            volumeMounts:
+            - name: sql
+              mountPath: /sql
+              readOnly: true
+          volumes:
+          - name: sql
+            configMap:
+              name: {{ include "hapihub.fullname" . }}-prune-dpop-jti
+{{- end }}
