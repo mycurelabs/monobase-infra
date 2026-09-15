@@ -25,6 +25,13 @@
 #                           the OTHER platforms and exits non-zero, and a SECOND
 #                           run (failure cleared) completes the straggler. Proves
 #                           a partial failure is recoverable, never wedged.
+#   (f) prod-render       — EFFECTIVE-RENDER assertion (not the script, the wiring):
+#                           render the PROD deployment overlay through the real
+#                           argocd-applications factory + charts/maestroapp and
+#                           assert prod actually renders the reconcile CronJob with
+#                           the intended schedule ALONGSIDE the promote Job. Guards
+#                           against the drift guard being INERT in prod because the
+#                           overlay forgot to flip reconcile.enabled (round-4 fix).
 #
 # Run:  sh charts/maestroapp/tests/promote-selfcheck.sh
 # Needs: helm, sh, jq, sha256sum, mktemp, mkdir/cat. No cluster, no real mc/MinIO.
@@ -271,5 +278,65 @@ grep -q "linux_x86_64/latest.json" "$WRITES_LOG" || fail "(e) run2 did not compl
 # darwin/windows already at PIN from run1 => byte-identical => must be no-op skips
 grep -q "darwin_aarch64/latest.json" "$WRITES_LOG" && fail "(e) run2 re-copied already-reconciled darwin (not idempotent)"
 echo "PASS (e) run2: straggler linux completed, already-done platforms skipped, exit $rc"
+
+# ============================================================================
+# (f) prod-render: the PROD overlay must actually ENABLE the reconcile CronJob.
+#     Renders the real argocd-applications factory with base + mycure-production
+#     values (exactly as `mise run lint-helm` does), extracts the maestroapp
+#     Application's valuesObject, feeds it back into charts/maestroapp, and
+#     asserts BOTH the promote Job AND the reconcile CronJob render — the CronJob
+#     with the schedule the overlay set. A drift guard that defaults off is inert
+#     unless the prod overlay flips it; this asserts the effective render, not the
+#     chart's capability.
+# ============================================================================
+repo_root=$(CDPATH= cd -- "$chart_dir/../.." && pwd)
+base_vals="$repo_root/values/deployments/base.yaml"
+prod_vals="$repo_root/values/deployments/mycure-production.yaml"
+[ -f "$base_vals" ] || fail "(f) missing $base_vals"
+[ -f "$prod_vals" ] || fail "(f) missing $prod_vals"
+
+# 1) render the app-of-apps and pull the maestroapp Application's valuesObject.
+apps="$work/apps.yaml"
+helm template lint "$repo_root/charts/argocd-applications" \
+  -f "$base_vals" -f "$prod_vals" \
+  --set argocd.repoURL=lint --set argocd.targetRevision=lint \
+  >"$apps" 2>"$work/apps.err" \
+  || { cat "$work/apps.err" >&2; fail "(f) argocd-applications prod render failed"; }
+
+# Extract the valuesObject block under the mycure-production-maestroapp Application.
+# It sits between `valuesObject:` and the next same-or-lower-indent key
+# (`  destination:`), inside that one Application document.
+prod_vo="$work/prod_valuesobject.yaml"
+awk '
+  /name: mycure-production-maestroapp/ { inapp=1 }
+  inapp && /^      valuesObject:/       { invo=1; next }
+  invo && /^  destination:/            { invo=0; inapp=0 }
+  invo                                 { sub(/^        /, ""); print }
+' "$apps" >"$prod_vo"
+[ -s "$prod_vo" ] || fail "(f) could not extract maestroapp valuesObject from prod render"
+grep -q '^reconcile:' "$prod_vo" \
+  || fail "(f) prod overlay does NOT set maestroapp.reconcile — CronJob would be inert in prod"
+
+# 2) feed that effective valuesObject into charts/maestroapp and render.
+prod_render="$work/prod_maestroapp.yaml"
+helm template maestroapp "$chart_dir" -f "$prod_vo" \
+  >"$prod_render" 2>"$work/render.err" \
+  || { cat "$work/render.err" >&2; fail "(f) charts/maestroapp prod render failed"; }
+
+# 3) assert BOTH workloads render, and the CronJob carries the overlay's schedule.
+grep -Eq '^kind: Job$'     "$prod_render" || fail "(f) prod render missing the promote Job"
+grep -Eq '^kind: CronJob$' "$prod_render" || fail "(f) prod render missing the reconcile CronJob (drift guard inert in prod)"
+grep -q 'name: maestroapp-reconcile' "$prod_render" \
+  || fail "(f) reconcile CronJob not named as expected in prod render"
+
+# schedule the CronJob renders with must equal the schedule the prod overlay set.
+# strip only surrounding quotes (not inner spaces) so the cron expr stays readable.
+unquote() { sed -e "s/^['\"]//" -e "s/['\"]$//"; }
+want_sched=$(sed -n 's/^  schedule:[[:space:]]*//p' "$prod_vo"    | head -n1 | unquote)
+[ -n "$want_sched" ] || fail "(f) prod overlay set reconcile.enabled but no reconcile.schedule"
+got_sched=$(sed -n 's/^  schedule:[[:space:]]*//p' "$prod_render" | head -n1 | unquote)
+[ "$got_sched" = "$want_sched" ] \
+  || fail "(f) rendered CronJob schedule '$got_sched' != prod overlay schedule '$want_sched'"
+echo "PASS (f) prod-render: promote Job + reconcile CronJob both present in prod, schedule='$got_sched'"
 
 echo "ALL CHECKS PASSED"
