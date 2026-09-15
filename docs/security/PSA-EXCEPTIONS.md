@@ -13,6 +13,21 @@ kubectl labels — see charts/argocd-infrastructure/templates/{velero,monitoring
                               control is kubeconfig custody.
 - monitoring                  audit/warn=baseline only — node-exporter is
                               hostNetwork + hostPath BY DESIGN (node metrics).
+                              ALSO houses promtail (DaemonSet): runs as root
+                              (default) + hostPath mounts (/var/log,
+                              /var/lib/docker/containers) BY DESIGN — it tails
+                              node/container log files, which requires host FS
+                              read + root. Compensating controls: promtail is
+                              NONPROD-ONLY on DOKS (no node-pool tolerations, so
+                              it never lands on prod-db/prod-apps/infra), read-
+                              only-root-fs + drop-ALL caps on its own container,
+                              and its container security context sets
+                              allowPrivilegeEscalation:false. Follow-ups: (1)
+                              migrate to Grafana Alloy — promtail is deprecated
+                              upstream (EOL 2026); (2) drop root via
+                              runAsUser + a supplemental group with read on the
+                              log paths; (3) pin image digests. Plan to remove:
+                              superseded by the Alloy migration.
 - argocd                      enforce=baseline (holds cluster-admin; no
                               privileged pods, restricted is the goal)
 - cert-manager                enforce=baseline

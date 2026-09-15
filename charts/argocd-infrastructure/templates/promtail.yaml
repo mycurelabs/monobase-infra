@@ -1,6 +1,22 @@
 {{- if (.Values.loki | default dict).enabled }}
 # ArgoCD Application: Promtail — per-node log collector shipping to Loki.
 # Sync Wave 1 - after the monitoring stack (wave 0).
+#
+# SCOPE: NONPROD-ONLY on DOKS. Promtail is a DaemonSet and carries NO
+# node-pool tolerations, so it schedules only on untainted nodes. On DOKS every
+# pool except `nonprod` is tainted (node-pool=<pool>:NoSchedule: prod-db,
+# prod-apps, infra), so promtail runs on the nonprod pool only and collects
+# nothing from prod-apps / prod-db / infra. This is DELIBERATE: full-fleet
+# collection would put prod (PHI-bearing) container logs into Loki, which runs
+# auth_enabled:false — that needs an explicit PHI/retention sign-off plus the
+# Loki NetworkPolicy (see loki.yaml) before adding node-pool tolerations here.
+# Until then Loki/Promtail is a nonprod log stack, NOT a prod log stack, and
+# Falco's prod alerts (falco runs fleet-wide) are NOT collected by this promtail.
+#
+# The nonprod nodeSelector + empty tolerations below are the DOKS defaults; a
+# single-node cluster with no node-pool labels (vanaheim k3d) overrides both via
+# `loki.promtail.nodeSelector` / `loki.promtail.tolerations` in its cluster
+# values so the DaemonSet can still schedule on its one (untainted) node.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -53,13 +69,22 @@ spec:
               - ALL
           readOnlyRootFilesystem: true
 
-        tolerations:
-          - effect: NoSchedule
-            key: node-role.kubernetes.io/master
-            operator: Exists
-          - effect: NoSchedule
-            key: node-role.kubernetes.io/control-plane
-            operator: Exists
+        # NONPROD-ONLY, enforced by BOTH mechanisms (see the SCOPE note above):
+        #   1. nodeSelector pins pods to the untainted nonprod pool. This is the
+        #      durable positive boundary — empty tolerations alone are not, since
+        #      a newly untainted node or a changed prod taint could otherwise let
+        #      this privileged host-log collector land on a PROD node and ship
+        #      PHI-bearing logs to Loki (auth_enabled:false).
+        #   2. NO tolerations — the old master/control-plane tolerations were
+        #      inert on DOKS (managed worker nodes carry no such taint), removed.
+        # Both default to the DOKS shape; a cluster without a nonprod pool
+        # (vanaheim k3d, single untainted node) sets loki.promtail.nodeSelector:
+        # {} + its own tolerations in cluster values so the DaemonSet schedules.
+        {{- $pt := .Values.loki.promtail | default dict }}
+        {{- $ptNodeSelector := ternary (index $pt "nodeSelector") (dict "node-pool" "nonprod") (hasKey $pt "nodeSelector") }}
+        {{- $ptTolerations := ternary (index $pt "tolerations") (list) (hasKey $pt "tolerations") }}
+        nodeSelector: {{ if $ptNodeSelector }}{{ $ptNodeSelector | toYaml | nindent 10 }}{{ else }}{}{{ end }}
+        tolerations: {{ if $ptTolerations }}{{ $ptTolerations | toYaml | nindent 10 }}{{ else }}[]{{ end }}
 
         serviceMonitor:
           enabled: false

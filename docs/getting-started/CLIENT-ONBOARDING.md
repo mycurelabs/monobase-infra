@@ -142,8 +142,13 @@ git push origin main
 ## Step 7: Bootstrap Cluster (One-Time)
 
 ```bash
-# Run bootstrap script to install ArgoCD + Infrastructure
-mise run bootstrap
+# Run bootstrap script to install ArgoCD + Infrastructure.
+# Select the target kubectl context first (bootstrap.ts uses the current
+# context), then pass --cluster-name to load the per-cluster
+# values/clusters/<cluster>/argocd/bootstrap.yaml. A bare `mise run bootstrap`
+# falls back to the generic `aws-main` chart default and mis-seeds the roots.
+kubectl config use-context <your-context>
+mise run bootstrap -- --cluster-name <cluster>
 
 # This installs:
 # 1. ArgoCD itself

@@ -4,6 +4,16 @@
 # Everything DigitalOcean-specific or heavy is disabled below.
 # Note: argocd.repoURL is injected from infrastructure-root.yaml bootstrap file
 
+# Which cluster this infra config belongs to. The infrastructure root injects
+# this same value down at bootstrap; declaring it here too makes the child
+# Applications that read it directly from THIS file — velero-resources and
+# external-dns, which resolve their own per-cluster valueFiles path from
+# `.Values.clusterName` — independent of the root injection. Their templates
+# `required` it (no fallback, #436), so this line is load-bearing: if it goes
+# missing those two Applications hard-fail to render instead of silently
+# retargeting a non-existent cluster directory.
+clusterName: mycure-onprem-vanaheim
+
 # Cert Manager - TLS certificate automation
 certManager:
   enabled: true
@@ -347,6 +357,18 @@ loki:
   perStreamRateLimitBurst: "128KB"
   promtail:
     version: "6.16.6"
+    # vanaheim is a single-node k3d cluster with NO node-pool labels, so the
+    # DOKS-default `nodeSelector: {node-pool: nonprod}` would leave the promtail
+    # DaemonSet unschedulable. Clear it and tolerate the k3d server-node taints
+    # so promtail runs on the one node (this cluster is nonprod in its entirety).
+    nodeSelector: {}
+    tolerations:
+      - effect: NoSchedule
+        key: node-role.kubernetes.io/master
+        operator: Exists
+      - effect: NoSchedule
+        key: node-role.kubernetes.io/control-plane
+        operator: Exists
 
 # Tailscale egress to the vanaheim workstation Ollama
 ollamaEgress:
