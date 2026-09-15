@@ -1,0 +1,98 @@
+{{- if (.Values.loki | default dict).enabled }}
+# ArgoCD Application: Promtail — per-node log collector shipping to Loki.
+# Sync Wave 1 - after the monitoring stack (wave 0).
+#
+# SCOPE: NONPROD-ONLY on DOKS. Promtail is a DaemonSet and carries NO
+# node-pool tolerations, so it schedules only on untainted nodes. On DOKS every
+# pool except `nonprod` is tainted (node-pool=<pool>:NoSchedule: prod-db,
+# prod-apps, infra), so promtail runs on the nonprod pool only and collects
+# nothing from prod-apps / prod-db / infra. This is DELIBERATE: full-fleet
+# collection would put prod (PHI-bearing) container logs into Loki, which runs
+# auth_enabled:false — that needs an explicit PHI/retention sign-off plus the
+# Loki NetworkPolicy (see loki.yaml) before adding node-pool tolerations here.
+# Until then Loki/Promtail is a nonprod log stack, NOT a prod log stack, and
+# Falco's prod alerts (falco runs fleet-wide) are NOT collected by this promtail.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: promtail
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+
+  source:
+    chart: promtail
+    repoURL: https://grafana.github.io/helm-charts
+    targetRevision: {{ (.Values.loki.promtail | default dict).version | default "6.16.6" }}
+    helm:
+      releaseName: promtail
+      valuesObject:
+        config:
+          clients:
+            - url: http://loki.monitoring.svc:3100/loki/api/v1/push
+          snippets:
+            pipelineStages:
+              - cri: {}
+              - json:
+                  expressions:
+                    level: level
+                    msg: msg
+                    timestamp: timestamp
+              - labels:
+                  level:
+              # Drop health-check noise.
+              - drop:
+                  source: msg
+                  expression: "^(GET|HEAD) /(livez|readyz|healthz)"
+
+        resources:
+          requests:
+            cpu: 50m
+            memory: 64Mi
+          limits:
+            cpu: 200m
+            memory: 128Mi
+
+        containerSecurityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+              - ALL
+          readOnlyRootFilesystem: true
+
+        # NONPROD-ONLY, enforced by BOTH mechanisms (see the SCOPE note above):
+        #   1. nodeSelector pins pods to the untainted nonprod pool. This is the
+        #      durable positive boundary — empty tolerations alone are not, since
+        #      a newly untainted node or a changed prod taint could otherwise let
+        #      this privileged host-log collector land on a PROD node and ship
+        #      PHI-bearing logs to Loki (auth_enabled:false).
+        #   2. NO tolerations — the old master/control-plane tolerations were
+        #      inert on DOKS (managed worker nodes carry no such taint), removed.
+        nodeSelector:
+          node-pool: nonprod
+        tolerations: []
+
+        serviceMonitor:
+          enabled: false
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 10s
+        maxDuration: 5m
+{{- end }}

@@ -17,3 +17,12 @@
 infra:
   nodeSelector: {}
   tolerations: []
+
+# Loki/Promtail log stack — OFF by default. A cluster opts in from
+# values/clusters/<cluster>/argocd/infrastructure.yaml (loki.enabled: true,
+# with version/storageSize/retention + promtail.version). The loki.yaml and
+# promtail.yaml templates are additionally nil-safe ((.Values.loki | default
+# dict).enabled), so a cluster values file that omits `loki:` entirely still
+# renders — this default just documents the key.
+loki:
+  enabled: false
