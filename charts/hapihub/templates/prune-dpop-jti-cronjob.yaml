@@ -1,0 +1,98 @@
+{{- if and .Values.enabled .Values.pruneExpiredDpopJti.enabled }}
+# Prune of expired DPoP (RFC 9449) replay-guard rows. The developer platform
+# (mono#4393) stores each accepted DPoP proof jti in `dpop_jti_seen`
+# (jti TEXT PK, expires_at) purely for replay detection; a row is only
+# meaningful until expires_at (proof iat + 60s) but hapihub never deletes it,
+# so the table grows unbounded. Runs a plain psql
+# `DELETE FROM dpop_jti_seen WHERE expires_at < now()` — bounded, idempotent,
+# only touches already-expired rows, so it never rejects a live proof.
+# Mirrors prune-sessions-cronjob exactly (same image / DATABASE_URI wiring);
+# no trigger bypass needed (dpop_jti_seen is a plain table).
+# Assumes in-cluster PostgreSQL (postgresql.external: false), like prune-sessions.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "hapihub.fullname" . }}-prune-dpop-jti
+  namespace: {{ include "hapihub.namespace" . }}
+  labels:
+    {{- include "hapihub.labels" . | nindent 4 }}
+    job-type: prune-dpop-jti
+spec:
+  schedule: {{ .Values.pruneExpiredDpopJti.schedule | default "0 * * * *" | quote }}
+  timeZone: {{ .Values.pruneExpiredDpopJti.timeZone | default "Etc/UTC" | quote }}
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: {{ .Values.pruneExpiredDpopJti.successfulJobsHistoryLimit | default 3 }}
+  failedJobsHistoryLimit: {{ .Values.pruneExpiredDpopJti.failedJobsHistoryLimit | default 3 }}
+  startingDeadlineSeconds: 3600
+  jobTemplate:
+    spec:
+      backoffLimit: {{ .Values.pruneExpiredDpopJti.backoffLimit | default 1 }}
+      ttlSecondsAfterFinished: {{ .Values.pruneExpiredDpopJti.ttlSecondsAfterFinished | default 86400 }}
+      activeDeadlineSeconds: {{ .Values.pruneExpiredDpopJti.activeDeadlineSeconds | default 600 }}
+      template:
+        metadata:
+          {{- with .Values.podAnnotations }}
+          annotations:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          labels:
+            {{- include "hapihub.selectorLabels" . | nindent 12 }}
+            job-type: prune-dpop-jti
+        spec:
+          {{- with .Values.imagePullSecrets }}
+          imagePullSecrets:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          serviceAccountName: {{ include "hapihub.serviceAccountName" . }}
+          enableServiceLinks: false
+          restartPolicy: Never
+          {{- $nodePool := include "hapihub.nodePool" . -}}
+          {{- if or $nodePool .Values.nodeSelector }}
+          nodeSelector:
+            {{- if $nodePool }}
+            node-pool: {{ $nodePool }}
+            {{- end }}
+            {{- with .Values.nodeSelector }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          {{- end }}
+          {{- if or $nodePool .Values.tolerations }}
+          tolerations:
+            {{- if $nodePool }}
+            - key: "node-pool"
+              operator: "Equal"
+              value: {{ $nodePool | quote }}
+              effect: "NoSchedule"
+            {{- end }}
+            {{- with .Values.tolerations }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          {{- end }}
+          securityContext:
+            {{- toYaml .Values.podSecurityContext | nindent 12 }}
+          containers:
+          - name: {{ .Chart.Name }}-prune-dpop-jti
+            securityContext:
+              {{- toYaml .Values.securityContext | nindent 14 }}
+            # Same image the in-cluster PG statefulset runs — already on nodes.
+            image: {{ .Values.pruneExpiredDpopJti.image | default "docker.io/bitnamilegacy/postgresql:16.4.0-debian-12-r13" | quote }}
+            imagePullPolicy: IfNotPresent
+            command: ["/bin/sh", "-ec"]
+            args:
+              - |
+                psql "$DATABASE_URI" -v ON_ERROR_STOP=1 \
+                  -c 'DELETE FROM dpop_jti_seen WHERE expires_at < now();'
+            resources:
+              {{- toYaml .Values.pruneExpiredDpopJti.resources | nindent 14 }}
+            env:
+            # Mirrors the DATABASE_URI composition in hapihub.containerEnv.
+            - name: POSTGRESQL_USER
+              value: {{ include "hapihub.postgresql.username" . | quote }}
+            - name: POSTGRESQL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.postgresql.auth.existingSecret | default "postgresql" }}
+                  key: postgres-password
+            - name: DATABASE_URI
+              value: "postgres://$(POSTGRESQL_USER):$(POSTGRESQL_PASSWORD)@{{ include "hapihub.postgresql.host" . }}:5432/{{ include "hapihub.postgresql.database" . }}"
+{{- end }}

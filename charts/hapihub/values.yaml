@@ -217,6 +217,26 @@ pruneExpiredSessions:
       cpu: 100m
       memory: 128Mi
 
+# Hourly CronJob that psql-DELETEs expired DPoP replay-guard rows from
+# dpop_jti_seen (mono#4393 developer platform / RFC 9449). hapihub records
+# each accepted proof jti for replay detection but never removes the row once
+# it expires (iat + 60s), so the table grows unbounded. Idempotent + bounded;
+# only deletes already-expired rows, never rejects a live proof. Runs the
+# in-cluster PG client image; DATABASE_URI composed the same way as
+# hapihub.containerEnv. Opt in per-environment (mirrors pruneExpiredSessions).
+pruneExpiredDpopJti:
+  enabled: false
+  schedule: "0 * * * *"   # hourly (rows are meaningful only ~60s)
+  timeZone: "Etc/UTC"
+  # image: override the psql client image (defaults to the in-cluster PG image)
+  resources:
+    requests:
+      cpu: 25m
+      memory: 32Mi
+    limits:
+      cpu: 100m
+      memory: 128Mi
+
 # Weekly HIPAA-retention prune of the #3484 append-only audit_events trail.
 # Connects as the PG SUPERUSER and runs `SET session_replication_role = replica`
 # to bypass the append-only guard trigger for the DELETE (see the CronJob

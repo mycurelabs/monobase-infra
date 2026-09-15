@@ -309,6 +309,10 @@ hapihubWorker:
   pruneExpiredSessions:
     enabled: false
 
+  # ...and the hourly dpop_jti_seen prune — API release owns it too.
+  pruneExpiredDpopJti:
+    enabled: false
+
   # Fixed single replica — job throughput does not need an HPA, and pg-boss
   # handles multi-consumer anyway if this is ever raised.
   autoscaling:

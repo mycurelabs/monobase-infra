@@ -111,6 +111,11 @@ hapihub:
   pruneExpiredSessions:
     enabled: true
 
+  # DPoP replay-guard prune (mono#4393). Same pattern as pruneExpiredSessions —
+  # runs on the API release; the prod worker disables it to avoid a double render.
+  pruneExpiredDpopJti:
+    enabled: true
+
   # NOTE: replicaCount is ignored — autoscaling.enabled: true below means the
   # HPA owns the replica count (chart omits spec.replicas). Scale via
   # autoscaling.minReplicas/maxReplicas.
