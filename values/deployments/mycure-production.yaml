@@ -672,6 +672,41 @@ minio-artifacts:
     hostname: ""  # defaults to artifacts.localfirsthealth.com
     sectionName: https-lfh
 
+# ===== FLEET: maestroapp desktop version pin (mono#4095) =====
+# Single source of truth for the maestroapp version this environment's clinic
+# fleet runs. Not a k8s deployment of the app (the fleet runs on clinic
+# boxes): charts/maestroapp renders a promotion Job that copies the immutable
+# v<version>/latest.json → the platform-root latest.json fleet pointers on the
+# minio-artifacts store above (what the Tauri auto-updater and install.sh
+# poll), then verifies the store serves the pin. The mono release pipeline
+# publishes artifacts + versioned manifests but never touches the root
+# pointers.
+# ROLLBACK: a pin bump is a fleet-wide rollout; reverting the bump only HALTS an
+# in-flight rollout — it does NOT downgrade boxes. Auto-updaters never move a box
+# to a LOWER version; the publisher keeps only the newest 5 releases + the live
+# pin; only v<pin> has a versioned manifest to promote. So a revert points the
+# root latest.json back at the prior version (new boxes stop taking the bump);
+# boxes already updated stay put. Genuine downgrade = publish + pin an older
+# version still inside the retained window.
+# The pinned version must already be published for every platform — a missing
+# versioned manifest fails the Job loudly (app Degraded), rolling nothing for
+# that platform.
+maestroapp:
+  enabled: true
+  version: "2.1.109"
+  # Post-completion drift guard — ON for prod. The event-driven promote Job only
+  # reconciles the platform-root latest.json pointers when a pin bump / re-sync
+  # re-runs it; a COMPLETED Job never observes drift that happens AFTERWARD (an
+  # old root re-copied out of band, a rotted manifest). Prod is the fleet whose
+  # auto-updaters continuously poll those roots, so it needs a self-healing floor:
+  # this CronJob re-asserts the SAME idempotent reconcile script on a schedule,
+  # correcting any drift within one interval instead of waiting for the next pin
+  # bump. concurrencyPolicy=Forbid + the idempotent script make backed-up/overlapping
+  # runs safe no-ops at steady state.
+  reconcile:
+    enabled: true
+    schedule: "*/30 * * * *"
+
 # ===== EMAIL TESTING: Mailpit =====
 mailpit:
   enabled: false
