@@ -1,13 +1,25 @@
 {{- if and .Values.enabled .Values.pruneExpiredDpopJti.enabled }}
-# Prune of expired DPoP (RFC 9449) replay-guard rows. The developer platform
-# (mono#4393) stores each accepted DPoP proof jti in `dpop_jti_seen`
-# (jti TEXT PK, expires_at) purely for replay detection; a row is only
-# meaningful until expires_at (proof iat + 60s) but hapihub never deletes it,
-# so the table grows unbounded. Runs a plain psql
-# `DELETE FROM dpop_jti_seen WHERE expires_at < now()` — bounded, idempotent,
-# only touches already-expired rows, so it never rejects a live proof.
-# Mirrors prune-sessions-cronjob exactly (same image / DATABASE_URI wiring);
-# no trigger bypass needed (dpop_jti_seen is a plain table).
+# Hourly prune of expired DPoP (RFC 9449) replay-guard rows. The developer
+# platform (monobase-mycure#4393) stores each accepted DPoP proof jti in
+# `dpop_jti_seen` (jti TEXT PK, expires_at) purely for replay detection; a row is
+# only meaningful until expires_at (proof iat + validity window) but hapihub never
+# deletes it, so the table grows unbounded.
+#
+# SAFETY (PR #451 review — the table is created only by the UNRELEASED migration
+# monobase-mycure#0106_oauth_dpop, so this must be a clean no-op until it ships):
+#  - Absence guard: `to_regclass('public.dpop_jti_seen')` — if NULL, exit 0. Absent
+#    table is an intentional no-op (success), never a failed Job.
+#  - Least-privilege: connects as the dedicated `dpop_pruner` role (CONNECT + schema
+#    USAGE + SELECT/DELETE on dpop_jti_seen only), NOT the postgres superuser. The
+#    role + (expires_at) index + grants are provisioned by the superuser PreSync Job
+#    (provision-dpop-pruner-*.yaml).
+#  - Bounded batched DELETE: `ctid IN (SELECT … LIMIT :batch)` looped until 0 rows,
+#    with per-statement SET lock_timeout / SET statement_timeout (activeDeadlineSeconds
+#    is a Job cap, NOT a DB lock/statement timeout). Avoids the unbounded single-txn
+#    DELETE that would seq-scan and burst WAL/dead-tuples on a backlog.
+#  - No argv creds: PGHOST/PGPORT/PGUSER/PGDATABASE/PGPASSWORD env, no URI/password
+#    on the command line (invisible to `ps`).
+#
 # Assumes in-cluster PostgreSQL (postgresql.external: false), like prune-sessions.
 apiVersion: batch/v1
 kind: CronJob
@@ -78,21 +90,39 @@ spec:
             image: {{ .Values.pruneExpiredDpopJti.image | default "docker.io/bitnamilegacy/postgresql:16.4.0-debian-12-r13" | quote }}
             imagePullPolicy: IfNotPresent
             command: ["/bin/sh", "-ec"]
+            # Absence-guarded, batched, timeout-bounded prune. SQL is the single
+            # source of truth in the sibling ConfigMap (also exercised by the
+            # self-check test tests/prune-dpop-jti.test.sh — keep them in lockstep).
             args:
               - |
-                psql "$DATABASE_URI" -v ON_ERROR_STOP=1 \
-                  -c 'DELETE FROM dpop_jti_seen WHERE expires_at < now();'
+                psql -v ON_ERROR_STOP=1 \
+                  -v batch={{ .Values.pruneExpiredDpopJti.batchSize | default 10000 }} \
+                  -v lock_timeout={{ .Values.pruneExpiredDpopJti.lockTimeout | default "5s" | quote }} \
+                  -v statement_timeout={{ .Values.pruneExpiredDpopJti.statementTimeout | default "60s" | quote }} \
+                  -f /sql/prune.sql
             resources:
               {{- toYaml .Values.pruneExpiredDpopJti.resources | nindent 14 }}
             env:
-            # Mirrors the DATABASE_URI composition in hapihub.containerEnv.
-            - name: POSTGRESQL_USER
-              value: {{ include "hapihub.postgresql.username" . | quote }}
-            - name: POSTGRESQL_PASSWORD
+            # Least-privilege role connection via env — NO password in argv/URI.
+            - name: PGHOST
+              value: {{ include "hapihub.postgresql.host" . | quote }}
+            - name: PGPORT
+              value: "5432"
+            - name: PGUSER
+              value: {{ (.Values.pruneExpiredDpopJti.provision | default dict).role | default "dpop_pruner" | quote }}
+            - name: PGDATABASE
+              value: {{ include "hapihub.postgresql.database" . | quote }}
+            - name: PGPASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: {{ .Values.postgresql.auth.existingSecret | default "postgresql" }}
-                  key: postgres-password
-            - name: DATABASE_URI
-              value: "postgres://$(POSTGRESQL_USER):$(POSTGRESQL_PASSWORD)@{{ include "hapihub.postgresql.host" . }}:5432/{{ include "hapihub.postgresql.database" . }}"
+                  name: {{ (.Values.pruneExpiredDpopJti.provision | default dict).secretName | default "postgresql-dpop-pruner" }}
+                  key: dpop-pruner-password
+            volumeMounts:
+            - name: sql
+              mountPath: /sql
+              readOnly: true
+          volumes:
+          - name: sql
+            configMap:
+              name: {{ include "hapihub.fullname" . }}-prune-dpop-jti
 {{- end }}

@@ -309,7 +309,12 @@ hapihubWorker:
   pruneExpiredSessions:
     enabled: false
 
-  # ...and the hourly dpop_jti_seen prune — API release owns it too.
+  # ...and the hourly dpop_jti_seen prune — API release owns it too (and its
+  # superuser provision Job; the worker's provisioner is also force-disabled in
+  # charts/argocd-applications/templates/hapihub-worker.yaml). NOTE: prod is NOT
+  # yet opted in — pruneExpiredDpopJti is disabled in base.yaml until the hapihub
+  # image ships monobase-mycure#0106_oauth_dpop (PR #451 enablement gate). This
+  # worker override stays false regardless.
   pruneExpiredDpopJti:
     enabled: false
 
