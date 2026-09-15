@@ -17,7 +17,10 @@ guarantee is an eventually-consistent RECONCILE:
     typo'd/partly-published pin promotes NOTHING (never a half-fleet bump);
   * idempotent re-assert — every run compares each root to the pinned manifest
     by content hash and re-copies on ANY difference (missing, wrong version, OR
-    same-version-but-wrong-bytes), so drift self-corrects;
+    same-version-but-wrong-bytes), so drift self-corrects. The re-copy publishes
+    the LOCAL bytes validated in Phase A (not a re-read of the remote versioned
+    object), so a concurrent overwrite of v<PIN> between validation and publish
+    can never reach a root pointer (no TOCTOU);
   * self-healing partial failure — if a copy fails mid-phase the script keeps
     reconciling the remaining platforms, then exits non-zero, so the next run
     (selfHeal Force+Replace re-create, or the periodic CronJob) completes the
@@ -184,10 +187,18 @@ for dir in $PLATFORMS; do
     echo "= $dir root already byte-identical to v$PIN"; continue
   fi
   echo "~ $dir root differs (hash $cur_h != $want_h) — reconciling to v$PIN"
-  if ! mc cp "$base/v$PIN/latest.json" "$base/latest.json"; then
+  # Publish the EXACT LOCAL BYTES validated in Phase A ($work/$dir.json), NOT a
+  # re-read of the remote v$PIN/latest.json. Closing a TOCTOU: the publisher
+  # identity can overwrite versioned objects, so if the remote v$PIN manifest
+  # changed BETWEEN Phase-A validation and this copy, `mc cp <remote-v$PIN>`
+  # would push UNVALIDATED bytes onto the live root pointer (detected only AFTER
+  # exposure). Copying the local validated file guarantees only bytes that
+  # passed Phase A can ever land on a root pointer.
+  if ! mc cp "$want" "$base/latest.json"; then
     echo "ERROR: $dir copy failed — will be retried next run"; failed="$failed $dir"; continue
   fi
-  # Verify the store now serves the exact pinned bytes.
+  # Verify the store now serves the exact pinned bytes (== the Phase-A-validated
+  # local file's hash), so a concurrent overwrite of the root is still caught.
   if ! mc cat "$base/latest.json" >"$work/$dir.verify.json" 2>/dev/null; then
     echo "ERROR: $dir root unreadable after copy — will be retried next run"; failed="$failed $dir"; continue
   fi

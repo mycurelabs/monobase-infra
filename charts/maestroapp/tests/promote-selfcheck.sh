@@ -25,6 +25,14 @@
 #                           the OTHER platforms and exits non-zero, and a SECOND
 #                           run (failure cleared) completes the straggler. Proves
 #                           a partial failure is recoverable, never wedged.
+#   (g) toctou-publish    — the versioned source v<PIN>/latest.json is MUTATED
+#                           BETWEEN Phase-A validation and Phase-B publication.
+#                           The published root MUST carry the Phase-A-validated
+#                           bytes, NEVER the mutated remote bytes. Proves the
+#                           publisher copies the LOCAL validated file, not a
+#                           re-read of the remote (closes the TOCTOU window).
+#                           Falsifier: revert the publish to re-read the remote
+#                           v<PIN> and this case FAILS.
 #   (f) prod-render       — EFFECTIVE-RENDER assertion (not the script, the wiring):
 #                           render the PROD deployment overlay through the real
 #                           argocd-applications factory + charts/maestroapp and
@@ -71,6 +79,16 @@ sh -n "$script" || fail "extracted script is not valid POSIX sh"
 # `sleep` is a no-op so the script's bounded retry loop runs instantly.
 # MC_FAIL_CP_FOR (optional): a platform dir name whose `cp` must FAIL exactly
 # once per process, so we can simulate a mid-phase copy failure (falsifier e).
+#
+# MC_MUTATE_VPIN_FOR (optional): a platform dir name whose versioned source
+# (v<PIN>/latest.json) is MUTATED mid-run to simulate a TOCTOU — the publisher
+# identity overwriting the versioned object BETWEEN Phase-A validation and
+# Phase-B publication (falsifier g). The stub serves the ORIGINAL valid bytes
+# on the Phase-A `cat` (so validation passes), then IMMEDIATELY replaces the
+# on-disk v<PIN>/latest.json with the mutated bytes ($MC_MUTATE_VPIN_BYTES).
+# A publisher that RE-READS the remote in Phase B would then copy the mutated
+# bytes to the root; a publisher that copies the LOCAL Phase-A-validated file
+# never touches the mutated remote. One-shot, tracked by a marker file.
 bin="$work/bin"
 mkdir -p "$bin"
 
@@ -85,11 +103,29 @@ cat >"$bin/mc" <<'EOF'
 # Path form used by the script: store/<bucket>/<key>
 set -eu
 sub=$1; shift
-resolve() { printf '%s/%s\n' "$STORE_ROOT" "${1#store/}"; }
+# Map a `store/<bucket>/<key>` path onto the on-disk store; pass an absolute
+# local path (e.g. the Phase-A-validated $work/<dir>.json the publisher copies
+# from) through unchanged so `mc cp <local> store/...` works like real mc.
+resolve() {
+  case "$1" in
+    /*) printf '%s\n' "$1" ;;
+    *)  printf '%s/%s\n' "$STORE_ROOT" "${1#store/}" ;;
+  esac
+}
 case "$sub" in
   alias)  exit 0 ;;                                  # alias set store ...
   stat)   p=$(resolve "$1"); [ -f "$p" ] ;;          # exit 1 if absent
-  cat)    p=$(resolve "$1"); cat "$p" ;;             # errors if absent (real mc does too)
+  cat)    p=$(resolve "$1"); cat "$p"                # errors if absent (real mc does too)
+          # TOCTOU injection (falsifier g): once the Phase-A `cat` of the
+          # chosen platform's versioned source has served its (valid) bytes,
+          # overwrite that versioned object on disk with the mutated bytes so a
+          # later Phase-B re-read of the remote would pick up UNVALIDATED bytes.
+          if [ -n "${MC_MUTATE_VPIN_FOR:-}" ] && [ ! -f "$STORE_ROOT/.vpin_mutated" ] \
+             && printf '%s' "$1" | grep -q "/${MC_MUTATE_VPIN_FOR}/v${PIN}/latest.json$"; then
+            : >"$STORE_ROOT/.vpin_mutated"       # one-shot: mutate exactly once
+            printf '%s' "${MC_MUTATE_VPIN_BYTES:-}" >"$p"
+            echo "stub mc: MUTATED remote v$PIN/latest.json for $MC_MUTATE_VPIN_FOR after Phase-A read" >&2
+          fi ;;
   cp)     s=$(resolve "$1"); d=$(resolve "$2")
           # Inject a one-shot copy failure for a chosen platform (falsifier e).
           if [ -n "${MC_FAIL_CP_FOR:-}" ] && [ ! -f "$STORE_ROOT/.cp_failed" ] \
@@ -137,12 +173,14 @@ ver_hash() { # <platform> -> sha256 of the v<PIN>/latest.json
   sha256sum "$STORE/$BUCKET/maestroapp/desktop/$1/v$PIN/latest.json" | cut -d' ' -f1
 }
 
-run_script() { # runs the extracted script in a fresh store env; sets rc. arg1=MC_FAIL_CP_FOR
+run_script() { # runs the extracted script in a fresh store env; sets rc.
+               # arg1=MC_FAIL_CP_FOR  arg2=MC_MUTATE_VPIN_FOR  arg3=MC_MUTATE_VPIN_BYTES
   set +e
   env PATH="$bin:$PATH" \
       MC_CONFIG_DIR="$work/.mc" \
       STORE_ROOT="$STORE" WRITES_LOG="$WRITES_LOG" \
       MC_FAIL_CP_FOR="${1:-}" \
+      MC_MUTATE_VPIN_FOR="${2:-}" MC_MUTATE_VPIN_BYTES="${3:-}" \
       PIN="$PIN" PLATFORMS="$PLATFORMS" BUCKET="$BUCKET" \
       STORE_ENDPOINT="http://stub:9000" STORE_USER="u" STORE_PASSWORD="p" \
       sh "$script" >"$work/out.log" 2>&1
@@ -278,6 +316,60 @@ grep -q "linux_x86_64/latest.json" "$WRITES_LOG" || fail "(e) run2 did not compl
 # darwin/windows already at PIN from run1 => byte-identical => must be no-op skips
 grep -q "darwin_aarch64/latest.json" "$WRITES_LOG" && fail "(e) run2 re-copied already-reconciled darwin (not idempotent)"
 echo "PASS (e) run2: straggler linux completed, already-done platforms skipped, exit $rc"
+
+# ============================================================================
+# (g) toctou-publish: the versioned source (v<PIN>/latest.json) is MUTATED
+#     BETWEEN Phase-A validation and Phase-B publication. The published root
+#     pointer MUST carry the Phase-A-validated bytes, NEVER the mutated remote
+#     bytes. This is the TOCTOU falsifier: the publisher must copy the LOCAL
+#     validated file, not re-read the remote versioned object. Reverting the
+#     publish line to `mc cp "$base/v$PIN/latest.json" "$base/latest.json"`
+#     makes Phase B re-read the (now-mutated) remote and this case FAILS.
+# ============================================================================
+STORE="$work/store_g"; WRITES_LOG="$work/writes_g"; : >"$WRITES_LOG"; mkdir -p "$STORE"
+for p in $PLATFORMS; do
+  # All v<PIN> valid with the GOOD content marker; roots stale so a copy fires.
+  seed_manifest "$BUCKET/maestroapp/desktop/$p/v$PIN/latest.json" "$PIN" "good"
+  seed_manifest "$BUCKET/maestroapp/desktop/$p/latest.json"       "2.1.108"
+done
+# The bytes Phase A validates for linux (what a correct publisher emits). This
+# is exactly the on-disk v<PIN> file BEFORE the mutation, so hash it directly
+# (Phase A copies these bytes verbatim to $work/linux.json, then to the root).
+validated_h=$(ver_hash linux_x86_64)
+# The MUTATED bytes the stub injects into the remote v<PIN> after Phase A reads
+# it — still "version":PIN (so a naive version-string check wouldn't notice) but
+# byte-different, standing in for an unvalidated concurrent overwrite. The stub
+# writes them with `printf '%s'` (no trailing newline), so hash them the same way.
+mutated_bytes='{"version":"'"$PIN"'","content":"EVIL-UNVALIDATED"}'
+mutated_h=$(printf '%s' "$mutated_bytes" | sha256sum | cut -d' ' -f1)
+[ "$mutated_h" != "$validated_h" ] || fail "(g) test bug: mutated bytes match validated bytes"
+
+# arg1 (no cp failure), arg2=platform to mutate, arg3=mutated bytes.
+run_script "" linux_x86_64 "$mutated_bytes"
+[ "$rc" -eq 0 ] || { cat "$work/out.log"; fail "(g) expected clean exit, got $rc"; }
+# The stub's mutation notice goes to stderr during Phase A's `mc cat ... 2>/dev/null`
+# (suppressed by the script), so assert the mutation actually fired via the
+# stub's marker file AND by confirming the on-disk remote v<PIN> now holds the
+# mutated bytes — proving the TOCTOU window was genuinely exercised.
+[ -f "$STORE/.vpin_mutated" ] \
+  || fail "(g) test bug: stub never injected the mid-run mutation (no marker)"
+remote_now_h=$(sha256sum "$STORE/$BUCKET/maestroapp/desktop/linux_x86_64/v$PIN/latest.json" | cut -d' ' -f1)
+[ "$remote_now_h" = "$mutated_h" ] \
+  || fail "(g) test bug: remote v$PIN was not actually mutated to the injected bytes"
+# The linux root pointer must serve the Phase-A-VALIDATED bytes, not the mutated
+# remote bytes. Compare the actual published root file's hash.
+published_h=$(root_hash linux_x86_64)
+if [ "$published_h" = "$mutated_h" ]; then
+  echo "--- published root (linux) ---"; cat "$STORE/$BUCKET/maestroapp/desktop/linux_x86_64/latest.json"
+  fail "(g) TOCTOU: MUTATED (unvalidated) bytes reached the root pointer — publisher re-read the remote"
+fi
+[ "$published_h" = "$validated_h" ] \
+  || fail "(g) published root hash '$published_h' != Phase-A-validated hash '$validated_h'"
+# The other platforms (not mutated) must also land on their validated bytes.
+for p in darwin_aarch64 windows_x86_64; do
+  [ "$(root_version "$p")" = "$PIN" ] || fail "(g) $p root not reconciled to $PIN"
+done
+echo "PASS (g) toctou-publish: mid-run v$PIN mutation NEVER exposed on root; published bytes == Phase-A-validated bytes, exit $rc"
 
 # ============================================================================
 # (f) prod-render: the PROD overlay must actually ENABLE the reconcile CronJob.
