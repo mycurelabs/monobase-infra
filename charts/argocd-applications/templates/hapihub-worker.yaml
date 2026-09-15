@@ -60,8 +60,11 @@ spec:
         {{- end }}
         {{- toYaml $merged | nindent 8 }}
         global: {{ .Values.global | toYaml | nindent 10 }}
-        minio: {{ mergeOverwrite (deepCopy .Values.minio) (.Values.hapihub.minio | default dict) | toYaml | nindent 10 }}
-        valkey: {{ mergeOverwrite (deepCopy .Values.valkey) (.Values.hapihub.valkey | default dict) | toYaml | nindent 10 }}
+        {{- /* chartRepo/chartVersion pin the standalone Application's OCI source, not
+               hapihub's client config — strip them so setting them can't leak into
+               the worker's minio/valkey valuesObject. */}}
+        minio: {{ mergeOverwrite (omit (deepCopy .Values.minio) "chartRepo" "chartVersion") (.Values.hapihub.minio | default dict) | toYaml | nindent 10 }}
+        valkey: {{ mergeOverwrite (omit (deepCopy .Values.valkey) "chartRepo" "chartVersion") (.Values.hapihub.valkey | default dict) | toYaml | nindent 10 }}
         mailpit: {{ mergeOverwrite (deepCopy .Values.mailpit) (.Values.hapihub.mailpit | default dict) | toYaml | nindent 10 }}
 
   destination:
