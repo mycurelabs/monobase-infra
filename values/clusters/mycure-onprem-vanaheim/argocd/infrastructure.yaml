@@ -307,32 +307,44 @@ loki:
   enabled: true
   version: "6.24.0"
   storageSize: "20Gi"   # vanaheim is a small k3d cluster (local-path vol)
-  # ── ENFORCED disk bound (PROVABLY fits 20Gi) ──────────────────────────────
+  # ── ENFORCED disk bound (PROVABLY fits 20Gi, COMPRESSION-INDEPENDENT) ──────
   # Loki 3.3.2 has NO byte/free-space cap for the filesystem store (see
   # loki.yaml); the only server-side ceiling is `ingestion_rate_mb` (a hard 429
-  # per tenant) × the compactor's time `retention`. This local-path vol is
-  # carved from the SAME vanaheim host disk as the preprod + staging Postgres,
-  # so the WORST-CASE ADMITTED footprint must fit UNDER 20Gi with headroom —
-  # NOT rely on "real ingest is small". Arithmetic (rate=1 MiB/s, retention=1d):
+  # per tenant, enforced by the distributor) × the compactor's time `retention`.
+  # This local-path vol is carved from the SAME vanaheim host disk as the
+  # preprod + staging Postgres, so the WORST-CASE ADMITTED footprint must fit
+  # UNDER 20Gi with headroom — and it must do so WITHOUT relying on chunk
+  # compression, because the gzip ratio is NOT enforced: an incompressible or
+  # poorly-compressible log stream stores close to its RAW admitted bytes.
+  # (Round-3 sized the bound on an ASSUMED 10:1 gzip divisor — at rate=1 MiB/s
+  #  that admits ~84.4 GiB RAW/day, which if incompressible would exhaust the
+  #  shared host disk and take the databases down with it. Fixed here.)
   #
-  #   raw admitted  = 1 MiB/s × 86,400 s/d × 1 d      = 86,400 MiB ≈ 84.4 GiB/d
-  #   on-disk       = raw ÷ ~10 (tsdb chunk gzip) × 1.2 (index+WAL margin)
-  #                 = 84.4 GiB ÷ 10 × 1.2            ≈ 10.1 GiB worst-case
-  #   fit           = 10.1 GiB / 20 GiB              ≈ 51 %  → ~9.9 GiB headroom
+  # So the bound is sized on RAW admitted bytes only:
   #
-  # So even a SUSTAINED pathological push held at the 1 MiB/s cap for a full
-  # retention window lands ~10 GiB on disk — provably inside 20Gi. (At the old
-  # 3d retention this was 1 MiB/s × 3d ≈ 253 GiB raw ÷ 10 ≈ 25 GiB > 20Gi,
-  # i.e. it did NOT fit before index/WAL — that's why retention is cut to 24h.)
-  # Real preprod ingest is a tiny fraction of the cap, so steady-state sits
-  # sub-GiB; the bound above is the guaranteed ceiling, not the expectation.
-  # vanaheim runs no Prometheus, so k3s kubelet nodefs eviction is the only
-  # automated backstop — hence the deliberately tight cap + short retention.
-  retention: "24h"         # was 3d — 24h makes the worst-case admitted bound fit
-  ingestionRateMb: 1       # 1 MiB/s sustained cap (429 above) — small shared host
-  ingestionBurstMb: 2
-  perStreamRateLimit: "512KB"
-  perStreamRateLimitBurst: "1MB"
+  #   target        = raw + overhead  ≤  15 GiB   (75 % of 20Gi → ≥25 % headroom)
+  #   raw budget    = 15 GiB ÷ 1.3 (index+WAL overhead)        ≈ 11.54 GiB
+  #   rate needed   = 11.54 GiB ÷ 86,400 s/d                   ≈ 0.137 MiB/s
+  #   → pick rate   = 0.13 MiB/s (clean, under budget)
+  #   raw admitted  = 0.13 MiB/s × 86,400 s/d × 1 d = 11,232 MiB ≈ 10.97 GiB RAW
+  #   on-disk       = 10.97 GiB × 1.3 (index+WAL)              ≈ 14.26 GiB
+  #   fit           = 14.26 GiB / 20 GiB ≈ 71 %  → ~5.74 GiB headroom
+  #
+  # A SUSTAINED pathological push pinned at the 0.13 MiB/s cap for a full 24h
+  # retention window lands ≤ ~14.3 GiB on disk EVEN IF EVERY BYTE IS
+  # INCOMPRESSIBLE — provably inside 20Gi, no compression assumed. gzip only
+  # ever helps (real preprod sits sub-GiB); it is never load-bearing for safety.
+  # `ingestion_rate_strategy: local` (set in loki.yaml) enforces the cap
+  # per-distributor-instance so the bound does not depend on the distributor
+  # ring reporting N healthy replicas (N=1 for single-binary anyway).
+  # Per-stream limits keep a single noisy stream from monopolising the global
+  # budget. vanaheim runs no Prometheus, so k3s kubelet nodefs eviction is the
+  # only automated backstop — hence the deliberately tight cap + short retention.
+  retention: "24h"         # 24h — makes the RAW admitted bound fit 20Gi w/o gzip
+  ingestionRateMb: 0.13    # 0.13 MiB/s hard cap (429 above); raw≈10.97GiB/24h
+  ingestionBurstMb: 0.26   # 2× rate — bounds a single oversized push request
+  perStreamRateLimit: "64KB"      # < global rate; no single stream dominates
+  perStreamRateLimitBurst: "128KB"
   promtail:
     version: "6.16.6"
 
