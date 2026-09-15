@@ -20,3 +20,13 @@ exactRewrites: []
 #   - pattern: (.*)\.<env>\.example.com
 #     to: nginx-internal-gateway-nginx.nginx-gateway-system.svc.cluster.local
 regexRewrites: []
+
+# Extra raw override entries rendered verbatim as additional data keys
+# (<name>.override). For cluster-local CoreDNS tweaks that must live in the
+# SAME ConfigMap (ArgoCD apply replaces data wholesale — an out-of-band key,
+# e.g. one baked by a provisioning module, would be clobbered on sync).
+#   aaaa: |
+#     template IN AAAA {
+#       rcode NOERROR
+#     }
+extraOverrides: {}

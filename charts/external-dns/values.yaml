@@ -82,6 +82,13 @@ instances: []
 
 # Global configuration applied to all instances
 global:
+  # Self-hosted API server egress. OFF by default (managed control planes like
+  # DOKS terminate the apiserver on 443, already covered by the 443 egress
+  # rule). Only self-hosted k3s/k3d clusters (vanaheim) whose apiserver listens
+  # on 6443 set this true — it opens a broad TCP 6443-to-anywhere egress the
+  # informer's first LIST needs. Gating it OFF on DOKS keeps its policy tighter.
+  selfHostedAPIServerEgress: false
+
   # Sources to watch (applied to all instances)
   sources:
     - gateway-httproute

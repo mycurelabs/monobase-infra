@@ -124,6 +124,36 @@ config:
   MEDLEY_CHAT_MODEL: ""
   MEDLEY_CORS_ORIGINS: ""
 
+# Shared PostgreSQL (medley 2.x): its own `medley` database on the shared bitnami instance. When enabled,
+# DATABASE_URL is built in the Deployment from the in-cluster postgres secret (password stays out of git),
+# mirroring the cadence/hapihub pattern. medley 1.x (sqlite) leaves this disabled → no DATABASE_URL env.
+postgresql:
+  enabled: false
+  serviceName: postgresql-primary
+  port: 5432
+  auth:
+    username: postgres
+    database: medley
+    existingSecret: postgresql
+    secretKey: postgres-password
+  # Dedicated non-superuser role provisioning (monobase-infra#420 item 7). When
+  # enabled, a PreSync Job creates/owns the `medley` role + database and the
+  # runtime DATABASE_URL points at it (set auth.username: medley + the scoped
+  # secret). Default OFF: the chart still works with the plain superuser DSN
+  # where a scoped role hasn't been provisioned. Runs as the in-cluster
+  # superuser (superuserSecret), never with the runtime medley credentials.
+  provisionRole:
+    enabled: false
+    # superuserSecret/superuserSecretKey: the in-cluster PG superuser used to
+    # CREATE ROLE + reassign ownership (NOT the runtime medley DSN).
+    superuserSecret: postgresql
+    superuserSecretKey: postgres-password
+    # statementTimeout / idleInTransactionTimeout: safety caps on the runtime role.
+    statementTimeout: "60s"
+    idleInTransactionTimeout: "120s"
+    backoffLimit: 3
+    activeDeadlineSeconds: 600
+
 # External Secrets — MEDLEY_HISTORY_KEY pulled from GCP Secret Manager
 externalSecrets:
   enabled: true
@@ -131,50 +161,44 @@ externalSecrets:
   refreshInterval: 1h
   secrets: []          # Override in deployment values with MEDLEY_HISTORY_KEY entry
 
-# Network Policy
+# Network Policy — least-privilege by default (monobase-infra#420).
+# NetworkPolicies are ADDITIVE, so these defaults must themselves be tight: no
+# all-namespace ingress, no 0.0.0.0/0 egress. The template (networkpolicy.yaml)
+# renders: gateway-only ingress on service.targetPort, DNS egress, same-namespace
+# PostgreSQL egress (when postgresql.enabled), the pinned Ollama destination, and
+# any opt-in in-cluster dependency egress. Override the specifics per environment
+# in values/deployments/*.yaml (e.g. ollamaEgress.cidr, extra client selectors).
 networkPolicy:
   enabled: true
   policyTypes:
     - Ingress
     - Egress
-  # ollamaEgress.cidr: CIDR of the external Ollama GPU endpoint.
-  # Set to the actual IP range in the deployment values file.
-  # Placeholder: replace <<EXTERNAL_OLLAMA_URL_PLACEHOLDER>> with real host.
+  # DNS: CoreDNS/kube-dns lives in kube-system on both k3d and DOKS.
+  dns:
+    namespace: kube-system
+  # PostgreSQL primary selector (same namespace as medley). Matches the Bitnami
+  # postgresql primary pod labels; egress only rendered when postgresql.enabled.
+  postgresql:
+    podSelector:
+      app.kubernetes.io/name: postgresql
+      app.kubernetes.io/component: primary
+  # ollamaEgress: the SINGLE intended Ollama destination. Default OFF — set in the
+  # deployment overlay. Pin EITHER an external/host endpoint (cidr, e.g. the k3d
+  # host gateway 172.21.0.1/32) OR an in-cluster one (namespaceSelector). Never
+  # 0.0.0.0/0.
   ollamaEgress:
-    enabled: true
-    cidr: "0.0.0.0/0"   # TODO: tighten to the actual Ollama host CIDR
+    enabled: false
+    cidr: ""                 # e.g. "172.21.0.1/32" for the k3d host Ollama
+    namespaceSelector: {}    # OR in-cluster: e.g. {kubernetes.io/metadata.name: tailscale}
     port: 11434
-  ingress:
-    - from:
-        - namespaceSelector: {}
-      ports:
-        - protocol: TCP
-          port: 8970
-  egress:
-    - to:
-        - namespaceSelector: {}
-      ports:
-        - protocol: TCP
-          port: 5432   # PostgreSQL
-        - protocol: TCP
-          port: 6379   # Valkey
-        - protocol: TCP
-          port: 7500   # hapihub in-cluster
-        - protocol: TCP
-          port: 8940   # medgemma-worker in-cluster
-        - protocol: TCP
-          port: 8920   # openmed in-cluster
-        - protocol: TCP
-          port: 11434  # ollama egress Service (tailscale ns) — in-cluster pod needs namespaceSelector, not ipBlock
-        - protocol: TCP
-          port: 53
-        - protocol: UDP
-          port: 53
-    - to:
-        - namespaceSelector: {}
-      ports:
-        - protocol: TCP
-          port: 443
+  # extraIngress: additional client from-selectors appended to the gateway rule
+  # (default empty — gateway is the only ingress). Use to allow specific extra
+  # namespaces/pods that legitimately call medley:8970.
+  extraIngress: []
+  # inClusterEgress: opt-in egress to in-cluster medley dependencies (hapihub /
+  # medgemma-worker / openmed). Default empty — preprod uses the host Ollama only
+  # and leaves these disabled. Scope by namespaceSelector/podSelector + port.
+  inClusterEgress: []
 
 serviceMonitor:
   enabled: false
