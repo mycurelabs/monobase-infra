@@ -57,7 +57,37 @@ provisionRole:
 dump:
   compressLevel: 6      # pg_dump -Fc -Z<level>
   globals: true         # pg_dumpall --globals-only --no-role-passwords
-  verify: true          # pg_restore --list gate — fail on a truncated/corrupt dump
+  # In-CronJob integrity gate. Beyond `pg_restore --list` (TOC only), the dump
+  # step also streams the whole archive through `pg_restore -> /dev/null`, which
+  # decompresses and emits every DATA block — catching compressed-data corruption
+  # that --list cannot. A TRUE restore-into-scratch-DB (row-count verified) is the
+  # separate `restoreVerify` gate below + the drill runbook.
+  verify: true
+
+# ── REAL scratch-restore gate (finding #5) ─────────────────────────────────────
+# `pg_restore --list` (and even a full decompress) proves the archive is READABLE,
+# not that it RESTORES into a working database. This Job spins a THROWAWAY Postgres
+# server inside its own pod (initdb on an emptyDir — nothing external, nothing
+# persistent), restores the newest dump pulled from the crypt remote into a scratch
+# database, and asserts expected tables exist with row_count > 0. It must PASS before
+# activation. Run it as a one-shot (helm test / `kubectl create job --from`) or gate
+# it in CI; it is NOT part of the nightly path. Disabled by default.
+# Also scripted for out-of-cluster runs: scripts/pg-logical-backup-restore-drill.sh
+# + docs/operations/PG_LOGICAL_BACKUP.md.
+restoreVerify:
+  enabled: false
+  # Tables that MUST come back with rows — the row-count assertion. Tune per DB.
+  requireTables:
+    - organizations
+    - accounts
+  # Minimum total rows across requireTables for the restore to be considered real
+  # (guards against an empty/structure-only archive passing).
+  minRows: 1
+  scratchDb: pgdump_restore_scratch
+  # emptyDir sizing for the throwaway PGDATA + the pulled dump.
+  pgdataSizeLimit: 20Gi
+  activeDeadlineSeconds: 3600
+  backoffLimit: 0
 
 destination:
   # An rclone `crypt` remote (defined in the ESO-synced rclone.conf) — plaintext
@@ -79,8 +109,11 @@ work:
 
 externalSecrets:
   enabled: true
-  secretStore: ""                 # default: <namespace>-secretstore
-  secretStoreKind: SecretStore
+  # Vanaheim (and DOKS) provide a CLUSTER-scoped GCP store, NOT a per-namespace
+  # SecretStore. Match every other chart here (cadence, tenzir, database-secrets,
+  # nocodb…): ClusterSecretStore/gcp-secretstore.
+  secretStore: gcp-secretstore
+  secretStoreKind: ClusterSecretStore
   refreshInterval: 1h
   # remoteKeys must exist in GCP Secret Manager before activation (handoff).
   secrets:
@@ -91,8 +124,23 @@ externalSecrets:
 
 networkPolicy:
   enabled: true
-  # Extra egress CIDRs the upload needs (e.g. niflheim tailnet IP /32, or the
-  # object-store endpoint). DNS + the in-cluster replica are allowed by default.
+  # The upload step ships the crypt dump off-cluster. DNS + the in-cluster PG
+  # (primary for role-provision, replica for the dump) are allowed by default.
+  # The OFF-CLUSTER upload destination is NOT open by default — it must be pinned
+  # here, destination-scoped, so the pod cannot egress to the whole internet.
+  #
+  # `destinations` renders one NetworkPolicy egress rule per entry: a specific
+  # CIDR (never 0.0.0.0/0) + the exact ports rclone needs for that backend.
+  # niflheim is reached over the tailnet — a Tailscale peer IP is a /32 in the
+  # 100.64.0.0/10 CGNAT range. Pin the /32 in the overlay once niflheim's tailnet
+  # IP is known (see NOTES.txt). Ports: 22 (sftp) or 443 (HTTPS object store).
+  destinations: []
+  # Example (pin in the deployment overlay at activation):
+  #   destinations:
+  #     - cidr: 100.100.20.30/32   # niflheim tailnet IP (rclone sftp receive)
+  #       ports:
+  #         - { port: 22, protocol: TCP }
+  # Escape hatch for a raw egress rule (rare). Prefer `destinations`.
   extraEgress: []
 
 resources:

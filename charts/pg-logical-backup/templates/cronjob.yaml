@@ -52,7 +52,15 @@ spec:
             args:
               - |
                 TS=$(date -u +%Y%m%dT%H%M%SZ)
-                echo "$TS" > /work/.run-id
+                # Per-run workspace: this run touches ONLY its own dir, so the
+                # upload can never sweep up a stale/other run's files, and a
+                # crashed prior run leaves no cross-run residue.
+                RUNDIR="/work/run-${TS}"
+                # Clean any residue from a same-timestamp retry, recreate fresh.
+                rm -rf "$RUNDIR"
+                mkdir -p "$RUNDIR"
+                echo "$RUNDIR" > /work/.run-dir
+                echo "$TS"      > /work/.run-id
                 HOST="{{ .Values.database.readService }}.{{ include "pgLogicalBackup.namespace" . }}.svc.cluster.local"
                 # Password via PGPASSWORD (env), never on the command line.
                 export PGPASSWORD="$DUMPER_PASSWORD"
@@ -60,17 +68,28 @@ spec:
                 {{- if .Values.dump.globals }}
                 echo "[dump] pg_dumpall --globals-only"
                 pg_dumpall --globals-only --no-role-passwords -d "${BASE}/{{ .Values.database.name }}" \
-                  > "/work/globals-${TS}.sql"
+                  > "${RUNDIR}/globals-${TS}.sql"
                 {{- end }}
                 echo "[dump] pg_dump -Fc {{ .Values.database.name }}"
                 pg_dump -Fc -Z {{ .Values.dump.compressLevel }} \
                   -d "${BASE}/{{ .Values.database.name }}" \
-                  -f "/work/{{ .Values.database.name }}-${TS}.dump"
+                  -f "${RUNDIR}/{{ .Values.database.name }}-${TS}.dump"
                 {{- if .Values.dump.verify }}
-                echo "[dump] verify — pg_restore --list"
-                pg_restore --list "/work/{{ .Values.database.name }}-${TS}.dump" > /dev/null
+                # Integrity gate. --list only reads the archive TOC; it does NOT
+                # prove the COMPRESSED TABLE DATA is intact. Piping the whole
+                # archive through `pg_restore -f /dev/null` forces pg_restore to
+                # DECOMPRESS and emit every data block — so a truncated/corrupt
+                # data member fails HERE, before anything ships. (A full
+                # restore-into-a-scratch-DB gate — row-count verified — lives in
+                # the values-gated `restore-verify` Job + the drill runbook; see
+                # docs/operations/PG_LOGICAL_BACKUP.md.)
+                echo "[dump] verify — pg_restore --list (TOC)"
+                pg_restore --list "${RUNDIR}/{{ .Values.database.name }}-${TS}.dump" > /dev/null
+                echo "[dump] verify — full decompress (pg_restore -> /dev/null)"
+                pg_restore --no-owner --no-privileges \
+                  "${RUNDIR}/{{ .Values.database.name }}-${TS}.dump" > /dev/null
                 {{- end }}
-                echo "[dump] done: $(ls -lh /work | grep "${TS}")"
+                echo "[dump] done: $(ls -lh "$RUNDIR")"
             env:
             - name: DUMPER_PASSWORD
               valueFrom:
@@ -96,14 +115,33 @@ spec:
             args:
               - |
                 TS=$(cat /work/.run-id)
+                RUNDIR=$(cat /work/.run-dir)
                 DEST="{{ .Values.destination.rcloneRemote }}:{{ .Values.destination.path }}/${TS}"
-                echo "[upload] rclone copy -> ${DEST}"
-                rclone copy /work "${DEST}" \
+                # Upload ONLY this run's directory — never a glob over /work that
+                # would re-ship every historical dump still on the PVC.
+                echo "[upload] rclone copy ${RUNDIR} -> ${DEST}"
+                rclone copy "${RUNDIR}" "${DEST}" \
                   --include "*.dump" --include "*.sql" \
                   --transfers 2 --retries 3 --stats-one-line
+
+                # Plaintext hygiene: once the crypt upload SUCCEEDED, the local
+                # plaintext dump must not linger (esp. on a persistent PVC).
+                echo "[upload] cleanup plaintext workspace ${RUNDIR}"
+                rm -rf "${RUNDIR}"
+                # Belt-and-suspenders on PVC mode: drop any older run-* dirs a
+                # crashed prior run may have left behind (emptyDir starts clean).
+                find /work -maxdepth 1 -type d -name 'run-*' -exec rm -rf {} +
+
+                # Retention prune. Deletion failures are NOT swallowed with
+                # `|| true` — a prune that silently fails lets the remote grow
+                # unbounded (cost + blast radius). Fail the container so the Job
+                # goes Failed and the failure is visible/alertable.
                 echo "[upload] retention prune — keep < {{ .Values.destination.retentionDays }}d"
-                rclone delete "{{ .Values.destination.rcloneRemote }}:{{ .Values.destination.path }}" \
-                  --min-age {{ .Values.destination.retentionDays }}d --rmdirs || true
+                if ! rclone delete "{{ .Values.destination.rcloneRemote }}:{{ .Values.destination.path }}" \
+                     --min-age {{ .Values.destination.retentionDays }}d --rmdirs --stats-one-line; then
+                  echo "[upload] ERROR: retention prune failed — remote may be growing unbounded" >&2
+                  exit 1
+                fi
                 echo "[upload] done"
             env:
             - name: RCLONE_CONFIG
@@ -113,7 +151,6 @@ spec:
             volumeMounts:
             - name: work
               mountPath: /work
-              readOnly: true
             - name: rclone-config
               mountPath: /config/rclone
               readOnly: true

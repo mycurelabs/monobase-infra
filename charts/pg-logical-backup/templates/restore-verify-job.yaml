@@ -1,0 +1,154 @@
+{{- if and .Values.enabled .Values.restoreVerify.enabled }}
+# REAL scratch-restore gate (monobase-mycure#4320, review finding #5).
+#
+# `pg_restore --list` validates only the archive table-of-contents, and even a
+# full decompress only proves the archive is READABLE — neither proves the dump
+# RESTORES into a working database. This one-shot Job does the real thing:
+#
+#   initContainer `fetch`  (rclone)   — pull the NEWEST dump for {{ .Values.destination.path }}
+#                                       from the crypt remote (decrypts on pull).
+#   container     `restore` (postgres) — initdb a THROWAWAY PGDATA on an emptyDir,
+#                                       start a local-socket-only postgres, create a
+#                                       scratch db, `pg_restore` the dump into it,
+#                                       then assert the required tables came back with
+#                                       rows. Nothing persistent, nothing external —
+#                                       the scratch server dies with the pod.
+#
+# NOT part of the nightly path — run it as a pre-activation drill / in CI.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "pgLogicalBackup.fullname" . }}-restore-verify
+  namespace: {{ include "pgLogicalBackup.namespace" . }}
+  labels:
+    {{- include "pgLogicalBackup.labels" . | nindent 4 }}
+    job-type: restore-verify
+spec:
+  backoffLimit: {{ .Values.restoreVerify.backoffLimit | default 0 }}
+  ttlSecondsAfterFinished: 86400
+  activeDeadlineSeconds: {{ .Values.restoreVerify.activeDeadlineSeconds | default 3600 }}
+  template:
+    metadata:
+      labels:
+        {{- include "pgLogicalBackup.selectorLabels" . | nindent 8 }}
+        job-type: restore-verify
+    spec:
+      restartPolicy: Never
+      enableServiceLinks: false
+      serviceAccountName: {{ include "pgLogicalBackup.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      initContainers:
+      - name: fetch
+        image: {{ .Values.image.rclone | quote }}
+        imagePullPolicy: IfNotPresent
+        securityContext:
+          {{- toYaml .Values.securityContext | nindent 10 }}
+        command: ["/bin/sh", "-ec"]
+        args:
+          - |
+            REMOTE="{{ .Values.destination.rcloneRemote }}:{{ .Values.destination.path }}"
+            echo "[fetch] newest dump under ${REMOTE}"
+            # Pick the most recent run dir, pull its *.dump into /scratch.
+            NEWEST=$(rclone lsf --dirs-only "${REMOTE}" | sort | tail -1)
+            if [ -z "$NEWEST" ]; then echo "[fetch] ERROR: no runs at ${REMOTE}" >&2; exit 1; fi
+            echo "[fetch] restoring from run ${NEWEST}"
+            rclone copy "${REMOTE}/${NEWEST}" /scratch --include "*.dump" \
+              --transfers 1 --retries 3 --stats-one-line
+            ls -lh /scratch/*.dump
+        env:
+        - name: RCLONE_CONFIG
+          value: /config/rclone/rclone.conf
+        - name: HOME
+          value: /tmp
+        volumeMounts:
+        - name: scratch
+          mountPath: /scratch
+        - name: rclone-config
+          mountPath: /config/rclone
+          readOnly: true
+        - name: tmp
+          mountPath: /tmp
+        resources:
+          {{- toYaml .Values.resources.upload | nindent 10 }}
+      containers:
+      - name: restore
+        image: {{ .Values.image.postgres | quote }}
+        imagePullPolicy: IfNotPresent
+        securityContext:
+          # A live postgres server must write PGDATA + its unix socket; the rest
+          # of the container fs stays read-only. Both are emptyDir mounts.
+          {{- toYaml .Values.securityContext | nindent 10 }}
+        command: ["/bin/sh", "-ec"]
+        args:
+          - |
+            export PGDATA=/pgdata/db
+            export PGHOST=/pgrun            # local unix socket only — no TCP listener
+            SCRATCH_DB="{{ .Values.restoreVerify.scratchDb }}"
+            DUMP=$(ls /scratch/*.dump | head -1)
+            echo "[restore] initdb throwaway PGDATA"
+            initdb -D "$PGDATA" -U postgres --auth=trust -E UTF8 >/dev/null
+            echo "unix_socket_directories = '/pgrun'" >> "$PGDATA/postgresql.conf"
+            echo "listen_addresses = ''"              >> "$PGDATA/postgresql.conf"
+            echo "fsync = off"                         >> "$PGDATA/postgresql.conf"
+            pg_ctl -D "$PGDATA" -w -t 120 -o "-k /pgrun" start
+            trap 'pg_ctl -D "$PGDATA" -m immediate stop || true' EXIT
+            echo "[restore] create scratch db ${SCRATCH_DB}"
+            createdb -h /pgrun -U postgres "$SCRATCH_DB"
+            echo "[restore] pg_restore ${DUMP} -> ${SCRATCH_DB}"
+            # --no-owner/--no-privileges: roles from the source cluster don't
+            # exist in the throwaway server; we're validating DATA restorability.
+            pg_restore -h /pgrun -U postgres -d "$SCRATCH_DB" \
+              --no-owner --no-privileges -j2 "$DUMP" || {
+                echo "[restore] ERROR: pg_restore failed" >&2; exit 1; }
+            echo "[restore] row-count assertions"
+            TOTAL=0
+            {{- range .Values.restoreVerify.requireTables }}
+            N=$(psql -h /pgrun -U postgres -d "$SCRATCH_DB" -tAc \
+                 "SELECT count(*) FROM {{ . }}") || {
+                 echo "[restore] ERROR: table {{ . }} missing after restore" >&2; exit 1; }
+            echo "[restore]   {{ . }} = ${N} rows"
+            TOTAL=$((TOTAL + N))
+            {{- end }}
+            if [ "$TOTAL" -lt "{{ .Values.restoreVerify.minRows }}" ]; then
+              echo "[restore] ERROR: only ${TOTAL} rows across required tables (< {{ .Values.restoreVerify.minRows }}) — dump is empty/structure-only" >&2
+              exit 1
+            fi
+            echo "[restore] PASS — dump restores into a working database (${TOTAL} rows verified)"
+        env:
+        - name: HOME
+          value: /tmp
+        - name: PGPASSWORD
+          value: "unused-trust-auth"
+        volumeMounts:
+        - name: scratch
+          mountPath: /scratch
+          readOnly: true
+        - name: pgdata
+          mountPath: /pgdata
+        - name: pgrun
+          mountPath: /pgrun
+        - name: tmp
+          mountPath: /tmp
+        resources:
+          {{- toYaml .Values.resources.dump | nindent 10 }}
+      volumes:
+      - name: scratch
+        emptyDir:
+          sizeLimit: {{ .Values.restoreVerify.pgdataSizeLimit }}
+      - name: pgdata
+        emptyDir:
+          sizeLimit: {{ .Values.restoreVerify.pgdataSizeLimit }}
+      - name: pgrun
+        emptyDir:
+          sizeLimit: 16Mi
+      - name: tmp
+        emptyDir:
+          sizeLimit: 128Mi
+      - name: rclone-config
+        secret:
+          secretName: {{ .Values.database.existingSecret }}
+          items:
+          - key: rclone.conf
+            path: rclone.conf
+{{- end }}

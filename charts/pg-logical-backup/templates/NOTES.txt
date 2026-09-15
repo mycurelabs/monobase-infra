@@ -8,7 +8,8 @@ Ship to   : {{ .Values.destination.rcloneRemote }}:{{ .Values.destination.path }
 
 ACTIVATION PREREQUISITES (out-of-band — do these before setting enabled: true / suspend: false):
 
-  1. Seed GCP Secret Manager (handoff — Joff / IAM):
+  1. Seed GCP Secret Manager (handoff — Joff / IAM). ESO syncs these via
+     {{ .Values.externalSecrets.secretStoreKind }}/{{ include "pgLogicalBackup.secretStore" . }}:
        {{- range .Values.externalSecrets.secrets }}
        - {{ .remoteKey }}
        {{- end }}
@@ -18,12 +19,23 @@ ACTIVATION PREREQUISITES (out-of-band — do these before setting enabled: true 
                             niflheim pulls from (sftp to niflheim, or an object-store
                             prefix). The crypt password lives ONLY here.
 
-  2. niflheim receive/pull side — configure niflheim's existing rclone timer to
+  2. Pin the egress destination — networkPolicy.destinations must carry niflheim's
+     real tailnet /32 (+ port 22 sftp, or 443 for an HTTPS object store). The
+     overlay ships a PLACEHOLDER (100.64.0.0/10) — replace it. The chart REFUSES
+     to render (helm fail) if enabled with no destination pinned. Never 0.0.0.0/0.
+
+  3. niflheim receive/pull side — configure niflheim's existing rclone timer to
      pull (or receive) {{ .Values.destination.path }}/ into /mnt/storage/mycure/pgdump/.
 
-  3. Flip on: set pgLogicalBackup.enabled: true (and suspend: false) in the
-     deployment overlay. The PreSync hook provisions the `dumper` role; the
-     CronJob runs at {{ .Values.schedule }}.
+  4. PASS the restore drill (evidence before activation):
+       scripts/pg-logical-backup-restore-drill.sh --remote {{ .Values.destination.rcloneRemote }}:{{ .Values.destination.path }}
+     or the in-cluster gate: --set restoreVerify.enabled=true (throwaway PG,
+     restores + row-counts). See docs/operations/PG_LOGICAL_BACKUP.md.
+
+  5. Flip on: set pgLogicalBackup.enabled: true (and suspend: false) in the
+     deployment overlay. The PreSync hooks (SA -11, ExternalSecret -10, role
+     ConfigMap -6, role Job -5) provision the `dumper` role; the CronJob runs at
+     {{ .Values.schedule }}.
 
 RESTORE (documented in docs/operations/):
   rclone copy {{ .Values.destination.rcloneRemote }}:{{ .Values.destination.path }}/<TS> .   # decrypts on pull

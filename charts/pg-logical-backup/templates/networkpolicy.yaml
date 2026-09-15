@@ -1,9 +1,18 @@
 {{- if and .Values.enabled .Values.networkPolicy.enabled }}
 # Egress-only: the backup pod initiates connections, accepts none.
 #   - DNS (kube-dns)
-#   - the in-cluster PG replica (5432)
-#   - extraEgress: the off-cloud upload target (niflheim tailnet /32, or the
-#     object-store endpoint) — supplied per-deployment.
+#   - the in-cluster PG (primary for role provision, replica for the dump)
+#   - destinations[]: the off-cloud upload target(s), destination-scoped
+#     (specific CIDR + ports; NEVER 0.0.0.0/0) — pinned per-deployment.
+#   - extraEgress: raw escape-hatch rules (rare).
+#
+# Fail-closed guard: if the backup is enabled but no upload destination is
+# pinned (and no raw extraEgress), the pod could never reach niflheim — surface
+# that at render time rather than shipping a policy that silently blocks every
+# upload. (Set networkPolicy.enabled: false to opt out entirely.)
+{{- if and (not .Values.networkPolicy.destinations) (not .Values.networkPolicy.extraEgress) }}
+{{- fail "pg-logical-backup: networkPolicy is enabled but no upload destination is pinned. Set networkPolicy.destinations (e.g. niflheim tailnet /32 + port 22) in the deployment overlay, or networkPolicy.extraEgress, or disable the NetworkPolicy. See charts/pg-logical-backup/NOTES.txt." }}
+{{- end }}
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -34,6 +43,16 @@ spec:
       ports:
         - protocol: TCP
           port: {{ .Values.database.port }}
+    {{- range .Values.networkPolicy.destinations }}
+    # Off-cluster upload destination (pinned, destination-scoped)
+    - to:
+        - ipBlock:
+            cidr: {{ required "networkPolicy.destinations[].cidr is required" .cidr }}
+      {{- with .ports }}
+      ports:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    {{- end }}
     {{- with .Values.networkPolicy.extraEgress }}
     {{- toYaml . | nindent 4 }}
     {{- end }}

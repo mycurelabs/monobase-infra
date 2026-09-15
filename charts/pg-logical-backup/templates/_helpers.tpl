@@ -66,8 +66,9 @@ ServiceAccount name
 {{- end }}
 
 {{/*
-SecretStore name for ESO (default: <namespace>-secretstore)
+Secret store name for ESO (default: the cluster-wide gcp-secretstore this
+cluster actually provides — every chart here uses ClusterSecretStore/gcp-secretstore).
 */}}
 {{- define "pgLogicalBackup.secretStore" -}}
-{{- .Values.externalSecrets.secretStore | default (printf "%s-secretstore" (include "pgLogicalBackup.namespace" .)) }}
+{{- .Values.externalSecrets.secretStore | default "gcp-secretstore" }}
 {{- end }}

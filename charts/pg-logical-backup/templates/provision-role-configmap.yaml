@@ -34,6 +34,12 @@ data:
   provision.sql: |
     \set ON_ERROR_STOP on
 
+    -- The dumper role password arrives via the DUMPER_PASSWORD env var and is
+    -- pulled in with \getenv — NEVER as a `-v` flag or in the connection URI
+    -- (both land in argv / `ps`). The superuser password is likewise off argv
+    -- (PGPASSWORD env). monobase-infra#420 pattern.
+    \getenv dumper_password DUMPER_PASSWORD
+
     -- ── Role (CREATE ROLE has no IF NOT EXISTS; password kept current) ──
     SELECT format('CREATE ROLE %I LOGIN PASSWORD %L', :'dump_role', :'dumper_password')
     WHERE NOT EXISTS (SELECT FROM pg_roles WHERE rolname = :'dump_role') \gexec
