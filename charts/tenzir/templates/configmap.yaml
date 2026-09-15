@@ -142,6 +142,32 @@ data:
             publish "findings"
           restart-on-error: 10s
 
+        15-bulk-view:
+          name: "detect: bulk PHI record viewing (T1530)"
+          # Sibling of 11-mass-export: phi.record_accessed shares the exact event
+          # envelope of phi.record_exported (actor, organization, ip all present;
+          # confirmed against hapihub actions.ts + phi-emitters.e2e). Viewing (not
+          # exporting) a large number of records in one window is data-staging /
+          # recon rather than exfil — hence T1530 (data from local system) vs the
+          # T1567 (exfil) of mass-export. Threshold/window in values .detect.bulkView.
+          definition: |
+            subscribe "audit"
+            where action == "phi.record_accessed"
+            every {{ $d.bulkView.window }} {
+              summarize actor, n=count(), org=first(organization), ip=first(ip)
+            }
+            where n >= {{ $d.bulkView.threshold }}
+            this = {
+              signal: "bulk_patient_view", severity: "warning", attck: "T1530",
+              ocsf_class_uid: 4001,
+              title: f"Bulk patient-record viewing by {actor}",
+              description: f"{n} records viewed by actor {actor} in {{ $d.bulkView.window }}",
+              entity: {actor: actor, organization: org, ip: ip},
+              time: now(),
+            }
+            publish "findings"
+          restart-on-error: 10s
+
         {{- if .Values.geoip.enabled }}
         20-unusual-country:
           name: "detect: sign-in from unusual country (T1078.004)"
