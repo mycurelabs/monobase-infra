@@ -1,0 +1,113 @@
+{{- /* NOTE: `ne … false`, NOT `| default true` — see the ConfigMap header. */ -}}
+{{- if and .Values.enabled .Values.pruneExpiredDpopJti.enabled (ne ((.Values.pruneExpiredDpopJti.provision | default dict).enabled) false) }}
+# Provision the least-privilege dpop_pruner role + (expires_at) index + grants
+# (PR #451 security addendum). PreSync, run as the in-cluster superuser. Idempotent
+# and guarded on table existence — see the sibling ConfigMap for the chicken-and-egg
+# note. Weight -5 (after the -6 ConfigMap it mounts). Mirrors provision-db-roles-job.
+#
+# Superuser is required HERE (role create + index create + GRANT need it), and only
+# here — the HOURLY pruner CronJob runs as the least-privilege dpop_pruner role this
+# Job provisions, never as superuser. This is the "split the elevated one-time step
+# from the least-priv recurring step" the review asked for.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "hapihub.fullname" . }}-provision-dpop-pruner
+  namespace: {{ include "hapihub.namespace" . }}
+  labels:
+    {{- include "hapihub.labels" . | nindent 4 }}
+    job-type: provision-dpop-pruner
+  annotations:
+    helm.sh/hook: pre-install,pre-upgrade
+    helm.sh/hook-weight: "-5"
+    helm.sh/hook-delete-policy: before-hook-creation
+    argocd.argoproj.io/hook: PreSync
+    # Keep the last Job around for log forensics until the next sync.
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+spec:
+  backoffLimit: {{ .Values.pruneExpiredDpopJti.provision.backoffLimit | default 3 }}
+  ttlSecondsAfterFinished: 86400
+  activeDeadlineSeconds: {{ .Values.pruneExpiredDpopJti.provision.activeDeadlineSeconds | default 300 }}
+  template:
+    metadata:
+      labels:
+        {{- include "hapihub.selectorLabels" . | nindent 8 }}
+        job-type: provision-dpop-pruner
+    spec:
+      restartPolicy: Never
+      enableServiceLinks: false
+      {{- $nodePool := include "hapihub.nodePool" . -}}
+      {{- if or $nodePool .Values.nodeSelector }}
+      nodeSelector:
+        {{- if $nodePool }}
+        node-pool: {{ $nodePool }}
+        {{- end }}
+        {{- with .Values.nodeSelector }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      {{- end }}
+      {{- if or $nodePool .Values.tolerations }}
+      tolerations:
+        {{- if $nodePool }}
+        - key: "node-pool"
+          operator: "Equal"
+          value: {{ $nodePool | quote }}
+          effect: "NoSchedule"
+        {{- end }}
+        {{- with .Values.tolerations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+      - name: provision-dpop-pruner
+        securityContext:
+          {{- toYaml .Values.securityContext | nindent 10 }}
+        # Same image the in-cluster PG statefulset runs — already on nodes.
+        image: {{ .Values.pruneExpiredDpopJti.provision.image | default .Values.pruneExpiredDpopJti.image | default "docker.io/bitnamilegacy/postgresql:16.4.0-debian-12-r13" | quote }}
+        imagePullPolicy: IfNotPresent
+        command: ["/bin/sh", "-ec"]
+        # Superuser connection via env (PGPASSWORD), NEVER a URI/argv password.
+        args:
+          - |
+            psql -v ON_ERROR_STOP=1 \
+              -v DBNAME={{ include "hapihub.postgresql.database" . }} \
+              -v pruner_role={{ .Values.pruneExpiredDpopJti.provision.role | default "dpop_pruner" | quote }} \
+              -v pruner_password="$PRUNER_PASSWORD" \
+              -f /sql/provision.sql
+        env:
+        - name: PGHOST
+          value: {{ include "hapihub.postgresql.host" . | quote }}
+        - name: PGPORT
+          value: "5432"
+        - name: PGUSER
+          value: "postgres"
+        - name: PGDATABASE
+          value: {{ include "hapihub.postgresql.database" . | quote }}
+        - name: PGPASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.postgresql.auth.existingSecret | default "postgresql" }}
+              key: postgres-password
+        - name: PRUNER_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.pruneExpiredDpopJti.provision.secretName | default "postgresql-dpop-pruner" }}
+              key: dpop-pruner-password
+        volumeMounts:
+        - name: sql
+          mountPath: /sql
+          readOnly: true
+        resources:
+          requests:
+            cpu: 25m
+            memory: 32Mi
+          limits:
+            cpu: 100m
+            memory: 128Mi
+      volumes:
+      - name: sql
+        configMap:
+          name: {{ include "hapihub.fullname" . }}-provision-dpop-pruner
+{{- end }}

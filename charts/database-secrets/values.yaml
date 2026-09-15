@@ -30,6 +30,13 @@ roleSplit:
 medleyDb:
   enabled: false
 
+# Least-privilege DPoP-pruner role toggle (PR #451, monobase-mycure#4393).
+# Forwarded from the deployment values. Default off: the postgresql-dpop-pruner
+# secret is only synced where the hourly dpop_jti_seen prune is enabled (the GCP
+# key doesn't exist elsewhere).
+dpopPruner:
+  enabled: false
+
 # DB/cache credential ExternalSecrets, rendered by templates/externalsecret.yaml.
 # secretName + k8sKey are the CONTRACT the Bitnami charts + app consumers read by
 # name (e.g. postgresql.auth.existingSecret: postgresql, key postgres-password) —
@@ -69,3 +76,10 @@ databases:
     enabledFrom: medleyDb   # gated on .Values.medleyDb.enabled
     fields:
       - {var: medleyDbPassword, k8sKey: medley-db-password, remoteSuffix: medley-db-password}
+  # PR #451 (monobase-mycure#4393): the least-privilege dpop_pruner role password.
+  # Separate entry gated on dpopPruner.enabled — the GCP key exists only where the
+  # hourly dpop_jti_seen prune is switched on. Password must be URL-safe (hex).
+  - secretName: postgresql-dpop-pruner
+    enabledFrom: dpopPruner   # gated on .Values.dpopPruner.enabled
+    fields:
+      - {var: dpopPrunerPassword, k8sKey: dpop-pruner-password, remoteSuffix: postgresql-dpop-pruner-password}
