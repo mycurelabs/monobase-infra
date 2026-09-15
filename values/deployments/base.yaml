@@ -77,6 +77,8 @@ appRegistry:
     key: nocodb
   openmed:
     key: openmed
+  pg-logical-backup:
+    key: pgLogicalBackup
 
 # ===== HEALTHCARE: MyCure Dashboard (operator/admin web UI) =====
 mycure-dashboard:
@@ -128,6 +130,13 @@ medley:
 medleyapp:
   enabled: false
 openmed:
+  enabled: false
+# pg-logical-backup (monobase-mycure#4320): logical pg_dump DR tier. Off
+# everywhere by default; only the preprod overlay stages real config (still
+# disabled, gated on GCP SM keys + niflheim's verified tailnet /32). This base
+# block exists so generic-app.yaml's fail-closed guard can tell a legitimately
+# -off app from a misspelled registry `key`.
+pgLogicalBackup:
   enabled: false
 
 # ===== HEALTHCARE: MyCure PXP (patient-facing web app) =====

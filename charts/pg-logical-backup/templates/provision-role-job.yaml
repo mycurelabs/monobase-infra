@@ -1,0 +1,149 @@
+{{- if and .Values.enabled .Values.provisionRole.enabled }}
+# Provision the read-only `dumper` DB role — BEFORE the CronJob's first run.
+# Idempotent psql run as the in-cluster superuser against the PRIMARY. SQL lives
+# in the sibling ConfigMap.
+#
+# NORMAL resource (Sync wave -10), NOT a PreSync hook — deliberate (finding #1):
+# the ESO-synced dumper Secret is a normal resource (wave -20) on this cluster
+# (ExternalSecret health is `None` here). A PreSync hook Job runs in a phase
+# BEFORE the Sync phase where that ExternalSecret is applied, so it could never
+# wait for its own Secret. As a Sync-wave resource ordered AFTER the
+# ExternalSecret, the wait-for-secret initContainer below can actually observe
+# the populated target Secret.
+#
+# Rotation self-heal: `Replace=true` makes ArgoCD delete+recreate this Job every
+# sync, so the idempotent ALTER ROLE re-applies a rotated dumper password
+# (the behaviour BeforeHookCreation previously provided).
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "pgLogicalBackup.fullname" . }}-provision-role
+  namespace: {{ include "pgLogicalBackup.namespace" . }}
+  labels:
+    {{- include "pgLogicalBackup.labels" . | nindent 4 }}
+    job-type: provision-role
+  annotations:
+    argocd.argoproj.io/sync-wave: "-10"
+    argocd.argoproj.io/sync-options: Replace=true
+spec:
+  backoffLimit: {{ .Values.provisionRole.backoffLimit | default 3 }}
+  ttlSecondsAfterFinished: 86400
+  activeDeadlineSeconds: {{ .Values.provisionRole.activeDeadlineSeconds | default 300 }}
+  template:
+    metadata:
+      labels:
+        {{- include "pgLogicalBackup.selectorLabels" . | nindent 8 }}
+        job-type: provision-role
+    spec:
+      restartPolicy: Never
+      enableServiceLinks: false
+      serviceAccountName: {{ include "pgLogicalBackup.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      initContainers:
+      # ── Secret readiness gate (finding #1) ──────────────────────────────────
+      # ArgoCD/Helm hook WEIGHTS only ORDER creation; on this cluster an
+      # ExternalSecret has NO health check, so nothing proves the ESO-synced
+      # target Secret is populated before this Job runs. Without this gate the
+      # provision container would either CreateContainerConfigError-loop (secret
+      # absent) or race a half-written Secret.
+      #
+      # The dumper Secret is mounted OPTIONAL here (so the pod still schedules
+      # when the Secret does not exist yet) and we BLOCK until the password key
+      # is present AND non-empty, with a bounded timeout — then hand off to the
+      # provision container, which reads the same key via secretKeyRef.
+      - name: wait-for-secret
+        image: {{ .Values.provisionRole.image | quote }}
+        imagePullPolicy: IfNotPresent
+        securityContext:
+          {{- toYaml .Values.securityContext | nindent 10 }}
+        command: ["/bin/sh", "-ec"]
+        args:
+          - |
+            KEYFILE="/secret/{{ .Values.database.passwordKey }}"
+            DEADLINE={{ .Values.provisionRole.secretWaitTimeoutSeconds | default 240 }}
+            INTERVAL=5
+            WAITED=0
+            echo "[wait] blocking until ${KEYFILE} exists and is non-empty (timeout ${DEADLINE}s)"
+            while [ ! -s "$KEYFILE" ]; do
+              if [ "$WAITED" -ge "$DEADLINE" ]; then
+                echo "[wait] TIMEOUT after ${DEADLINE}s: secret {{ .Values.database.existingSecret }} key {{ .Values.database.passwordKey }} not populated by ESO — refusing to provision" >&2
+                exit 1
+              fi
+              sleep "$INTERVAL"
+              WAITED=$((WAITED + INTERVAL))
+            done
+            echo "[wait] secret ready after ${WAITED}s"
+        volumeMounts:
+        - name: dumper-secret
+          mountPath: /secret
+          readOnly: true
+        resources:
+          requests:
+            cpu: 10m
+            memory: 16Mi
+          limits:
+            cpu: 50m
+            memory: 64Mi
+      containers:
+      - name: provision-role
+        securityContext:
+          {{- toYaml .Values.securityContext | nindent 10 }}
+        image: {{ .Values.provisionRole.image | quote }}
+        imagePullPolicy: IfNotPresent
+        command: ["/bin/sh", "-ec"]
+        args:
+          - |
+            # Connect to the `postgres` maintenance db on the PRIMARY — the role
+            # is created here and replicates to the standby that the CronJob dumps.
+            # NO credentials on the command line (they'd show in `ps`/argv):
+            #  • superuser password  -> PGPASSWORD env (libpq reads it; not in the URI)
+            #  • dumper role password -> \getenv inside the SQL, from DUMPER_PASSWORD
+            # (monobase-infra#420 pattern).
+            psql "postgresql://postgres@{{ .Values.database.primaryService }}.{{ include "pgLogicalBackup.namespace" . }}.svc.cluster.local:{{ .Values.database.port }}/postgres" \
+              -v ON_ERROR_STOP=1 \
+              -v target_database={{ .Values.database.name }} \
+              -v dump_role={{ .Values.database.dumpRole }} \
+              -f /sql/provision.sql
+        env:
+        - name: PGPASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.provisionRole.superuserSecret }}
+              key: {{ .Values.provisionRole.superuserSecretKey }}
+        # Read inside provision.sql via `\getenv dumper_password DUMPER_PASSWORD`
+        # — never on argv, never in the connection URI.
+        - name: DUMPER_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.database.existingSecret }}
+              key: {{ .Values.database.passwordKey }}
+        - name: HOME
+          value: /tmp
+        volumeMounts:
+        - name: sql
+          mountPath: /sql
+          readOnly: true
+        - name: tmp
+          mountPath: /tmp
+        resources:
+          requests:
+            cpu: 25m
+            memory: 32Mi
+          limits:
+            cpu: 100m
+            memory: 128Mi
+      volumes:
+      - name: sql
+        configMap:
+          name: {{ include "pgLogicalBackup.fullname" . }}-provision-role
+      # Mounted OPTIONAL so the readiness-gate initContainer can schedule and
+      # poll even before ESO has created/populated the target Secret.
+      - name: dumper-secret
+        secret:
+          secretName: {{ .Values.database.existingSecret }}
+          optional: true
+      - name: tmp
+        emptyDir:
+          sizeLimit: 64Mi
+{{- end }}
