@@ -22,6 +22,62 @@ global:
     provider: ""
     className: ""
 
+  # app.kubernetes.io/part-of label for all mycure workloads. Tenant identity —
+  # lives here, not baked into the chart engine (app/nocodb read global.partOf).
+  partOf: mycureapp
+
+# App registry for the argocd-applications pass-through factory (generic-app.yaml).
+# Tenant app identity lives HERE, not in the shared engine.
+#
+# MAP-KEYED (NOT a list): the map key IS the Application name; the value carries
+# `key` (deployment-values key holding this app's config) and optional `chart`
+# (charts/<chart>; defaults to the map key). It is a MAP on purpose — Helm REPLACES
+# arrays across value files but DEEP-MERGES maps, so an overlay that adds one app
+# ADDS it instead of dropping every other app. To REMOVE an app, set its
+# `<key>.enabled: false` (or delete the entry in THIS base file) — do NOT null the
+# entry: the generic-app.yaml guard FAILS the render on a null/mis-shaped entry
+# rather than silently pruning. `appRegistry` must appear ONLY here (base); an
+# overlay must never re-declare it (scripts/lint-app-registry.sh enforces this).
+# Bespoke-wired apps (postgresql, valkey, minio, minio-artifacts, mailpit, hapihub,
+# hapihub-worker, namespace, security-baseline, database-secrets) keep dedicated
+# templates — not listed here.
+appRegistry:
+  cadence:
+    key: cadence
+  cadence-relay:
+    key: cadenceRelay
+  hapihub-docs:
+    key: hapihub-docs
+    chart: app
+  maestroapp:
+    key: maestroapp
+  medgemma-worker:
+    key: medgemmaWorker
+  medley:
+    key: medley
+  medleyapp:
+    key: medleyapp
+    chart: app
+  mycure:
+    key: mycure
+    chart: app
+  mycure-dashboard:
+    key: mycure-dashboard
+    chart: app
+  mycurelocal:
+    key: mycurelocal
+    chart: app
+  mycure-myaccount:
+    key: mycure-myaccount
+    chart: app
+  mycure-pxp:
+    key: mycure-pxp
+    chart: app
+  nocodb:
+    key: nocodb
+  openmed:
+    key: openmed
+
 # ===== HEALTHCARE: MyCure Dashboard (operator/admin web UI) =====
 mycure-dashboard:
   enabled: true
@@ -52,6 +108,26 @@ mycure-dashboard:
 # on and adds an ExternalSecret for a stable NC_AUTH_JWT_SECRET + admin bootstrap,
 # plus a dedicated read-only Postgres role for the data source.
 nocodb:
+  enabled: false
+
+# ===== Registry apps with no base config (off here, enabled per-overlay) =====
+# These are `appRegistry` entries whose real config lives ONLY in specific
+# overlays (medley/medleyapp/medgemmaWorker/openmed = staging+preprod;
+# maestroapp = protective no-op, not enabled anywhere yet — review #2). Each
+# needs a base block so generic-app.yaml's fail-closed guard can tell a
+# legitimately-off app apart from a MISSPELLED registry `key` (which resolves to
+# nothing and now aborts the render instead of silently dropping the app).
+# `enabled: false` here → skipped in this overlay; an overlay deep-merges its
+# real config (incl. `enabled: true`) on top.
+maestroapp:
+  enabled: false
+medgemmaWorker:
+  enabled: false
+medley:
+  enabled: false
+medleyapp:
+  enabled: false
+openmed:
   enabled: false
 
 # ===== HEALTHCARE: MyCure PXP (patient-facing web app) =====
