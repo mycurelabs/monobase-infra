@@ -88,21 +88,76 @@ markdownlint-cli2 --fix '**/*.md' --ignore node_modules --ignore .git 2>&1 || tr
 [tasks.lint-helm]
 description = "Lint Helm charts (render every app-of-apps tree with real values)"
 run = """
+set -eu
 echo "Rendering app-of-apps trees (validates every chart in use)..."
 helm template lint charts/argocd-applications -f values/deployments/base.yaml -f values/deployments/mycure-production.yaml --set argocd.repoURL=lint --set argocd.targetRevision=lint > /dev/null
+helm template lint charts/argocd-applications -f values/deployments/base.yaml -f values/deployments/mycure-staging.yaml --set argocd.repoURL=lint --set argocd.targetRevision=lint > /dev/null
 helm template lint charts/argocd-applications -f values/deployments/base.yaml -f values/deployments/mycure-preprod.yaml --set argocd.repoURL=lint --set argocd.targetRevision=lint > /dev/null
+# infra + bootstrap render with the DOKS cluster's real values (clusterName is
+# now `required` in the velero-resources/external-dns templates — this render
+# would fail hard if it went missing). bootstrap renders with the per-cluster
+# values file, not the generic aws-main chart default.
 helm template lint charts/argocd-infrastructure -f values/clusters/mycure-doks-main/argocd/infrastructure.yaml --set argocd.repoURL=lint --set argocd.targetRevision=lint > /dev/null
-helm template lint charts/argocd-bootstrap > /dev/null
+helm template lint charts/argocd-bootstrap -f values/clusters/mycure-doks-main/argocd/bootstrap.yaml > /dev/null
 # Leaf charts referenced BY the Applications above are not rendered by the
 # app-of-apps trees — render them directly or template bugs reach main green.
 helm template lint charts/database-secrets --set global.namespace=lint --set walg.enabled=true > /dev/null
 helm template lint charts/monitoring-resources --set global.namespace=lint > /dev/null
+# App-registry guards a plain render (rc=0) can't catch: (a) appRegistry
+# re-declared outside base.yaml, (b) a generic-app Application disappearing.
+./scripts/lint-app-registry.sh
 echo "✓ All trees render"
+"""
+
+[tasks.lint-app-registry]
+description = "Guard the argocd-applications app registry (base-only + no-app-disappears)"
+run = "./scripts/lint-app-registry.sh"
+
+[tasks.lint-cluster-paths]
+description = "Fail if any argocd template references a values/clusters/<x> path that does not exist"
+run = """
+set -eu
+echo "Checking argocd-* templates for dangling values/clusters/<cluster> references..."
+tmp=$(mktemp)
+# Render argocd-infrastructure with every real per-cluster values file, extract
+# the ../../values/clusters/<x>/... valueFiles the render resolved to, and assert
+# each target file exists on disk. clusterName is now `required` in the
+# velero-resources/external-dns templates, so a cluster whose infrastructure.yaml
+# forgot the clusterName line fails the render here (helm errors -> non-zero).
+render=$(mktemp)
+for dir in values/clusters/*/; do
+  cluster=$(basename "$dir")
+  infra="values/clusters/${cluster}/argocd/infrastructure.yaml"
+  [ -f "$infra" ] || continue
+  # Render to a file so helm's exit status is checked DIRECTLY (set -e), instead
+  # of being masked by a `helm | grep || true` pipeline. A real render/template
+  # error (e.g. a missing `required` clusterName) must fail this task; only the
+  # benign "grep found zero dangling paths" case is allowed to be non-fatal.
+  helm template lint charts/argocd-infrastructure -f "$infra" \\
+    --set argocd.repoURL=lint --set argocd.targetRevision=lint > "$render"
+  grep -oE '\\.\\./\\.\\./values/clusters/[^/]+/argocd/[A-Za-z0-9._-]+\\.yaml' "$render" >> "$tmp" || true
+done
+rm -f "$render"
+sort -u "$tmp" > "${tmp}.u" && mv "${tmp}.u" "$tmp"
+missing=0
+while read -r ref; do
+  [ -n "$ref" ] || continue
+  target="${ref#../../}"
+  if [ ! -f "$target" ]; then
+    echo "✗ argocd template references missing path: $target"
+    missing=1
+  fi
+done < "$tmp"
+rm -f "$tmp"
+if [ "$missing" -ne 0 ]; then
+  echo "✗ dangling values/clusters/<x> reference(s) found"; exit 1
+fi
+echo "✓ All referenced values/clusters/<x> paths exist"
 """
 
 [tasks.lint]
 description = "Run all linters"
-depends = ["lint-tf", "lint-yaml", "lint-shell", "lint-helm", "lint-md"]
+depends = ["lint-tf", "lint-yaml", "lint-shell", "lint-helm", "lint-cluster-paths", "lint-md"]
 run = "echo '✓ All linting complete'"
 
 # Validation

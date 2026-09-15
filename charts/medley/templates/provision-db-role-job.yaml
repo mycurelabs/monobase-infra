@@ -45,18 +45,35 @@ spec:
           - |
             # Connect to the `postgres` maintenance db — the SQL creates the
             # role + database here (phase 1) then \c into the target db (phase 2).
-            psql "postgres://postgres:$(POSTGRES_PASSWORD)@{{ .Values.postgresql.serviceName | default "postgresql-primary" }}.{{ include "medley.namespace" . }}.svc.cluster.local:{{ .Values.postgresql.port | default 5432 }}/postgres" \
+            #
+            # NO secrets in argv: the superuser password is passed to libpq via
+            # the PGPASSWORD env var (connection string carries NO password), and
+            # the medley role password is read INSIDE the SQL from the
+            # MEDLEY_PASSWORD env var via psql `\getenv` (never `-v`, which would
+            # expose it in the process command line visible to `ps`/argv).
+            psql \
               -v ON_ERROR_STOP=1 \
               -v target_database={{ .Values.postgresql.auth.database | default "medley" }} \
-              -v medley_password="$MEDLEY_PASSWORD" \
               -f /sql/provision.sql
         env:
-        - name: POSTGRES_PASSWORD
+        # libpq connection parameters — keeps host/user/db (and the password,
+        # via PGPASSWORD below) OUT of argv. psql with no conn string uses these.
+        - name: PGHOST
+          value: {{ printf "%s.%s.svc.cluster.local" (.Values.postgresql.serviceName | default "postgresql-primary") (include "medley.namespace" .) | quote }}
+        - name: PGPORT
+          value: {{ .Values.postgresql.port | default 5432 | quote }}
+        - name: PGUSER
+          value: "postgres"
+        - name: PGDATABASE
+          value: "postgres"
+        - name: PGPASSWORD
           valueFrom:
             secretKeyRef:
               # The in-cluster superuser secret (never the runtime medley DSN).
               name: {{ (((.Values.postgresql).provisionRole | default dict).superuserSecret) | default "postgresql" }}
               key: {{ (((.Values.postgresql).provisionRole | default dict).superuserSecretKey) | default "postgres-password" }}
+        # Read by the SQL via `\getenv medley_password MEDLEY_PASSWORD` — never
+        # placed in argv.
         - name: MEDLEY_PASSWORD
           valueFrom:
             secretKeyRef:

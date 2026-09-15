@@ -4,7 +4,7 @@ A second, **independent-cloud-provider** copy of production backups, so a Digita
 Spaces outage — or account loss/compromise — no longer means zero recoverable backups.
 Motivated by the 2026-08-28 data-loss incident (the risk this workstream exists to remove).
 Tracked in [mycurelabs/monobase-mycure#4007]; PRs #406 (setup), #410 (native-b2 fix),
-#412 (OOM fix).
+# 412 (OOM fix).
 
 B2 is the **off-provider cloud tier** — complementary to the on-prem mirror (Tier 4). See
 the tier table in [BACKUP_DR.md](BACKUP_DR.md).

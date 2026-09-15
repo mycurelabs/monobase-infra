@@ -390,6 +390,20 @@ medley:
     MEDLEY_TRANSCRIPT_DIR: "/tmp/medley-transcripts"  # 2.0.1 JSONL run transcripts (ephemeral; demo of monobase-mycure#4149)
   externalSecrets:
     enabled: false   # 2.x has no MEDLEY_HISTORY_KEY; its only secret (DATABASE_URL) comes via the chart
+  # NetworkPolicy — least-privilege (monobase-infra#420 security review). The chart
+  # default is already scoped (gateway-only ingress on 8970, DNS + same-namespace
+  # postgresql-primary egress). Here we pin the ONE preprod-specific egress: the
+  # host Ollama. OLLAMA_URL/MEDLEY_MODELS above all target host.k3d.internal:11434,
+  # which CoreDNS resolves to 172.21.0.1 (the k3d docker-bridge gateway = the vanaheim
+  # host) — see kube-system/coredns NodeHosts. A NetworkPolicy can't match host
+  # traffic by pod/ns selector, so pin it as an ipBlock /32. No 0.0.0.0/0.
+  # hapihub/medgemma-worker/openmed egress stays empty: HAPIHUB_URL is unset and
+  # those workers are disabled in preprod, so medley never dials them.
+  networkPolicy:
+    ollamaEgress:
+      enabled: true
+      cidr: "172.21.0.1/32"   # host.k3d.internal → vanaheim host Ollama (openai-compatible /v1)
+      port: 11434
   podDisruptionBudget:
     enabled: false
 medleyapp:

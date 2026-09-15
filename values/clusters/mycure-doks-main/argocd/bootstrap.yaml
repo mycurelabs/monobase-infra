@@ -1,0 +1,53 @@
+# argocd-bootstrap override for the DOKS production cluster.
+#
+# Makes prod's bootstrap identity EXPLICIT. Previously DOKS relied on the
+# argocd-bootstrap chart's mycure-branded clusterName default (mycure-doks-main)
+# plus a HAND-PATCHED live AppSet whose deploymentPaths added a mycure-preprod
+# exclude the chart default never carried (main's chart default excludes only
+# example-*, _base and mycure-staging). Those engine defaults are now genericized
+# to `aws-main`, so prod must declare its own values here.
+#
+# RE-BOOTSTRAP / RE-APPLY (prod) — diff-first, context-pinned. `scripts/bootstrap.ts`
+# ignores --context (it always uses the CURRENT kubectl context) and would
+# `helm upgrade --install argocd … 9.0.3`, so do NOT use it to re-apply the seed
+# objects on a live cluster. Run this ONLY from a checkout at origin/main:
+#
+#   helm template argocd-bootstrap charts/argocd-bootstrap \
+#     -f values/clusters/mycure-doks-main/argocd/bootstrap.yaml \
+#     | kubectl --context do-sgp1-mycure-doks-main diff -f -
+#   # inspect, then apply the same rendered manifest:
+#   helm template argocd-bootstrap charts/argocd-bootstrap \
+#     -f values/clusters/mycure-doks-main/argocd/bootstrap.yaml \
+#     | kubectl --context do-sgp1-mycure-doks-main apply -f -
+#
+# STOP and investigate if that diff touches the AppSet's `spec.generators` or
+# `spec.template`, or the infra root's `spec.source.helm.valueFiles` /
+# `clusterName` — a change there means the seed no longer matches the running
+# GitOps engine and re-applying could retarget or re-scope live Applications.
+#
+# For a genuinely fresh/empty cluster (no ArgoCD yet), `bun scripts/bootstrap.ts
+# --cluster-name mycure-doks-main` auto-loads this file (see resolveBootstrapValues).
+#
+# Values below match the live DOKS infrastructure root + auto-discover
+# ApplicationSet as seeded (verified against the running cluster — see PR).
+argocd:
+  clusterName: mycure-doks-main
+  repoURL: https://github.com/mycurelabs/monobase-infra.git
+  targetRevision: HEAD
+  # DOKS prod discovers all env overlays EXCEPT the example reference set, the
+  # _base parents, and staging + preprod (those deploy only on their own
+  # clusters' ArgoCD — see "Branch Conventions (one ref per cluster)" in
+  # docs/architecture/GITOPS-ARGOCD.md). The mycure-preprod exclude is a guard
+  # for when that overlay is (re)introduced on main — it is not present on this
+  # branch, so the exclude is currently a no-op, matching the hand-patched live
+  # AppSet.
+  deploymentPaths:
+    - path: "values/deployments/*.yaml"
+    - path: "values/deployments/example-*.yaml"
+      exclude: true
+    - path: "values/deployments/_base/*.yaml"
+      exclude: true
+    - path: "values/deployments/mycure-staging.yaml"
+      exclude: true
+    - path: "values/deployments/mycure-preprod.yaml"
+      exclude: true
