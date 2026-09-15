@@ -21,8 +21,11 @@ ACTIVATION PREREQUISITES (out-of-band — do these before setting enabled: true 
 
   2. Pin the egress destination — networkPolicy.destinations must carry niflheim's
      real tailnet /32 (+ port 22 sftp, or 443 for an HTTPS object store). The
-     overlay ships a PLACEHOLDER (100.64.0.0/10) — replace it. The chart REFUSES
-     to render (helm fail) if enabled with no destination pinned. Never 0.0.0.0/0.
+     overlay ships EMPTY (destinations: []) on purpose. The chart REFUSES to
+     render (helm fail) if enabled with (a) no destination pinned, OR (b) any
+     destination CIDR that is not an exact /32 — a broad prefix (e.g. the
+     100.64.0.0/10 CGNAT range) is a placeholder, not the host, and is rejected.
+     Pin the VERIFIED peer /32. Never 0.0.0.0/0.
 
   3. niflheim receive/pull side — configure niflheim's existing rclone timer to
      pull (or receive) {{ .Values.destination.path }}/ into /mnt/storage/mycure/pgdump/.
@@ -33,9 +36,12 @@ ACTIVATION PREREQUISITES (out-of-band — do these before setting enabled: true 
      restores + row-counts). See docs/operations/PG_LOGICAL_BACKUP.md.
 
   5. Flip on: set pgLogicalBackup.enabled: true (and suspend: false) in the
-     deployment overlay. The PreSync hooks (SA -11, ExternalSecret -10, role
-     ConfigMap -6, role Job -5) provision the `dumper` role; the CronJob runs at
-     {{ .Values.schedule }}.
+     deployment overlay. Sync-wave ordering (all NORMAL resources, no PreSync
+     hooks): ExternalSecret (-20) → ServiceAccount (-12) → role ConfigMap (-11)
+     → role Job (-10) → CronJob/NetworkPolicy (0). The role Job's wait-for-secret
+     initContainer BLOCKS until the ESO-synced dumper Secret is populated before
+     provisioning the `dumper` role (Replace=true re-runs it each sync to re-apply
+     a rotated password); the CronJob then runs at {{ .Values.schedule }}.
 
 RESTORE (documented in docs/operations/):
   rclone copy {{ .Values.destination.rcloneRemote }}:{{ .Values.destination.path }}/<TS> .   # decrypts on pull

@@ -53,6 +53,13 @@ provisionRole:
   image: docker.io/bitnamilegacy/postgresql:16.4.0-debian-12-r13
   backoffLimit: 3
   activeDeadlineSeconds: 300
+  # Readiness gate (finding #1): the wait-for-secret initContainer BLOCKS until
+  # the ESO-synced dumper Secret exists AND its password key is non-empty before
+  # any psql runs. Bounded — if ESO hasn't populated the Secret within this many
+  # seconds the Job fails (visible) rather than provisioning against a missing
+  # credential. Keep < activeDeadlineSeconds so the gate, not the deadline, is
+  # the thing that reports the timeout.
+  secretWaitTimeoutSeconds: 240
 
 dump:
   compressLevel: 6      # pg_dump -Fc -Z<level>

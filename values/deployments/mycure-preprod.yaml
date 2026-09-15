@@ -429,15 +429,20 @@ pgLogicalBackup:
   networkPolicy:
     # Destination-scoped egress for the off-cloud upload — NEVER 0.0.0.0/0.
     # niflheim is reached over the tailnet (rclone sftp receive of pgdump-preprod/).
-    # ⚠️ CONFIRM niflheim's actual tailnet /32 before flipping enabled:true — this
-    # placeholder is in the 100.64.0.0/10 CGNAT range but is NOT yet the real peer
-    # IP (activation prerequisite, see NOTES.txt). Add port 443 instead of 22 if
-    # the crypt remote wraps an HTTPS object store rather than sftp-to-niflheim.
-    destinations:
-      - cidr: 100.64.0.0/10          # PLACEHOLDER — replace with niflheim/<ip>/32
-        ports:
-          - port: 22
-            protocol: TCP
+    #
+    # Left EMPTY on purpose: the chart's fail-closed guard REFUSES to render when
+    # enabled with no destination pinned, AND rejects any CIDR that is not an
+    # exact /32 (a broad prefix like the old 100.64.0.0/10 CGNAT placeholder is a
+    # NON-answer — it would open SSH egress to the whole range and might still not
+    # reach niflheim). So activation is impossible until niflheim's VERIFIED
+    # tailnet /32 is pinned here (activation prerequisite #2, see NOTES.txt).
+    # At activation, replace with the confirmed peer /32, e.g.:
+    #   destinations:
+    #     - cidr: 100.100.20.30/32     # niflheim tailnet host (rclone sftp receive)
+    #       ports:
+    #         - port: 22               # sftp; use 443 if the crypt remote wraps an HTTPS object store
+    #           protocol: TCP
+    destinations: []
 
 # ===== DATABASE: PostgreSQL (HA — 1 primary + 1 read replica, prod parity) =====
 # The cadence hub's reconcile/serve scan plane reads from the replica

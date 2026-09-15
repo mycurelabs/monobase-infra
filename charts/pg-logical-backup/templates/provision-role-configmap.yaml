@@ -25,11 +25,9 @@ metadata:
     {{- include "pgLogicalBackup.labels" . | nindent 4 }}
     job-type: provision-role
   annotations:
-    helm.sh/hook: pre-install,pre-upgrade
-    helm.sh/hook-weight: "-6"
-    helm.sh/hook-delete-policy: before-hook-creation
-    argocd.argoproj.io/hook: PreSync
-    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+    # NORMAL resource (Sync wave -11) — applied before the provision-role Job
+    # (wave -10) that mounts it. Not a hook, so it stays stable between syncs.
+    argocd.argoproj.io/sync-wave: "-11"
 data:
   provision.sql: |
     \set ON_ERROR_STOP on
