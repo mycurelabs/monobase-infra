@@ -54,8 +54,15 @@ argocd/
 ## Bootstrap Workflow
 
 ```bash
-# Step 1: Install ArgoCD (manual, once)
-mise run bootstrap
+# Step 1: Install ArgoCD (manual, once).
+# Select the target kubectl context first (bootstrap.ts uses the current
+# context), then pass --cluster-name to load the per-cluster bootstrap values
+# (values/clusters/<cluster>/argocd/bootstrap.yaml). A bare `mise run bootstrap`
+# defaults --cluster-name to mycure-doks-main (seeds DOKS prod) — always pass
+# --cluster-name for any other cluster. Bootstrap validates the resolved values
+# (real, non-generic argocd.clusterName + existing paths) before touching the cluster.
+kubectl config use-context <your-context>
+mise run bootstrap -- --cluster-name <cluster>   # e.g. mycure-doks-main
 
 # This installs:
 # 1. ArgoCD itself
@@ -350,7 +357,10 @@ kubectl logs -n myclient-prod -l app=api
 
 ## References
 
-- Bootstrap script: `mise run bootstrap`
+- Bootstrap script: `mise run bootstrap -- --cluster-name <cluster>` (loads the
+  per-cluster `values/clusters/<cluster>/argocd/bootstrap.yaml`; a bare invocation
+  defaults `--cluster-name` to `mycure-doks-main` and seeds DOKS prod, and
+  validates the resolved values before touching the cluster)
 - Infrastructure values: `charts/argocd-infrastructure/values.yaml`
 - Application templates: `charts/argocd-applications/templates/`
 - Deployment configs: `deployments/*/values.yaml`

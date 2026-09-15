@@ -283,13 +283,22 @@ kubectl logs -n argocd deployment/argocd-repo-server --tail=100
 Initial cluster setup (one-time):
 
 ```bash
-# Full bootstrap (installs ArgoCD, deploys infrastructure, enables auto-discover)
-mise run bootstrap
+# Full bootstrap (installs ArgoCD, deploys infrastructure, enables auto-discover).
+# Select the target context first (bootstrap.ts uses the CURRENT kubectl context),
+# then pass --cluster-name so it loads the per-cluster bootstrap values
+# (values/clusters/<cluster>/argocd/bootstrap.yaml). A bare `mise run bootstrap`
+# falls back to the generic `aws-main` chart default and mis-seeds the roots.
+kubectl config use-context <your-context>
+mise run bootstrap -- --cluster-name <cluster>   # e.g. mycure-doks-main
 
-# Manual bootstrap steps:
-# 1. Install ArgoCD
-# 2. kubectl apply -f argocd/bootstrap/infrastructure-root.yaml
-# 3. kubectl apply -f argocd/bootstrap/applicationset-auto-discover.yaml
+# Re-seed / re-apply on an EXISTING cluster (ArgoCD already installed) —
+# diff-first, from a checkout at origin/main, do NOT use bootstrap.ts (it would
+# helm-upgrade ArgoCD and ignores --context):
+#   helm template argocd-bootstrap charts/argocd-bootstrap \
+#     -f values/clusters/<cluster>/argocd/bootstrap.yaml \
+#     | kubectl --context <ctx> diff -f -
+#   # inspect, then swap `diff` for `apply`. STOP if the diff touches the AppSet's
+#   # spec.generators / spec.template, or the infra root's valueFiles / clusterName.
 ```
 
 ## Infrastructure vs Deployment Values
@@ -338,4 +347,4 @@ A "Healthy" app whose `synced revision` is **older** than the `targetRevision` m
 | "is the deploy done?" | Run the 5-check block above |
 | "I rotated the DB password" | Annotate the relevant ExternalSecret with `force-sync=$(date +%s)` (see `k8s` skill) |
 | "rollback X" | `argocd app history` + `argocd app rollback`, with stateful-safety check for db/migrator apps |
-| "bring up a fresh cluster" | `mise run bootstrap` |
+| "bring up a fresh cluster" | select context, then `mise run bootstrap -- --cluster-name <cluster>` (loads per-cluster bootstrap.yaml; bare invocation falls back to the generic `aws-main` default) |

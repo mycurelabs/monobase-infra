@@ -245,9 +245,16 @@ export KUBECONFIG=~/.kube/monobase-prod
 kubectl get nodes
 kubectl get pods -A
 
-# 10. Bootstrap cluster with ArgoCD + Infrastructure
+# 10. Bootstrap cluster with ArgoCD + Infrastructure.
+#     Select the target kubectl context first (bootstrap.ts uses the current
+#     context), then pass --cluster-name to load the per-cluster
+#     values/clusters/<cluster>/argocd/bootstrap.yaml. A bare `mise run bootstrap`
+#     defaults --cluster-name to mycure-doks-main (seeds DOKS prod) — always pass
+#     --cluster-name for any other cluster. Bootstrap validates the resolved
+#     values (real, non-generic argocd.clusterName + existing paths) first.
 cd ../../../
-mise run bootstrap
+kubectl config use-context <your-context>
+mise run bootstrap -- --cluster-name <cluster>
 
 # Then add client configurations in deployments/
 # ArgoCD ApplicationSet will auto-discover and deploy them
@@ -696,9 +703,13 @@ clusters/
 cd clusters/shared-prod
 tofu apply
 
-# 2. Bootstrap cluster once
+# 2. Bootstrap cluster once (select context first; --cluster-name loads the
+#    per-cluster values/clusters/<cluster>/argocd/bootstrap.yaml — a bare
+#    `mise run bootstrap` defaults --cluster-name to mycure-doks-main and seeds
+#    DOKS prod, so always pass --cluster-name for any other cluster).
 cd ../../..
-mise run bootstrap
+kubectl config use-context <your-context>
+mise run bootstrap -- --cluster-name <cluster>
 
 # 3. Add client configurations in deployments/
 mkdir -p deployments/client-a-prod deployments/client-b-prod deployments/client-c-prod
@@ -1058,7 +1069,12 @@ After successfully provisioning a cluster:
   manual helm installs:
 
   ```bash
-  mise run bootstrap
+  # Select the target context first; --cluster-name loads the per-cluster
+  # values/clusters/<cluster>/argocd/bootstrap.yaml (a bare `mise run bootstrap`
+  # defaults --cluster-name to mycure-doks-main and seeds DOKS prod — always pass
+  # --cluster-name for any other cluster).
+  kubectl config use-context <your-context>
+  mise run bootstrap -- --cluster-name <cluster>
   ```
 
 - [ ] **Add client configuration**
