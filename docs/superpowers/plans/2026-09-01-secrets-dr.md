@@ -28,6 +28,7 @@
 Secrets are KB-scale, so unlike the GCS bucket (#3878) this is essentially free — the cost story is the *opposite* extreme, and it's the strongest argument for Option A over a warm standby.
 
 **Option A (recommended) — effectively $0/mo:**
+
 | Component | Cost | Why |
 |---|---|---|
 | Secret Manager **access ops** | **$0** | ~115 reads/day ≈ 3,450/mo, under the **10,000/mo free tier**; beyond it it's $0.03/10k (~$0.01/mo). |
@@ -38,6 +39,7 @@ Secrets are KB-scale, so unlike the GCS bucket (#3878) this is essentially free 
 | *Optional 3rd store (AWS S3 Object Lock)* | **~cents/mo** | <100 MB storage ~$0.002/mo; GCP egress of KB/day is under the 100 GB free tier; PUTs negligible. |
 
 **Provider-specific warm-standby alternatives — real money (why they're deferred):**
+
 - **HCP Vault Dedicated:** Development tier ~$0.03–0.62/hr (~$22–450/mo) is single-node with **no HA and no snapshot restore** → unusable for DR. DR-grade needs Standard/Plus (~$1.58–1.84/hr ≈ $1,150–1,350/mo) **per cluster**, and DR replication needs a **second cluster** → **~$2,300+/mo**, plus **$72.92/client/mo**. (Rates vary across sources post-IBM tier renames — confirm in the HCP portal.)
 - **Self-managed Vault Enterprise:** DR replication is Enterprise-only = quote-based license (typically tens of k$/yr) + you run the infra + solve Vault's own unseal-key DR.
 - **Infisical:** self-host is free on the MIT core (infra cost only, ~tens/mo on our cluster) but enterprise features need a license; Cloud Pro is **$18/identity/mo** and machine identities count (scales fast).
@@ -64,6 +66,7 @@ Secrets are KB-scale, so unlike the GCS bucket (#3878) this is essentially free 
 | `docs/operations/SECRETS_DR.md` | Runbook: verify, restore/break-glass, key escrow policy, quarterly drill. |
 
 **Human prerequisites (not chart-managed):**
+
 - **P1. Generate the age key pair OFFLINE** (`age-keygen`) on an air-gapped/trusted machine. Commit only the **public** recipient (`age1...`). The **private** key is escrowed per the policy in Task 5 — never touches GCP, the cluster, or git.
 - **P2. Create a read-only exporter GCP SA** in `mc-v4-prod` with `roles/secretmanager.viewer` + `roles/secretmanager.secretAccessor` (list + access, NO write/delete). Store its JSON key in Secret Manager as `mycure-production-secrets-dr-exporter-sa` (ESO reads it). `# ponytail: reuse ESO's existing reader SA only if it's already read-only-scoped; else a dedicated one keeps blast radius to read.`
 - **P3. Create the DO Spaces backup bucket** `mycure-secrets-dr` with **versioning** (API-only, `mc version enable` — **Spaces has no Object Lock, don't rely on it**). That's it: the quarantining mirror that consumes this bucket is **built by the plan** as a host-side script on niflheim (Task 6, `scripts/secrets-dr-mirror-setup.sh`) — it is NOT a human prerequisite and NOT chart-managed.
@@ -74,10 +77,12 @@ Secrets are KB-scale, so unlike the GCS bucket (#3878) this is essentially free 
 ### Task 1: Chart scaffold + exporter SA/creds wiring
 
 **Files:**
+
 - Create: `charts/secrets-dr-backup/{Chart.yaml,values.yaml}`
 - Create: `charts/secrets-dr-backup/templates/{serviceaccount.yaml,externalsecret.yaml,networkpolicy.yaml}`
 
 **Interfaces:**
+
 - Consumes: `global.namespace`; ESO `ClusterSecretStore` (existing GCP store); Spaces creds remoteKeys.
 - Produces: k8s Secret `secrets-dr-backup` (keys: `gcp-sa.json`, `spaces-access-key`, `spaces-secret-key`) + SA `secrets-dr-backup` + egress NetworkPolicy.
 
@@ -166,6 +171,7 @@ spec:
 - [ ] **Step 6: Lint + commit**
 
 Run: `helm lint charts/secrets-dr-backup` and `helm template charts/secrets-dr-backup --set enabled=true | head`
+
 ```bash
 git add charts/secrets-dr-backup
 git commit -m "feat(secrets-dr): chart scaffold + exporter SA/creds wiring (monobase-mycure#3882)"
@@ -176,9 +182,11 @@ git commit -m "feat(secrets-dr): chart scaffold + exporter SA/creds wiring (mono
 ### Task 2: The export → encrypt → upload CronJob
 
 **Files:**
+
 - Create: `charts/secrets-dr-backup/templates/{configmap.yaml,cronjob.yaml}`
 
 **Interfaces:**
+
 - Consumes: Secret `secrets-dr-backup`, ConfigMap `secrets-dr-backup-script`, `.Values.ageRecipients`, `.Values.spaces.*`.
 - Produces: a daily object `secrets/<sourceProjectId>/YYYY-MM-DD.json.age` (timestamp injected at runtime, not build time) in the Spaces bucket.
 
@@ -304,6 +312,7 @@ spec:
 - [ ] **Step 3: Render + commit**
 
 Run: `helm template charts/secrets-dr-backup --set enabled=true --set ageRecipients={age1xxx} | grep -A2 kind:`
+
 ```bash
 git add charts/secrets-dr-backup/templates/{configmap.yaml,cronjob.yaml}
 git commit -m "feat(secrets-dr): daily export→age-encrypt→Spaces CronJob"
@@ -314,6 +323,7 @@ git commit -m "feat(secrets-dr): daily export→age-encrypt→Spaces CronJob"
 ### Task 3: Enable in the production overlay (gated) + plan review
 
 **Files:**
+
 - Modify: `values/deployments/mycure-production.yaml` (add the chart values + ESO remoteKeys for exporter SA + Spaces creds if not already synced).
 
 - [ ] **Step 1:** Add under the appropriate app block:
@@ -342,13 +352,16 @@ secretsDrBackup:
 ### Task 4: First run + backup verification
 
 - [ ] **Step 1:** After ArgoCD syncs, trigger a manual run:
+
 ```bash
 kubectl create job --from=cronjob/secrets-dr-backup secrets-dr-manual-1 -n mycure-production
 kubectl logs -n mycure-production job/secrets-dr-manual-1
 ```
+
 Expected: `exported 115 secrets` … `uploaded s3://mycure-secrets-dr/secrets/mc-v4-prod/<stamp>.json.age`.
 
 - [ ] **Step 2:** Confirm the object exists and is ciphertext:
+
 ```bash
 aws --endpoint-url https://sgp1.digitaloceanspaces.com s3 ls s3://mycure-secrets-dr/secrets/mc-v4-prod/
 # download + confirm it does NOT decrypt without the offline key (should fail):
@@ -364,6 +377,7 @@ sops --decrypt <obj>   # expect: no matching age identity
 A silently-failing secrets backup is the worst kind — this job protects the *irreplaceable* keys, so it is strictly more critical than the wal-g/GCS tiers and must page on failure, not wait for a weekly manual `s3 ls`. Mirrors PR #398's Task 4.5 (Tier-1 alerting), adapted to a k8s CronJob.
 
 **Files:**
+
 - Modify: `charts/secrets-dr-backup/values.yaml` (add `alert.enabled` + webhook/receiver ref).
 - Create: `charts/secrets-dr-backup/templates/prometheusrule.yaml` (alert on job failure).
 
@@ -412,6 +426,7 @@ spec:
 - [ ] **Step 3: Render + commit**
 
 Run: `helm template charts/secrets-dr-backup --set enabled=true --set ageRecipients={age1xxx} | grep -A2 'kind: PrometheusRule'`
+
 ```bash
 git add charts/secrets-dr-backup/{values.yaml,templates/prometheusrule.yaml}
 git commit -m "feat(secrets-dr): CronJob failure + staleness alerting (monobase-mycure#3882)"
@@ -422,6 +437,7 @@ git commit -m "feat(secrets-dr): CronJob failure + staleness alerting (monobase-
 ### Task 5: Runbook + escrow policy (the security model)
 
 **Files:**
+
 - Create: `docs/operations/SECRETS_DR.md`
 
 - [ ] **Step 1: Write the runbook** with these sections:
@@ -496,6 +512,7 @@ These are warm layers on top of — not replacements for — the offline archive
 ```
 
 - [ ] **Step 2: Commit**
+
 ```bash
 git add docs/operations/SECRETS_DR.md
 git commit -m "docs(secrets-dr): runbook + age-key escrow policy + break-glass drill"
@@ -508,10 +525,12 @@ git commit -m "docs(secrets-dr): runbook + age-key escrow policy + break-glass d
 The in-cluster CronJob (Tasks 1–2) only *uploads* to `mycure-secrets-dr` — **nothing mirrors that bucket off-provider yet**. This task builds the second half: a **host-side script on niflheim**, not a chart template. `charts/secrets-dr-backup/` deploys into the in-cluster `mycure-production` namespace; niflheim is an off-cluster bare-metal host a Helm chart can't reach — same host/cluster split PRs #400/#402 navigate, so it ships as a `scripts/` script + runbook. The two halves meet **only** through the Spaces bucket. The mirror uses `rclone sync --backup-dir` so a delete on Spaces (compromised/mis-scoped write key) moves the object into a dated quarantine directory locally instead of deleting the on-prem copy; a prune sweeps quarantine dirs older than a retention window (the `WAL_QUARANTINE_DAYS` pattern, here `QUARANTINE_DAYS`). Modeled on `mycure-wal-reconcile`; **NOT** an edit to the shared `onprem-backup-setup.sh` (another owner's hotspot).
 
 **Files:**
+
 - Create: `scripts/secrets-dr-mirror-setup.sh`
 - Modify: `docs/operations/SECRETS_DR.md` (add a "niflheim quarantine mirror" section pointing at the script + the quarantine dir).
 
 **Interfaces:**
+
 - Consumes (env): `SPACES_ACCESS_KEY`, `SPACES_SECRET_KEY` (read-only Spaces key preferred); flags for bucket/region/dir/retention.
 - Produces: one systemd `secrets-dr-mirror.service` + `.timer` on niflheim that runs `rclone sync spaces:mycure-secrets-dr/ <dir>/ --backup-dir <dir>/secrets-deleted/<date>`, plus an age-based quarantine prune.
 
@@ -712,6 +731,7 @@ echo "  trigger now   : sudo systemctl start $SERVICE_NAME.service"
 - [ ] **Step 2: Runbook + commit**
 
 Add a "niflheim quarantine mirror" section to `docs/operations/SECRETS_DR.md`: how to (re)run the setup (`sudo SPACES_ACCESS_KEY=… SPACES_SECRET_KEY=… scripts/secrets-dr-mirror-setup.sh`), where the quarantine lives (`/var/backups/mycure-secrets-dr/secrets-deleted/<date>`), and how to recover an object a Spaces delete moved into quarantine.
+
 ```bash
 git add scripts/secrets-dr-mirror-setup.sh docs/operations/SECRETS_DR.md
 git commit -m "feat(secrets-dr): niflheim quarantining Spaces mirror (host-side, monobase-mycure#3882)"
@@ -726,6 +746,7 @@ git commit -m "feat(secrets-dr): niflheim quarantining Spaces mirror (host-side,
 **Host/cluster split:** the CronJob (Tasks 1–2, in-cluster `mycure-production`) and the quarantine (Task 6, off-cluster niflheim) meet ONLY through the Spaces bucket. The quarantine is a `scripts/` host script, NOT a chart template — a chart can't reach niflheim (same split as PRs #400/#402). ✅
 
 **Open items for biz/owner decision (issue #3882):**
+
 1. **age private-key escrow** — who are the M-of-N custodians and the threshold (recommend 2-of-3)? This is the entire security model.
 2. **Off-provider stores** — Spaces (versioning) + niflheim (`--backup-dir` quarantine) sufficient, or add a 3rd store where **Object Lock actually works** (Backblaze B2 / Wasabi / Cloudflare R2 / AWS S3) for true WORM? The Spaces write key lives in-cluster, so without an immutable copy a cluster compromise could delete the Spaces archive — the on-prem quarantine closes that half; a WORM 3rd store closes it fully. <100 MB ciphertext → cents/mo.
 3. **Warm standby** — build the provider-specific Vault/Akeyless/Infisical layer now, or defer (plan defers it; Option A only).

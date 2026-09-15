@@ -20,7 +20,7 @@ data:
   # which `route` maps uniformly to an Alertmanager v2 alert.
   #
   # TWO variants are rendered so the node can fail OPEN on a missing MaxMind db:
-  #   tenzir.yaml        : NO-GEO — the five non-geo detections + ingest + route.
+  #   tenzir.yaml        : NO-GEO — the six non-geo detections + ingest + route.
   #                        No geoip-city context, so it boots even with no mmdb.
   #   tenzir-geoip.yaml  : GEO — adds 20-unusual-country + 21-impossible-travel and
   #                        the geoip-city context (only rendered when geoip.enabled).
@@ -28,7 +28,7 @@ data:
   # present and non-empty; otherwise it falls back to tenzir.yaml. This matters
   # because tenzir-node v6.13.0 exits 139 (SIGSEGV) when a configured geoip
   # context points at a missing/empty db — selecting the no-geo config in that
-  # case keeps the node (and the five non-geo detections) running.
+  # case keeps the node (and the non-geo detections) running.
   tenzir.yaml: |
     {{- include "tenzir.config" (dict "root" . "geo" false) | nindent 4 }}
   {{- if .Values.geoip.enabled }}

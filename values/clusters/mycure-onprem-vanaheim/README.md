@@ -123,6 +123,7 @@ The `nginx-internal-gateway` is exposed on the tailnet by the tailscale operator
   deleting them once and letting external-dns recreate.
 
 Reach it (with Tailscale up), always over **https://**:
+
 - `https://mycure.staging.localfirsthealth.com` (login), `mycure-dashboard`, `mycure-pxp`
 - `https://hapihub.staging.localfirsthealth.com/health`
 - preprod: same hostnames under `.preprod.localfirsthealth.com` (+ `cadence`,
@@ -140,6 +141,7 @@ split-DNS for `localfirsthealth.com` → `1.1.1.1`.
 ```bash
 mise run cluster-destroy mycure-onprem-vanaheim   # or: k3d cluster delete mycure-onprem-vanaheim
 ```
+
 Then re-provision + re-bootstrap. **The gateway's tailnet IP changes on rebuild** (it also
 changes if the tailscale operator re-creates the proxy device — it did on 2026-09-03,
 appending `-1` to the device name). Update the `external-dns.alpha.kubernetes.io/target`

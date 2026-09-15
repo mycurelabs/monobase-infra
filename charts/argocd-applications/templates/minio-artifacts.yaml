@@ -24,16 +24,32 @@ spec:
     jsonPointers:
     - /secrets
     - /imagePullSecrets
+  # ConfigMap `.data` ignore is NAME-SCOPED to `minio-artifacts` (the Bitnami
+  # chart's main config ConfigMap) and deliberately EXCLUDES
+  # `minio-artifacts-provisioning`. The provisioning ConfigMap carries the
+  # promoter/publisher policy + user definitions (mono#4095): if its `.data`
+  # were ignored, every sync with RespectIgnoreDifferences=true copies the live
+  # `.data` back into target, so the app never goes OutOfSync, auto-sync never
+  # fires, the provisioning PostSync hook never re-runs, and the promoter user +
+  # publisher Deny are never created. Comparing its `.data` lets a policy change
+  # flip the app OutOfSync → sync → re-run provisioning. The main config
+  # ConfigMap still needs the ignore (MinIO mutates it at runtime).
   - group: ""
     kind: ConfigMap
+    name: minio-artifacts
     jqPathExpressions:
     - .data
 
   sources:
     # Source 1: Bitnami MinIO Helm chart (dedicated artifacts instance)
     - chart: minio
-      repoURL: https://charts.bitnami.com/bitnami
-      targetRevision: 14.x.x
+      # Bitnami OCI-only since 2025; pull from the OCI registry, pinned.
+      # Pin via the artifacts-store's OWN knob first: prod sets `minio.enabled: false`,
+      # so a bare `.Values.minio.chartVersion` here is dead config (this dedicated
+      # instance is driven by `minio-artifacts.*`). Fall back to `minio.*` then the
+      # literal so shared overlays that only set `minio.chartVersion` still work.
+      repoURL: {{ (index .Values "minio-artifacts").chartRepo | default .Values.minio.chartRepo | default "registry-1.docker.io/bitnamicharts" }}
+      targetRevision: {{ (index .Values "minio-artifacts").chartVersion | default .Values.minio.chartVersion | default "14.10.5" | quote }}
       helm:
         releaseName: minio-artifacts
         valuesObject:
@@ -115,8 +131,68 @@ spec:
                       - "s3:DeleteObject"
                       {{- end }}
                   {{- end }}
+                  # The maestroapp platform-root latest.json files are the FLEET
+                  # POINTERS (mono#4095): the clinic auto-updater + install.sh
+                  # poll them, and only the promote-maestroapp Job (the
+                  # artifacts-promoter user below, driven by the git pin in
+                  # values/deployments/mycure-production.yaml) may write them.
+                  # Explicit Deny so the publisher key — including a re-run of an
+                  # OLD release workflow whose publish.ts still wrote root
+                  # latest.json — cannot roll the fleet. This Deny sits AFTER the
+                  # publishers range above (which grants maestroapp PutObject on
+                  # artifacts/maestroapp/*); MinIO evaluates Deny over Allow
+                  # regardless of order, so the root pointers stay carved out of
+                  # the publisher's write scope. Literal keys, not a wildcard: S3
+                  # policy `*` crosses `/`, so desktop/*/latest.json would also
+                  # match the versioned v<ver>/latest.json manifests the
+                  # publisher MUST keep writing. The pruner never touches root
+                  # latest.json, so denying delete here is free.
+                  # Platforms MUST match charts/maestroapp/values.yaml `platforms`
+                  # and the promoter Allow below — three separate lists, no shared
+                  # source, so they drift silently. linux_aarch64 is intentionally
+                  # absent: the mono release matrix ships only these three.
+                  - effect: "Deny"
+                    resources:
+                      - "arn:aws:s3:::artifacts/maestroapp/desktop/linux_x86_64/latest.json"
+                      - "arn:aws:s3:::artifacts/maestroapp/desktop/darwin_aarch64/latest.json"
+                      - "arn:aws:s3:::artifacts/maestroapp/desktop/windows_x86_64/latest.json"
+                    actions:
+                      - "s3:PutObject"
+                      - "s3:DeleteObject"
+              # Fleet promoter (mono#4095): the ONLY identity allowed to write
+              # the maestroapp platform-root latest.json fleet pointers. Used
+              # exclusively by the charts/maestroapp promotion Job, which copies
+              # the pinned v<ver>/latest.json over them. Dedicated user so
+              # promotes are attributable in audit and revocable without touching
+              # the CI publisher key. It cannot upload artifacts or delete
+              # anything; reads under maestroapp/ are granted because the Job's
+              # authenticated mc calls (stat/cat/copy-source) are evaluated
+              # against THIS policy, not the anonymous-download rule. Platform
+              # list must match the Deny above + charts/maestroapp/values.yaml
+              # `platforms` — three separate lists, no shared source.
+              - name: minio-artifacts-promoter
+                statements:
+                  - effect: "Allow"
+                    resources:
+                      - "arn:aws:s3:::artifacts"
+                    actions:
+                      - "s3:ListBucket"
+                      - "s3:GetBucketLocation"
+                  - effect: "Allow"
+                    resources:
+                      - "arn:aws:s3:::artifacts/maestroapp/*"
+                    actions:
+                      - "s3:GetObject"
+                  - effect: "Allow"
+                    resources:
+                      - "arn:aws:s3:::artifacts/maestroapp/desktop/linux_x86_64/latest.json"
+                      - "arn:aws:s3:::artifacts/maestroapp/desktop/darwin_aarch64/latest.json"
+                      - "arn:aws:s3:::artifacts/maestroapp/desktop/windows_x86_64/latest.json"
+                    actions:
+                      - "s3:PutObject"
             usersExistingSecrets:
               - minio-artifacts-ci
+              - minio-artifacts-promoter
           persistence:
             enabled: true
             storageClass: {{ (index .Values "minio-artifacts").persistence.storageClass | default "" }}

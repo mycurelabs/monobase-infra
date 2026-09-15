@@ -1,0 +1,10 @@
+apiVersion: v2
+name: maestroapp
+description: >-
+  maestroapp desktop fleet version promotion (mono#4095). The fleet itself runs
+  on clinic boxes, not in k8s — this chart's only resource is a Job that
+  reconciles the artifacts store's platform-root latest.json fleet pointers
+  (what the Tauri auto-updater and install.sh poll) to the pinned version.
+type: application
+version: 0.1.0
+appVersion: "1.0"

@@ -61,8 +61,15 @@ curl https://api.myclient.com/health
 # (Use same cloud provider for S3 access)
 
 # 2. Deploy core infrastructure (ArgoCD bootstrap installs the gateway,
-#    external-secrets, cert-manager, etc. via GitOps)
-mise run bootstrap
+#    external-secrets, cert-manager, etc. via GitOps).
+#    Pass --cluster-name so bootstrap loads the per-cluster
+#    values/clusters/<cluster>/argocd/bootstrap.yaml (clusterName + repoURL +
+#    deploymentPaths). Without it the chart falls back to the generic `aws-main`
+#    reference and seeds the infra root/AppSet at a non-existent cluster path —
+#    NONE of the ~20 infra apps would be created. bootstrap.ts always uses the
+#    CURRENT kubectl context, so select the target context first.
+kubectl config use-context do-sgp1-mycure-doks-main   # DOKS prod; substitute per cluster
+mise run bootstrap -- --cluster-name mycure-doks-main
 
 # 3. Install Velero with SAME S3 bucket
 helm install velero vmware-tanzu/velero \

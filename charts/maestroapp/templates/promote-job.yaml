@@ -1,0 +1,54 @@
+# Promotion Job (mono#4095). The version is part of the Job name, so a pin
+# bump renders a NEW Job (ArgoCD prunes the old one and runs this) while an
+# unchanged pin stays Synced with the completed Job. No ttlSecondsAfterFinished
+# on purpose: TTL-deleting a completed Job makes ArgoCD see it OutOfSync and
+# re-run it forever.
+#
+# The script (charts/maestroapp/templates/_helpers.tpl → maestroapp.promoteScript,
+# shared verbatim with the optional periodic reconcile CronJob) is an
+# eventually-consistent RECONCILE, NOT an atomic commit — three independent S3
+# object copies cannot flip as one, so we do not claim atomicity. Instead it
+# STRUCTURALLY validates every platform's v<PIN> manifest with jq BEFORE writing
+# any root pointer (never a half-fleet promotion on a bad pin), then reconciles
+# each platform-root to the pinned bytes by CONTENT HASH (fixes same-version
+# content drift too), and on a mid-phase copy failure finishes the rest and
+# exits non-zero so the next run self-heals the stragglers. selfHeal /
+# Force+Replace re-creations are harmless no-ops at steady state.
+#
+# This Job is the EVENT-driven trigger (fires on a pin bump / re-sync). A
+# COMPLETED Job does not observe drift that happens afterward — that gap is
+# covered by the values-gated reconcile CronJob (reconcile.schedule), which
+# re-asserts the same script on a schedule. ArgoCD's periodic app sync
+# (Force+Replace) is a secondary re-trigger of this Job.
+{{- $ver := .Values.version | required "maestroapp.version is required (the pinned fleet version)" }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: maestroapp-promote-{{ $ver | replace "." "-" }}
+  labels:
+    app.kubernetes.io/name: maestroapp-promote
+    app.kubernetes.io/component: fleet-promotion
+  annotations:
+    # A Job's pod template is immutable. The version is in the Job name, so a
+    # PIN bump renders a new Job (no conflict). But any OTHER spec change (image
+    # bump, hardening tweak) at an UNCHANGED pin would leave the app in
+    # SyncError — ArgoCD can't patch an immutable Job in place. Force+Replace
+    # makes ArgoCD delete-and-recreate the Job on such a change. Harmless at
+    # steady state (identical spec → nothing to replace) and the script is
+    # idempotent, so a recreate re-runs a no-op reconcile.
+    argocd.argoproj.io/sync-options: Force=true,Replace=true
+spec:
+  # backoffLimit is a second safety net only. The primary transient-recovery
+  # path is the in-script bounded validate-retry loop (below): a Failed Job
+  # whose manifest is unchanged (same pin) is NOT re-run by ArgoCD selfHeal, so
+  # a transient "artifact not published yet" must recover WITHIN a single Job
+  # run or it strands until manual deletion. The loop waits for the missing
+  # v<PIN> manifests to appear (bounded), then promotes; backoffLimit=2 only
+  # covers a mid-run pod eviction.
+  backoffLimit: 2
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: maestroapp-promote
+    spec:
+      {{- include "maestroapp.promotePodSpec" . | nindent 6 }}

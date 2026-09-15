@@ -152,8 +152,10 @@ terraform apply -var-file=../../../cluster/terraform.tfvars
 # 6. Configure kubectl
 eval $(terraform output -raw configure_kubectl)
 
-# 7. Bootstrap GitOps
-mise run bootstrap
+# 7. Bootstrap GitOps (kubectl context is set above; --cluster-name loads the
+#    per-cluster values/clusters/<cluster>/argocd/bootstrap.yaml — a bare
+#    `mise run bootstrap` falls back to the generic `aws-main` chart default).
+mise run bootstrap -- --cluster-name <cluster>
 ```
 
 Or use the automated script:

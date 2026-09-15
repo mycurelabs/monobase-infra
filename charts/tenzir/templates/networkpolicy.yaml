@@ -1,0 +1,48 @@
+{{- if .Values.enabled }}
+# Ingress NetworkPolicy for the Tenzir node (infra#359a).
+#
+# The `security` namespace ships with ZERO NetworkPolicies, so tenzir-ingest:8080
+# is reachable from ANY pod in the cluster. This locks it to client (product)
+# namespaces only — the audit-sink emitters. It is the symmetric ingress half of
+# the egress allow each client namespace already carries (security-baseline
+# deny-cross-namespace: client -> security:8080).
+#
+# Selecting the source: client/product namespaces are the ones created via
+# argocd-applications (charts/namespace) and carry `app.kubernetes.io/environment`
+# — infrastructure namespaces (security, monitoring, argocd, nginx-*, velero, ...)
+# do not. So `app.kubernetes.io/environment: Exists` is exactly "client namespaces,
+# not infra" and stays correct as new client namespaces are added, without
+# hardcoding names into this cluster-generic chart. To pin to a specific set
+# instead, swap the matchExpressions below for
+#   matchExpressions:
+#     - {key: kubernetes.io/metadata.name, operator: In, values: [mycure-production, ...]}
+#
+# Only Ingress is policed. Egress is unaffected (tenzir's outbound to Alertmanager
+# + its replies keep working — response traffic to tenzir's own connections is not
+# governed by this ingress policy). 8080 is tenzir's ONLY inbound port (5158 is
+# localhost-only; no metrics port scraped), so restricting it here is complete.
+# Kubelet health probes (httpGet :ingest) originate host-local and are exempt on
+# the cluster CNI, same as every port-scoped app NetworkPolicy already in prod.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: tenzir-ingest-allow-clients
+  namespace: {{ include "tenzir.namespace" . }}
+  labels:
+    {{- include "tenzir.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "tenzir.selectorLabels" . | nindent 6 }}
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchExpressions:
+              - key: app.kubernetes.io/environment
+                operator: Exists
+      ports:
+        - protocol: TCP
+          port: {{ .Values.ingestPort }}
+{{- end }}

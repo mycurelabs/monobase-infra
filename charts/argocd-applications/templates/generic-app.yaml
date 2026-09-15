@@ -10,6 +10,7 @@
   (dict "name" "cadence"          "key" "cadence")
   (dict "name" "cadence-relay"    "key" "cadenceRelay")
   (dict "name" "hapihub-docs"     "key" "hapihub-docs" "chart" "app")
+  (dict "name" "maestroapp"       "key" "maestroapp")
   (dict "name" "medgemma-worker"  "key" "medgemmaWorker")
   (dict "name" "medley"           "key" "medley")
   (dict "name" "medleyapp"        "key" "medleyapp" "chart" "app")
