@@ -693,7 +693,7 @@ minio-artifacts:
 # that platform.
 maestroapp:
   enabled: true
-  version: "2.1.109"
+  version: "2.1.110"
   # Post-completion drift guard — ON for prod. The event-driven promote Job only
   # reconciles the platform-root latest.json pointers when a pin bump / re-sync
   # re-runs it; a COMPLETED Job never observes drift that happens AFTERWARD (an
