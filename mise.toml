@@ -91,6 +91,8 @@ run = """
 set -eu
 echo "Rendering app-of-apps trees (validates every chart in use)..."
 helm template lint charts/argocd-applications -f values/deployments/base.yaml -f values/deployments/mycure-production.yaml --set argocd.repoURL=lint --set argocd.targetRevision=lint > /dev/null
+helm template lint charts/argocd-applications -f values/deployments/base.yaml -f values/deployments/mycure-staging.yaml --set argocd.repoURL=lint --set argocd.targetRevision=lint > /dev/null
+helm template lint charts/argocd-applications -f values/deployments/base.yaml -f values/deployments/mycure-preprod.yaml --set argocd.repoURL=lint --set argocd.targetRevision=lint > /dev/null
 # infra + bootstrap render with the DOKS cluster's real values (clusterName is
 # now `required` in the velero-resources/external-dns templates — this render
 # would fail hard if it went missing). bootstrap renders with the per-cluster
@@ -101,8 +103,15 @@ helm template lint charts/argocd-bootstrap -f values/clusters/mycure-doks-main/a
 # app-of-apps trees — render them directly or template bugs reach main green.
 helm template lint charts/database-secrets --set global.namespace=lint --set walg.enabled=true > /dev/null
 helm template lint charts/monitoring-resources --set global.namespace=lint > /dev/null
+# App-registry guards a plain render (rc=0) can't catch: (a) appRegistry
+# re-declared outside base.yaml, (b) a generic-app Application disappearing.
+./scripts/lint-app-registry.sh
 echo "✓ All trees render"
 """
+
+[tasks.lint-app-registry]
+description = "Guard the argocd-applications app registry (base-only + no-app-disappears)"
+run = "./scripts/lint-app-registry.sh"
 
 [tasks.lint-cluster-paths]
 description = "Fail if any argocd template references a values/clusters/<x> path that does not exist"
@@ -196,6 +205,10 @@ run = "echo '✓ Auto-fix complete'"
 
 # Testing
 # =============================================================================
+
+[tasks.test-hapihub-manual-deployment]
+description = "Render-test the shared HapiHub manual deployment gate (no cluster access)"
+run = "bun test charts/argocd-applications/tests/hapihub-manual-deployment.test.ts"
 
 [tasks.test-helm]
 description = "Run Helm unit tests"

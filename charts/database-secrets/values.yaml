@@ -24,6 +24,19 @@ minio:
 roleSplit:
   enabled: false
 
+# Dedicated medley DB role secret toggle. Forwarded from the deployment values.
+# Default off: the mycure-preprod-medley-db ExternalSecret (and its GCP key) only
+# exists where medley runs with a scoped non-superuser role (preprod).
+medleyDb:
+  enabled: false
+
+# Least-privilege DPoP-pruner role toggle (PR #451, monobase-mycure#4393).
+# Forwarded from the deployment values. Default off: the postgresql-dpop-pruner
+# secret is only synced where the hourly dpop_jti_seen prune is enabled (the GCP
+# key doesn't exist elsewhere).
+dpopPruner:
+  enabled: false
+
 # DB/cache credential ExternalSecrets, rendered by templates/externalsecret.yaml.
 # secretName + k8sKey are the CONTRACT the Bitnami charts + app consumers read by
 # name (e.g. postgresql.auth.existingSecret: postgresql, key postgres-password) —
@@ -53,3 +66,20 @@ databases:
       - {var: migratorPassword, k8sKey: migrator-password, remoteSuffix: postgresql-migrator-password}
       - {var: appRwPassword, k8sKey: app-rw-password, remoteSuffix: postgresql-app-rw-password}
       - {var: cadencePassword, k8sKey: cadence-password, remoteSuffix: postgresql-cadence-password}
+  # Dedicated NON-superuser role for medley (its own `medley` database on the
+  # shared PG). Gated on medleyDb.enabled — the GCP key
+  # {prefix}-medley-db-password only exists where medley runs with a scoped
+  # role (preprod). Password must be URL-safe (hex) — DATABASE_URL does no
+  # urlencoding. Separate from postgresql-app-roles: those roles live in the
+  # hapihub database; medley owns a different database entirely.
+  - secretName: mycure-preprod-medley-db
+    enabledFrom: medleyDb   # gated on .Values.medleyDb.enabled
+    fields:
+      - {var: medleyDbPassword, k8sKey: medley-db-password, remoteSuffix: medley-db-password}
+  # PR #451 (monobase-mycure#4393): the least-privilege dpop_pruner role password.
+  # Separate entry gated on dpopPruner.enabled — the GCP key exists only where the
+  # hourly dpop_jti_seen prune is switched on. Password must be URL-safe (hex).
+  - secretName: postgresql-dpop-pruner
+    enabledFrom: dpopPruner   # gated on .Values.dpopPruner.enabled
+    fields:
+      - {var: dpopPrunerPassword, k8sKey: dpop-pruner-password, remoteSuffix: postgresql-dpop-pruner-password}

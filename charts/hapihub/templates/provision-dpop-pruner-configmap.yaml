@@ -1,0 +1,74 @@
+{{- /* NOTE: `ne … false`, NOT `| default true` — sprig `default` treats an
+     explicit false as empty and would re-enable the job on the release that
+     must disable it (the prod worker), same trap as the roleSplit gates
+     (monobase-mycure#4147 stage-2). */ -}}
+{{- if and .Values.enabled .Values.pruneExpiredDpopJti.enabled (ne ((.Values.pruneExpiredDpopJti.provision | default dict).enabled) false) }}
+# SQL for the provision-dpop-pruner PreSync Job (PR #451 security addendum).
+# Runs as the in-cluster superuser and, IDEMPOTENTLY + GUARDED ON TABLE EXISTENCE:
+#   1. creates/refreshes the least-privilege `dpop_pruner` LOGIN role,
+#   2. creates the (expires_at) index the source migration omits, and
+#   3. grants the role exactly CONNECT + schema USAGE + SELECT/DELETE on
+#      dpop_jti_seen — the minimum the batched-delete pruner needs.
+#
+# CHICKEN-AND-EGG (flagged intentionally): the table `public.dpop_jti_seen` is
+# created only by the UNRELEASED migration monobase-mycure#0106_oauth_dpop. Until
+# that ships, `to_regclass('public.dpop_jti_seen')` is NULL and the whole
+# table-scoped block (index + grants) is SKIPPED — the role is still created so
+# the pruner CronJob can authenticate, and it simply finds no table (clean
+# no-op). Because this Job re-runs every PreSync, the index + DELETE grant land
+# automatically on the first sync AFTER the migration ships. Re-applying grants
+# each run is the mechanism, not a bug.
+#
+# Hook-annotated PreSync at a LOWER weight than the Job so the ConfigMap exists
+# before the Job that mounts it (PreSync hooks run before the main sync applies
+# plain resources). Mirrors provision-db-roles-configmap.yaml.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "hapihub.fullname" . }}-provision-dpop-pruner
+  namespace: {{ include "hapihub.namespace" . }}
+  labels:
+    {{- include "hapihub.labels" . | nindent 4 }}
+    job-type: provision-dpop-pruner
+  annotations:
+    helm.sh/hook: pre-install,pre-upgrade
+    helm.sh/hook-weight: "-6"
+    helm.sh/hook-delete-policy: before-hook-creation
+    argocd.argoproj.io/hook: PreSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+data:
+  provision.sql: |
+    \set ON_ERROR_STOP on
+
+    -- ── Role: LOGIN, no inherited privileges. CREATE ROLE has no IF NOT EXISTS,
+    --    so guard the create; the ALTER … PASSWORD is UNCONDITIONAL so the role
+    --    re-syncs after an ESO rotation / cluster reseed (same rationale as the
+    --    roleSplit provisioner). NOSUPERUSER/NOCREATEDB/NOCREATEROLE explicit. ──
+    SELECT format('CREATE ROLE %I LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE PASSWORD %L', :'pruner_role', :'pruner_password')
+    WHERE NOT EXISTS (SELECT FROM pg_roles WHERE rolname = :'pruner_role') \gexec
+    SELECT format('ALTER ROLE %I PASSWORD %L', :'pruner_role', :'pruner_password') \gexec
+
+    -- ── Database-level grant is table-independent, always safe to (re)apply. ──
+    SELECT format('GRANT CONNECT ON DATABASE %I TO %I', :'DBNAME', :'pruner_role') \gexec
+
+    -- ── TABLE-SCOPED block: only when the migration has created the table.
+    --    to_regclass returns NULL (not an error) for an absent relation, so this
+    --    whole section is skipped pre-migration — the role still exists, the
+    --    pruner authenticates, finds no table, and no-ops. ──
+    SELECT format(
+      'GRANT USAGE ON SCHEMA public TO %I', :'pruner_role')
+    WHERE to_regclass('public.dpop_jti_seen') IS NOT NULL \gexec
+
+    -- Index the source migration omits (jti PK only). CREATE INDEX IF NOT EXISTS
+    -- is idempotent; run as superuser here so the pruner role never needs DDL.
+    -- Not CONCURRENTLY: this runs inside the psql transaction block a PreSync Job
+    -- gives it, and the table is tiny (~1h of rows), so a brief build lock is fine.
+    SELECT 'CREATE INDEX IF NOT EXISTS dpop_jti_seen_expires_at_idx ON public.dpop_jti_seen (expires_at)'
+    WHERE to_regclass('public.dpop_jti_seen') IS NOT NULL \gexec
+
+    -- SELECT is needed for the batched delete's ctid subquery; DELETE for the
+    -- prune itself. Nothing else — no INSERT/UPDATE/TRUNCATE/DDL.
+    SELECT format(
+      'GRANT SELECT, DELETE ON public.dpop_jti_seen TO %I', :'pruner_role')
+    WHERE to_regclass('public.dpop_jti_seen') IS NOT NULL \gexec
+{{- end }}

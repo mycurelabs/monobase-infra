@@ -5,6 +5,7 @@
   either block.
 */ -}}
 {{- if and ((.Values.hapihub | default dict).enabled) ((.Values.hapihubWorker | default dict).enabled) }}
+{{- $manualDeployment := (.Values.hapihub | default dict).manualDeployment | default false }}
 # ArgoCD Application: HapiHub Worker (background jobs off the API pods)
 #
 # Second Helm release of the hapihub chart. Runs the SAME image/config as
@@ -41,9 +42,13 @@ spec:
     helm:
       releaseName: hapihub-worker
       valuesObject:
-        {{- $base := omit .Values.hapihub "minio" "valkey" "mailpit" }}
-        {{- $overrides := omit .Values.hapihubWorker "enabled" }}
+        {{- $base := omit .Values.hapihub "minio" "valkey" "mailpit" "manualDeployment" }}
+        {{- /* The shared gate belongs to hapihub, never to worker overrides. */}}
+        {{- $overrides := omit .Values.hapihubWorker "enabled" "manualDeployment" }}
         {{- $merged := mergeOverwrite (deepCopy $base) $overrides }}
+        {{- if $manualDeployment }}
+        {{- $_ := set $merged "manualDeployment" true }}
+        {{- end }}
         {{- /* roleSplit's PreSync Jobs (provision-db-roles, migrate) must run ONCE,
              from the API release only. The worker is a SECOND release against the
              SAME database in a SEPARATE, independently-syncing Application, so if an
@@ -57,6 +62,19 @@ spec:
              is on, so prod (no roleSplit) renders byte-identical. */ -}}
         {{- if (($merged.roleSplit) | default dict).enabled }}
         {{- $merged = mergeOverwrite $merged (dict "roleSplit" (dict "provision" (dict "enabled" false) "migrateJob" (dict "enabled" false))) }}
+        {{- end }}
+        {{- /* Same one-owner rule for the dpop_jti_seen prune (PR #451): the
+             superuser provision-dpop-pruner PreSync Job must run ONCE, from the
+             API release. If an overlay enables hapihub.pruneExpiredDpopJti, the
+             worker inherits it via the deep-merge and would arm its OWN superuser
+             provisioner (role create + grants racing the API's). Force the worker's
+             provisioner off structurally so no overlay can arm it. The worker's
+             pruneExpiredDpopJti.enabled itself is set false in the prod overlay so
+             the CronJob renders once; this guard covers the provision Job the same
+             way. Injected only when the prune is on, so envs without it render
+             byte-identical. */ -}}
+        {{- if (($merged.pruneExpiredDpopJti) | default dict).enabled }}
+        {{- $merged = mergeOverwrite $merged (dict "pruneExpiredDpopJti" (dict "provision" (dict "enabled" false))) }}
         {{- end }}
         {{- toYaml $merged | nindent 8 }}
         global: {{ .Values.global | toYaml | nindent 10 }}
@@ -72,13 +90,19 @@ spec:
     namespace: {{ .Values.global.namespace }}
 
   syncPolicy:
+    {{- if not $manualDeployment }}
     automated:
       prune: true
       selfHeal: true
+    {{- end }}
     syncOptions:
       - CreateNamespace=false
     retry:
+      {{- if $manualDeployment }}
+      limit: 0
+      {{- else }}
       limit: 5
+      {{- end }}
       backoff:
         duration: 10s
         maxDuration: 5m

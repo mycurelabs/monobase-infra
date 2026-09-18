@@ -86,15 +86,63 @@ spec:
                   prefix: loki_index_
                   period: 24h
           limits_config:
+            # ── ENFORCED disk ceiling (COMPRESSION-INDEPENDENT) ──────────────
+            # OSS Loki 3.3.2 (this chart's appVersion) has NO byte/disk-usage
+            # cap for the filesystem store — it deletes chunks STRICTLY by the
+            # compactor's time retention, never by free space (the WAL
+            # `disk_full_threshold` throttle only exists in Loki >= 3.7). The
+            # persistence volume can be local-path, which does NOT enforce its
+            # nominal `size` (e.g. on vanaheim it is carved from the SAME host
+            # disk as the preprod + staging Postgres). So the ceiling must come
+            # from Loki's OWN admission control, which IS enforced server-side:
+            #
+            #   worst-case on-disk bytes  <=  ingestion_rate_mb (hard-rejected
+            #   above this, per tenant)  x  retention_period  x  (1 + overhead)
+            #
+            # `ingestion_rate_mb` is a hard reject (429) — it bounds bytes/sec
+            # ADMITTED regardless of how much promtail pushes — and the compactor
+            # deletes everything past `retention_period`. The bound is on RAW
+            # ADMITTED BYTES with NO compression divisor, because the tsdb gzip
+            # ratio is NOT enforced — an incompressible log stream stores near
+            # its raw admitted size, so a bound that divides by ~10 is NOT
+            # provable. Pick loki.retention / loki.ingestionRateMb in each
+            # cluster's values so worst-case RAW+overhead fits UNDER
+            # loki.storageSize with headroom; NEVER raise the code default up.
+            #   e.g. vanaheim (20Gi vol): rate=0.13 MiB/s, retention=24h ->
+            #   0.13 x 86400 x 1 = 11232 MiB ~= 10.97 GiB RAW; x1.3 ~= 14.26 GiB
+            #   ~= 71% of 20Gi — holds EVEN IF EVERY BYTE IS INCOMPRESSIBLE.
+            # `ingestion_rate_strategy: local` enforces the cap per distributor
+            # INSTANCE (not divided across a ring), so the bound does not depend
+            # on the distributor ring reporting N healthy replicas — correct for
+            # a single-binary deploy (N=1) and makes the 429 unconditional. It is
+            # rendered only for clusters that set a tightened ingestionRateMb
+            # (below), so the DOKS default profile is unchanged.
             retention_period: {{ .Values.loki.retention | default "30d" }}
             max_query_lookback: {{ .Values.loki.retention | default "30d" }}
+            {{- if hasKey .Values.loki "ingestionRateMb" }}
+            ingestion_rate_strategy: {{ .Values.loki.ingestionRateStrategy | default "local" | quote }}
+            ingestion_rate_mb: {{ .Values.loki.ingestionRateMb }}
+            ingestion_burst_size_mb: {{ .Values.loki.ingestionBurstMb | default 8 }}
+            per_stream_rate_limit: {{ .Values.loki.perStreamRateLimit | default "2MB" | quote }}
+            per_stream_rate_limit_burst: {{ .Values.loki.perStreamRateLimitBurst | default "6MB" | quote }}
+            {{- else }}
             ingestion_rate_mb: 10
             ingestion_burst_size_mb: 20
+            {{- end }}
             max_streams_per_user: 10000
           compactor:
             working_directory: /var/loki/compactor
             retention_enabled: true
             delete_request_store: filesystem
+            {{- if hasKey .Values.loki "ingestionRateMb" }}
+            # Tightened (shared-volume) profile only — compact + apply retention
+            # aggressively so deleted chunks free disk quickly (chart default
+            # delete_delay is 2h). Gated on the same ingestionRateMb marker as
+            # the rate limits so the DOKS default profile is unchanged.
+            compaction_interval: {{ .Values.loki.compactionInterval | default "10m" }}
+            retention_delete_delay: {{ .Values.loki.retentionDeleteDelay | default "1h" }}
+            retention_delete_worker_count: 50
+            {{- end }}
           commonConfig:
             replication_factor: 1
 
