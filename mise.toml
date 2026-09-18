@@ -206,6 +206,10 @@ run = "echo '✓ Auto-fix complete'"
 # Testing
 # =============================================================================
 
+[tasks.test-hapihub-manual-deployment]
+description = "Render-test the shared HapiHub manual deployment gate (no cluster access)"
+run = "bun test charts/argocd-applications/tests/hapihub-manual-deployment.test.ts"
+
 [tasks.test-helm]
 description = "Run Helm unit tests"
 run = """

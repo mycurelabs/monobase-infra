@@ -14,6 +14,14 @@ global:
 # HapiHub application configuration
 enabled: true
 
+# Set hapihub.manualDeployment in the deployment overlay: the parent chart gates
+# BOTH Applications and forwards true here. Worker overrides cannot change it.
+# Retains roleSplit hook Jobs without retries or time-to-live cleanup; defaults
+# preserve automatic deployment. Archive evidence before any newly approved sync
+# (BeforeHookCreation still replaces hooks). Runbook:
+# docs/operations/preprod-hapihub-manual-deployment.md
+manualDeployment: false
+
 replicaCount: 2
 
 image:
@@ -65,7 +73,7 @@ gateway:
   parentRefs:
     - name: shared-gateway
       namespace: gateway-system
-  
+
   # HTTPRoute timeout configuration
   # Disabled by default — nginx-public-gateway (NGF 2.4.1) doesn't
   # implement spec.rules[].timeouts and reports UnsupportedField, which
