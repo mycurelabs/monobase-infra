@@ -72,6 +72,9 @@ mycure-pxp:
     API_URL: "https://hapihub.preprod.localfirsthealth.com"
 
 hapihub:
+  # Declarative gate for BOTH HapiHub and worker; merge is not rollout approval.
+  # See docs/operations/preprod-hapihub-manual-deployment.md before any sync.
+  manualDeployment: true
   # Least-privilege DB role split (monobase-mycure#4147) — stage 2: PreSync
   # provision-db-roles (superuser: roles/adoption/grants) then migrate
   # (hapihub migrate as migrator); Deployment + worker run as DML-only app_rw
@@ -84,15 +87,11 @@ hapihub:
       # migrator password (2026-09-09 rotation, monobase-mycure#4147). ArgoCD
       # otherwise adopts an unchanged succeeded hook without re-running it.
       activeDeadlineSeconds: 900
-  # Prod parity — same tag as mycure-production.yaml. Bump here first when
-  # rehearsing a promotion. 2026-09-15: prod moved to 11.20.126 while preprod
-  # sat at 11.20.124, so preprod is now BEHIND. Realigning to prod (126) — the
-  # cadence hub admission fp is derived from the live hapihub DB schema, so a
-  # hapihub-version gap (124 vs 126) gives the preprod hub a different schema-fp
-  # than prod (6036242728107773936 vs 13787843142053037340) and pauses sync for
-  # any peer built off a different migration level. 126 restores prod-parity fp.
-  # (124 had carried the X-Real-IP fix monobase-mycure#4279 + audit-sink role
-  # split monobase-mycure#4291; both are in 126.)
+  # Application/migration parity with prod, NOT a proven admission fix.
+  # .124 already includes billing_items.taxes; 0101-0103 are cloud-only for
+  # the 76-collection sync contract. The isolated .126 rehearsal left that
+  # catalog fingerprint unchanged; the running hub's startup/admission
+  # fingerprint remains unverified. Fresh admission requires separate checks.
   image:
     tag: "11.20.126"
   cache:

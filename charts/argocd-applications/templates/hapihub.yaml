@@ -1,4 +1,5 @@
-{{- if .Values.hapihub.enabled }}
+{{- if (.Values.hapihub | default dict).enabled }}
+{{- $manualDeployment := (.Values.hapihub | default dict).manualDeployment | default false }}
 # ArgoCD Application: HapiHub API
 # Sync Wave 3 - Deploy application after database
 
@@ -21,7 +22,10 @@ spec:
     helm:
       releaseName: hapihub
       valuesObject:
-        {{- $hapihubValues := omit .Values.hapihub "minio" "valkey" "mailpit" }}
+        {{- $hapihubValues := omit .Values.hapihub "minio" "valkey" "mailpit" "manualDeployment" }}
+        {{- if $manualDeployment }}
+        {{- $_ := set $hapihubValues "manualDeployment" true }}
+        {{- end }}
         {{- toYaml $hapihubValues | nindent 8 }}
         global: {{ .Values.global | toYaml | nindent 10 }}
         {{- /* chartRepo/chartVersion pin the standalone Application's OCI source, not
@@ -36,13 +40,19 @@ spec:
     namespace: {{ .Values.global.namespace }}
 
   syncPolicy:
+    {{- if not $manualDeployment }}
     automated:
       prune: true
       selfHeal: true
+    {{- end }}
     syncOptions:
       - CreateNamespace=false
     retry:
+      {{- if $manualDeployment }}
+      limit: 0
+      {{- else }}
       limit: 5
+      {{- end }}
       backoff:
         duration: 10s
         maxDuration: 5m
