@@ -1,0 +1,73 @@
+{{- if and .Values.enabled .Values.pruneExpiredDpopJti.enabled }}
+# prune.sql for the prune-dpop-jti CronJob (PR #451). Single source of truth for
+# the prune logic — the CronJob mounts this, and tests/prune-dpop-jti.test.sh runs
+# the SAME file against a throwaway postgres so a logic regression fails the test.
+#
+# One psql invocation runs the whole prune:
+#  - to_regclass absence guard: absent table -> RAISE NOTICE + return, exit 0.
+#  - per-run SET lock_timeout / statement_timeout (hard DB-side caps).
+#  - bounded batches: DELETE … WHERE ctid IN (SELECT ctid … WHERE expires_at < now()
+#    LIMIT :batch) looped until GET DIAGNOSTICS reports 0 rows.
+#
+# NOTE the loop is inside one DO block (one transaction). That is deliberate for a
+# table this small (≈ 1h of rows): the (expires_at) index makes the delete an index
+# scan, batches keep per-statement lock/WAL bounded, and a single hourly txn on a
+# tiny table is fine. If dpop_jti_seen ever grows huge, split into per-batch client
+# transactions — but that is a scale this table cannot reach on an hourly prune.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "hapihub.fullname" . }}-prune-dpop-jti
+  namespace: {{ include "hapihub.namespace" . }}
+  labels:
+    {{- include "hapihub.labels" . | nindent 4 }}
+    job-type: prune-dpop-jti
+data:
+  prune.sql: |
+    \set ON_ERROR_STOP on
+
+    -- Surface our own NOTICEs in the Job log regardless of the server/image
+    -- default (the bitnami PG image ships client_min_messages=error, which would
+    -- swallow the absent-table + deleted-count summary below).
+    SET client_min_messages = notice;
+
+    -- Hard DB-side caps for this session (a Job activeDeadlineSeconds is NOT a
+    -- statement/lock timeout). Applied before any DELETE runs.
+    SET lock_timeout = :'lock_timeout';
+    SET statement_timeout = :'statement_timeout';
+
+    -- Carry the batch size into the DO block via a session GUC — a psql `-v`
+    -- variable does NOT substitute inside a dollar-quoted body. set_config with
+    -- is_local=false so it survives to the DO block in the same session.
+    SELECT set_config('prune.batch', :'batch', false);
+
+    DO $prune$
+    DECLARE
+      batch  integer := current_setting('prune.batch')::int;
+      n      bigint;
+      total  bigint := 0;
+    BEGIN
+      -- Absence = intentional no-op (the table ships only with the UNRELEASED
+      -- migration monobase-mycure#0106_oauth_dpop). NULL from to_regclass is not
+      -- an error; log and return so the Job exits 0.
+      IF to_regclass('public.dpop_jti_seen') IS NULL THEN
+        RAISE NOTICE 'dpop_jti_seen absent — no-op (migration monobase-mycure#0106_oauth_dpop not yet applied)';
+        RETURN;
+      END IF;
+
+      LOOP
+        DELETE FROM public.dpop_jti_seen
+        WHERE ctid IN (
+          SELECT ctid FROM public.dpop_jti_seen
+          WHERE expires_at < now()
+          LIMIT batch
+        );
+        GET DIAGNOSTICS n = ROW_COUNT;
+        total := total + n;
+        EXIT WHEN n = 0;
+      END LOOP;
+
+      RAISE NOTICE 'dpop_jti_seen prune: deleted % expired row(s)', total;
+    END
+    $prune$;
+{{- end }}

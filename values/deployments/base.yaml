@@ -111,6 +111,24 @@ hapihub:
   pruneExpiredSessions:
     enabled: true
 
+  # DPoP replay-guard prune (monobase-mycure#4393). DISABLED here in shared base
+  # ON PURPOSE (PR #451 security addendum): base.yaml is inherited by STAGING too,
+  # and the `dpop_jti_seen` table exists ONLY once the hapihub image ships the
+  # UNRELEASED migration monobase-mycure#0106_oauth_dpop. Enabling it before that
+  # migration lands would arm an hourly Job (and a superuser PreSync provisioner)
+  # against a table that isn't there.
+  #
+  # ENABLEMENT GATE — opt in per-environment overlay (mycure-production.yaml /
+  # mycure-staging.yaml) ONLY after PROVING that env's running hapihub image
+  # contains monobase-mycure#0106_oauth_dpop. When you do, set on the API release:
+  #     pruneExpiredDpopJti:
+  #       enabled: true
+  # and disable it on that env's hapihubWorker (double-render guard, like sessions).
+  # The absence guard makes an accidental early enable a clean no-op, but the gate
+  # is the intended control.
+  pruneExpiredDpopJti:
+    enabled: false
+
   # NOTE: replicaCount is ignored — autoscaling.enabled: true below means the
   # HPA owns the replica count (chart omits spec.replicas). Scale via
   # autoscaling.minReplicas/maxReplicas.

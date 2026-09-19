@@ -58,6 +58,19 @@ spec:
         {{- if (($merged.roleSplit) | default dict).enabled }}
         {{- $merged = mergeOverwrite $merged (dict "roleSplit" (dict "provision" (dict "enabled" false) "migrateJob" (dict "enabled" false))) }}
         {{- end }}
+        {{- /* Same one-owner rule for the dpop_jti_seen prune (PR #451): the
+             superuser provision-dpop-pruner PreSync Job must run ONCE, from the
+             API release. If an overlay enables hapihub.pruneExpiredDpopJti, the
+             worker inherits it via the deep-merge and would arm its OWN superuser
+             provisioner (role create + grants racing the API's). Force the worker's
+             provisioner off structurally so no overlay can arm it. The worker's
+             pruneExpiredDpopJti.enabled itself is set false in the prod overlay so
+             the CronJob renders once; this guard covers the provision Job the same
+             way. Injected only when the prune is on, so envs without it render
+             byte-identical. */ -}}
+        {{- if (($merged.pruneExpiredDpopJti) | default dict).enabled }}
+        {{- $merged = mergeOverwrite $merged (dict "pruneExpiredDpopJti" (dict "provision" (dict "enabled" false))) }}
+        {{- end }}
         {{- toYaml $merged | nindent 8 }}
         global: {{ .Values.global | toYaml | nindent 10 }}
         {{- /* chartRepo/chartVersion pin the standalone Application's OCI source, not
