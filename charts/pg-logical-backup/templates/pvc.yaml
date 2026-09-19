@@ -1,0 +1,20 @@
+{{- if and .Values.enabled (eq .Values.work.type "pvc") }}
+# Staging volume for the plaintext dump before crypt upload. Only for large
+# (prod) dumps where an emptyDir on node ephemeral storage won't fit.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "pgLogicalBackup.fullname" . }}-work
+  namespace: {{ include "pgLogicalBackup.namespace" . }}
+  labels:
+    {{- include "pgLogicalBackup.labels" . | nindent 4 }}
+spec:
+  accessModes:
+    - ReadWriteOnce
+  {{- with .Values.work.pvc.storageClass }}
+  storageClassName: {{ . | quote }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.work.pvc.size }}
+{{- end }}

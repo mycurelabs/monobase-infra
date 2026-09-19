@@ -1,0 +1,186 @@
+# pg-logical-backup — nightly logical pg_dump DR tier (monobase-mycure#4320).
+#
+# Fills the gap left by the physical tiers (Velero/Kopia snapshots, wal-g PITR,
+# the GCS-DR blob mirror): a portable `pg_dump -Fc` that restores into ANY
+# Postgres >= source, on any host, with no cluster rebuild and selective
+# (table-level) restore. Runs as an in-cluster CronJob that dumps the READ
+# REPLICA (never the primary), verifies, encrypts, and ships off-cloud.
+#
+# Disabled by default — activation is gated on out-of-band prerequisites
+# (GCP Secret Manager keys + niflheim rclone receive). See NOTES.txt.
+enabled: false
+
+image:
+  # Same PG image family the in-cluster statefulset runs — already on nodes.
+  postgres: docker.io/bitnamilegacy/postgresql:16.4.0-debian-12-r13
+  rclone: rclone/rclone:1.68
+
+# ── Schedule: 00:00 Asia/Manila (12 midnight PHT) ──
+# timeZone needs k8s >= 1.27 (DOKS is). On older control planes, clear timeZone
+# and set schedule to "0 16 * * *" (16:00 UTC == 00:00 PHT).
+schedule: "0 0 * * *"
+timeZone: "Asia/Manila"
+concurrencyPolicy: Forbid
+startingDeadlineSeconds: 3600
+successfulJobsHistoryLimit: 3
+failedJobsHistoryLimit: 3
+suspend: false
+backoffLimit: 1
+# Ceiling on a single dump run (6h). Sized well above the expected window;
+# a run that blows past this is a signal, not normal.
+activeDeadlineSeconds: 21600
+
+database:
+  name: hapihub
+  # Dump target — the REPLICA. A multi-hour dump must never load the primary.
+  readService: postgresql-read
+  # Role creation happens on the PRIMARY (roles are cluster-global, replicated
+  # to the standby via WAL — you cannot CREATE ROLE on a read-only standby).
+  primaryService: postgresql-primary
+  port: 5432
+  dumpRole: dumper
+  # ESO-synced secret holding the dumper password + rclone.conf (see below).
+  existingSecret: pg-logical-backup-secrets
+  passwordKey: dumper-db-password
+
+# PreSync hook that provisions the read-only `dumper` login role (pg_read_all_data).
+# Idempotent; self-heals the password after an ESO rotation. Same machinery as
+# medley's provision-db-role (monobase-infra#420).
+provisionRole:
+  enabled: true
+  superuserSecret: postgresql
+  superuserSecretKey: postgres-password
+  image: docker.io/bitnamilegacy/postgresql:16.4.0-debian-12-r13
+  backoffLimit: 3
+  activeDeadlineSeconds: 300
+  # Readiness gate (finding #1): the wait-for-secret initContainer BLOCKS until
+  # the ESO-synced dumper Secret exists AND its password key is non-empty before
+  # any psql runs. Bounded — if ESO hasn't populated the Secret within this many
+  # seconds the Job fails (visible) rather than provisioning against a missing
+  # credential. Keep < activeDeadlineSeconds so the gate, not the deadline, is
+  # the thing that reports the timeout.
+  secretWaitTimeoutSeconds: 240
+
+dump:
+  compressLevel: 6      # pg_dump -Fc -Z<level>
+  globals: true         # pg_dumpall --globals-only --no-role-passwords
+  # In-CronJob integrity gate. Beyond `pg_restore --list` (TOC only), the dump
+  # step also streams the whole archive through `pg_restore -> /dev/null`, which
+  # decompresses and emits every DATA block — catching compressed-data corruption
+  # that --list cannot. A TRUE restore-into-scratch-DB (row-count verified) is the
+  # separate `restoreVerify` gate below + the drill runbook.
+  verify: true
+
+# ── REAL scratch-restore gate (finding #5) ─────────────────────────────────────
+# `pg_restore --list` (and even a full decompress) proves the archive is READABLE,
+# not that it RESTORES into a working database. This Job spins a THROWAWAY Postgres
+# server inside its own pod (initdb on an emptyDir — nothing external, nothing
+# persistent), restores the newest dump pulled from the crypt remote into a scratch
+# database, and asserts expected tables exist with row_count > 0. It must PASS before
+# activation. Run it as a one-shot (helm test / `kubectl create job --from`) or gate
+# it in CI; it is NOT part of the nightly path. Disabled by default.
+# Also scripted for out-of-cluster runs: scripts/pg-logical-backup-restore-drill.sh
+# + docs/operations/PG_LOGICAL_BACKUP.md.
+restoreVerify:
+  enabled: false
+  # Tables that MUST come back with rows — the row-count assertion. Tune per DB.
+  requireTables:
+    - organizations
+    - accounts
+  # Minimum total rows across requireTables for the restore to be considered real
+  # (guards against an empty/structure-only archive passing).
+  minRows: 1
+  scratchDb: pgdump_restore_scratch
+  # emptyDir sizing for the throwaway PGDATA + the pulled dump.
+  pgdataSizeLimit: 20Gi
+  activeDeadlineSeconds: 3600
+  backoffLimit: 0
+
+destination:
+  # An rclone `crypt` remote (defined in the ESO-synced rclone.conf) — plaintext
+  # PHI never rests off-cluster. The remote wraps whatever backend niflheim pulls
+  # from (an sftp push to niflheim, or an object-store prefix niflheim mirrors).
+  rcloneRemote: "pgdump-crypt"
+  path: "pgdump-preprod"
+  retentionDays: 7      # keep ~7 daily; time-based prune (rclone delete --min-age)
+
+work:
+  # Where the plaintext dump stages IN-CLUSTER before the crypt upload. Brief,
+  # ephemeral, deleted with the pod.
+  # ponytail: emptyDir for preprod (small data); switch to a PVC for prod's ~30-60GB dump.
+  type: emptyDir        # emptyDir | pvc
+  sizeLimit: 5Gi
+  pvc:
+    size: 100Gi
+    storageClass: ""
+
+externalSecrets:
+  enabled: true
+  # Vanaheim (and DOKS) provide a CLUSTER-scoped GCP store, NOT a per-namespace
+  # SecretStore. Match every other chart here (cadence, tenzir, database-secrets,
+  # nocodb…): ClusterSecretStore/gcp-secretstore.
+  secretStore: gcp-secretstore
+  secretStoreKind: ClusterSecretStore
+  refreshInterval: 1h
+  # remoteKeys must exist in GCP Secret Manager before activation (handoff).
+  secrets:
+    - secretKey: dumper-db-password
+      remoteKey: mycure-preprod-pg-logical-backup-db-password
+    - secretKey: rclone.conf
+      remoteKey: mycure-preprod-pg-logical-backup-rclone-conf
+
+networkPolicy:
+  enabled: true
+  # The upload step ships the crypt dump off-cluster. DNS + the in-cluster PG
+  # (primary for role-provision, replica for the dump) are allowed by default.
+  # The OFF-CLUSTER upload destination is NOT open by default — it must be pinned
+  # here, destination-scoped, so the pod cannot egress to the whole internet.
+  #
+  # `destinations` renders one NetworkPolicy egress rule per entry: a specific
+  # CIDR (never 0.0.0.0/0) + the exact ports rclone needs for that backend.
+  # niflheim is reached over the tailnet — a Tailscale peer IP is a /32 in the
+  # 100.64.0.0/10 CGNAT range. Pin the /32 in the overlay once niflheim's tailnet
+  # IP is known (see NOTES.txt). Ports: 22 (sftp) or 443 (HTTPS object store).
+  destinations: []
+  # Example (pin in the deployment overlay at activation):
+  #   destinations:
+  #     - cidr: 100.100.20.30/32   # niflheim tailnet IP (rclone sftp receive)
+  #       ports:
+  #         - { port: 22, protocol: TCP }
+  # Escape hatch for a raw egress rule (rare). Prefer `destinations`.
+  extraEgress: []
+
+resources:
+  dump:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: "2"
+      memory: 2Gi
+  upload:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 1Gi
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1001
+  runAsGroup: 1001
+  fsGroup: 1001
+  seccompProfile:
+    type: RuntimeDefault
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop:
+      - ALL
+
+serviceAccount:
+  create: true
+  name: ""

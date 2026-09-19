@@ -1,0 +1,72 @@
+{{- if and .Values.enabled .Values.networkPolicy.enabled }}
+# Egress-only: the backup pod initiates connections, accepts none.
+#   - DNS (kube-dns)
+#   - the in-cluster PG (primary for role provision, replica for the dump)
+#   - destinations[]: the off-cloud upload target(s), destination-scoped
+#     (specific CIDR + ports; NEVER 0.0.0.0/0) — pinned per-deployment.
+#   - extraEgress: raw escape-hatch rules (rare).
+#
+# Fail-closed guard (findings #1/#2 — activation must be impossible until the
+# REAL peer is pinned):
+#   (a) enabled but NO upload destination pinned (and no raw extraEgress) → fail:
+#       the pod could never reach niflheim, so surface it at render time rather
+#       than ship a policy that silently blocks every upload.
+#   (b) any destination CIDR that is NOT an exact /32 → fail: a broad prefix
+#       (e.g. the 100.64.0.0/10 CGNAT range) is a placeholder, not niflheim's
+#       exact host. Shipping it would open SSH egress to the whole range AND
+#       might still not reach niflheim. Require the verified peer /32.
+# (Set networkPolicy.enabled: false to opt out of the NetworkPolicy entirely;
+#  use networkPolicy.extraEgress only for a deliberately-reviewed raw rule.)
+{{- if and (not .Values.networkPolicy.destinations) (not .Values.networkPolicy.extraEgress) }}
+{{- fail "pg-logical-backup: networkPolicy is enabled but no upload destination is pinned. Set networkPolicy.destinations (niflheim tailnet /32 + port 22) in the deployment overlay, or networkPolicy.extraEgress, or disable the NetworkPolicy. See charts/pg-logical-backup/NOTES.txt." }}
+{{- end }}
+{{- range .Values.networkPolicy.destinations }}
+{{- $cidr := required "pg-logical-backup: networkPolicy.destinations[].cidr is required" .cidr }}
+{{- if not (hasSuffix "/32" $cidr) }}
+{{- fail (printf "pg-logical-backup: networkPolicy.destinations cidr %q is not a /32. Egress must be pinned to the EXACT niflheim tailnet host (a Tailscale peer is a /32 in 100.64.0.0/10) — a broad prefix is a placeholder that would open SSH egress to the whole range. Pin the verified peer /32 (e.g. 100.100.20.30/32) before activation, or use networkPolicy.extraEgress for a reviewed raw rule. See charts/pg-logical-backup/NOTES.txt." $cidr) }}
+{{- end }}
+{{- end }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "pgLogicalBackup.fullname" . }}
+  namespace: {{ include "pgLogicalBackup.namespace" . }}
+  labels:
+    {{- include "pgLogicalBackup.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "pgLogicalBackup.selectorLabels" . | nindent 6 }}
+  policyTypes:
+    - Egress
+  egress:
+    # DNS
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    # In-cluster PostgreSQL (primary for role provision, replica for the dump)
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: postgresql
+      ports:
+        - protocol: TCP
+          port: {{ .Values.database.port }}
+    {{- range .Values.networkPolicy.destinations }}
+    # Off-cluster upload destination (pinned, destination-scoped)
+    - to:
+        - ipBlock:
+            cidr: {{ required "networkPolicy.destinations[].cidr is required" .cidr }}
+      {{- with .ports }}
+      ports:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    {{- end }}
+    {{- with .Values.networkPolicy.extraEgress }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+{{- end }}
