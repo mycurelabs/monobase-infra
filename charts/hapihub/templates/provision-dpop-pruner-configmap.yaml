@@ -5,8 +5,11 @@
 {{- if and .Values.enabled .Values.pruneExpiredDpopJti.enabled (ne ((.Values.pruneExpiredDpopJti.provision | default dict).enabled) false) }}
 # SQL for the provision-dpop-pruner PreSync Job (PR #451 security addendum).
 # Runs as the in-cluster superuser and, IDEMPOTENTLY + GUARDED ON TABLE EXISTENCE:
-#   1. creates/refreshes the least-privilege `dpop_pruner` LOGIN role,
-#   2. creates the (expires_at) index the source migration omits, and
+#   1. creates/refreshes the least-privilege `dpop_pruner` LOGIN role (its password
+#      is imported via \getenv, never on psql argv),
+#   2. creates the (expires_at) index the source migration omits — via CREATE INDEX
+#      CONCURRENTLY (SHARE UPDATE EXCLUSIVE lock, never blocks writes), dropping any
+#      INVALID leftover from an interrupted build first, and
 #   3. grants the role exactly CONNECT + schema USAGE + SELECT/DELETE on
 #      dpop_jti_seen — the minimum the batched-delete pruner needs.
 #
@@ -40,6 +43,12 @@ data:
   provision.sql: |
     \set ON_ERROR_STOP on
 
+    -- Import the pruner role password from the environment INSIDE the session, so
+    -- it is NEVER on psql's argv (`-v pruner_password=…` would be visible to `ps`).
+    -- \getenv reads $PRUNER_PASSWORD into the :pruner_password psql variable, which
+    -- is then interpolated as an SQL literal via %L below (never string-concatenated).
+    \getenv pruner_password PRUNER_PASSWORD
+
     -- ── Role: LOGIN, no inherited privileges. CREATE ROLE has no IF NOT EXISTS,
     --    so guard the create; the ALTER … PASSWORD is UNCONDITIONAL so the role
     --    re-syncs after an ESO rotation / cluster reseed (same rationale as the
@@ -59,11 +68,26 @@ data:
       'GRANT USAGE ON SCHEMA public TO %I', :'pruner_role')
     WHERE to_regclass('public.dpop_jti_seen') IS NOT NULL \gexec
 
-    -- Index the source migration omits (jti PK only). CREATE INDEX IF NOT EXISTS
-    -- is idempotent; run as superuser here so the pruner role never needs DDL.
-    -- Not CONCURRENTLY: this runs inside the psql transaction block a PreSync Job
-    -- gives it, and the table is tiny (~1h of rows), so a brief build lock is fine.
-    SELECT 'CREATE INDEX IF NOT EXISTS dpop_jti_seen_expires_at_idx ON public.dpop_jti_seen (expires_at)'
+    -- Index the source migration omits (jti PK only), built as superuser here so
+    -- the pruner role never needs DDL. SAFE BUILD (PR #451 review blocker 3):
+    --  * CREATE INDEX CONCURRENTLY — takes only a SHARE UPDATE EXCLUSIVE lock, so
+    --    it never blocks INSERTs/DELETEs on the table while building. It CANNOT run
+    --    inside a transaction block, so it is emitted via \gexec (psql autocommit,
+    --    one simple query) and is NOT wrapped in DO/BEGIN.
+    --  * A CONCURRENTLY build that is interrupted leaves an INVALID index behind;
+    --    a plain IF NOT EXISTS would then see the name and skip forever, so we
+    --    first DROP any INVALID same-named index, then (re)build. Both steps are
+    --    guarded on table existence and are idempotent.
+    -- Drop a leftover INVALID index from a previously-interrupted CONCURRENTLY build.
+    SELECT 'DROP INDEX IF EXISTS public.dpop_jti_seen_expires_at_idx'
+    WHERE to_regclass('public.dpop_jti_seen') IS NOT NULL
+      AND EXISTS (
+        SELECT 1 FROM pg_class c
+        JOIN pg_index i ON i.indexrelid = c.oid
+        WHERE c.relname = 'dpop_jti_seen_expires_at_idx' AND NOT i.indisvalid
+      ) \gexec
+    -- Build concurrently, outside any transaction block (never wrap in DO/BEGIN).
+    SELECT 'CREATE INDEX CONCURRENTLY IF NOT EXISTS dpop_jti_seen_expires_at_idx ON public.dpop_jti_seen (expires_at)'
     WHERE to_regclass('public.dpop_jti_seen') IS NOT NULL \gexec
 
     -- SELECT is needed for the batched delete's ctid subquery; DELETE for the

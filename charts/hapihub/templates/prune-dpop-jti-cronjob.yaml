@@ -13,10 +13,14 @@
 #    USAGE + SELECT/DELETE on dpop_jti_seen only), NOT the postgres superuser. The
 #    role + (expires_at) index + grants are provisioned by the superuser PreSync Job
 #    (provision-dpop-pruner-*.yaml).
-#  - Bounded batched DELETE: `ctid IN (SELECT … LIMIT :batch)` looped until 0 rows,
-#    with per-statement SET lock_timeout / SET statement_timeout (activeDeadlineSeconds
-#    is a Job cap, NOT a DB lock/statement timeout). Avoids the unbounded single-txn
-#    DELETE that would seq-scan and burst WAL/dead-tuples on a backlog.
+#  - Bounded batched DELETE, ONE COMMIT PER BATCH: a client-side SHELL loop re-runs
+#    prune.sql (a single `ctid IN (SELECT … LIMIT :batch)` DELETE) once per batch,
+#    each its OWN connection/transaction that COMMITS → durable progress, bounded
+#    row-locks/WAL per batch. Loops until a batch deletes 0 rows or maxIterations is
+#    hit. per-batch SET lock_timeout / SET statement_timeout apply to each DELETE
+#    independently (activeDeadlineSeconds is a Job cap, NOT a DB lock/statement
+#    timeout). Replaces the earlier single-DO-block loop (one long txn whose
+#    statement_timeout covered the WHOLE DO — a backlog rolled back every batch).
 #  - No argv creds: PGHOST/PGPORT/PGUSER/PGDATABASE/PGPASSWORD env, no URI/password
 #    on the command line (invisible to `ps`).
 #
@@ -90,16 +94,36 @@ spec:
             image: {{ .Values.pruneExpiredDpopJti.image | default "docker.io/bitnamilegacy/postgresql:16.4.0-debian-12-r13" | quote }}
             imagePullPolicy: IfNotPresent
             command: ["/bin/sh", "-ec"]
-            # Absence-guarded, batched, timeout-bounded prune. SQL is the single
-            # source of truth in the sibling ConfigMap (also exercised by the
-            # self-check test tests/prune-dpop-jti.test.sh — keep them in lockstep).
+            # CLIENT-SIDE batch loop (PR #451 review blocker 2). prune.sql deletes
+            # ONE bounded batch per call and prints `DELETED <n>`; this shell re-runs
+            # it until a batch deletes 0 rows or MAX_ITER is reached — so every batch
+            # is its own committed transaction (durable progress, bounded lock/WAL).
+            # prune.sql is the single source of truth for the SQL (also exercised by
+            # tests/prune-dpop-jti.test.sh — keep them in lockstep).
             args:
               - |
-                psql -v ON_ERROR_STOP=1 \
-                  -v batch={{ .Values.pruneExpiredDpopJti.batchSize | default 10000 }} \
-                  -v lock_timeout={{ .Values.pruneExpiredDpopJti.lockTimeout | default "5s" | quote }} \
-                  -v statement_timeout={{ .Values.pruneExpiredDpopJti.statementTimeout | default "60s" | quote }} \
-                  -f /sql/prune.sql
+                MAX_ITER={{ .Values.pruneExpiredDpopJti.maxIterations | default 1000 }}
+                total=0
+                i=0
+                while [ "$i" -lt "$MAX_ITER" ]; do
+                  i=$((i + 1))
+                  out="$(psql -v ON_ERROR_STOP=1 \
+                    -v batch={{ .Values.pruneExpiredDpopJti.batchSize | default 10000 }} \
+                    -v lock_timeout={{ .Values.pruneExpiredDpopJti.lockTimeout | default "5s" | quote }} \
+                    -v statement_timeout={{ .Values.pruneExpiredDpopJti.statementTimeout | default "60s" | quote }} \
+                    -f /sql/prune.sql 2>&1)"
+                  echo "$out"
+                  n="$(printf '%s\n' "$out" | sed -n 's/^DELETED \([0-9][0-9]*\)$/\1/p' | tail -1)"
+                  # A missing count means prune.sql did not reach its final \echo
+                  # (e.g. a DB error under ON_ERROR_STOP) — fail loudly, never loop.
+                  [ -n "$n" ] || { echo "prune: no DELETED count in batch $i output — aborting"; exit 1; }
+                  total=$((total + n))
+                  [ "$n" -eq 0 ] && break
+                done
+                echo "dpop_jti_seen prune: deleted $total expired row(s) across $i batch call(s)"
+                if [ "$i" -ge "$MAX_ITER" ] && [ "$n" -ne 0 ]; then
+                  echo "prune: hit maxIterations=$MAX_ITER with a non-empty final batch — backlog remains, will resume next run"
+                fi
             resources:
               {{- toYaml .Values.pruneExpiredDpopJti.resources | nindent 14 }}
             env:
