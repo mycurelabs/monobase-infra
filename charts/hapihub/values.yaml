@@ -217,6 +217,80 @@ pruneExpiredSessions:
       cpu: 100m
       memory: 128Mi
 
+# Hourly CronJob that psql-DELETEs expired DPoP replay-guard rows from
+# dpop_jti_seen (monobase-mycure#4393 developer platform / RFC 9449). hapihub
+# records each accepted proof jti for replay detection but never removes the row
+# once it expires (iat + proof-validity window), so the table grows unbounded.
+#
+# SAFETY DESIGN (monobase-mycure#4393 review, PR #451):
+#  - Absence = clean no-op. The table is created only by the UNRELEASED migration
+#    monobase-mycure#0106_oauth_dpop; until that ships, `to_regclass` returns NULL
+#    and both the pruner and its provisioner exit 0. Absence is success, not error.
+#  - Least-privilege. The CronJob authenticates as a DEDICATED `dpop_pruner` role
+#    (provision.role/secretName below), NOT the postgres superuser — it holds only
+#    CONNECT + schema USAGE + SELECT/DELETE on dpop_jti_seen.
+#  - Bounded batched DELETE, ONE COMMIT PER BATCH. The source migration indexes
+#    only the jti PK, so an unbounded `DELETE WHERE expires_at < now()` would
+#    seq-scan and could delete a whole backlog in ONE txn (WAL/dead-tuple burst +
+#    long lock). We add the (expires_at) index and run a CLIENT-SIDE shell loop that
+#    re-invokes a single bounded `ctid IN (… LIMIT batchSize)` DELETE per call, each
+#    its own committed transaction, with per-batch lock_timeout + statement_timeout,
+#    until a batch deletes 0 rows or maxIterations is hit (durable progress; a slow
+#    batch times out on its own without rolling back prior committed batches).
+#  - NULL expires_at = never-expiring. `WHERE expires_at < now()` excludes NULLs
+#    (NULL is never < now()), so NULL-expiry rows are NEVER pruned. The source
+#    migration monobase-mycure#0106_oauth_dpop makes expires_at a NULLABLE timestamp.
+#  - No creds in argv. Connects via PGHOST/PGPORT/PGUSER/PGDATABASE/PGPASSWORD env
+#    (password from a secretKeyRef), never a URI or password on the command line.
+#
+# RETENTION BOUND: on an HOURLY schedule the table holds, just before a run, roughly
+# one hour of accepted-proof jtis PLUS the proof-validity window of still-live rows
+# — NOT "rate × 120s". The prune only removes already-expired rows.
+# DEFAULT OFF in the chart AND in shared base.yaml — opt in per-environment only
+# after that env's hapihub image ships monobase-mycure#0106_oauth_dpop.
+pruneExpiredDpopJti:
+  enabled: false
+  schedule: "0 * * * *"   # hourly (rows are meaningful only until proof expiry)
+  timeZone: "Etc/UTC"
+  # image: override the psql client image (defaults to the in-cluster PG image)
+  # Bounded batched-delete tuning. batchSize rows are deleted per psql call; the
+  # CronJob's shell loop re-invokes prune.sql (one committed batch each) until a
+  # batch deletes 0 rows or maxIterations is reached. Keeps WAL/lock bursts small
+  # and makes progress DURABLE across batches.
+  batchSize: 10000
+  # Safety cap on the client-side batch loop so a pathological backlog (or a bug)
+  # can't spin forever in a single Job. At batchSize=10000 this caps one run at
+  # 10M rows; any remainder is picked up the next hourly run. Bounds runtime
+  # alongside the Job's activeDeadlineSeconds.
+  maxIterations: 1000
+  # Per-statement DB-side caps (a Job activeDeadlineSeconds is NOT a DB lock/stmt
+  # timeout). Applied per psql call, so they bound EACH batch independently.
+  # lockTimeout bounds how long a single batch waits for row locks; statementTimeout
+  # bounds each batch's DELETE runtime. Both are hard PG caps.
+  lockTimeout: "5s"
+  statementTimeout: "60s"
+  resources:
+    requests:
+      cpu: 25m
+      memory: 32Mi
+    limits:
+      cpu: 100m
+      memory: 128Mi
+  # Least-privilege role provisioning (PR #451 security addendum). A superuser
+  # PreSync Job creates the dedicated pruner role + (expires_at) index + grants,
+  # idempotently and guarded on table existence. Disable per-release where the
+  # CronJob must not own it (the prod worker sets provision.enabled: false, the
+  # same double-render guard as roleSplit). The role password is synced from GCP
+  # Secret Manager via the database-secrets chart (dpopPruner.enabled), key
+  # {secretPrefix|namespace}-postgresql-dpop-pruner-password (hex — no urlencode).
+  provision:
+    enabled: true
+    role: dpop_pruner
+    secretName: postgresql-dpop-pruner
+    # image: override the psql client image (defaults to the in-cluster PG image)
+    backoffLimit: 3
+    activeDeadlineSeconds: 300
+
 # Weekly HIPAA-retention prune of the #3484 append-only audit_events trail.
 # Connects as the PG SUPERUSER and runs `SET session_replication_role = replica`
 # to bypass the append-only guard trigger for the DELETE (see the CronJob

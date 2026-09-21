@@ -1,0 +1,69 @@
+{{- if and .Values.enabled .Values.pruneExpiredDpopJti.enabled }}
+# prune.sql for the prune-dpop-jti CronJob (PR #451). Single source of truth for
+# the prune logic — the CronJob mounts this, and tests/prune-dpop-jti.test.sh runs
+# the SAME file against a throwaway postgres so a logic regression fails the test.
+#
+# ONE BOUNDED BATCH PER INVOCATION (PR #451 review blocker 2). This file deletes
+# AT MOST :batch expired rows in a SINGLE autocommitted statement, then prints the
+# deleted count on a line `DELETED <n>`. The CronJob's SHELL loop re-invokes psql
+# for each batch, so every batch is its OWN connection + transaction that COMMITS
+# on success → durable progress, bounded row-locks and WAL per batch. The earlier
+# single-DO-block loop was one long transaction: locks/WAL grew until the final
+# commit and the 60s statement_timeout applied to the whole DO (a backlog timed
+# out and rolled back EVERY batch forever, never making progress).
+#
+#  - to_regclass absence guard: absent table -> print `ABSENT`, exit 0 (no-op; the
+#    table ships only with UNRELEASED migration monobase-mycure#0106_oauth_dpop).
+#  - per-invocation SET lock_timeout / statement_timeout (hard DB-side caps) apply
+#    to THIS batch's DELETE only, since each psql call is a fresh session.
+#  - `WHERE expires_at < now()` NATURALLY EXCLUDES NULL expires_at (a NULL is never
+#    < now()), so a NULL-expiry row is treated as never-expiring and is NEVER pruned
+#    — matches source migration monobase-mycure#0106_oauth_dpop's nullable timestamp.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "hapihub.fullname" . }}-prune-dpop-jti
+  namespace: {{ include "hapihub.namespace" . }}
+  labels:
+    {{- include "hapihub.labels" . | nindent 4 }}
+    job-type: prune-dpop-jti
+data:
+  prune.sql: |
+    \set ON_ERROR_STOP on
+
+    -- Surface our own NOTICEs in the Job log regardless of the server/image
+    -- default (the bitnami PG image ships client_min_messages=error).
+    SET client_min_messages = notice;
+
+    -- Hard DB-side caps for THIS batch's session. Because the CronJob shell loop
+    -- runs one psql per batch, each batch gets these caps independently — a slow
+    -- batch times out on its OWN statement without touching prior committed batches
+    -- (a Job activeDeadlineSeconds is NOT a statement/lock timeout).
+    SET lock_timeout = :'lock_timeout';
+    SET statement_timeout = :'statement_timeout';
+
+    -- Absence = intentional no-op. `to_regclass` is NULL (not an error) for an
+    -- absent relation. This SELECT ALWAYS returns exactly one row (a boolean), so
+    -- \gset never trips ON_ERROR_STOP with "no rows returned"; on absence we print
+    -- DELETED 0 (the shell loop's stop sentinel) and \quit exit 0.
+    SELECT (to_regclass('public.dpop_jti_seen') IS NOT NULL) AS present \gset
+    \if :present
+    \else
+      \echo 'dpop_jti_seen absent — no-op (migration monobase-mycure#0106_oauth_dpop not yet applied)'
+      \echo 'DELETED 0'
+      \quit
+    \endif
+
+    -- ONE bounded batch, its own statement/transaction (psql autocommit). The
+    -- ctid subquery uses the (expires_at) index; NULLs never match `< now()`.
+    DELETE FROM public.dpop_jti_seen
+    WHERE ctid IN (
+      SELECT ctid FROM public.dpop_jti_seen
+      WHERE expires_at < now()
+      LIMIT :batch
+    );
+
+    -- Emit the affected row count on a parseable line for the shell loop. psql
+    -- exposes the last command's row count as :ROW_COUNT.
+    \echo 'DELETED' :ROW_COUNT
+{{- end }}
