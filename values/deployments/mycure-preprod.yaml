@@ -420,6 +420,44 @@ openmed:
 walg:
   enabled: false
 
+# ===== LOGICAL BACKUP: nightly pg_dump DR tier (monobase-mycure#4320) =====
+# Portable pg_dump -Fc of the hapihub DB (the logical tier the physical backups
+# — Velero/Kopia, wal-g PITR — don't provide), dumped from the READ REPLICA,
+# verified, crypt-encrypted, shipped off-cloud to niflheim. Staged here disabled;
+# activation is gated on two GCP Secret Manager keys + niflheim's rclone receive
+# (see charts/pg-logical-backup NOTES.txt). Flip enabled+suspend to go live.
+pgLogicalBackup:
+  enabled: false
+  # suspend: true    # uncomment to land the app + provision the role without running yet
+  database:
+    name: hapihub
+    readService: postgresql-read
+    primaryService: postgresql-primary
+  destination:
+    path: pgdump-preprod
+    retentionDays: 7
+  externalSecrets:
+    # Vanaheim provides ClusterSecretStore/gcp-secretstore (no per-ns store).
+    secretStore: gcp-secretstore
+    secretStoreKind: ClusterSecretStore
+  networkPolicy:
+    # Destination-scoped egress for the off-cloud upload — NEVER 0.0.0.0/0.
+    # niflheim is reached over the tailnet (rclone sftp receive of pgdump-preprod/).
+    #
+    # Left EMPTY on purpose: the chart's fail-closed guard REFUSES to render when
+    # enabled with no destination pinned, AND rejects any CIDR that is not an
+    # exact /32 (a broad prefix like the old 100.64.0.0/10 CGNAT placeholder is a
+    # NON-answer — it would open SSH egress to the whole range and might still not
+    # reach niflheim). So activation is impossible until niflheim's VERIFIED
+    # tailnet /32 is pinned here (activation prerequisite #2, see NOTES.txt).
+    # At activation, replace with the confirmed peer /32, e.g.:
+    #   destinations:
+    #     - cidr: 100.100.20.30/32     # niflheim tailnet host (rclone sftp receive)
+    #       ports:
+    #         - port: 22               # sftp; use 443 if the crypt remote wraps an HTTPS object store
+    #           protocol: TCP
+    destinations: []
+
 # ===== DATABASE: PostgreSQL (HA — 1 primary + 1 read replica, prod parity) =====
 # The cadence hub's reconcile/serve scan plane reads from the replica
 # (CADENCE_DB_READ_URL), same read-plane split as prod. Local-path storage
