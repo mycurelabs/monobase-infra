@@ -69,12 +69,15 @@ spec:
         imagePullPolicy: IfNotPresent
         command: ["/bin/sh", "-ec"]
         # Superuser connection via env (PGPASSWORD), NEVER a URI/argv password.
+        # The pruner ROLE password is NOT passed with `-v` either (that would land
+        # it in psql's argv, visible to `ps`) — provision.sql imports it inside the
+        # session with `\getenv pruner_password PRUNER_PASSWORD`. Only non-secret
+        # vars go on the command line here.
         args:
           - |
             psql -v ON_ERROR_STOP=1 \
               -v DBNAME={{ include "hapihub.postgresql.database" . }} \
               -v pruner_role={{ .Values.pruneExpiredDpopJti.provision.role | default "dpop_pruner" | quote }} \
-              -v pruner_password="$PRUNER_PASSWORD" \
               -f /sql/provision.sql
         env:
         - name: PGHOST
