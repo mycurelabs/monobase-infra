@@ -93,6 +93,7 @@ echo "Rendering app-of-apps trees (validates every chart in use)..."
 helm template lint charts/argocd-applications -f values/deployments/base.yaml -f values/deployments/mycure-production.yaml --set argocd.repoURL=lint --set argocd.targetRevision=lint > /dev/null
 helm template lint charts/argocd-applications -f values/deployments/base.yaml -f values/deployments/mycure-staging.yaml --set argocd.repoURL=lint --set argocd.targetRevision=lint > /dev/null
 helm template lint charts/argocd-applications -f values/deployments/base.yaml -f values/deployments/mycure-preprod.yaml --set argocd.repoURL=lint --set argocd.targetRevision=lint > /dev/null
+helm template lint charts/argocd-applications -f values/deployments/base.yaml -f values/deployments/mycure-sandbox.yaml --set argocd.repoURL=lint --set argocd.targetRevision=lint > /dev/null
 # infra + bootstrap render with the DOKS cluster's real values (clusterName is
 # now `required` in the velero-resources/external-dns templates — this render
 # would fail hard if it went missing). bootstrap renders with the per-cluster

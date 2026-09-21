@@ -20,3 +20,5 @@ argocd:
     - path: "values/deployments/mycure-staging.yaml"
     # preprod on the local cluster (mycure#4135), post-PR#409 DOKS decommission.
     - path: "values/deployments/mycure-preprod.yaml"
+    # isolated MediCard sandbox (monobase-mycure#4509) — vanaheim-only, like preprod.
+    - path: "values/deployments/mycure-sandbox.yaml"

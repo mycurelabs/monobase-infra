@@ -170,6 +170,29 @@ nginxGatewayResources:
         - name: relay-quic-preprod
           port: 7842
           protocol: UDP
+        # ---- sandbox (isolated MediCard sandbox, monobase-mycure#4509). Same
+        # anti-HTTP/2-coalescing pattern as preprod: exact-hostname listeners for
+        # the app<->api pair + a wildcard for the rest. No QUIC legs — cadence is
+        # disabled in the sandbox overlay (no box sync). ----
+        - name: https-sandbox-mycure
+          port: 443
+          protocol: HTTPS
+          hostname: "mycure.sandbox.localfirsthealth.com"
+          tlsSecretName: nginx-gateway-tls-sandbox-mycure
+        - name: https-sandbox-hapihub
+          port: 443
+          protocol: HTTPS
+          hostname: "hapihub.sandbox.localfirsthealth.com"
+          tlsSecretName: nginx-gateway-tls-sandbox-hapihub
+        - name: https-sandbox-lfh
+          port: 443
+          protocol: HTTPS
+          hostname: "*.sandbox.localfirsthealth.com"
+          tlsSecretName: nginx-gateway-tls-sandbox
+        - name: http-sandbox-lfh
+          port: 80
+          protocol: HTTP
+          hostname: "*.sandbox.localfirsthealth.com"
 
   tls:
     certificates:
@@ -201,6 +224,20 @@ nginxGatewayResources:
         clusterIssuer: letsencrypt-mycure-cloudflare-prod  # DNS-01, wildcard
         dnsNames:
           - "*.preprod.localfirsthealth.com"
+      # sandbox (monobase-mycure#4509). Exact-name certs MUST stay single-hostname —
+      # extra dnsNames would re-enable HTTP/2 coalescing.
+      - secretName: nginx-gateway-tls-sandbox-mycure
+        clusterIssuer: letsencrypt-mycure-cloudflare-prod  # DNS-01
+        dnsNames:
+          - mycure.sandbox.localfirsthealth.com
+      - secretName: nginx-gateway-tls-sandbox-hapihub
+        clusterIssuer: letsencrypt-mycure-cloudflare-prod  # DNS-01
+        dnsNames:
+          - hapihub.sandbox.localfirsthealth.com
+      - secretName: nginx-gateway-tls-sandbox
+        clusterIssuer: letsencrypt-mycure-cloudflare-prod  # DNS-01, wildcard
+        dnsNames:
+          - "*.sandbox.localfirsthealth.com"
 
   # Cluster-wide SnippetsPolicies for the shared nginx Gateway.
   snippetsPolicies:

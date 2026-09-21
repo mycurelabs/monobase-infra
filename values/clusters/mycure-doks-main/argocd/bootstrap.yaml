@@ -51,3 +51,7 @@ argocd:
       exclude: true
     - path: "values/deployments/mycure-preprod.yaml"
       exclude: true
+    # vanaheim-only sandbox (monobase-mycure#4509). Guard: never on main today, but
+    # exclude keeps it off DOKS prod even if the overlay ever reaches this branch.
+    - path: "values/deployments/mycure-sandbox.yaml"
+      exclude: true
