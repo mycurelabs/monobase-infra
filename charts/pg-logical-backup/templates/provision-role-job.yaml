@@ -11,9 +11,17 @@
 # ExternalSecret, the wait-for-secret initContainer below can actually observe
 # the populated target Secret.
 #
-# Rotation self-heal: `Replace=true` makes ArgoCD delete+recreate this Job every
-# sync, so the idempotent ALTER ROLE re-applies a rotated dumper password
-# (the behaviour BeforeHookCreation previously provided).
+# BOOTSTRAP role: this Job creates the `dumper` role at DEPLOY time (sync-wave
+# -10), so the role exists before the CronJob's first run. `Replace=true` makes
+# ArgoCD delete+recreate it whenever THIS Job's manifest changes on a sync.
+#
+# ROTATION self-heal is NOT owned by this Job (review finding #1): a COMPLETED
+# Job with an unchanged manifest is Synced and is NOT recreated on subsequent
+# syncs, so an ESO password rotation would NOT re-run it. Instead, the nightly
+# CronJob carries a `provision-role` initContainer (same idempotent provision.sql)
+# that re-applies the CURRENT dumper password to the PG role before every dump —
+# a deterministic, ArgoCD-independent trigger on the nightly cadence (≤24h to
+# re-sync a rotated password). See charts/pg-logical-backup/templates/cronjob.yaml.
 apiVersion: batch/v1
 kind: Job
 metadata:

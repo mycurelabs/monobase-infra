@@ -1,7 +1,17 @@
 {{- if .Values.enabled }}
 # Nightly logical pg_dump DR tier (monobase-mycure#4320).
 #
-# Two ordered steps in one pod, sharing an ephemeral `work` volume:
+# Ordered steps in one pod, sharing an ephemeral `work` volume:
+#   0. initContainer `provision-role` (postgres image, DETERMINISTIC ROTATION
+#      SELF-HEAL — review finding #1) — an idempotent superuser psql against the
+#      PRIMARY that re-applies the CURRENT dumper password (ALTER ROLE) from the
+#      ESO-synced Secret before every dump. This is what makes rotation safe:
+#      the CronJob runs nightly, so a rotated ESO password is re-applied to the
+#      PG role within ≤24h with NO dependence on ArgoCD re-running a completed
+#      Job (a completed Replace=true Job is NOT recreated on an unchanged sync —
+#      the bug this fixes). The standalone provision-role Job still bootstraps
+#      the role at deploy time (sync-wave -10); this initContainer keeps it in
+#      sync thereafter. Gated on provisionRole.enabled.
 #   1. initContainer `dump`   (postgres image) — pg_dumpall globals + pg_dump -Fc
 #      of the app DB against the READ REPLICA, then a pg_restore --list integrity
 #      gate. A corrupt/truncated dump fails the pod here, before anything ships.
@@ -43,6 +53,53 @@ spec:
           securityContext:
             {{- toYaml .Values.podSecurityContext | nindent 12 }}
           initContainers:
+          {{- if .Values.provisionRole.enabled }}
+          # ── Rotation self-heal (finding #1) ─────────────────────────────────
+          # Re-apply the CURRENT dumper password to the PG role from the
+          # ESO-synced Secret, every night, as the superuser against the PRIMARY.
+          # Idempotent (same provision.sql the bootstrap Job runs). This is the
+          # deterministic rotation trigger: it does not rely on ArgoCD recreating
+          # a completed Job — the nightly cadence guarantees a rotated password
+          # re-syncs to PG within ≤24h. If the dumper Secret rotated, the dump
+          # step below (which reads the SAME key) and this step read identical
+          # values, so the ensuing pg_dump authenticates.
+          - name: provision-role
+            image: {{ .Values.provisionRole.image | quote }}
+            imagePullPolicy: IfNotPresent
+            securityContext:
+              {{- toYaml .Values.securityContext | nindent 14 }}
+            command: ["/bin/sh", "-ec"]
+            args:
+              - |
+                # NO credentials on argv (superuser via PGPASSWORD env, dumper
+                # password via \getenv inside the SQL). monobase-infra#420 pattern.
+                psql "postgresql://postgres@{{ .Values.database.primaryService }}.{{ include "pgLogicalBackup.namespace" . }}.svc.cluster.local:{{ .Values.database.port }}/postgres" \
+                  -v ON_ERROR_STOP=1 \
+                  -v target_database={{ .Values.database.name }} \
+                  -v dump_role={{ .Values.database.dumpRole }} \
+                  -f /sql/provision.sql
+            env:
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.provisionRole.superuserSecret }}
+                  key: {{ .Values.provisionRole.superuserSecretKey }}
+            - name: DUMPER_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.database.existingSecret }}
+                  key: {{ .Values.database.passwordKey }}
+            - name: HOME
+              value: /tmp
+            volumeMounts:
+            - name: sql
+              mountPath: /sql
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+            resources:
+              {{- toYaml .Values.resources.upload | nindent 14 }}
+          {{- end }}
           - name: dump
             image: {{ .Values.image.postgres | quote }}
             imagePullPolicy: IfNotPresent
@@ -159,6 +216,13 @@ spec:
             resources:
               {{- toYaml .Values.resources.upload | nindent 14 }}
           volumes:
+          {{- if .Values.provisionRole.enabled }}
+          # provision.sql for the rotation-self-heal initContainer (same ConfigMap
+          # the bootstrap provision-role Job mounts).
+          - name: sql
+            configMap:
+              name: {{ include "pgLogicalBackup.fullname" . }}-provision-role
+          {{- end }}
           - name: work
             {{- if eq .Values.work.type "pvc" }}
             persistentVolumeClaim:

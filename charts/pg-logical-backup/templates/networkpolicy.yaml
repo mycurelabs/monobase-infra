@@ -11,10 +11,17 @@
 #   (a) enabled but NO upload destination pinned (and no raw extraEgress) → fail:
 #       the pod could never reach niflheim, so surface it at render time rather
 #       than ship a policy that silently blocks every upload.
-#   (b) any destination CIDR that is NOT an exact /32 → fail: a broad prefix
-#       (e.g. the 100.64.0.0/10 CGNAT range) is a placeholder, not niflheim's
-#       exact host. Shipping it would open SSH egress to the whole range AND
-#       might still not reach niflheim. Require the verified peer /32.
+#   (b) any destination CIDR that is NOT a REAL IPv4 host with an exact /32 mask
+#       → fail: a broad prefix (e.g. the 100.64.0.0/10 CGNAT range) is a
+#       placeholder, not niflheim's exact host — and a bare "/32" suffix check is
+#       too weak (it accepted `not-an-ip/32` and `100.100.20.30/32` alike). We
+#       parse the four octets (each 0-255) AND require the /32 mask, so only an
+#       actual pinned host renders. Shipping a range would open SSH egress to the
+#       whole range AND might still not reach niflheim.
+#   (c) a destination with NO explicit ports → fail: an egress rule with an
+#       ipBlock but no `ports` allows ALL ports to that host — the opposite of a
+#       destination-scoped rule. Require the exact port(s) rclone needs (22 sftp
+#       / 443 HTTPS).
 # (Set networkPolicy.enabled: false to opt out of the NetworkPolicy entirely;
 #  use networkPolicy.extraEgress only for a deliberately-reviewed raw rule.)
 {{- if and (not .Values.networkPolicy.destinations) (not .Values.networkPolicy.extraEgress) }}
@@ -22,8 +29,32 @@
 {{- end }}
 {{- range .Values.networkPolicy.destinations }}
 {{- $cidr := required "pg-logical-backup: networkPolicy.destinations[].cidr is required" .cidr }}
-{{- if not (hasSuffix "/32" $cidr) }}
-{{- fail (printf "pg-logical-backup: networkPolicy.destinations cidr %q is not a /32. Egress must be pinned to the EXACT niflheim tailnet host (a Tailscale peer is a /32 in 100.64.0.0/10) — a broad prefix is a placeholder that would open SSH egress to the whole range. Pin the verified peer /32 (e.g. 100.100.20.30/32) before activation, or use networkPolicy.extraEgress for a reviewed raw rule. See charts/pg-logical-backup/NOTES.txt." $cidr) }}
+{{/*
+  Validate a REAL IPv4 /32: split "<ip>/<mask>", assert mask == 32, then assert
+  the address is four numeric octets each in 0-255. A bare hasSuffix "/32" check
+  passed `not-an-ip/32`; this parses the actual octets.
+*/}}
+{{- $parts := splitList "/" $cidr }}
+{{- if ne (len $parts) 2 }}
+{{- fail (printf "pg-logical-backup: networkPolicy.destinations cidr %q is not a valid <ipv4>/32. Pin the verified niflheim tailnet host, e.g. 100.100.20.30/32. See charts/pg-logical-backup/NOTES.txt." $cidr) }}
+{{- end }}
+{{- $addr := index $parts 0 }}
+{{- $mask := index $parts 1 }}
+{{- if ne $mask "32" }}
+{{- fail (printf "pg-logical-backup: networkPolicy.destinations cidr %q is not a /32 (mask %q). Egress must be pinned to the EXACT niflheim tailnet host (a Tailscale peer is a /32 in 100.64.0.0/10) — a broad prefix would open SSH egress to the whole range. Pin the verified peer /32 (e.g. 100.100.20.30/32), or use networkPolicy.extraEgress for a reviewed raw rule. See charts/pg-logical-backup/NOTES.txt." $cidr $mask) }}
+{{- end }}
+{{- $octets := splitList "." $addr }}
+{{- if ne (len $octets) 4 }}
+{{- fail (printf "pg-logical-backup: networkPolicy.destinations cidr %q is not a valid IPv4 address (expected four octets, got %q). Pin the verified niflheim tailnet host, e.g. 100.100.20.30/32. See charts/pg-logical-backup/NOTES.txt." $cidr $addr) }}
+{{- end }}
+{{- range $octets }}
+{{- if not (regexMatch "^(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])$" .) }}
+{{- fail (printf "pg-logical-backup: networkPolicy.destinations cidr %q has an invalid IPv4 octet %q (each octet must be 0-255). Pin the verified niflheim tailnet host, e.g. 100.100.20.30/32. See charts/pg-logical-backup/NOTES.txt." $cidr .) }}
+{{- end }}
+{{- end }}
+{{/* (c) destination-scoped means EXPLICIT ports — an ipBlock with no ports = all ports. */}}
+{{- if not .ports }}
+{{- fail (printf "pg-logical-backup: networkPolicy.destinations entry for cidr %q has no ports. An egress rule with an ipBlock but no ports allows ALL ports to that host — set the exact port(s) rclone needs, e.g. ports: [{port: 22, protocol: TCP}] (sftp) or 443 (HTTPS object store). See charts/pg-logical-backup/NOTES.txt." $cidr) }}
 {{- end }}
 {{- end }}
 apiVersion: networking.k8s.io/v1
