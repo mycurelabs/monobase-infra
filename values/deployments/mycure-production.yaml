@@ -93,7 +93,7 @@ hapihub:
     # Preflight confirmed both columns and both tables are absent, so the bare ALTER/CREATE
     # statements will not collide with schema drift. No migration contains DROP or DELETE; as with
     # all forward-only migrations, rollback leaves these additive schema objects in place.
-    tag: "11.20.126"
+    tag: "11.20.127"
   cache:
     # Response cache OFF in prod — interim mitigation for the single-hot-key
     # bentocache stampede that wedged prod (#179, #2839, #2617). The serve-stale
@@ -331,7 +331,7 @@ mycure:
   image:
     # Ships with hapihub 11.20.126 — expects an API carrying the 0098
     # medical_records.updated_by changes, so these two move together.
-    tag: "10.25.137"
+    tag: "10.25.138"
   resources:
     requests:
       cpu: 10m
