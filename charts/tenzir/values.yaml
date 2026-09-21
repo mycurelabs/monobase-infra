@@ -26,9 +26,12 @@ alertmanager:
 
 # GeoIP enrichment (unusual_country + impossible_travel). Needs a MaxMind
 # GeoLite2-City.mmdb. When enabled, an init container downloads it with the
-# license key from the ESO secret. Off until the license key is provisioned →
-# the two geo signals stay dormant (fail-open: no geo field, no geo finding);
-# the other six signals run regardless.
+# license key from its own ESO secret (tenzir-maxmind-license, kept separate
+# from the HMAC key). Fail-open: if the download fails, the init container
+# exits 0 and the node boots the NO-GEO config variant, so the FIVE non-geo
+# detection signals (failed_logins, mass_export, late_night, privilege_change,
+# concurrent_sessions) keep running regardless — only the two geo signals go
+# dormant. Off until the license key is provisioned.
 geoip:
   enabled: false
   # Countries treated as normal for unusual_country (ISO-3166 alpha-2).
@@ -80,9 +83,11 @@ externalSecrets:
   secretStoreKind: ClusterSecretStore
   refreshInterval: 1h
   # remoteKey = GCP Secret Manager name. secretKey = key in the k8s Secret.
-  # The MaxMind license (infrastructure-tenzir-maxmind-license) is added by the
-  # ExternalSecret template only when geoip.enabled — so phase 1 needs just this
-  # one HMAC secret and a missing MaxMind key can't fail the whole sync.
+  # This drives the tenzir-secrets ExternalSecret (HMAC key only). The MaxMind
+  # license (infrastructure-tenzir-maxmind-license) is a SEPARATE ExternalSecret
+  # (tenzir-maxmind-license), rendered only when geoip.enabled — so a MaxMind-
+  # side failure can never fault the HMAC key's sync, and phase 1 needs just
+  # this one HMAC secret.
   secrets:
     - secretKey: hmac-key
       remoteKey: infrastructure-tenzir-ingest-hmac

@@ -625,13 +625,51 @@ loki:
 # ENABLED (preprod bring-up 2026-08-25): the HMAC secret
 # infrastructure-tenzir-ingest-hmac exists; hapihub preprod POSTs audit_events
 # to http://tenzir-ingest.security.svc.cluster.local:8080/ingest/audit-events
-# (see values/deployments/mycure-preprod.yaml hapihub AUDIT_SINK_*). geoip stays
-# off (no MaxMind key yet) so unusual_country/impossible_travel stay dormant.
+# (see values/deployments/mycure-preprod.yaml hapihub AUDIT_SINK_*).
 tenzir:
   enabled: true
-  # geoip stays off until the MaxMind license key is provisioned — the two geo
-  # signals (unusual_country, impossible_travel) stay dormant; the other five run.
+  # geoip HELD DISABLED (infra#358): the machinery is READY — flipping this to
+  # true arms 20-unusual-country + 21-impossible-travel and the geoip-city
+  # context; the init container downloads GeoLite2-City using the MaxMind license
+  # from infrastructure-tenzir-maxmind-license (infra#3744 — verified to exist in
+  # mc-v4-prod and readable by the prod ESO SA external-secrets@, which holds an
+  # unconditional project secretAccessor). Merging this PR deploys the DISABLED
+  # machinery only — it is NOT an active geoip rollout. The real client-IP audit
+  # flow is NOT yet verified/proven in prod; do not enable until it is.
+  #
+  # ⚠️ Keep DISABLED — do NOT set enabled: true until ALL of:
+  #  (1) PR #428 is prod-live (audit-sink emitter + pipeline), AND
+  #  (2) prod hapihub is on a PROVEN-ELIGIBLE release — a future hapihub version
+  #      that (a) is ≥ the X-Real-IP fix, (b) carries the fail-safe audit trigger,
+  #      and (c) is NOT 11.20.124 or 11.20.125 (both are explicitly PROHIBITED by
+  #      #428, which is now disarmed and does NOT prove audit delivery). The exact
+  #      eligible version is TBD — pin it here once hapihub ships the fix. Prod
+  #      currently runs 11.20.122, so the real client IP is NOT yet landing in
+  #      audit_events.ip; until an eligible release is live, geoip would enrich
+  #      the gateway/proxy IP, not the client — resolving the wrong country. Do
+  #      NOT infer this is satisfied from a proxy/gateway config alone, and do NOT
+  #      treat 11.20.124/125 as eligible; gate on the hapihub VERSION.
+  #  (3) audit_events are actually flowing to Tenzir with real client IPs (verify
+  #      the sink delivering + a real audit_events.ip).
+  # Flipping geoip before all three just arms two pipelines that enrich garbage.
+  #
+  # PREPROD SCOPE: the non-geo pipeline (five detections) + the ingest/HMAC path
+  # were validated on preprod. The geoip ENRICHMENT itself is prod-only and was
+  # NOT exercised on preprod — vanaheim is tailnet-only (100.x/10.42.x) so
+  # GeoLite2 returns country=null and both geo pipelines filter to zero signals.
+  # The geo enrichment is therefore validated by config review + `helm template`
+  # (renders the geo pipelines, the geoip-city context, and — the fail-open path
+  # — the separate no-geo config variant selected when the mmdb is absent).
+  #
+  # SHARED QUOTA: prod and preprod use the SAME MaxMind license key
+  # (infrastructure-tenzir-maxmind-license) → they share MaxMind's per-key
+  # GeoLite2 download quota. Fetch is once per pod start, so headroom is large,
+  # but if the quota is ever hit both clusters' init containers fail together
+  # (fail-open → both boot no-geo). Split the key if that ever becomes a concern.
   geoip:
+    # READY but HELD — do not enable until (a) #428 emitter armed on an eligible
+    # hapihub release [NOT 11.20.124/125], and (b) real client-IP audit flow
+    # demonstrated. Merging this deploys the disabled machinery only.
     enabled: false
 
 # Tailscale egress to the vanaheim workstation Ollama (medical-AI preprod inference)
