@@ -27,7 +27,7 @@ securityBaseline:
   strictGatewayIngress: true
 mycure-dashboard:
   image:
-    tag: "0.14.20-staging.b6e2577"
+    tag: "0.14.24"
   resources:
     requests:
       cpu: 50m
