@@ -153,13 +153,12 @@ hapihub:
     API_SCOPE_ENFORCE: "true"
     API_ORIGIN_ENFORCE: "true"
     API_DPOP_ENFORCE: "true"
-    # API_AUDIENCE_ENFORCE HELD: enabling it adds an env var, which trips an ArgoCD
-    # ComparisonError (strategic-merge-patch fails) because the rendered hapihub
-    # Deployment has DUPLICATE STORAGE_* env — the chart's minio.enabled block
-    # (_helpers.tpl) and this overlay's config: block BOTH emit STORAGE_BUCKET/TYPE/
-    # S3_ENDPOINT/REGION/FORCE_PATH_STYLE. Latent (last-wins at runtime) until any env
-    # add/remove forces a patch. Blocked until the dup is deduped (remove redundant
-    # config: STORAGE_* here + set minio.defaultBuckets: hapihub) OR ServerSideApply.
+    # Final audience-rollout step (#4290/#4552). Enabled after hapihub 11.20.129 shipped
+    # the x-audience annotation-coverage fixes AND the chart's containerEnv dedupe (the
+    # hapihub Deployment env is now deduped by name so adding this flag no longer trips
+    # ArgoCD's strategic-merge-patch on the duplicate STORAGE_* env). ENTITLEMENT/QUOTA
+    # stay OFF. Sandbox stays OFF (baseline); prod untouched.
+    API_AUDIENCE_ENFORCE: "true"
 
   env:
       # Prod parity (#2114): cap the JSC heap below the 4Gi container limit.
