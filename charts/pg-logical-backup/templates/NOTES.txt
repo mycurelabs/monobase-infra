@@ -1,0 +1,54 @@
+pg-logical-backup ({{ .Chart.Version }}) — logical pg_dump DR tier (monobase-mycure#4320)
+
+Namespace : {{ include "pgLogicalBackup.namespace" . }}
+Enabled   : {{ .Values.enabled }}
+Schedule  : {{ .Values.schedule }}{{ with .Values.timeZone }} ({{ . }}){{ end }}
+Dump      : pg_dump -Fc {{ .Values.database.name }} @ {{ .Values.database.readService }} (REPLICA)
+Ship to   : {{ .Values.destination.rcloneRemote }}:{{ .Values.destination.path }}  (keep < {{ .Values.destination.retentionDays }}d)
+
+ACTIVATION PREREQUISITES (out-of-band — do these before setting enabled: true / suspend: false):
+
+  1. Seed GCP Secret Manager (handoff — Joff / IAM). ESO syncs these via
+     {{ .Values.externalSecrets.secretStoreKind }}/{{ include "pgLogicalBackup.secretStore" . }}:
+       {{- range .Values.externalSecrets.secrets }}
+       - {{ .remoteKey }}
+       {{- end }}
+     • dumper-db-password : a strong random password for the read-only `dumper` role.
+     • rclone.conf        : an rclone config with a `crypt` remote named
+                            "{{ .Values.destination.rcloneRemote }}" wrapping the backend
+                            niflheim pulls from (sftp to niflheim, or an object-store
+                            prefix). The crypt password lives ONLY here.
+
+  2. Pin the egress destination — networkPolicy.destinations must carry niflheim's
+     real tailnet /32 (+ port 22 sftp, or 443 for an HTTPS object store). The
+     overlay ships EMPTY (destinations: []) on purpose. The chart REFUSES to
+     render (helm fail) if enabled with (a) no destination pinned, OR (b) any
+     destination CIDR that is not an exact /32 — a broad prefix (e.g. the
+     100.64.0.0/10 CGNAT range) is a placeholder, not the host, and is rejected.
+     Pin the VERIFIED peer /32. Never 0.0.0.0/0.
+
+  3. niflheim receive/pull side — configure niflheim's existing rclone timer to
+     pull (or receive) {{ .Values.destination.path }}/ into /mnt/storage/mycure/pgdump/.
+
+  4. PASS the restore drill (evidence before activation):
+       scripts/pg-logical-backup-restore-drill.sh --remote {{ .Values.destination.rcloneRemote }}:{{ .Values.destination.path }}
+     or the in-cluster gate: --set restoreVerify.enabled=true (throwaway PG,
+     restores + row-counts). See docs/operations/PG_LOGICAL_BACKUP.md.
+
+  5. Flip on: set pgLogicalBackup.enabled: true (and suspend: false) in the
+     deployment overlay. Sync-wave ordering (all NORMAL resources, no PreSync
+     hooks): ExternalSecret (-20) → ServiceAccount (-12) → role ConfigMap (-11)
+     → role Job (-10) → CronJob/NetworkPolicy (0). The role Job's wait-for-secret
+     initContainer BLOCKS until the ESO-synced dumper Secret is populated before
+     provisioning the `dumper` role (Replace=true re-runs it each sync to re-apply
+     a rotated password); the CronJob then runs at {{ .Values.schedule }}.
+
+RESTORE (documented in docs/operations/):
+  rclone copy {{ .Values.destination.rcloneRemote }}:{{ .Values.destination.path }}/<TS> .   # decrypts on pull
+  psql -f globals-<TS>.sql            # roles/grants first (reset passwords after)
+  pg_restore -j4 -d <target-db> {{ .Values.database.name }}-<TS>.dump
+
+VERIFY a run:
+  kubectl -n {{ include "pgLogicalBackup.namespace" . }} get cronjob,job -l app.kubernetes.io/name=pg-logical-backup
+  kubectl -n {{ include "pgLogicalBackup.namespace" . }} logs job/<job-name> -c dump
+  kubectl -n {{ include "pgLogicalBackup.namespace" . }} logs job/<job-name> -c upload

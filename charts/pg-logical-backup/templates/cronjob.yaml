@@ -1,0 +1,243 @@
+{{- if .Values.enabled }}
+# Nightly logical pg_dump DR tier (monobase-mycure#4320).
+#
+# Ordered steps in one pod, sharing an ephemeral `work` volume:
+#   0. initContainer `provision-role` (postgres image, DETERMINISTIC ROTATION
+#      SELF-HEAL — review finding #1) — an idempotent superuser psql against the
+#      PRIMARY that re-applies the CURRENT dumper password (ALTER ROLE) from the
+#      ESO-synced Secret before every dump. This is what makes rotation safe:
+#      the CronJob runs nightly, so a rotated ESO password is re-applied to the
+#      PG role within ≤24h with NO dependence on ArgoCD re-running a completed
+#      Job (a completed Replace=true Job is NOT recreated on an unchanged sync —
+#      the bug this fixes). The standalone provision-role Job still bootstraps
+#      the role at deploy time (sync-wave -10); this initContainer keeps it in
+#      sync thereafter. Gated on provisionRole.enabled.
+#   1. initContainer `dump`   (postgres image) — pg_dumpall globals + pg_dump -Fc
+#      of the app DB against the READ REPLICA, then a pg_restore --list integrity
+#      gate. A corrupt/truncated dump fails the pod here, before anything ships.
+#   2. container     `upload` (rclone image)   — rclone copy to a `crypt` remote
+#      (plaintext PHI never rests off-cluster), then a time-based retention prune.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "pgLogicalBackup.fullname" . }}
+  namespace: {{ include "pgLogicalBackup.namespace" . }}
+  labels:
+    {{- include "pgLogicalBackup.labels" . | nindent 4 }}
+spec:
+  schedule: {{ .Values.schedule | quote }}
+  {{- with .Values.timeZone }}
+  timeZone: {{ . | quote }}
+  {{- end }}
+  concurrencyPolicy: {{ .Values.concurrencyPolicy }}
+  startingDeadlineSeconds: {{ .Values.startingDeadlineSeconds }}
+  successfulJobsHistoryLimit: {{ .Values.successfulJobsHistoryLimit }}
+  failedJobsHistoryLimit: {{ .Values.failedJobsHistoryLimit }}
+  suspend: {{ .Values.suspend }}
+  jobTemplate:
+    metadata:
+      labels:
+        {{- include "pgLogicalBackup.labels" . | nindent 8 }}
+    spec:
+      backoffLimit: {{ .Values.backoffLimit }}
+      activeDeadlineSeconds: {{ .Values.activeDeadlineSeconds }}
+      ttlSecondsAfterFinished: 86400
+      template:
+        metadata:
+          labels:
+            {{- include "pgLogicalBackup.selectorLabels" . | nindent 12 }}
+        spec:
+          restartPolicy: Never
+          enableServiceLinks: false
+          serviceAccountName: {{ include "pgLogicalBackup.serviceAccountName" . }}
+          securityContext:
+            {{- toYaml .Values.podSecurityContext | nindent 12 }}
+          initContainers:
+          {{- if .Values.provisionRole.enabled }}
+          # ── Rotation self-heal (finding #1) ─────────────────────────────────
+          # Re-apply the CURRENT dumper password to the PG role from the
+          # ESO-synced Secret, every night, as the superuser against the PRIMARY.
+          # Idempotent (same provision.sql the bootstrap Job runs). This is the
+          # deterministic rotation trigger: it does not rely on ArgoCD recreating
+          # a completed Job — the nightly cadence guarantees a rotated password
+          # re-syncs to PG within ≤24h. If the dumper Secret rotated, the dump
+          # step below (which reads the SAME key) and this step read identical
+          # values, so the ensuing pg_dump authenticates.
+          - name: provision-role
+            image: {{ .Values.provisionRole.image | quote }}
+            imagePullPolicy: IfNotPresent
+            securityContext:
+              {{- toYaml .Values.securityContext | nindent 14 }}
+            command: ["/bin/sh", "-ec"]
+            args:
+              - |
+                # NO credentials on argv (superuser via PGPASSWORD env, dumper
+                # password via \getenv inside the SQL). monobase-infra#420 pattern.
+                psql "postgresql://postgres@{{ .Values.database.primaryService }}.{{ include "pgLogicalBackup.namespace" . }}.svc.cluster.local:{{ .Values.database.port }}/postgres" \
+                  -v ON_ERROR_STOP=1 \
+                  -v target_database={{ .Values.database.name }} \
+                  -v dump_role={{ .Values.database.dumpRole }} \
+                  -f /sql/provision.sql
+            env:
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.provisionRole.superuserSecret }}
+                  key: {{ .Values.provisionRole.superuserSecretKey }}
+            - name: DUMPER_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.database.existingSecret }}
+                  key: {{ .Values.database.passwordKey }}
+            - name: HOME
+              value: /tmp
+            volumeMounts:
+            - name: sql
+              mountPath: /sql
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+            resources:
+              {{- toYaml .Values.resources.upload | nindent 14 }}
+          {{- end }}
+          - name: dump
+            image: {{ .Values.image.postgres | quote }}
+            imagePullPolicy: IfNotPresent
+            securityContext:
+              {{- toYaml .Values.securityContext | nindent 14 }}
+            command: ["/bin/sh", "-ec"]
+            args:
+              - |
+                TS=$(date -u +%Y%m%dT%H%M%SZ)
+                # Per-run workspace: this run touches ONLY its own dir, so the
+                # upload can never sweep up a stale/other run's files, and a
+                # crashed prior run leaves no cross-run residue.
+                RUNDIR="/work/run-${TS}"
+                # Clean any residue from a same-timestamp retry, recreate fresh.
+                rm -rf "$RUNDIR"
+                mkdir -p "$RUNDIR"
+                echo "$RUNDIR" > /work/.run-dir
+                echo "$TS"      > /work/.run-id
+                HOST="{{ .Values.database.readService }}.{{ include "pgLogicalBackup.namespace" . }}.svc.cluster.local"
+                # Password via PGPASSWORD (env), never on the command line.
+                export PGPASSWORD="$DUMPER_PASSWORD"
+                BASE="postgresql://{{ .Values.database.dumpRole }}@${HOST}:{{ .Values.database.port }}"
+                {{- if .Values.dump.globals }}
+                echo "[dump] pg_dumpall --globals-only"
+                pg_dumpall --globals-only --no-role-passwords -d "${BASE}/{{ .Values.database.name }}" \
+                  > "${RUNDIR}/globals-${TS}.sql"
+                {{- end }}
+                echo "[dump] pg_dump -Fc {{ .Values.database.name }}"
+                pg_dump -Fc -Z {{ .Values.dump.compressLevel }} \
+                  -d "${BASE}/{{ .Values.database.name }}" \
+                  -f "${RUNDIR}/{{ .Values.database.name }}-${TS}.dump"
+                {{- if .Values.dump.verify }}
+                # Integrity gate. --list only reads the archive TOC; it does NOT
+                # prove the COMPRESSED TABLE DATA is intact. Piping the whole
+                # archive through `pg_restore -f /dev/null` forces pg_restore to
+                # DECOMPRESS and emit every data block — so a truncated/corrupt
+                # data member fails HERE, before anything ships. (A full
+                # restore-into-a-scratch-DB gate — row-count verified — lives in
+                # the values-gated `restore-verify` Job + the drill runbook; see
+                # docs/operations/PG_LOGICAL_BACKUP.md.)
+                echo "[dump] verify — pg_restore --list (TOC)"
+                pg_restore --list "${RUNDIR}/{{ .Values.database.name }}-${TS}.dump" > /dev/null
+                echo "[dump] verify — full decompress (pg_restore -> /dev/null)"
+                pg_restore --no-owner --no-privileges \
+                  "${RUNDIR}/{{ .Values.database.name }}-${TS}.dump" > /dev/null
+                {{- end }}
+                echo "[dump] done: $(ls -lh "$RUNDIR")"
+            env:
+            - name: DUMPER_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.database.existingSecret }}
+                  key: {{ .Values.database.passwordKey }}
+            - name: HOME
+              value: /tmp
+            volumeMounts:
+            - name: work
+              mountPath: /work
+            - name: tmp
+              mountPath: /tmp
+            resources:
+              {{- toYaml .Values.resources.dump | nindent 14 }}
+          containers:
+          - name: upload
+            image: {{ .Values.image.rclone | quote }}
+            imagePullPolicy: IfNotPresent
+            securityContext:
+              {{- toYaml .Values.securityContext | nindent 14 }}
+            command: ["/bin/sh", "-ec"]
+            args:
+              - |
+                TS=$(cat /work/.run-id)
+                RUNDIR=$(cat /work/.run-dir)
+                DEST="{{ .Values.destination.rcloneRemote }}:{{ .Values.destination.path }}/${TS}"
+                # Upload ONLY this run's directory — never a glob over /work that
+                # would re-ship every historical dump still on the PVC.
+                echo "[upload] rclone copy ${RUNDIR} -> ${DEST}"
+                rclone copy "${RUNDIR}" "${DEST}" \
+                  --include "*.dump" --include "*.sql" \
+                  --transfers 2 --retries 3 --stats-one-line
+
+                # Plaintext hygiene: once the crypt upload SUCCEEDED, the local
+                # plaintext dump must not linger (esp. on a persistent PVC).
+                echo "[upload] cleanup plaintext workspace ${RUNDIR}"
+                rm -rf "${RUNDIR}"
+                # Belt-and-suspenders on PVC mode: drop any older run-* dirs a
+                # crashed prior run may have left behind (emptyDir starts clean).
+                find /work -maxdepth 1 -type d -name 'run-*' -exec rm -rf {} +
+
+                # Retention prune. Deletion failures are NOT swallowed with
+                # `|| true` — a prune that silently fails lets the remote grow
+                # unbounded (cost + blast radius). Fail the container so the Job
+                # goes Failed and the failure is visible/alertable.
+                echo "[upload] retention prune — keep < {{ .Values.destination.retentionDays }}d"
+                if ! rclone delete "{{ .Values.destination.rcloneRemote }}:{{ .Values.destination.path }}" \
+                     --min-age {{ .Values.destination.retentionDays }}d --rmdirs --stats-one-line; then
+                  echo "[upload] ERROR: retention prune failed — remote may be growing unbounded" >&2
+                  exit 1
+                fi
+                echo "[upload] done"
+            env:
+            - name: RCLONE_CONFIG
+              value: /config/rclone/rclone.conf
+            - name: HOME
+              value: /tmp
+            volumeMounts:
+            - name: work
+              mountPath: /work
+            - name: rclone-config
+              mountPath: /config/rclone
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+            resources:
+              {{- toYaml .Values.resources.upload | nindent 14 }}
+          volumes:
+          {{- if .Values.provisionRole.enabled }}
+          # provision.sql for the rotation-self-heal initContainer (same ConfigMap
+          # the bootstrap provision-role Job mounts).
+          - name: sql
+            configMap:
+              name: {{ include "pgLogicalBackup.fullname" . }}-provision-role
+          {{- end }}
+          - name: work
+            {{- if eq .Values.work.type "pvc" }}
+            persistentVolumeClaim:
+              claimName: {{ include "pgLogicalBackup.fullname" . }}-work
+            {{- else }}
+            emptyDir:
+              sizeLimit: {{ .Values.work.sizeLimit }}
+            {{- end }}
+          - name: tmp
+            emptyDir:
+              sizeLimit: 128Mi
+          - name: rclone-config
+            secret:
+              secretName: {{ .Values.database.existingSecret }}
+              items:
+              - key: rclone.conf
+                path: rclone.conf
+{{- end }}

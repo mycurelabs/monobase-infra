@@ -51,3 +51,12 @@ argocd:
       exclude: true
     - path: "values/deployments/mycure-preprod.yaml"
       exclude: true
+    # vanaheim-only sandbox (monobase-mycure#4509). LOAD-BEARING — do NOT delete:
+    # the overlay values/deployments/mycure-sandbox.yaml lands on main via #420, and
+    # the generator above discovers values/deployments/*.yaml by wildcard. Without
+    # this exclude the sandbox's 11 Applications deploy onto the DOKS prod cluster
+    # (same reason mycure-staging/mycure-preprod are excluded). NOTE: monobase-auto-
+    # discover is applied OUT-OF-BAND (not GitOps-managed), so this exclude only takes
+    # effect once the bootstrap chart is re-applied to DOKS — must be done before #420 merges.
+    - path: "values/deployments/mycure-sandbox.yaml"
+      exclude: true

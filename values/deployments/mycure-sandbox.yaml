@@ -1,0 +1,237 @@
+# Sandbox overlay; extends: base (values/deployments/base.yaml, helm merge:
+# base first, this file wins per key; arrays replace wholesale).
+# MyCure Sandbox Configuration — monobase-mycure#4509.
+#
+# ISOLATED sandbox on the LOCAL vanaheim k3d cluster for MediCard integration
+# development / training / verification with SYNTHETIC DATA ONLY. No production
+# data, credentials, storage, queues, or databases are reused (#4509 isolation).
+# Shaped like staging (the leanest profile): standalone Postgres, small PVCs, no
+# read-plane split, no cadence, no medical-AI. File storage is preprod-style
+# in-cluster MinIO (NOT prod's GCS), isolated from every other env.
+#
+# Own mycure-sandbox-* GCP secrets (never prod's): ENC_* / auth / DB / cache /
+# storage generated fresh; external integrations (Google OAuth, Stripe) stubbed
+# until real sandbox values are provisioned. Data is seeded fresh (synthetic).
+#
+# developer-portal (the #4509 core ask): now WIRED below (image ghcr.io/mycurelabs/
+# developer-portal:0.1.0, public). Static Vite SPA on the generic `app` chart,
+# riding the *.sandbox wildcard listener (https-sandbox-lfh) — no dedicated cert.
+
+extends: base
+
+global:
+  domain: sandbox.localfirsthealth.com
+  namespace: mycure-sandbox
+  environment: sandbox
+  # No global.gateway override: inherit the DENY-FIRST tailnet-only
+  # nginx-internal-gateway from base (sandbox is tailnet-only, like preprod).
+  # No nodePool: k3d nodes are untainted.
+
+  # Sandbox-own DB/cache/storage credentials, isolated from every other env.
+  # database-secrets pulls mycure-sandbox-* GCP keys for Postgres/Valkey/Minio.
+  secretPrefix: "mycure-sandbox"
+
+# Prod parity — deny-first gateway ingress (satisfies #4509 "network policies
+# permit only the required paths"). Apps rely on their own port-scoped rules.
+securityBaseline:
+  strictGatewayIngress: true
+
+mycure-dashboard:
+  resources:
+    requests:
+      cpu: 10m
+  gateway:
+    sectionName: https-sandbox-lfh
+  config:
+    API_URL: "https://hapihub.sandbox.localfirsthealth.com"
+
+mycure-pxp:
+  resources:
+    requests:
+      cpu: 10m
+  gateway:
+    sectionName: https-sandbox-lfh
+  config:
+    API_URL: "https://hapihub.sandbox.localfirsthealth.com"
+
+hapihub:
+  # Prod-current image (known-good), same tag as the preprod copy.
+  image:
+    tag: "11.20.128"
+  cache:
+    enabled: false
+  # No Prometheus Operator on this lean k3d cluster.
+  serviceMonitor:
+    enabled: false
+  pruneAuditEvents:
+    enabled: true
+  # Single replica, no HPA (lean sandbox; hapihub runs workers in-process —
+  # no separate hapihubWorker split).
+  replicaCount: 1
+  autoscaling:
+    enabled: false
+  resources:
+    requests:
+      memory: 768Mi
+    limits:
+      memory: 2Gi
+  gateway:
+    hostnames:
+      - hapihub.sandbox.localfirsthealth.com
+    sectionName: https-sandbox-hapihub # anti-coalescing exact listener, pairs with mycure block
+  betterAuth:
+    passkey:
+      rpName: "Mycure (sandbox)"
+      rpId: "sandbox.localfirsthealth.com"
+  config:
+    CORS_ORIGINS: "https://hapihub.sandbox.localfirsthealth.com,https://mycure.sandbox.localfirsthealth.com,https://mycure-dashboard.sandbox.localfirsthealth.com,https://mycure-pxp.sandbox.localfirsthealth.com,https://developer-portal.sandbox.localfirsthealth.com"
+    # File storage — sandbox-own in-cluster MinIO (S3), isolated from prod's GCS.
+    # Access creds come from the minio secret via externalSecrets below; MinIO
+    # auto-creates the bucket.
+    STORAGE_TYPE: "s3"
+    STORAGE_S3_ENDPOINT: "http://minio.mycure-sandbox.svc.cluster.local:9000"
+    STORAGE_S3_REGION: "us-east-1"
+    STORAGE_S3_FORCE_PATH_STYLE: "true"
+    STORAGE_BUCKET: "hapihub"
+  env:
+    - name: BETTER_AUTH_RATE_LIMIT_ENABLED
+      value: "true"
+    - name: BETTER_AUTH_RATE_LIMIT_WINDOW
+      value: "60"
+    - name: BETTER_AUTH_RATE_LIMIT_MAX
+      value: "300"
+    - name: BETTER_AUTH_SESSION_COOKIE_CACHE_ENABLED
+      value: "false"
+    # Email: mailpit (chart default SMTP → in-namespace mailpit). Sandbox must
+    # never send real mail; no mycure-sandbox-postmark-api-key exists.
+  # Sandbox-own mycure-sandbox-* GCP keys. Auth/JWT generated fresh; GOOGLE_*/
+  # STRIPE_* stubbed until real sandbox integrations exist. No cadence issuer key
+  # (cadence disabled), no ENC_*/PUBLIC_KEY (unused / derived), no GCS storage
+  # keys (in-cluster MinIO above).
+  externalSecrets:
+    secrets:
+      # Google OAuth (stub)
+      - secretKey: GOOGLE_CLIENT_ID
+        remoteKey: mycure-sandbox-google-oauth-client-id
+      - secretKey: GOOGLE_CLIENT_SECRET
+        remoteKey: mycure-sandbox-google-oauth-client-secret
+      # JWT/Auth (PUBLIC_KEY derived from PRIVATE_KEY at runtime)
+      - secretKey: PRIVATE_KEY
+        remoteKey: mycure-sandbox-private-key
+      # Storage — in-cluster MinIO (S3) access creds
+      - secretKey: STORAGE_S3_ACCESS_KEY_ID
+        remoteKey: mycure-sandbox-minio-root-user
+      - secretKey: STORAGE_S3_SECRET_ACCESS_KEY
+        remoteKey: mycure-sandbox-minio-root-password
+      # Stripe checkout redirect URLs (stub)
+      - secretKey: STRIPE_CHECKOUT_SUCCESS_URL
+        remoteKey: mycure-sandbox-stripe-checkout-success-url
+      - secretKey: STRIPE_CHECKOUT_CANCEL_URL
+        remoteKey: mycure-sandbox-stripe-checkout-cancel-url
+      - secretKey: AUTH_SECRET
+        remoteKey: mycure-sandbox-auth-secret
+      - secretKey: BETTER_AUTH_SECRET
+        remoteKey: mycure-sandbox-better-auth-secret
+
+mycure:
+  image:
+    tag: "10.25.139"
+  resources:
+    requests:
+      cpu: 10m
+  gateway:
+    sectionName: https-sandbox-mycure # anti-coalescing exact listener (exact-name cert kills HTTP/2 cross-host reuse -> 421s)
+  config:
+    API_URL: "https://hapihub.sandbox.localfirsthealth.com"
+    HAPIHUB_URL: "https://hapihub.sandbox.localfirsthealth.com"
+
+# ===== DEVELOPER PLATFORM: MYCURE Developer Portal (monobase-mycure#4509 core ask) =====
+# Static Vite SPA on the generic `app` chart (Caddy :8080). Runtime API URL via
+# config->env (entrypoint writes /tmp/config.json). Rides the *.sandbox wildcard
+# listener/cert (https-sandbox-lfh) — no dedicated listener/cert. Host derives to
+# developer-portal.sandbox.localfirsthealth.com (external-dns publishes it). No
+# secret (pure frontend). Enforcement flags stay DEFAULT-OFF; portal lifecycle +
+# keyOrgIds tenant-scoping + x-permission are always-on and testable here.
+developerPortal:
+  enabled: true
+  image:
+    tag: "0.1.0"
+  resources:
+    requests:
+      cpu: 10m
+  gateway:
+    sectionName: https-sandbox-lfh  # *.sandbox.localfirsthealth.com wildcard listener (tailnet-only)
+  config:
+    API_URL: "https://hapihub.sandbox.localfirsthealth.com"
+    HAPIHUB_URL: "https://hapihub.sandbox.localfirsthealth.com"
+
+mycurelocal:
+  enabled: false
+mycure-myaccount:
+  enabled: false
+hapihub-docs:
+  enabled: false
+nocodb:
+  enabled: false
+
+# ===== MEDICAL AI: disabled wholesale in sandbox =====
+medley:
+  enabled: false
+medleyapp:
+  enabled: false
+medgemmaWorker:
+  enabled: false
+openmed:
+  enabled: false
+
+# ===== DATABASE: PostgreSQL (standalone — inherit base; lean sandbox sizing) =====
+# No replication (no read-plane split needed): hapihub writes to the default
+# `postgresql` service. WAL archiving stays OFF (ephemeral synthetic data).
+postgresql:
+  primary:
+    persistence:
+      size: 8Gi
+    resources:
+      requests:
+        cpu: 250m
+        memory: 1Gi
+      limits:
+        cpu: 1000m
+        memory: 4Gi
+  podDisruptionBudget:
+    enabled: false
+
+# ===== CACHE: Valkey (Redis) =====
+valkey:
+  master:
+    persistence:
+      size: 4Gi
+    resources:
+      requests:
+        cpu: 100m
+        memory: 512Mi
+      limits:
+        cpu: 500m
+        memory: 2Gi
+
+# ===== STORAGE: MinIO Object Storage (sandbox-own, isolated) =====
+minio:
+  enabled: true
+  gateway:
+    sectionName: https-sandbox-lfh
+  # No WORM audit cold-archive in sandbox.
+  auditArchive:
+    enabled: false
+
+mailpit:
+  enabled: true
+  gateway:
+    # Web UI exposed with NO auth — tailnet-only reachability is the fence.
+    # Synthetic data only, so no real PHI/OTPs land here.
+    hostname: "mail.sandbox.localfirsthealth.com"
+
+# ===== BACKUP / SYNC: cadence stack disabled (no box sync in sandbox) =====
+cadenceRelay:
+  enabled: false
+cadence:
+  enabled: false

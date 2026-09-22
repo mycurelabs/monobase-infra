@@ -18,6 +18,11 @@ instances:
     enabled: true
     provider: cloudflare
 
+    # UNIQUE owner id — the DOKS cluster's instance is `external-dns-primary`
+    # (chart default); sharing it would make the two sync-policy instances
+    # delete each other's records.
+    txtOwnerId: mycure-onprem-vanaheim
+
     # Manage DNS subdomains across all namespaces
     domainFilters:
       - localfirsthealth.com
@@ -66,6 +71,11 @@ tolerations:
 
 # Global configuration applied to all instances
 global:
+  # vanaheim is a self-hosted k3d cluster — its apiserver listens on 6443, so
+  # the external-dns informer needs the broad TCP 6443 egress. DOKS (managed,
+  # 443) leaves this OFF (chart default) so its NetworkPolicy stays tighter.
+  selfHostedAPIServerEgress: true
+
   # Sources to watch (applied to all instances)
   sources:
     - gateway-httproute
@@ -73,8 +83,15 @@ global:
     - gateway-tlsroute
     - service
 
-  # Policy: sync (create+update+delete) or upsert-only (create+update)
-  policy: sync
+  # Policy: sync (create+update+delete) or upsert-only (create+update).
+  # VANAHEIM = upsert-only (NEVER DELETE): this preprod cluster shares the prod
+  # `localfirsthealth.com` Cloudflare zone with the DOKS prod cluster, guarded
+  # only by a distinct txtOwnerId. `sync` would let a preprod hiccup (a route
+  # deleted, external-dns losing sight of a record it believes it owns) issue a
+  # DELETE against a record in the SHARED prod zone. upsert-only can create/update
+  # but never delete, so a preprod fault can't take down a prod DNS record.
+  # DOKS keeps `sync` (it owns the zone). Stale preprod records are pruned by hand.
+  policy: upsert-only
 
   # Registry type for tracking ownership
   registry: txt

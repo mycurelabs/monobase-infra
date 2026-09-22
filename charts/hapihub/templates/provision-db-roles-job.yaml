@@ -25,8 +25,13 @@ metadata:
     # Keep the last Job around for log forensics until the next sync.
     argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
 spec:
+  {{- if .Values.manualDeployment }}
+  # Literal zero avoids Sprig's default-zero trap; preserve first-failure logs.
+  backoffLimit: 0
+  {{- else }}
   backoffLimit: {{ .Values.roleSplit.provision.backoffLimit | default 3 }}
   ttlSecondsAfterFinished: 86400
+  {{- end }}
   activeDeadlineSeconds: {{ .Values.roleSplit.provision.activeDeadlineSeconds | default 600 }}
   template:
     metadata:
@@ -48,15 +53,19 @@ spec:
         command: ["/bin/sh", "-ec"]
         args:
           - |
-            psql "postgres://postgres:$(POSTGRES_PASSWORD)@{{ include "hapihub.postgresql.host" . }}:5432/{{ include "hapihub.postgresql.database" . }}" \
+            # NO secrets in argv: the superuser password reaches libpq via the
+            # PGPASSWORD env var (connection string carries NO password), and the
+            # migrator/app_rw/cadence role passwords are read INSIDE the SQL from
+            # their *_PASSWORD env vars via psql `\getenv` (never `-v`, which
+            # would expose them in the process command line visible to `ps`/argv).
+            psql "postgres://postgres@{{ include "hapihub.postgresql.host" . }}:5432/{{ include "hapihub.postgresql.database" . }}" \
               -v ON_ERROR_STOP=1 \
               -v DBNAME={{ include "hapihub.postgresql.database" . }} \
-              -v migrator_password="$MIGRATOR_PASSWORD" \
-              -v app_rw_password="$APP_RW_PASSWORD" \
-              -v cadence_password="$CADENCE_PASSWORD" \
               -f /sql/provision.sql
         env:
-        - name: POSTGRES_PASSWORD
+        # Superuser password to libpq via PGPASSWORD — keeps it OUT of argv and
+        # out of the connection string.
+        - name: PGPASSWORD
           valueFrom:
             secretKeyRef:
               name: {{ .Values.postgresql.auth.existingSecret | default "postgresql" }}

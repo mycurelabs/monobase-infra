@@ -31,6 +31,16 @@ data:
   provision.sql: |
     \set ON_ERROR_STOP on
 
+    -- Pull the role passwords from their *_PASSWORD env vars into psql variables
+    -- WITHOUT exposing them in argv. `\getenv` (psql >= 16) reads an environment
+    -- variable into a psql var; the value never appears on the command line
+    -- (unlike `-v migrator_password=...`, which `ps` would show). The superuser
+    -- password reaches libpq via PGPASSWORD (set on the Job), so no password is
+    -- in the connection string either.
+    \getenv migrator_password MIGRATOR_PASSWORD
+    \getenv app_rw_password APP_RW_PASSWORD
+    \getenv cadence_password CADENCE_PASSWORD
+
     -- ── Roles (CREATE ROLE has no IF NOT EXISTS); passwords kept current ──
     -- The ALTER ROLE … PASSWORD lines are UNCONDITIONAL by design — do NOT move
     -- them under the WHERE-NOT-EXISTS guard. All three roles authenticate with the

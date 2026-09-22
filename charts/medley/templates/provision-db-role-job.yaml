@@ -1,0 +1,97 @@
+{{- if and .Values.enabled .Values.postgresql.enabled (((.Values.postgresql).provisionRole | default dict).enabled) }}
+# Provision medley's dedicated non-superuser DB role (monobase-infra#420 item 7)
+# — PreSync, BEFORE the Deployment starts. Idempotent psql run as the in-cluster
+# superuser: creates/refreshes the `medley` role, moves the `medley` database +
+# its objects to it, applies grants + safety timeouts. Zero-touch: survives
+# reseeds, self-heals the role password after ESO rotation. SQL lives in the
+# sibling ConfigMap. Removes the superuser DSN from the runtime path.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "medley.fullname" . }}-provision-db-role
+  namespace: {{ include "medley.namespace" . }}
+  labels:
+    {{- include "medley.labels" . | nindent 4 }}
+    job-type: provision-db-role
+  annotations:
+    helm.sh/hook: pre-install,pre-upgrade
+    helm.sh/hook-weight: "-5"
+    helm.sh/hook-delete-policy: before-hook-creation
+    argocd.argoproj.io/hook: PreSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+spec:
+  backoffLimit: {{ (((.Values.postgresql).provisionRole | default dict).backoffLimit) | default 3 }}
+  ttlSecondsAfterFinished: 86400
+  activeDeadlineSeconds: {{ (((.Values.postgresql).provisionRole | default dict).activeDeadlineSeconds) | default 600 }}
+  template:
+    metadata:
+      labels:
+        {{- include "medley.selectorLabels" . | nindent 8 }}
+        job-type: provision-db-role
+    spec:
+      restartPolicy: Never
+      enableServiceLinks: false
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+      - name: provision-db-role
+        securityContext:
+          {{- toYaml .Values.securityContext | nindent 10 }}
+        # Same image family the in-cluster PG statefulset runs — already on nodes.
+        image: {{ (((.Values.postgresql).provisionRole | default dict).image) | default "docker.io/bitnamilegacy/postgresql:16.4.0-debian-12-r13" | quote }}
+        imagePullPolicy: IfNotPresent
+        command: ["/bin/sh", "-ec"]
+        args:
+          - |
+            # Connect to the `postgres` maintenance db — the SQL creates the
+            # role + database here (phase 1) then \c into the target db (phase 2).
+            #
+            # NO secrets in argv: the superuser password is passed to libpq via
+            # the PGPASSWORD env var (connection string carries NO password), and
+            # the medley role password is read INSIDE the SQL from the
+            # MEDLEY_PASSWORD env var via psql `\getenv` (never `-v`, which would
+            # expose it in the process command line visible to `ps`/argv).
+            psql \
+              -v ON_ERROR_STOP=1 \
+              -v target_database={{ .Values.postgresql.auth.database | default "medley" }} \
+              -f /sql/provision.sql
+        env:
+        # libpq connection parameters — keeps host/user/db (and the password,
+        # via PGPASSWORD below) OUT of argv. psql with no conn string uses these.
+        - name: PGHOST
+          value: {{ printf "%s.%s.svc.cluster.local" (.Values.postgresql.serviceName | default "postgresql-primary") (include "medley.namespace" .) | quote }}
+        - name: PGPORT
+          value: {{ .Values.postgresql.port | default 5432 | quote }}
+        - name: PGUSER
+          value: "postgres"
+        - name: PGDATABASE
+          value: "postgres"
+        - name: PGPASSWORD
+          valueFrom:
+            secretKeyRef:
+              # The in-cluster superuser secret (never the runtime medley DSN).
+              name: {{ (((.Values.postgresql).provisionRole | default dict).superuserSecret) | default "postgresql" }}
+              key: {{ (((.Values.postgresql).provisionRole | default dict).superuserSecretKey) | default "postgres-password" }}
+        # Read by the SQL via `\getenv medley_password MEDLEY_PASSWORD` — never
+        # placed in argv.
+        - name: MEDLEY_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.postgresql.auth.existingSecret | default "mycure-preprod-medley-db" }}
+              key: {{ .Values.postgresql.auth.secretKey | default "medley-db-password" }}
+        volumeMounts:
+        - name: sql
+          mountPath: /sql
+          readOnly: true
+        resources:
+          requests:
+            cpu: 25m
+            memory: 32Mi
+          limits:
+            cpu: 100m
+            memory: 128Mi
+      volumes:
+      - name: sql
+        configMap:
+          name: {{ include "medley.fullname" . }}-provision-db-role
+{{- end }}
