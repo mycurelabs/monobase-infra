@@ -212,7 +212,34 @@ Returns empty string if disabled or not configured
 Container env for hapihub — shared by the Deployment and the prune-expired-sessions CronJob
 so a scheduled `hapihub backfill` boots with the identical environment.
 */}}
+{{/*
+Container env (deduped). The raw helper below concatenates many env blocks
+(templated storage/db/auth/etc. + `range .Values.config` + `.Values.env`), which
+can emit the SAME name twice — e.g. an overlay that sets STORAGE_* in `.Values.config`
+while `minio.enabled` also templates STORAGE_* . A container env list is name-keyed
+(x-kubernetes-patch-merge-key: name), so duplicates are invalid: kubectl/ArgoCD
+strategic-merge-patch fails ("order in patch list ... doesn't match $setElementOrder")
+the moment any env is added/removed. We therefore dedupe by name keeping the LAST
+occurrence (matches the container runtime, where the last duplicate env wins) while
+preserving order — NOT sorting, because $(VAR) interpolation requires a referenced
+var to appear earlier (e.g. REDIS_URL→$(VALKEY_PASSWORD), DATABASE_READ_URI→
+$(POSTGRESQL_USER)).
+*/}}
 {{- define "hapihub.containerEnv" -}}
+{{- $raw := include "hapihub.containerEnvRaw" . | fromYamlArray -}}
+{{- $lastIdx := dict -}}
+{{- range $i, $e := $raw -}}
+{{- $_ := set $lastIdx $e.name (printf "%d" $i) -}}
+{{- end -}}
+{{- $out := list -}}
+{{- range $i, $e := $raw -}}
+{{- if eq (index $lastIdx $e.name) (printf "%d" $i) -}}
+{{- $out = append $out $e -}}
+{{- end -}}
+{{- end -}}
+{{- toYaml $out -}}
+{{- end -}}
+{{- define "hapihub.containerEnvRaw" -}}
 # Set HOME to /tmp to avoid permission denied errors when running as non-root
 - name: HOME
   value: "/tmp"
