@@ -140,18 +140,20 @@ hapihub:
     STORAGE_BUCKET: "hapihub"
     # Prod parity (mono#2114): background jobs run in the hapihubWorker release.
     RUN_WORKERS: "false"
-    # Developer-platform enforcement (epic #4290 / #4389) — SAFE subset, PREPROD-only.
-    # All three are PARTNER/OAuth-audience-only (deriveAudience === 'partner') and
-    # cannot 403 first-party session callers (audience 'app' — mycure/dashboard/
-    # developer-portal lifecycle): scope gate keys on `audience === 'partner'`
-    # (pipeline.ts:993), origin gate on partner OAuth-token callers (pipeline.ts:1053/
-    # 1083), dpop gate on the OAuth token endpoint for requireDpop clients only
-    # (auth.ts:1037). Verified against hapihub src. AUDIENCE/ENTITLEMENT/QUOTA stay
-    # OFF (unset) — those can touch first-party 'app' callers. Sandbox stays OFF
+    # Developer-platform enforcement (epic #4290 / #4389) — PREPROD-only rollout.
+    # scope/origin/dpop are PARTNER/OAuth-audience-only (deriveAudience === 'partner')
+    # and never gate first-party 'app' session callers: scope pipeline.ts:993, origin
+    # pipeline.ts:1053/1083, dpop auth.ts:1037. AUDIENCE is the per-endpoint x-audience
+    # gate (pipeline.ts:872): fires for audience !== 'internal'; un-annotated ops
+    # default-allow ['internal','app'] so first-party 'app' passes unless an op sets
+    # x-audience WITHOUT 'app'. Enabled here only AFTER hapihub 11.20.129 shipped the
+    # #4552 annotation-coverage fixes (oauth mgmt ops → [internal,app]; patient-create
+    # → [internal,app,partner]). ENTITLEMENT/QUOTA stay OFF (unset). Sandbox stays OFF
     # (joff's pre-enforcement baseline).
     API_SCOPE_ENFORCE: "true"
     API_ORIGIN_ENFORCE: "true"
     API_DPOP_ENFORCE: "true"
+    API_AUDIENCE_ENFORCE: "true"
 
   env:
       # Prod parity (#2114): cap the JSC heap below the 4Gi container limit.
