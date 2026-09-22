@@ -93,7 +93,7 @@ hapihub:
   # catalog fingerprint unchanged; the running hub's startup/admission
   # fingerprint remains unverified. Fresh admission requires separate checks.
   image:
-    tag: "11.20.127"
+    tag: "11.20.128"
   cache:
     # Prod parity: response cache OFF (the #2839/#2617 bentocache stampede
     # mitigation). Re-enable here first when re-validating the serve-stale fix.
@@ -293,7 +293,7 @@ hapihubWorker:
 mycure:
   # Prod parity — moves with hapihub 11.20.121 (0098 medical_records.updated_by).
   image:
-    tag: "10.25.138"
+    tag: "10.25.139"
   resources:
     requests:
       cpu: 10m
