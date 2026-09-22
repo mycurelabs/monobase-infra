@@ -12,6 +12,11 @@
 import chalk from "chalk";
 import ora from "ora";
 import { parseArgs } from "util";
+import {
+  deriveProdApiHostname,
+  targetsProduction as targetsProductionAgainst,
+} from "./lib/targets-production";
+import { listUsersPath } from "./lib/admin-list-users";
 
 // ---------------------------------------------------------------------------
 // CLI
@@ -25,6 +30,10 @@ const ENVS: Record<string, { api: string; cms: string }> = {
   staging: {
     api: "https://hapihub.staging.localfirsthealth.com",
     cms: "https://mycure.staging.localfirsthealth.com",
+  },
+  sandbox: {
+    api: "https://hapihub.sandbox.localfirsthealth.com",
+    cms: "https://mycure.sandbox.localfirsthealth.com",
   },
   production: {
     api: "https://hapihub.localfirsthealth.com",
@@ -251,9 +260,40 @@ if (args.help) {
 let API_URL: string;
 let CMS_URL: string;
 
+// Canonical HOSTNAME of the production API endpoint the confirmation guard
+// protects. Derived from ENVS so it stays in sync if the prod URL ever changes.
+// Uses URL.hostname (NOT .host) so it carries no port — the match must be
+// port-insensitive. Used to fail closed when --api-url (which skips the env
+// lookup, and thus the --env production guard) happens to point at prod.
+const PROD_API_HOST = deriveProdApiHostname(ENVS.production.api);
+
+// See scripts/lib/targets-production.ts. Compares canonical HOSTNAMES on both
+// sides (URL.hostname, lowercased, trailing FQDN dot stripped), so scheme,
+// PORT (incl. :443/:8443), path, query, and userinfo are all irrelevant to the
+// match — a prod host on any port still trips the guard. A bare host without a
+// scheme is unparseable and is compared defensively as a normalized string, so
+// it fails closed too.
+const targetsProduction = (rawUrl: string): boolean =>
+  targetsProductionAgainst(rawUrl, PROD_API_HOST);
+
 if (args["api-url"]) {
   API_URL = args["api-url"];
   CMS_URL = "(custom)";
+  // Fail closed: --api-url skips the `args.env === "production"` guard below,
+  // so a raw prod endpoint (especially with --reset) would otherwise perform
+  // destructive cleanup against production without the --confirm gate. Require
+  // the same confirmation the --env production path enforces.
+  if (targetsProduction(API_URL) && !args.confirm) {
+    console.error(
+      chalk.red(
+        `--api-url points at the PRODUCTION API (${PROD_API_HOST}).\n` +
+          `This requires the --confirm flag (same guard as --env production),\n` +
+          `${args.reset ? "and --reset against production is refused without it.\n" : ""}` +
+          `Re-run with --confirm if you really mean to target production.`,
+      ),
+    );
+    process.exit(1);
+  }
 } else if (args.env) {
   const env = ENVS[args.env];
   if (!env) {
@@ -7449,16 +7489,78 @@ async function resetSeedData() {
   }
   // Verify the auto-elevation actually fired — otherwise our deletes will
   // silently 403 and we'll leave half-cleaned state. Better to abort early.
+  //
+  // The AUTHORITATIVE elevation marker is the legacy accounts.isServiceAccount
+  // flag (services/account/accounts.ts gates privileged scope on it, and the
+  // better-auth admin plugin authorizes service accounts off it too), NOT the
+  // better-auth user.role string. hapihub 11.20.127 elevates service accounts
+  // to role='owner' (older builds used 'admin') while still stamping
+  // isServiceAccount=true and granting full admin scope — so a role==='admin'
+  // check is a false negative. Non-elevated accounts are role='user' with
+  // isServiceAccount=false. Gate on the flag; role is informational only.
   const session = (await api("GET", "/auth/get-session")) as
     | { user?: { role?: string } }
     | null;
-  if (session?.user?.role !== "admin") {
+  const svcRole = session?.user?.role;
+  const svcAccs = (await api(
+    "GET",
+    `/accounts?email=${encodeURIComponent(serviceEmail)}`,
+  )) as { data?: Array<{ isServiceAccount?: boolean }> } | Array<{ isServiceAccount?: boolean }>;
+  const svcList = Array.isArray(svcAccs) ? svcAccs : svcAccs.data ?? [];
+  if (!svcList[0]?.isServiceAccount) {
     spinner.fail(
       chalk.red(
-        `${serviceEmail} signed in but better-auth user.role='${session?.user?.role}' (expected 'admin').\n` +
+        `${serviceEmail} signed in (role='${svcRole}') but legacy accounts.isServiceAccount is not true.\n` +
           `Auto-elevation did not fire. Make sure ACCOUNTS_SERVICE_ACCOUNT_EMAILS\n` +
           `on the running hapihub pod includes "${serviceEmail}", restart hapihub,\n` +
           `then re-run.`,
+      ),
+    );
+    process.exit(1);
+  }
+
+  // Second guard (fail-closed): the legacy accounts.isServiceAccount flag is
+  // NOT sufficient on its own. It's stamped by the signup after-hook, but the
+  // destructive user cleanup below drives better-auth's admin plugin
+  // (/auth/admin/list-users + /auth/admin/remove-user), which authorizes off
+  // the better-auth ROLE — stored INDEPENDENTLY of the legacy flag. If the
+  // after-hook set isServiceAccount=true but the later role elevation FAILED,
+  // the account carries the flag WITHOUT real admin permission, and every
+  // remove-user would 403. Verify the LIVE better-auth admin permission by
+  // actually calling the admin endpoint we're about to use for deletes and
+  // confirming it authorizes (200, not 403). Only proceed if BOTH the legacy
+  // flag AND the live admin permission hold.
+  try {
+    // Better Auth registers admin/list-users as GET-with-query-params, NOT
+    // POST-with-body (packages/better-auth/src/plugins/admin/routes.ts +
+    // client.ts). A POST method-errors before the handler runs, so the probe
+    // must issue GET with the filters URL-encoded on the query string. A 200
+    // means the live better-auth admin permission holds; the catch below still
+    // fails closed on 401/403 (and any other error).
+    await api(
+      "GET",
+      listUsersPath({
+        limit: 1,
+        searchValue: serviceEmail,
+        searchField: "email",
+        searchOperator: "contains",
+      }),
+    );
+  } catch (err: unknown) {
+    const msg = (err as Error).message;
+    // api() embeds the HTTP status as "→ <code>:" in the thrown message.
+    const forbidden = / → (401|403):/.test(msg);
+    spinner.fail(
+      chalk.red(
+        `${serviceEmail} has legacy isServiceAccount=true (role='${svcRole}') but the\n` +
+          `better-auth ADMIN permission check FAILED${forbidden ? " (forbidden)" : ""}:\n` +
+          `  ${msg}\n` +
+          `The account lacks a live better-auth admin role, so the destructive\n` +
+          `/auth/admin/remove-user cleanup would 403 and leave half-deleted state.\n` +
+          `This usually means the signup after-hook set the legacy flag but the\n` +
+          `better-auth role elevation did not take. Fix the account's better-auth\n` +
+          `role (or wipe both rows and re-run so elevation fires cleanly), then\n` +
+          `re-run --reset. Refusing to proceed (fail closed).`,
       ),
     );
     process.exit(1);
@@ -7907,6 +8009,18 @@ async function resetSeedData() {
   // For each non-service-account user, delete every legacy /accounts row
   // (handles polluted state with duplicate rows) then delete the
   // better-auth user via admin/remove-user (works because we're role=admin).
+  // Collect administrative-cleanup failures so we can fail the whole reset
+  // non-zero rather than swallowing them and reporting a false "complete".
+  // These are the better-auth admin plugin calls (list-users / remove-user);
+  // a failure here means a seed user's auth row may survive the reset.
+  const adminFailures: string[] = [];
+  // Distinguish "the better-auth user for this id doesn't exist" (a benign
+  // orphan — legacy id had no matching better-auth user) from a real failure.
+  const isNotFound = (msg: string) =>
+    / → 404:/.test(msg) ||
+    /USER_NOT_FOUND/i.test(msg) ||
+    /not found/i.test(msg);
+
   const targetEmails = USERS.map((u) => u.email).filter((e) => e !== serviceEmail);
   for (const email of targetEmails) {
     const uids = userIdsByEmail[email] ?? [];
@@ -7914,29 +8028,53 @@ async function resetSeedData() {
       try {
         await api("DELETE", `/accounts/${uid}`);
       } catch {
-        // ignore — best effort
+        // ignore — best effort (legacy row; may already be gone)
       }
       try {
         await api("POST", "/auth/admin/remove-user", { userId: uid });
-      } catch {
-        // ignore — better-auth user may not match the legacy id (orphan)
+      } catch (err: unknown) {
+        const msg = (err as Error).message;
+        // A 404 / not-found is expected when the legacy id has no better-auth
+        // counterpart (orphan). Anything else is a genuine admin-delete failure
+        // and must surface.
+        if (!isNotFound(msg)) {
+          adminFailures.push(`remove-user ${email} (${uid}): ${msg}`);
+        }
       }
     }
     // Cleanup pass: any better-auth user with this email but no legacy
     // counterpart we already deleted. List via admin/list-users.
+    let listed: { users?: Array<{ id: string; email: string }> } | null = null;
     try {
-      const lu = (await api(
-        "POST",
-        "/auth/admin/list-users",
-        { searchValue: email, searchField: "email", searchOperator: "contains" },
+      // GET-with-query-params (see the permission-probe note above): Better
+      // Auth's admin/list-users is a GET route, so the filters go on the query
+      // string. A failure here is still collected into adminFailures and
+      // surfaced (non-zero exit) below — never swallowed.
+      listed = (await api(
+        "GET",
+        listUsersPath({
+          searchValue: email,
+          searchField: "email",
+          searchOperator: "contains",
+        }),
       )) as { users?: Array<{ id: string; email: string }> };
-      const remaining = (lu.users ?? []).filter((u) => u.email === email);
+    } catch (err: unknown) {
+      // A failed list means we cannot confirm the email is fully cleaned —
+      // surface it rather than silently assuming it's clean.
+      adminFailures.push(`list-users ${email}: ${(err as Error).message}`);
+    }
+    if (listed) {
+      const remaining = (listed.users ?? []).filter((u) => u.email === email);
       for (const u of remaining) {
-        try { await api("POST", "/auth/admin/remove-user", { userId: u.id }); }
-        catch { /* ignore */ }
+        try {
+          await api("POST", "/auth/admin/remove-user", { userId: u.id });
+        } catch (err: unknown) {
+          const msg = (err as Error).message;
+          if (!isNotFound(msg)) {
+            adminFailures.push(`remove-user ${email} (${u.id}): ${msg}`);
+          }
+        }
       }
-    } catch {
-      // admin/list-users may not accept GET-style query — ignore
     }
   }
 
@@ -7988,6 +8126,24 @@ async function resetSeedData() {
       if (uid === liveUid) continue; // keep the one we're signed in as
       try { await api("DELETE", `/accounts/${uid}`); } catch { /* ignore */ }
     }
+  }
+
+  // Fail closed on swallowed admin-deletion failures: if any better-auth
+  // admin cleanup call failed, the reset did NOT fully complete — do not claim
+  // success. Surface every failure and exit non-zero so a reseed isn't run on
+  // top of a half-cleaned auth state.
+  if (adminFailures.length > 0) {
+    spinner.fail(
+      chalk.red(
+        `Reset INCOMPLETE — ${adminFailures.length} administrative user ` +
+          `deletion(s) failed:\n` +
+          adminFailures.map((f) => `  - ${f}`).join("\n") +
+          `\nThe better-auth admin cleanup did not fully succeed, so seed user ` +
+          `auth rows may survive.\nResolve the above (check the service ` +
+          `account's better-auth admin role and hapihub logs) and re-run --reset.`,
+      ),
+    );
+    process.exit(1);
   }
 
   // Clear session — main flow will re-auth fresh.
@@ -9335,9 +9491,22 @@ async function main() {
         | { user?: { role?: string; email?: string } }
         | null;
       const role = session?.user?.role;
-      if (role !== "admin") {
+      // The AUTHORITATIVE elevation marker is the legacy accounts.isServiceAccount
+      // flag (privileged /accounts scope + the better-auth admin plugin both
+      // authorize service accounts off it), NOT better-auth user.role. hapihub
+      // 11.20.127 stamps isServiceAccount=true but sets role='owner' (older
+      // builds used 'admin'), so a role==='admin' check is a false negative.
+      // Non-elevated accounts are role='user' with isServiceAccount=false.
+      // Gate on the flag; role is informational only. Self-scoped query —
+      // returns the caller's own row only.
+      const accs = (await api(
+        "GET",
+        `/accounts?email=${encodeURIComponent(email)}`,
+      )) as { data?: Array<{ isServiceAccount?: boolean }> } | Array<{ isServiceAccount?: boolean }>;
+      const list = Array.isArray(accs) ? accs : accs.data ?? [];
+      if (!list[0]?.isServiceAccount) {
         svcSpinner.fail(
-          `${email} signed in but better-auth user.role='${role}' (expected 'admin').\n` +
+          `${email} signed in (role='${role}') but legacy accounts.isServiceAccount is not true.\n` +
             `   Auto-elevation did not fire. Likely causes (most-common first):\n` +
             `     1. ACCOUNTS_SERVICE_ACCOUNT_EMAILS is not set on the running\n` +
             `        hapihub (env var or values misconfig). On local dev: add\n` +
@@ -9349,22 +9518,6 @@ async function main() {
             `        so signup hit "already exists" and the after-hook never\n` +
             `        re-ran. Wipe both better-auth user + legacy accounts rows\n` +
             `        for this email in the DB, then re-run.`,
-        );
-        process.exit(1);
-      }
-      // Cross-check the legacy /accounts row's flag. Self-scoped query —
-      // returns the caller's own row only.
-      const accs = (await api(
-        "GET",
-        `/accounts?email=${encodeURIComponent(email)}`,
-      )) as { data?: Array<{ isServiceAccount?: boolean }> } | Array<{ isServiceAccount?: boolean }>;
-      const list = Array.isArray(accs) ? accs : accs.data ?? [];
-      if (!list[0]?.isServiceAccount) {
-        svcSpinner.fail(
-          `${email}: better-auth role='admin' but legacy accounts.isServiceAccount=false.\n` +
-            `   Hook ran partially — set role='admin' but didn't stamp\n` +
-            `   isServiceAccount on the legacy row. Likely a hapihub bug;\n` +
-            `   check services/hapihub/src/auth/auth.ts databaseHooks.user.create.after.`,
         );
         process.exit(1);
       }
