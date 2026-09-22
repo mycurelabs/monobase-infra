@@ -128,7 +128,7 @@ hapihub:
       rpId: "preprod.localfirsthealth.com"
 
   config:
-    CORS_ORIGINS: "https://hapihub.preprod.localfirsthealth.com,https://mycure.preprod.localfirsthealth.com,https://mycurelocal.preprod.localfirsthealth.com,https://mycure-myaccount.preprod.localfirsthealth.com,https://mycure-dashboard.preprod.localfirsthealth.com,https://mycure-pxp.preprod.localfirsthealth.com,https://mycure-pr--*.web.app,https://mycure-reconstruct.web.app,https://mycure-reconstruct.firebaseapp.com"
+    CORS_ORIGINS: "https://hapihub.preprod.localfirsthealth.com,https://mycure.preprod.localfirsthealth.com,https://mycurelocal.preprod.localfirsthealth.com,https://mycure-myaccount.preprod.localfirsthealth.com,https://mycure-dashboard.preprod.localfirsthealth.com,https://mycure-pxp.preprod.localfirsthealth.com,https://developer-portal.preprod.localfirsthealth.com,https://mycure-pr--*.web.app,https://mycure-reconstruct.web.app,https://mycure-reconstruct.firebaseapp.com"
     # File storage — preprod-own in-cluster MinIO (S3-compatible), isolated
     # from prod's GCS bucket. Access creds (STORAGE_S3_ACCESS_KEY_ID/SECRET)
     # come from the minio secret via the externalSecret below; MinIO
@@ -339,6 +339,30 @@ hapihub-docs:
   gateway:
     hostname: "docs.preprod.localfirsthealth.com"
     sectionName: https-preprod-lfh
+
+# ===== DEVELOPER PLATFORM: MYCURE Developer Portal (monobase-mycure#4509) =====
+# First preprod deploy of the developer-platform epic. Static Vite SPA on the
+# generic `app` chart; runtime API URL injected via config -> env (entrypoint
+# writes /tmp/config.json). Rides the *.preprod wildcard listener/cert
+# (https-preprod-lfh) — no dedicated listener/cert. Host derives to
+# developer-portal.preprod.localfirsthealth.com (external-dns publishes it).
+# No secret. Enforcement flags stay DEFAULT-OFF (separate rollout decision);
+# portal lifecycle + keyOrgIds tenant-scoping + x-permission are always-on.
+developerPortal:
+  enabled: true
+
+  image:
+    tag: "0.1.0"
+
+  resources:
+    requests:
+      cpu: 10m
+  gateway:
+    sectionName: https-preprod-lfh  # *.preprod.localfirsthealth.com wildcard listener (tailnet-only)
+
+  config:
+    API_URL: "https://hapihub.preprod.localfirsthealth.com"
+    HAPIHUB_URL: "https://hapihub.preprod.localfirsthealth.com"
 
 # ===== MEDICAL AI: medley test setup lives HERE (moved from staging, monobase-mycure#4150).
 # Ollama runs on the vanaheim HOST — medley reaches it via host.k3d.internal (k3d's host

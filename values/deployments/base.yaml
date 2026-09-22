@@ -46,6 +46,9 @@ appRegistry:
     key: cadence
   cadence-relay:
     key: cadenceRelay
+  developer-portal:
+    key: developerPortal
+    chart: app
   hapihub-docs:
     key: hapihub-docs
     chart: app
@@ -339,6 +342,32 @@ mycure-myaccount:
 
   gateway:
     hostname: ""
+  podDisruptionBudget:
+    enabled: false
+
+# ===== DEVELOPER PLATFORM: MYCURE Developer Portal (monobase-mycure#4509) =====
+# Static Vite SPA served by Caddy on :8080 (app chart contract). Runtime API URL
+# via docker-entrypoint.sh -> /tmp/config.json (env API_URL/HAPIHUB_URL). OFF by
+# default (enabled only in the preprod overlay for developer-platform testing);
+# the base block exists so generic-app.yaml's fail-closed guard can tell a
+# legitimately-off app from a misspelled registry key. No secret (pure frontend).
+developerPortal:
+  enabled: false
+  image:
+    repository: ghcr.io/mycurelabs/developer-portal
+    pullPolicy: IfNotPresent
+
+  replicaCount: 1
+
+  resources:
+    requests:
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 128Mi
+
+  gateway:
+    hostname: ""  # defaults to developer-portal.<domain>
   podDisruptionBudget:
     enabled: false
 
