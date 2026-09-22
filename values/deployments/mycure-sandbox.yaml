@@ -13,9 +13,9 @@
 # storage generated fresh; external integrations (Google OAuth, Stripe) stubbed
 # until real sandbox values are provisioned. Data is seeded fresh (synthetic).
 #
-# DEFERRED: `developer-portal` (the #4509 core ask) has no chart/image in this
-# repo yet — tracked as a follow-up. When it exists, add its `app`-chart key here
-# pointing at the sandbox hapihub endpoint + a devportal.sandbox listener/cert.
+# developer-portal (the #4509 core ask): now WIRED below (image ghcr.io/mycurelabs/
+# developer-portal:0.1.0, public). Static Vite SPA on the generic `app` chart,
+# riding the *.sandbox wildcard listener (https-sandbox-lfh) — no dedicated cert.
 
 extends: base
 
@@ -57,7 +57,7 @@ mycure-pxp:
 hapihub:
   # Prod-current image (known-good), same tag as the preprod copy.
   image:
-    tag: "11.20.127"
+    tag: "11.20.128"
   cache:
     enabled: false
   # No Prometheus Operator on this lean k3d cluster.
@@ -84,7 +84,7 @@ hapihub:
       rpName: "Mycure (sandbox)"
       rpId: "sandbox.localfirsthealth.com"
   config:
-    CORS_ORIGINS: "https://hapihub.sandbox.localfirsthealth.com,https://mycure.sandbox.localfirsthealth.com,https://mycure-dashboard.sandbox.localfirsthealth.com,https://mycure-pxp.sandbox.localfirsthealth.com"
+    CORS_ORIGINS: "https://hapihub.sandbox.localfirsthealth.com,https://mycure.sandbox.localfirsthealth.com,https://mycure-dashboard.sandbox.localfirsthealth.com,https://mycure-pxp.sandbox.localfirsthealth.com,https://developer-portal.sandbox.localfirsthealth.com"
     # File storage — sandbox-own in-cluster MinIO (S3), isolated from prod's GCS.
     # Access creds come from the minio secret via externalSecrets below; MinIO
     # auto-creates the bucket.
@@ -135,12 +135,32 @@ hapihub:
 
 mycure:
   image:
-    tag: "10.25.138"
+    tag: "10.25.139"
   resources:
     requests:
       cpu: 10m
   gateway:
     sectionName: https-sandbox-mycure # anti-coalescing exact listener (exact-name cert kills HTTP/2 cross-host reuse -> 421s)
+  config:
+    API_URL: "https://hapihub.sandbox.localfirsthealth.com"
+    HAPIHUB_URL: "https://hapihub.sandbox.localfirsthealth.com"
+
+# ===== DEVELOPER PLATFORM: MYCURE Developer Portal (monobase-mycure#4509 core ask) =====
+# Static Vite SPA on the generic `app` chart (Caddy :8080). Runtime API URL via
+# config->env (entrypoint writes /tmp/config.json). Rides the *.sandbox wildcard
+# listener/cert (https-sandbox-lfh) — no dedicated listener/cert. Host derives to
+# developer-portal.sandbox.localfirsthealth.com (external-dns publishes it). No
+# secret (pure frontend). Enforcement flags stay DEFAULT-OFF; portal lifecycle +
+# keyOrgIds tenant-scoping + x-permission are always-on and testable here.
+developerPortal:
+  enabled: true
+  image:
+    tag: "0.1.0"
+  resources:
+    requests:
+      cpu: 10m
+  gateway:
+    sectionName: https-sandbox-lfh  # *.sandbox.localfirsthealth.com wildcard listener (tailnet-only)
   config:
     API_URL: "https://hapihub.sandbox.localfirsthealth.com"
     HAPIHUB_URL: "https://hapihub.sandbox.localfirsthealth.com"
