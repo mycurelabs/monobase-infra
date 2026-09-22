@@ -93,7 +93,7 @@ hapihub:
   # catalog fingerprint unchanged; the running hub's startup/admission
   # fingerprint remains unverified. Fresh admission requires separate checks.
   image:
-    tag: "11.20.128"
+    tag: "11.20.129"
   cache:
     # Prod parity: response cache OFF (the #2839/#2617 bentocache stampede
     # mitigation). Re-enable here first when re-validating the serve-stale fix.
