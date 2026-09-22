@@ -290,12 +290,19 @@ hapihubWorker:
     # (inherited from the shared hapihub block above), and pushes every
     # audit_events INSERT (all orgs) to the cluster-internal Tenzir ingest.
     #
-    # ── AUDIT_SINK_URL DELIBERATELY UNSET ON PROD — emitter stays DISARMED ──
-    # HOLD-PROD: do not set until prod hapihub is on a release whose audit-sink
-    # trigger is fail-safe, whose migrations are serialized, and whose setup()
-    # failures exit — 11.20.122–11.20.125 NOT eligible. Re-add the line below
-    # (uncommented) only once that gate is met:
-    # AUDIT_SINK_URL: "http://tenzir-ingest.security.svc.cluster.local:8080/ingest/audit-events"
+    # ── EMITTER ARMED 2026-09-22 (infra#357) ──
+    # Gate met: prod hapihub 11.20.127 contains the fail-safe audit fix
+    # (monobase-mycure 5d4521495, shipped 11.20.124): the pg_notify trigger is
+    # installed in the MIGRATION phase (privileged migrator, idempotent — NOT at
+    # runtime), AuditSink.start() only LISTENs and is wrapped in .catch so a start
+    # failure logs instead of crashing boot, and NOTIFY with no listener is a cheap
+    # no-op (so the trigger already present on prod since ≥11.20.124 was inert).
+    # Delivery is fire-and-forget with retry+drop (never blocks the LISTEN loop),
+    # so an unreachable/slow Tenzir cannot back-pressure or crash the worker.
+    # The 11.20.122–125 prohibition is moot: prod is well past it on 127.
+    # Path is dedicated to the sink (ingestPath /ingest/audit-events); the security
+    # ns ingress NetworkPolicy (infra#359a) allows mycure-production → :8080.
+    AUDIT_SINK_URL: "http://tenzir-ingest.security.svc.cluster.local:8080/ingest/audit-events"
 
   # No external traffic: keep the Service (probes) but no routes.
   gateway:
