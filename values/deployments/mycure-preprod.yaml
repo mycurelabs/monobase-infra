@@ -140,11 +140,18 @@ hapihub:
     STORAGE_BUCKET: "hapihub"
     # Prod parity (mono#2114): background jobs run in the hapihubWorker release.
     RUN_WORKERS: "false"
-    # Developer-platform enforcement (epic #4290 / #4389) stays DEFAULT-OFF in preprod
-    # until jofftiquez completes the #4506 PRE-ON verification baseline and signs off.
-    # The safe partner-only subset (API_SCOPE_ENFORCE / API_ORIGIN_ENFORCE /
-    # API_DPOP_ENFORCE) was verified safe but HELD per rollout sequencing — flip back
-    # on after his handover verification.
+    # Developer-platform enforcement (epic #4290 / #4389) — SAFE subset, PREPROD-only.
+    # All three are PARTNER/OAuth-audience-only (deriveAudience === 'partner') and
+    # cannot 403 first-party session callers (audience 'app' — mycure/dashboard/
+    # developer-portal lifecycle): scope gate keys on `audience === 'partner'`
+    # (pipeline.ts:993), origin gate on partner OAuth-token callers (pipeline.ts:1053/
+    # 1083), dpop gate on the OAuth token endpoint for requireDpop clients only
+    # (auth.ts:1037). Verified against hapihub src. AUDIENCE/ENTITLEMENT/QUOTA stay
+    # OFF (unset) — those can touch first-party 'app' callers. Sandbox stays OFF
+    # (joff's pre-enforcement baseline).
+    API_SCOPE_ENFORCE: "true"
+    API_ORIGIN_ENFORCE: "true"
+    API_DPOP_ENFORCE: "true"
 
   env:
       # Prod parity (#2114): cap the JSC heap below the 4Gi container limit.
