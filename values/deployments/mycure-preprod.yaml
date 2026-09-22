@@ -140,6 +140,17 @@ hapihub:
     STORAGE_BUCKET: "hapihub"
     # Prod parity (mono#2114): background jobs run in the hapihubWorker release.
     RUN_WORKERS: "false"
+    # Developer-platform enforcement (epic #4290 / #4389) — SAFE subset, PREPROD-only
+    # rollout. All three are PARTNER/OAuth-audience-only (deriveAudience === 'partner')
+    # and cannot 403 first-party session callers (audience 'app' — mycure/dashboard/
+    # developer-portal lifecycle): scope gate keys on `audience === 'partner'`
+    # (pipeline.ts), origin gate on partner OAuth-token callers, dpop gate on the
+    # OAuth token endpoint for requireDpop clients only. Verified against hapihub
+    # src before flip. AUDIENCE/ENTITLEMENT/QUOTA stay OFF (unset) — those can touch
+    # first-party 'app' callers and jofftiquez is verifying #4389 on preprod.
+    API_SCOPE_ENFORCE: "true"
+    API_ORIGIN_ENFORCE: "true"
+    API_DPOP_ENFORCE: "true"
 
   env:
       # Prod parity (#2114): cap the JSC heap below the 4Gi container limit.
