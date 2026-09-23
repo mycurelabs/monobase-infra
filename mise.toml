@@ -104,6 +104,7 @@ helm template lint charts/argocd-bootstrap -f values/clusters/mycure-doks-main/a
 # app-of-apps trees — render them directly or template bugs reach main green.
 helm template lint charts/database-secrets --set global.namespace=lint --set walg.enabled=true > /dev/null
 helm template lint charts/monitoring-resources --set global.namespace=lint > /dev/null
+helm template lint charts/tailscale-proxy --set enabled=true --set hostname=lint --set tag=tag:lint --set authkey.remoteKey=lint --set target=lint.svc:443 --set global.namespace=lint > /dev/null
 # App-registry guards a plain render (rc=0) can't catch: (a) appRegistry
 # re-declared outside base.yaml, (b) a generic-app Application disappearing.
 ./scripts/lint-app-registry.sh

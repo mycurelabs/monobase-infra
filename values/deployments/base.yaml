@@ -82,6 +82,8 @@ appRegistry:
     key: openmed
   pg-logical-backup:
     key: pgLogicalBackup
+  tailscale-proxy:
+    key: tailscaleProxy
 
 # ===== HEALTHCARE: MyCure Dashboard (operator/admin web UI) =====
 mycure-dashboard:
@@ -140,6 +142,11 @@ openmed:
 # block exists so generic-app.yaml's fail-closed guard can tell a legitimately
 # -off app from a misspelled registry `key`.
 pgLogicalBackup:
+  enabled: false
+# Per-namespace tailnet node (charts/tailscale-proxy). Off everywhere except an
+# overlay that must live on a DIFFERENT Tailscale account than the cluster-wide
+# operator (mycure-sandbox on vanaheim, monobase-mycure#4509).
+tailscaleProxy:
   enabled: false
 
 # ===== HEALTHCARE: MyCure PXP (patient-facing web app) =====
