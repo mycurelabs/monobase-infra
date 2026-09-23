@@ -1,0 +1,56 @@
+# tailscale-proxy — a single userspace tailscale node that exposes ONE cluster
+# Service on a tailnet by TCP-forwarding tailnet :443 to it (tailscale serve).
+#
+# Why not the tailscale-operator? The operator joins exactly one tailnet. When
+# a namespace must live on a DIFFERENT account (mycure-sandbox on vanaheim),
+# it gets its own node via this chart instead. Runs non-root, no NET_ADMIN,
+# no tun device — fits PSA=restricted tenant namespaces.
+
+global:
+  namespace: ""      # injected by the argocd-applications factory
+  partOf: ""         # app.kubernetes.io/part-of; factory injects the tenant value
+  gateway:
+    namespace: nginx-gateway-system   # netpol: where the forward target lives
+
+enabled: false
+
+nameOverride: ""
+fullnameOverride: ""
+
+image:
+  repository: ghcr.io/tailscale/tailscale
+  tag: ""            # empty -> Chart.appVersion
+  pullPolicy: IfNotPresent
+
+# Tailnet device name (TS_HOSTNAME). Required.
+hostname: ""
+
+# ACL tag advertised on join (--advertise-tags). Required: an OAuth-client
+# secret used as an auth key only works with one of the client's tags.
+tag: ""
+
+# Auth key source. The GCP secret VALUE must be the OAuth client secret with
+# node options appended, e.g.
+#   tskey-client-xxxx?ephemeral=false&preauthorized=true
+# ephemeral=false is load-bearing: OAuth-derived keys default to ephemeral,
+# and an ephemeral node is deleted (new IP) on every pod restart.
+authkey:
+  secretStore: gcp-secretstore
+  secretStoreKind: ClusterSecretStore
+  refreshInterval: 1h
+  remoteKey: ""      # required
+
+# host:port that tailnet :443 is forwarded to (raw TCP, TLS passes through so
+# the backend still sees the SNI). Required.
+target: ""
+
+resources:
+  requests:
+    cpu: 10m
+    memory: 64Mi
+  limits:
+    cpu: 200m
+    memory: 256Mi
+
+nodeSelector: {}
+tolerations: []
