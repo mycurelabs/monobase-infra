@@ -182,10 +182,10 @@ nginxGatewayResources:
       gatewayClassName: nginx
       annotations:
         # external-dns publishes attached routes' hostnames as A records -> the
-        # sandbox tailnet device IP. Assigned on first join; PLACEHOLDER = the
-        # old shared IP until rollout step B pins the real one (get it with
-        # `kubectl -n mycure-sandbox exec deploy/tailscale-proxy -- tailscale ip -4`).
-        external-dns.alpha.kubernetes.io/target: "100.124.242.71"
+        # sandbox tailnet device IP (assigned by the SANDBOX tailnet on first
+        # join; changes if the tailscale-proxy state Secret is lost — re-read
+        # with `kubectl -n mycure-sandbox exec deploy/tailscale-proxy -- tailscale ip -4`).
+        external-dns.alpha.kubernetes.io/target: "100.64.33.33"
       nginxProxy:
         serviceType: ClusterIP
         replicas: 1
