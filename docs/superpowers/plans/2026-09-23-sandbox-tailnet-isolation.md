@@ -14,6 +14,13 @@
 
 **Scratch dir for render output:** `$SCRATCH` = the session scratchpad directory (not `/tmp`).
 
+**Amendments after review (2026-09-23, Tasks 1–8 done):** the shipped
+`deployment.yaml` additionally sets `TS_SOCKET=/var/run/tailscale/tailscaled.sock`
+(containerboot's default `/tmp/tailscaled.sock` is not where the `tailscale` CLI
+looks, so the `tailscale ip -4` commands in Tasks 9–10 need it) and
+`readOnlyRootFilesystem: true`. Task 9 must not push until the GCP secret exists:
+between commit A and commit B the sandbox is unreachable from every tailnet.
+
 ---
 
 ## File map
@@ -1104,10 +1111,11 @@ gh pr create --base main --head feat/sandbox-tailnet \
 Spec: `docs/superpowers/specs/2026-09-23-sandbox-tailnet-isolation-design.md`
 
 ## Test plan
+(tick each box only after the step has actually been run and observed)
 - [x] `mise run lint-helm` / `validate-helm`
-- [x] Deployed on `cluster/vanaheim`; `nginx-sandbox-gateway` Programmed; proxy `/healthz` 200
-- [x] `*.sandbox` A records point at the sandbox tailnet IP; 200 from the sandbox tailnet; unreachable from the MyCure tailnet
-- [x] preprod/staging hosts still 200
+- [ ] Deployed on `cluster/vanaheim`; `nginx-sandbox-gateway` Programmed; proxy `/healthz` 200
+- [ ] `*.sandbox` A records point at the sandbox tailnet IP; 200 from the sandbox tailnet; unreachable from the MyCure tailnet
+- [ ] preprod/staging hosts still 200
 
 🤖 Generated with [Claude Code](https://claude.com/claude-code)
 EOF
