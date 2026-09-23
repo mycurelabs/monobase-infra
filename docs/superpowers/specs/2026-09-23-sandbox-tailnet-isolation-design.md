@@ -86,7 +86,8 @@ Container environment:
 | `TS_ACCEPT_DNS` | `false` | Keep cluster DNS; the serve target is a cluster hostname. |
 | `TS_SERVE_CONFIG` | `/etc/tailscale/serve.json` | Applied once tailscaled is up; the file is watched. |
 | `TS_ENABLE_HEALTH_CHECK` | `true` | Serves `/healthz` on `TS_LOCAL_ADDR_PORT` (default `[::]:9002`). |
-| `POD_NAME`, `POD_UID` | fieldRef | Upstream example; used for state-Secret ownership. |
+| `TS_SOCKET` | `/var/run/tailscale/tailscaled.sock` | containerboot defaults to `/tmp/tailscaled.sock`; the `tailscale` CLI looks in `/var/run/tailscale/`. Aligning them makes `kubectl exec … tailscale ip -4` work. |
+| `POD_NAME`, `POD_UID` | fieldRef | Upstream example; containerboot records them as data keys in the state Secret. It sets no ownerReference, so the Secret outlives the pod. |
 
 Values:
 
@@ -163,6 +164,12 @@ identical on both branches today.
    holds the current shared IP as a placeholder. After sync, read the new IP
    from `tailscale status` on any device on the new tailnet, or from the pod:
    `kubectl -n mycure-sandbox exec deploy/tailscale-proxy -- tailscale ip -4`.
+
+   **Outage window.** From the moment A syncs until B syncs and DNS TTL
+   expires, the sandbox is unreachable from everywhere: its listeners are gone
+   from the shared gateway while `*.sandbox` DNS still points at the shared IP.
+   Do not push A to `cluster/vanaheim` until the GCP secret exists, or the proxy
+   pod sits in `CreateContainerConfigError` and the window stays open.
 2. **Commit B** — set the `external-dns.alpha.kubernetes.io/target` annotation
    on `nginx-sandbox-gateway` to that IP. external-dns (`upsert-only`) updates
    the existing sandbox A records.
