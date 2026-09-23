@@ -1,0 +1,52 @@
+{{- if .Values.enabled }}
+# Egress allow-list for the tailscale node (the namespace default-denies egress).
+# No ingress rule: tailnet traffic arrives inside WireGuard/DERP flows the pod
+# itself opened outbound, so conntrack admits the replies.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "tailscale-proxy.fullname" . }}
+  namespace: {{ include "tailscale-proxy.namespace" . }}
+  labels:
+    {{- include "tailscale-proxy.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "tailscale-proxy.selectorLabels" . | nindent 6 }}
+  policyTypes:
+    - Egress
+  egress:
+    # Cluster DNS (resolves the serve target).
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    # The forward target: the gateway data plane.
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .Values.global.gateway.namespace }}
+      ports:
+        - protocol: TCP
+          port: 443
+    # Tailscale control plane + DERP relays (TCP 443), Kubernetes API server
+    # for the state Secret (TCP 443 managed / 6443 k3s), direct WireGuard
+    # (UDP 41641) and STUN (UDP 3478). DERP alone suffices if UDP is blocked.
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+      ports:
+        - protocol: TCP
+          port: 443
+        - protocol: TCP
+          port: 6443
+        - protocol: UDP
+          port: 41641
+        - protocol: UDP
+          port: 3478
+{{- end }}
