@@ -173,6 +173,9 @@ hapihub:
     CARE_MEDLEY_URL: "http://medley.mycure-preprod.svc.cluster.local:8970"
     CARE_MEDLEY_SKILL: "summarize-context"
     OPENMED_ENABLED: "false"
+    # qwen2.5:14b summarize-context runs ~140s; the default care→medley fetch timeout
+    # socket-closed on the first (cold) call. 240s gives headroom incl. model cold-start.
+    CARE_MEDLEY_TIMEOUT_MS: "240000"
 
   env:
       # Prod parity (#2114): cap the JSC heap below the 4Gi container limit.
@@ -409,7 +412,7 @@ medley:
   enabled: true
   image:
     repository: ghcr.io/mycurelabs/medley
-    tag: "2.0.6-care.d385970"  # CARE-branch build (feat/care-inc1-governed-copilot@d385970) — summarize-context skill for /care/ask. Distinct -care.<sha> tag (no clobber of main :2.0.6). Re-pin to "2.0.6" after e2e. Base: LCI skills (monobase-mycure#4356) + clinic-analytics UX (monobase-mycure#4385)
+    tag: "2.0.6-care.4adec3f"  # CARE-branch build @4adec3f0d — summarize-context now PRE-SEEDS caller-provided sources as retrieved (fix: qwen skipped getProvidedContext → empty grounding → S1 refused). Distinct -care.<sha> tag (no clobber of main :2.0.6). Re-pin to "2.0.6" after e2e. Base: LCI skills (monobase-mycure#4356) + clinic-analytics UX (monobase-mycure#4385)
     pullPolicy: IfNotPresent
   replicaCount: 1
   resources:
