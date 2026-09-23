@@ -34,14 +34,19 @@ instances:
         name: cloudflare-api-token
         key: api-token
 
-    # Resource limits
+    # Resource limits. Memory must exceed the v0.19 binary's cold-start working
+    # set: at 64Mi the container sat pinned on the limit, thrashed its own text
+    # pages (~56GB of file reads in 9 minutes, 11k major faults) and never
+    # finished the informer cache sync inside external-dns's hard-coded 60s
+    # deadline ("failed to sync *v1beta1.HTTPRoute: context deadline exceeded"),
+    # crash-looping for 45h (2026-09-21 → 09-23). Steady state is ~45Mi.
     resources:
       requests:
         cpu: 10m
-        memory: 32Mi
+        memory: 64Mi
       limits:
         cpu: 50m
-        memory: 64Mi
+        memory: 256Mi
 
   # Example: Add new client with different DNS provider
   # - name: client-a
