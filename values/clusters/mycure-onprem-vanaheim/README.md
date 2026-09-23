@@ -136,6 +136,23 @@ If your client won't resolve it (some tailnets shadow the domain), add `/etc/hos
 `<gateway-tailnet-ip> mycure.staging.localfirsthealth.com …`, or set a Tailscale admin
 split-DNS for `localfirsthealth.com` → `1.1.1.1`.
 
+### Sandbox: separate Tailscale account
+
+`*.sandbox.localfirsthealth.com` is **not** on the MyCure tailnet. The sandbox has its
+own `nginx-sandbox-gateway` (ClusterIP, not operator-exposed) and a
+`mycure-sandbox/tailscale-proxy` pod that joins the **sandbox tailnet** as device
+`nginx-sandbox-gateway` and forwards tailnet :443 to it (spec:
+`docs/superpowers/specs/2026-09-23-sandbox-tailnet-isolation-design.md`).
+
+- Reach it from a device on the sandbox tailnet: `https://mycure.sandbox.localfirsthealth.com`.
+- Its tailnet IP is pinned in the `external-dns.alpha.kubernetes.io/target` annotation
+  on `nginx-sandbox-gateway` (`argocd/infrastructure.yaml`). If the device is recreated
+  (state Secret `tailscale-proxy-state` deleted, or cluster rebuilt) the IP changes:
+  `kubectl -n mycure-sandbox exec deploy/tailscale-proxy -- tailscale ip -4`, then update
+  the annotation.
+- Credential: GCP secret `mycure-sandbox-tailscale-authkey` = OAuth client secret
+  (`auth_keys` scope, tag `tag:sandbox-gateway`) with `?ephemeral=false&preauthorized=true`.
+
 ## Nuke & rebuild
 
 ```bash
