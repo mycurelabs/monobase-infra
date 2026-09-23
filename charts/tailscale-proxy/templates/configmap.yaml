@@ -1,0 +1,15 @@
+{{- if .Values.enabled }}
+{{- $target := required "tailscale-proxy: `target` is required (host:port that tailnet :443 is forwarded to)" .Values.target }}
+# ipn.ServeConfig applied by containerboot (TS_SERVE_CONFIG). Raw TCP forward:
+# tailscaled does NOT terminate TLS, so the target (nginx) still sees the SNI.
+# TCPForward is dialed with the system resolver, so a cluster DNS name works.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "tailscale-proxy.fullname" . }}-serve
+  namespace: {{ include "tailscale-proxy.namespace" . }}
+  labels:
+    {{- include "tailscale-proxy.labels" . | nindent 4 }}
+data:
+  serve.json: {{ dict "TCP" (dict "443" (dict "TCPForward" $target)) | toJson | quote }}
+{{- end }}

@@ -1,0 +1,128 @@
+{{- if .Values.enabled }}
+{{- $hostname := required "tailscale-proxy: `hostname` is required (tailnet device name)" .Values.hostname }}
+{{- $tag := required "tailscale-proxy: `tag` is required (e.g. tag:sandbox-gateway — must be one of the OAuth client's tags)" .Values.tag }}
+# Follows tailscale's own docs/k8s/userspace-sidecar.yaml: non-root, userspace
+# networking (no tun, no NET_ADMIN), state in a Kubernetes Secret. Fits
+# PSA=restricted tenant namespaces.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "tailscale-proxy.fullname" . }}
+  namespace: {{ include "tailscale-proxy.namespace" . }}
+  labels:
+    {{- include "tailscale-proxy.labels" . | nindent 4 }}
+spec:
+  # ponytail: single replica by design — node identity lives in ONE state
+  # Secret; a second pod would fight over it. Recreate so the old pod releases
+  # the Secret before the new one starts.
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "tailscale-proxy.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      annotations:
+        checksum/serve-config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+      labels:
+        {{- include "tailscale-proxy.selectorLabels" . | nindent 8 }}
+    spec:
+      serviceAccountName: {{ include "tailscale-proxy.fullname" . }}
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: tailscale
+          image: {{ include "tailscale-proxy.image" . | quote }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          env:
+            - name: TS_AUTHKEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "tailscale-proxy.authSecret" . }}
+                  key: authkey
+            # Required when TS_AUTHKEY is an OAuth client secret.
+            - name: TS_EXTRA_ARGS
+              value: "--advertise-tags={{ $tag }}"
+            - name: TS_HOSTNAME
+              value: {{ $hostname | quote }}
+            - name: TS_USERSPACE
+              value: "true"
+            # Node identity persists here -> stable tailnet IP across restarts.
+            - name: TS_KUBE_SECRET
+              value: {{ include "tailscale-proxy.stateSecret" . }}
+            - name: TS_AUTH_ONCE
+              value: "true"
+            # Keep cluster DNS: the serve target is a cluster hostname.
+            - name: TS_ACCEPT_DNS
+              value: "false"
+            - name: TS_SERVE_CONFIG
+              value: /etc/tailscale/serve.json
+            - name: TS_ENABLE_HEALTH_CHECK
+              value: "true"
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: POD_UID
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.uid
+          ports:
+            - name: health
+              containerPort: 9002
+              protocol: TCP
+          # /healthz is 200 once tailscaled is up and holds a tailnet IP.
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: health
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: health
+            initialDelaySeconds: 60
+            periodSeconds: 30
+            failureThreshold: 6
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+            - name: serve-config
+              mountPath: /etc/tailscale
+              readOnly: true
+            - name: run
+              mountPath: /var/run/tailscale
+            - name: state
+              mountPath: /var/lib/tailscale
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: serve-config
+          configMap:
+            name: {{ include "tailscale-proxy.fullname" . }}-serve
+        - name: run
+          emptyDir: {}
+        - name: state
+          emptyDir: {}
+        - name: tmp
+          emptyDir: {}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}
