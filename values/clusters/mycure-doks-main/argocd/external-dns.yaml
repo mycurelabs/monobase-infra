@@ -30,14 +30,17 @@ instances:
         name: cloudflare-api-token
         key: api-token
 
-    # Resource limits
+    # Resource limits. Memory must exceed the v0.19 binary's cold-start working
+    # set: at 64Mi the vanaheim instance thrashed its own text pages and
+    # crash-looped on the informer's 60s cache-sync deadline for 45h (#461).
+    # Steady state is ~30-45Mi; the extra headroom only matters on cold start.
     resources:
       requests:
         cpu: 10m
-        memory: 32Mi
+        memory: 64Mi
       limits:
         cpu: 50m
-        memory: 64Mi
+        memory: 256Mi
 
   # Example: Add new client with different DNS provider
   # - name: client-a
