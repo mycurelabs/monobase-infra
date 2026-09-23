@@ -39,6 +39,7 @@
 ### Task 1: Chart scaffold (Chart.yaml, values.yaml, helpers)
 
 **Files:**
+
 - Create: `charts/tailscale-proxy/Chart.yaml`
 - Create: `charts/tailscale-proxy/values.yaml`
 - Create: `charts/tailscale-proxy/templates/_helpers.tpl`
@@ -203,6 +204,7 @@ git commit -m "feat(tailscale-proxy): chart scaffold — values + helpers for a 
 ### Task 2: Deployment + serve ConfigMap
 
 **Files:**
+
 - Create: `charts/tailscale-proxy/templates/configmap.yaml`
 - Create: `charts/tailscale-proxy/templates/deployment.yaml`
 
@@ -384,12 +386,15 @@ spec:
 - [ ] **Step 4: Verify the render**
 
 Run:
+
 ```bash
 $SCRATCH/render.sh | yq -N 'select(.kind=="Deployment") | .spec.template.spec.containers[0].env[] | select(.name=="TS_HOSTNAME" or .name=="TS_EXTRA_ARGS" or .name=="TS_KUBE_SECRET") | .name + "=" + .value'
 $SCRATCH/render.sh | yq -N 'select(.kind=="Deployment") | .spec.strategy.type + " " + (.spec.template.spec.securityContext.runAsUser|tostring) + " " + .spec.template.spec.containers[0].image'
 $SCRATCH/render.sh | yq -N 'select(.kind=="ConfigMap") | .data["serve.json"]'
 ```
+
 Expected, in order:
+
 ```
 TS_EXTRA_ARGS=--advertise-tags=tag:sandbox-gateway
 TS_HOSTNAME=nginx-sandbox-gateway
@@ -397,6 +402,7 @@ TS_KUBE_SECRET=tailscale-proxy-state
 Recreate 1000 ghcr.io/tailscale/tailscale:v1.98.9
 {"TCP":{"443":{"TCPForward":"nginx-sandbox-gateway-nginx.nginx-gateway-system.svc.cluster.local:443"}}}
 ```
+
 (env order may differ; the three lines must all appear.)
 
 - [ ] **Step 5: Verify the required-value guards fire**
@@ -416,6 +422,7 @@ git commit -m "feat(tailscale-proxy): deployment + serve config (userspace, non-
 ### Task 3: ExternalSecret, ServiceAccount, RBAC
 
 **Files:**
+
 - Create: `charts/tailscale-proxy/templates/externalsecret.yaml`
 - Create: `charts/tailscale-proxy/templates/rbac.yaml`
 
@@ -505,12 +512,15 @@ roleRef:
 - [ ] **Step 4: Verify**
 
 Run:
+
 ```bash
 $SCRATCH/render.sh | yq -N 'select(.kind=="Role") | .rules[1].resourceNames[0]'
 $SCRATCH/render.sh | yq -N 'select(.kind=="ExternalSecret") | .spec.secretStoreRef.kind + " " + .spec.secretStoreRef.name + " " + .spec.data[0].remoteRef.key + " -> " + .spec.target.name'
 $SCRATCH/render.sh | yq -N 'select(.kind=="Deployment") | .spec.template.spec.serviceAccountName'
 ```
+
 Expected:
+
 ```
 tailscale-proxy-state
 ClusterSecretStore gcp-secretstore mycure-sandbox-tailscale-authkey -> tailscale-proxy-auth
@@ -529,6 +539,7 @@ git commit -m "feat(tailscale-proxy): auth key ExternalSecret + RBAC for the sta
 ### Task 4: NetworkPolicy
 
 **Files:**
+
 - Create: `charts/tailscale-proxy/templates/networkpolicy.yaml`
 
 Context: `mycure-sandbox` carries `default-deny-egress` from security-baseline. Without this policy the pod can't reach DNS, the control plane, the API server (state Secret, k3d apiserver on TCP 6443), or the gateway.
@@ -617,6 +628,7 @@ git commit -m "feat(tailscale-proxy): egress NetworkPolicy (DNS, gateway ns, con
 ### Task 5: Registry wiring in `base.yaml` + lint line
 
 **Files:**
+
 - Modify: `values/deployments/base.yaml` (the `appRegistry` map, and the "Registry apps with no base config" section that ends with the `pgLogicalBackup:` block around line 142)
 - Modify: `mise.toml` (`[tasks.lint-helm]`, after the `monitoring-resources` render line ~106)
 
@@ -657,6 +669,7 @@ helm template lint charts/tailscale-proxy --set enabled=true --set hostname=lint
 - [ ] **Step 5: Verify the registry renders and nothing new appears anywhere**
 
 Run:
+
 ```bash
 for ov in mycure-production mycure-staging mycure-preprod mycure-sandbox; do
   printf '%s: ' "$ov"
@@ -664,6 +677,7 @@ for ov in mycure-production mycure-staging mycure-preprod mycure-sandbox; do
 done
 ./scripts/lint-app-registry.sh | tail -1
 ```
+
 Expected: `0` for all four overlays (sandbox is enabled in Task 6), then `[app-registry] OK`.
 
 - [ ] **Step 6: Commit**
@@ -678,6 +692,7 @@ git commit -m "feat(registry): register tailscale-proxy app (off by default) + l
 ### Task 6: Sandbox overlay — gateway override + proxy enabled
 
 **Files:**
+
 - Modify: `values/deployments/mycure-sandbox.yaml` (`global:` block at the top; new block after `securityBaseline:`)
 
 - [ ] **Step 1: Set the gateway override**
@@ -724,6 +739,7 @@ tailscaleProxy:
 - [ ] **Step 3: Verify the Application renders with the right values, only for sandbox**
 
 Run:
+
 ```bash
 helm template lint charts/argocd-applications -f values/deployments/base.yaml -f values/deployments/mycure-sandbox.yaml --set argocd.repoURL=lint --set argocd.targetRevision=lint \
   | yq -N 'select(.kind=="Application" and .metadata.name=="mycure-sandbox-tailscale-proxy") | .spec.source.path + " ns=" + .spec.destination.namespace + " gw=" + .spec.source.helm.valuesObject.global.gateway.name + " target=" + .spec.source.helm.valuesObject.target'
@@ -733,7 +749,9 @@ for ov in mycure-production mycure-staging mycure-preprod; do
   helm template lint charts/argocd-applications -f values/deployments/base.yaml -f values/deployments/$ov.yaml --set argocd.repoURL=lint --set argocd.targetRevision=lint | yq -N 'select(.kind=="Application") | .metadata.name' | grep -c tailscale-proxy || true
 done
 ```
+
 Expected:
+
 ```
 charts/tailscale-proxy ns=mycure-sandbox gw=nginx-sandbox-gateway target=nginx-sandbox-gateway-nginx.nginx-gateway-system.svc.cluster.local:443
 nginx-sandbox-gateway
@@ -745,12 +763,15 @@ nginx-sandbox-gateway
 - [ ] **Step 4: Render the leaf chart with the exact overlay values (what ArgoCD will do)**
 
 Run:
+
 ```bash
 helm template lint charts/argocd-applications -f values/deployments/base.yaml -f values/deployments/mycure-sandbox.yaml --set argocd.repoURL=lint --set argocd.targetRevision=lint \
   | yq 'select(.kind=="Application" and .metadata.name=="mycure-sandbox-tailscale-proxy") | .spec.source.helm.valuesObject' > "$SCRATCH/sandbox-tsproxy-values.yaml"
 helm template tailscale-proxy charts/tailscale-proxy -f "$SCRATCH/sandbox-tsproxy-values.yaml" | yq -N '.kind + "/" + .metadata.name'
 ```
+
 Expected (order may vary):
+
 ```
 ConfigMap/tailscale-proxy-serve
 Deployment/tailscale-proxy
@@ -773,15 +794,18 @@ git commit -m "feat(sandbox): own gateway + tailscale-proxy on a separate tailne
 ### Task 7: Gateway split on vanaheim
 
 **Files:**
+
 - Modify: `values/clusters/mycure-onprem-vanaheim/argocd/infrastructure.yaml` (the `nginx-internal-gateway` entry under `nginxGatewayResources.extraGateways`, listeners block ending just before `tls:`)
 
 - [ ] **Step 1: Capture the current listener layout (baseline)**
 
 Run:
+
 ```bash
 yq '.nginxGatewayResources' values/clusters/mycure-onprem-vanaheim/argocd/infrastructure.yaml > "$SCRATCH/ngr.yaml"
 helm template lint charts/nginx-gateway -f "$SCRATCH/ngr.yaml" | yq -N 'select(.kind=="Gateway") | .metadata.name + ": " + ([.spec.listeners[].name] | join(","))'
 ```
+
 Expected: one line for `nginx-internal-gateway` whose list contains `https-sandbox-mycure,https-sandbox-hapihub,https-sandbox-lfh,http-sandbox-lfh` at the end.
 
 - [ ] **Step 2: Remove the sandbox listeners from `nginx-internal-gateway`**
@@ -862,6 +886,7 @@ Insert right after the internal gateway entry (i.e. after its last listener `rel
 - [ ] **Step 4: Verify the split**
 
 Run:
+
 ```bash
 yq '.nginxGatewayResources' values/clusters/mycure-onprem-vanaheim/argocd/infrastructure.yaml > "$SCRATCH/ngr.yaml"
 helm template lint charts/nginx-gateway -f "$SCRATCH/ngr.yaml" | yq -N 'select(.kind=="Gateway") | .metadata.name + ": " + ([.spec.listeners[].name] | join(","))'
@@ -869,7 +894,9 @@ helm template lint charts/nginx-gateway -f "$SCRATCH/ngr.yaml" | yq -N 'select(.
 helm template lint charts/nginx-gateway -f "$SCRATCH/ngr.yaml" | yq -N 'select(.kind=="NginxProxy") | .metadata.name + " " + .spec.kubernetes.service.type'
 helm template lint charts/argocd-infrastructure -f values/clusters/mycure-onprem-vanaheim/argocd/infrastructure.yaml --set argocd.repoURL=lint --set argocd.targetRevision=lint > /dev/null && echo infra-render-ok
 ```
+
 Expected:
+
 ```
 nginx-internal-gateway: https-staging-mycure,...,relay-quic-preprod     (NO *sandbox* names)
 nginx-sandbox-gateway: https-sandbox-mycure,https-sandbox-hapihub,https-sandbox-lfh,http-sandbox-lfh
@@ -891,6 +918,7 @@ git commit -m "feat(vanaheim): split sandbox listeners onto nginx-sandbox-gatewa
 ### Task 8: Full repo lint + docs
 
 **Files:**
+
 - Modify: `values/clusters/mycure-onprem-vanaheim/README.md` (section `## Access (tailnet-only)`)
 
 - [ ] **Step 1: Run the repo's helm lint and validate tasks**
@@ -943,6 +971,7 @@ git commit -m "docs(vanaheim): sandbox lives on its own tailnet — access + IP 
 ### Task 9: Deploy commit A to vanaheim (GATED — needs the user's prerequisites)
 
 **Do not start until the user confirms all three:**
+
 1. New tailnet ACL has `tag:sandbox-gateway` in `tagOwners` and a grant to it on :443.
 2. OAuth client with `auth_keys` write scope and tag `tag:sandbox-gateway` exists.
 3. GCP secret exists. Check without printing it:
@@ -953,6 +982,7 @@ Expected: `1`
 - [ ] **Step 1: Cherry-pick the feature commits onto `cluster/vanaheim`**
 
 Run (from the feature worktree):
+
 ```bash
 FEAT_RANGE="$(git merge-base origin/main HEAD)..HEAD"
 cd ../cluster-vanaheim
@@ -961,6 +991,7 @@ git checkout cluster/vanaheim && git pull --ff-only origin cluster/vanaheim
 git cherry-pick $(git -C ../feat-sandbox-tailnet rev-list --reverse $FEAT_RANGE)
 git log --oneline -"$(git -C ../feat-sandbox-tailnet rev-list --count $FEAT_RANGE)"
 ```
+
 Expected: the same commit subjects as on `feat/sandbox-tailnet`, no conflicts (the touched files are identical on both branches as of 2026-09-23).
 
 - [ ] **Step 2: Push (this deploys — ArgoCD auto-syncs)**
@@ -970,6 +1001,7 @@ Run: `git push origin cluster/vanaheim`
 - [ ] **Step 3: Refresh and watch on vanaheim**
 
 Run:
+
 ```bash
 ssh freyr@100.120.88.93 '
 K="mise x kubectl@1.31.1 -- kubectl --context k3d-mycure-onprem-vanaheim"
@@ -981,6 +1013,7 @@ $K -n mycure-sandbox get externalsecret tailscale-proxy-auth
 $K -n mycure-sandbox get pods -l app.kubernetes.io/name=tailscale-proxy
 $K -n mycure-sandbox logs deploy/tailscale-proxy --tail=30'
 ```
+
 Expected: `nginx-sandbox-gateway` `PROGRAMMED True`; Service `nginx-sandbox-gateway-nginx` ClusterIP with `80/TCP,443/TCP`; ExternalSecret `SecretSynced True`; pod `1/1 Running`; logs show `Startup complete` / serve config applied, no `permission denied`.
 
 If the ExternalSecret is not Ready: the GCP secret name or the ESO SA grant is wrong. If the pod logs `--advertise-tags ... requested tags not permitted`: the tag is not on the OAuth client / not in tagOwners. If `/healthz` never turns 200 and logs show `control: ... dial`: egress is blocked, check `kubectl -n mycure-sandbox get netpol tailscale-proxy -o yaml`.
@@ -1000,6 +1033,7 @@ Expected: `100.124.242.71 nginx-staging-gateway-1 ...` and `HTTP/2 200`.
 ### Task 10: Commit B — pin the sandbox tailnet IP
 
 **Files:**
+
 - Modify: `values/clusters/mycure-onprem-vanaheim/argocd/infrastructure.yaml` (the `external-dns.alpha.kubernetes.io/target` annotation on `nginx-sandbox-gateway`)
 
 - [ ] **Step 1: Replace the placeholder (in the feature worktree)**
@@ -1055,6 +1089,7 @@ Expected: `unreachable` (the IP belongs to a different tailnet).
 - [ ] **Step 1: Push the feature branch and open the PR**
 
 Run (from the feature worktree):
+
 ```bash
 git push -u origin feat/sandbox-tailnet
 gh pr create --base main --head feat/sandbox-tailnet \
@@ -1078,6 +1113,7 @@ Spec: `docs/superpowers/specs/2026-09-23-sandbox-tailnet-isolation-design.md`
 EOF
 )"
 ```
+
 Expected: PR URL printed.
 
 - [ ] **Step 2: Hand off**
