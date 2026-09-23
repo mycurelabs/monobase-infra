@@ -1,6 +1,6 @@
 apiVersion: v2
 name: tailscale-proxy
-description: Unprivileged tailscale node that joins a tailnet and TCP-forwards :443 to one cluster Service (per-namespace tailnet exposure)
+description: Unprivileged tailscale node exposing one cluster Service (:443) on a tailnet
 type: application
 version: 1.0.0
 appVersion: "v1.98.9"

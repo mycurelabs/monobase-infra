@@ -42,9 +42,15 @@ spec:
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           securityContext:
             allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true  # tailscaled writes only under /tmp + /var/run/tailscale (emptyDirs)
             capabilities:
               drop: ["ALL"]
           env:
+            # containerboot defaults the LocalAPI socket to /tmp/tailscaled.sock,
+            # but the `tailscale` CLI looks in /var/run/tailscale/ — align them so
+            # `kubectl exec … tailscale ip -4` works (review finding, 2026-09-23).
+            - name: TS_SOCKET
+              value: /var/run/tailscale/tailscaled.sock
             - name: TS_AUTHKEY
               valueFrom:
                 secretKeyRef:
