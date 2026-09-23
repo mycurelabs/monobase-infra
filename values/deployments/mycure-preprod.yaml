@@ -92,8 +92,14 @@ hapihub:
   # the 76-collection sync contract. The isolated .126 rehearsal left that
   # catalog fingerprint unchanged; the running hub's startup/admission
   # fingerprint remains unverified. Fresh admission requires separate checks.
+  #
+  # CARE-branch build (feat/care-inc1-governed-copilot@d385970, monobase-mycure
+  # PR #4570). Distinct -care.<sha> tag built off a throwaway deploy branch so it
+  # does NOT clobber the main :11.20.129 image. TEMPORARY: replaces joff's #4389
+  # audience-enforce baseline for the CARE full-thread e2e (/care/ask → medley
+  # summarize-context → host Ollama). Re-pin to "11.20.129" after the e2e.
   image:
-    tag: "11.20.129"
+    tag: "11.20.129-care.d385970"
   cache:
     # Prod parity: response cache OFF (the #2839/#2617 bentocache stampede
     # mitigation). Re-enable here first when re-validating the serve-stale fix.
@@ -159,6 +165,14 @@ hapihub:
     # ArgoCD's strategic-merge-patch on the duplicate STORAGE_* env). ENTITLEMENT/QUOTA
     # stay OFF. Sandbox stays OFF (baseline); prod untouched.
     API_AUDIENCE_ENFORCE: "true"
+    # CARE governed copilot (monobase-mycure #4566/#4570) — point /care/ask at the
+    # preprod medley governed gateway; skill = summarize-context. openmed sidecar
+    # OFF → phi.ts regex de-id fallback (no openmed deployment in preprod). Route
+    # is always registered (services/care/index.ts:163), so this just wires the
+    # backend; the -care hapihub build lifts the /care/ask 404.
+    CARE_MEDLEY_URL: "http://medley.mycure-preprod.svc.cluster.local:8970"
+    CARE_MEDLEY_SKILL: "summarize-context"
+    OPENMED_ENABLED: "false"
 
   env:
       # Prod parity (#2114): cap the JSC heap below the 4Gi container limit.
@@ -311,8 +325,11 @@ hapihubWorker:
 # ===== HEALTHCARE: Frontend Application =====
 mycure:
   # Prod parity — moves with hapihub 11.20.121 (0098 medical_records.updated_by).
+  # CARE-branch build (feat/care-inc1-governed-copilot@d385970) — CareCopilotPanel
+  # UI arm of the e2e. Distinct -care.<sha> tag (does not clobber main :10.25.139).
+  # Re-pin to "10.25.139" after the e2e.
   image:
-    tag: "10.25.139"
+    tag: "10.25.139-care.d385970"
   resources:
     requests:
       cpu: 10m
@@ -392,7 +409,7 @@ medley:
   enabled: true
   image:
     repository: ghcr.io/mycurelabs/medley
-    tag: "2.0.6"           # ghcr (public) — Longitudinal Clinical Intelligence skills (monobase-mycure#4356) + clinic-analytics UX fixes (monobase-mycure#4385)
+    tag: "2.0.6-care.d385970"  # CARE-branch build (feat/care-inc1-governed-copilot@d385970) — summarize-context skill for /care/ask. Distinct -care.<sha> tag (no clobber of main :2.0.6). Re-pin to "2.0.6" after e2e. Base: LCI skills (monobase-mycure#4356) + clinic-analytics UX (monobase-mycure#4385)
     pullPolicy: IfNotPresent
   replicaCount: 1
   resources:
