@@ -441,8 +441,12 @@ medley:
     OLLAMA_URL: "http://host.k3d.internal:11434/v1"   # host ollama (openai-compatible /v1)
     MEDLEY_CHAT_MODEL: "qwen2.5:14b-instruct"    # legacy default (unused while MEDLEY_MODELS is set)
     # Model-router registry (monobase-mycure#4150): default = qwen; clinical = MedGemma (already pulled on
-    # the host Ollama for medgemma-worker). host.k3d.internal derives [local] — PHI-admissible.
-    MEDLEY_MODELS: '{"default":{"baseUrl":"http://host.k3d.internal:11434/v1","modelId":"qwen2.5:14b-instruct"},"clinical":{"baseUrl":"http://host.k3d.internal:11434/v1","modelId":"hf.co/unsloth/medgemma-4b-it-GGUF:Q4_K_M","capabilities":["structured-output"],"tier":1}}'
+    # the host Ollama for medgemma-worker). host.k3d.internal (172.21.0.1, private) derives [local], but the
+    # CARE governed harness (medley 2.x model.ts:343 — closes the PrivateLink fail-open) requires an explicit
+    # selfHosted:true attestation before local egress is PHI-admissible; without it the alias counts as
+    # external and boot fails closed (ModelRegistryError, no `disclosure`). The host Ollama IS our own box,
+    # so attest selfHosted:true (no disclosure ref needed for local egress).
+    MEDLEY_MODELS: '{"default":{"baseUrl":"http://host.k3d.internal:11434/v1","modelId":"qwen2.5:14b-instruct","selfHosted":true},"clinical":{"baseUrl":"http://host.k3d.internal:11434/v1","modelId":"hf.co/unsloth/medgemma-4b-it-GGUF:Q4_K_M","capabilities":["structured-output"],"tier":1,"selfHosted":true}}'
     # Route chart-summary's cited-output role to MedGemma (qwen keeps the tool loop) — testers exercise
     # the multi-model path via "Summarise chart".
     MEDLEY_SKILL_MODELS: '{"chart-summary":{"output":"clinical"}}'
