@@ -1,0 +1,46 @@
+{{- if .Values.enabled }}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ include "tailscale-proxy.fullname" . }}
+  namespace: {{ include "tailscale-proxy.namespace" . }}
+  labels:
+    {{- include "tailscale-proxy.labels" . | nindent 4 }}
+---
+# containerboot stores tailscaled state in TS_KUBE_SECRET. `create` cannot be
+# scoped by resourceName; everything else is pinned to the one state Secret.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "tailscale-proxy.fullname" . }}
+  namespace: {{ include "tailscale-proxy.namespace" . }}
+  labels:
+    {{- include "tailscale-proxy.labels" . | nindent 4 }}
+rules:
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["create"]
+  - apiGroups: [""]
+    resources: ["secrets"]
+    resourceNames: [{{ include "tailscale-proxy.stateSecret" . | quote }}]
+    verbs: ["get", "update", "patch"]
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["get", "create", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "tailscale-proxy.fullname" . }}
+  namespace: {{ include "tailscale-proxy.namespace" . }}
+  labels:
+    {{- include "tailscale-proxy.labels" . | nindent 4 }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "tailscale-proxy.fullname" . }}
+    namespace: {{ include "tailscale-proxy.namespace" . }}
+roleRef:
+  kind: Role
+  name: {{ include "tailscale-proxy.fullname" . }}
+  apiGroup: rbac.authorization.k8s.io
+{{- end }}
