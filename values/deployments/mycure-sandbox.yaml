@@ -23,8 +23,12 @@ global:
   domain: sandbox.localfirsthealth.com
   namespace: mycure-sandbox
   environment: sandbox
-  # No global.gateway override: inherit the DENY-FIRST tailnet-only
-  # nginx-internal-gateway from base (sandbox is tailnet-only, like preprod).
+  # Sandbox-OWN gateway (values/clusters/mycure-onprem-vanaheim/argocd/
+  # infrastructure.yaml). Same namespace as the shared internal gateway, but
+  # exposed on the SANDBOX tailnet by the tailscale-proxy below, not by the
+  # MyCure operator. Listener names are unchanged, so every sectionName holds.
+  gateway:
+    name: nginx-sandbox-gateway
   # No nodePool: k3d nodes are untainted.
 
   # Sandbox-own DB/cache/storage credentials, isolated from every other env.
@@ -35,6 +39,21 @@ global:
 # permit only the required paths"). Apps rely on their own port-scoped rules.
 securityBaseline:
   strictGatewayIngress: true
+
+# ===== TAILNET: sandbox-own Tailscale account (monobase-mycure#4509) =====
+# The cluster-wide operator serves the MyCure tailnet (staging/preprod). The
+# sandbox joins a SEPARATE account via this unprivileged node, which forwards
+# tailnet :443 to the sandbox gateway. Device: nginx-sandbox-gateway.
+# Prereqs (new tailnet admin console + GCP): tag:sandbox-gateway in tagOwners,
+# an auth_keys OAuth client carrying that tag, and GCP secret
+# mycure-sandbox-tailscale-authkey = tskey-client-…?ephemeral=false&preauthorized=true
+tailscaleProxy:
+  enabled: true
+  hostname: nginx-sandbox-gateway
+  tag: tag:sandbox-gateway
+  authkey:
+    remoteKey: mycure-sandbox-tailscale-authkey
+  target: nginx-sandbox-gateway-nginx.nginx-gateway-system.svc.cluster.local:443
 
 mycure-dashboard:
   resources:
