@@ -93,7 +93,7 @@ mycure-dashboard:
     repository: ghcr.io/mycurelabs/dashboard
     # Production and the cluster/vanaheim preprod overlay inherit this tag;
     # mycure-staging pins its own tag below.
-    tag: "0.14.25"
+    tag: "0.14.26"
     pullPolicy: IfNotPresent
 
   replicaCount: 1
