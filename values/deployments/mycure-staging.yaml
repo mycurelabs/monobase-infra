@@ -46,7 +46,7 @@ mycure-pxp:
 hapihub:
   # Keep the same image tag as the preprod copy.
   image:
-    tag: "11.20.130-staging.66e889b"
+    tag: "11.20.130-staging.ad9c391"
   cache:
     enabled: true
   # no Prometheus Operator on this lean k3d cluster (monitoring disabled)
