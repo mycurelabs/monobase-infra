@@ -99,7 +99,7 @@ hapihub:
   # audience-enforce baseline for the CARE full-thread e2e (/care/ask → medley
   # summarize-context → host Ollama). Re-pin to "11.20.129" after the e2e.
   image:
-    tag: "11.20.131-preprod.d5709e6"
+    tag: "11.20.132"
   cache:
     # Prod parity: response cache OFF (the #2839/#2617 bentocache stampede
     # mitigation). Re-enable here first when re-validating the serve-stale fix.
@@ -332,7 +332,7 @@ mycure:
   # UI arm of the e2e. Distinct -care.<sha> tag (does not clobber main :10.25.139).
   # Re-pin to "10.25.139" after the e2e.
   image:
-    tag: "10.25.141"
+    tag: "10.25.142"
   resources:
     requests:
       cpu: 10m
@@ -680,7 +680,7 @@ cadence:
   # organization_partners dropped).
   dropUnusedTables: true
   image:
-    tag: "2.1.103"
+    tag: "2.1.106"
   readIdleMs: 600000
   leafidsGlobalBudget: 150000
   maxConcurrentServes: 8
