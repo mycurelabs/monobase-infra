@@ -323,6 +323,14 @@ sync:
     - name: two_factor
       tags:
         - { ty: user, field: user_id }
+{{- if eq .Values.global.environment "preprod" }}
+    - name: two_factor_disabled
+      tags:
+        - { ty: user, field: user_id }
+    - name: two_factor_backup_code_spent
+      tags:
+        - { ty: user, field: user_id }
+{{- end }}
     - name: user
       tags:
         - { ty: user, field: id }

@@ -52,6 +52,8 @@ securityBaseline:
   strictGatewayIngress: true
 
 mycure-dashboard:
+  image:
+    tag: "0.14.29"
   resources:
     requests:
       cpu: 10m
@@ -680,7 +682,7 @@ cadence:
   # organization_partners dropped).
   dropUnusedTables: true
   image:
-    tag: "2.1.106"
+    tag: "2.1.107"
   readIdleMs: 600000
   leafidsGlobalBudget: 150000
   maxConcurrentServes: 8
