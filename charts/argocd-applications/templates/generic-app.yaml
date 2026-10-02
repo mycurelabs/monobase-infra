@@ -51,6 +51,7 @@
 {{- fail (printf "appRegistry entry %q references config key %q, which is %s, not a map. Expected a config block like `%s: {enabled: ...}`." $name $app.key (kindOf $vals) $app.key) }}
 {{- end }}
 {{- if $vals.enabled }}
+{{- $manualDeployment := $vals.manualDeployment | default false }}
 ---
 apiVersion: argoproj.io/v1alpha1
 kind: Application
@@ -70,19 +71,25 @@ spec:
     helm:
       releaseName: {{ $name }}
       valuesObject:
-        {{- toYaml $vals | nindent 8 }}
+        {{- toYaml (omit $vals "manualDeployment") | nindent 8 }}
         global: {{ $root.Values.global | toYaml | nindent 10 }}
   destination:
     server: https://kubernetes.default.svc
     namespace: {{ $root.Values.global.namespace }}
   syncPolicy:
+    {{- if not $manualDeployment }}
     automated:
       prune: true
       selfHeal: true
+    {{- end }}
     syncOptions:
       - CreateNamespace=false
     retry:
+      {{- if $manualDeployment }}
+      limit: 0
+      {{- else }}
       limit: 5
+      {{- end }}
       backoff:
         duration: 10s
         maxDuration: 5m

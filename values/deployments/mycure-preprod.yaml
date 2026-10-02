@@ -52,6 +52,8 @@ securityBaseline:
   strictGatewayIngress: true
 
 mycure-dashboard:
+  # Operator-gated preprod UI releases; no automatic rollout, pruning, or retries.
+  manualDeployment: true
   image:
     tag: "0.14.29"
   resources:
