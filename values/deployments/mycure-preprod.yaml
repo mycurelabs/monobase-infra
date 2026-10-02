@@ -55,7 +55,7 @@ mycure-dashboard:
   # Operator-gated preprod UI releases; no automatic rollout, pruning, or retries.
   manualDeployment: true
   image:
-    tag: "0.14.29"
+    tag: "0.14.30@sha256:35cc62c1dd4cdbc65c9b52a3c774ab4a19d6687dee37715375985d71c8f79c93"
   resources:
     requests:
       cpu: 10m
