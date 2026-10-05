@@ -103,7 +103,7 @@ hapihub:
   # audience-enforce baseline for the CARE full-thread e2e (/care/ask → medley
   # summarize-context → host Ollama). Re-pin to "11.20.129" after the e2e.
   image:
-    tag: "11.20.133@sha256:5e5a463b824265559a7244507588d2e35b23361b6b2bd415c2e6194fb3170650"
+    tag: "11.20.135-rc.0@sha256:6367d57735578453db5ea3f0672b4318973fba6a2cd982648ab218d59666754a"
   cache:
     # Prod parity: response cache OFF (the #2839/#2617 bentocache stampede
     # mitigation). Re-enable here first when re-validating the serve-stale fix.
