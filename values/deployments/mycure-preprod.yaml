@@ -97,13 +97,16 @@ hapihub:
   # catalog fingerprint unchanged; the running hub's startup/admission
   # fingerprint remains unverified. Fresh admission requires separate checks.
   #
-  # CARE-branch build (feat/care-inc1-governed-copilot@d385970, monobase-mycure
-  # PR #4570). Distinct -care.<sha> tag built off a throwaway deploy branch so it
-  # does NOT clobber the main :11.20.129 image. TEMPORARY: replaces joff's #4389
-  # audience-enforce baseline for the CARE full-thread e2e (/care/ask → medley
-  # summarize-context → host Ollama). Re-pin to "11.20.129" after the e2e.
+  # CARE-branch build (feat/care-inc1-governed-copilot@fd919f8a1, monobase-mycure
+  # PR #4570: Inc3 governed write-path + L2 ontology SoT + coded backbone + main-sync).
+  # Distinct -care.<sha> tag built off throwaway deploy/care-preprod-fd919f8a so it
+  # does NOT clobber main images. TEMPORARY: preprod tracks the CARE branch for the
+  # feature's duration; supersedes the 11.20.135-rc.0 pin (its rc-only
+  # 0112_portable_two_factor stays applied in the DB — orphaned but harmless; the
+  # CARE journal's 0112_care_resync/0113 timestamps sort AFTER it, so drizzle
+  # applies them cleanly). Re-pin to a plain main tag when preprod must be pristine.
   image:
-    tag: "11.20.135-rc.0@sha256:6367d57735578453db5ea3f0672b4318973fba6a2cd982648ab218d59666754a"
+    tag: "11.20.134-care.fd919f8a@sha256:023d0f417414d12009e250e8325117238560f5c6433c9380432146e83c6c1b4c"
   cache:
     # Prod parity: response cache OFF (the #2839/#2617 bentocache stampede
     # mitigation). Re-enable here first when re-validating the serve-stale fix.
@@ -416,7 +419,7 @@ medley:
   enabled: true
   image:
     repository: ghcr.io/mycurelabs/medley
-    tag: "2.0.6-care.4adec3f"  # CARE-branch build @4adec3f0d — summarize-context now PRE-SEEDS caller-provided sources as retrieved (fix: qwen skipped getProvidedContext → empty grounding → S1 refused). Distinct -care.<sha> tag (no clobber of main :2.0.6). Re-pin to "2.0.6" after e2e. Base: LCI skills (monobase-mycure#4356) + clinic-analytics UX (monobase-mycure#4385)
+    tag: "2.0.6-care.fd919f8a"  # CARE-branch build @fd919f8a1 (Inc3 Phase 2b commit-seam wiring; keeps the 4adec3f pre-seed grounding fix). Distinct -care.<sha> tag (no clobber of main :2.0.6). MEDLEY_MODELS selfHosted:true attestation below REQUIRED or boot fails closed. Re-pin to plain tag when preprod must be pristine.
     pullPolicy: IfNotPresent
   replicaCount: 1
   resources:
