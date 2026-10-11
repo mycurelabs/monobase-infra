@@ -583,7 +583,7 @@ cadence:
     clientId: easyjoey-native
     # EMPTY until the first EasyJoey clinic exists on staging — see ENROLLMENT above.
     # Format: "org:<id> org:<id>" (wildcards fail the render).
-    enrollScope: ""
+    enrollScope: "org:ejYQ4_lcu3_689T4S4WmtfAq"
     requireResponderGrant: true
     # Paid cloud-sync gate (#4967): only clinics with EasyJoey Cloud sync here; the
     # download-only setup window (easyjoey.setup) is derived automatically.
