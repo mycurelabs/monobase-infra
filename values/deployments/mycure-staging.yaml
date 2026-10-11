@@ -73,6 +73,7 @@ hapihub:
     enabled: true
     policyTypes:
       - Ingress
+      - Egress
     ingress:
       - from:
           - namespaceSelector:
@@ -84,6 +85,17 @@ hapihub:
         ports:
           - protocol: TCP
             port: 7500
+    # Outbound HTTPS to the internet (owner-approved 2026-10-12). Staging's
+    # security baseline denies all egress (default-deny-egress); hapihub needs
+    # Stripe (EasyJoey checkout, billing-provider setup) and other third-party
+    # APIs. Same rule as openmed: TCP 443 only.
+    egress:
+      - to:
+          - ipBlock:
+              cidr: 0.0.0.0/0
+        ports:
+          - protocol: TCP
+            port: 443
   # no Prometheus Operator on this lean k3d cluster (monitoring disabled)
   serviceMonitor:
     enabled: false
