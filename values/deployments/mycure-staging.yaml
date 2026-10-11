@@ -565,7 +565,10 @@ cadence:
   postgresql:
     serviceName: postgresql-primary
     # Read-plane split: reconcile/serve scans read from the replica; writes on primary.
-    readServiceName: postgresql-read
+    # Staging's postgresql-read replica is not replicating (pg_stat_replication empty on the primary;
+    # the replica never replayed and lacks newer tables), so the hub's lazy baseline failed with
+    # "relation cadence_fp does not exist". Read from the primary until the replica is repaired.
+    readServiceName: ""
   gateway:
     sectionName: https-staging-lfh
     udpListener: cadence-quic-staging
