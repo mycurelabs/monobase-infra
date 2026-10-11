@@ -8,6 +8,15 @@
 # internal ones (encryption keys, auth, DB/cache/storage) generated fresh;
 # external integrations (Google OAuth, Stripe, GCS storage) stubbed until real
 # staging values are provisioned. Tear down with `k3d cluster delete`.
+#
+# EASYJOEY ON STAGING (owner decision 2026-10-12; the preprod plan is cancelled):
+# staging runs monobase-mycure `feat/easyjoey` (environment/staging -> feat/easyjoey;
+# the staging lane still bumps hapihub.image.tag on this branch). The single `cadence:`
+# hub below is REPURPOSED as the EasyJoey cloud anchor (ALPN easyjoey/1, fleet
+# easyjoey-staging, registered client easyjoey-native, finite clinic scopes) — it no
+# longer serves MYCURE boxes (fleet mycure-staging / ALPN hapihub/2), which lose sync
+# here; accepted. The three EasyJoey frontends (easyjoey, easyjoey-website,
+# easyjoey-accounts) run from the app chart. Staging may be wiped/replaced freely.
 
 extends: base
 global:
@@ -71,7 +80,28 @@ hapihub:
       rpName: "Mycure (staging)"
       rpId: "staging.localfirsthealth.com"
   config:
-    CORS_ORIGINS: "https://hapihub.staging.localfirsthealth.com,https://mycure.staging.localfirsthealth.com,https://mycure-dashboard.staging.localfirsthealth.com,https://mycure-pxp.staging.localfirsthealth.com,https://medleyapp.staging.localfirsthealth.com,https://mycure-pr--*.web.app"
+    # + EasyJoey: the three frontends below and the Tauri shells (iOS/macOS webview origins).
+    CORS_ORIGINS: "https://hapihub.staging.localfirsthealth.com,https://mycure.staging.localfirsthealth.com,https://mycure-dashboard.staging.localfirsthealth.com,https://mycure-pxp.staging.localfirsthealth.com,https://medleyapp.staging.localfirsthealth.com,https://mycure-pr--*.web.app,https://easyjoey.staging.localfirsthealth.com,https://easyjoey-website.staging.localfirsthealth.com,https://easyjoey-accounts.staging.localfirsthealth.com,tauri://localhost,http://tauri.localhost"
+    # ---- EasyJoey (services/hapihub/docs/modules/sync.md "Cadence AS client profiles") ----
+    # Registered client `easyjoey-native`: its own audience (must start with `easyjoey-`
+    # and differ from CADENCE_ISSUER_FLEET_ID, else the profile is disabled) — unset, the
+    # discovery doc advertises the PRODUCTION defaults (easyjoey-production +
+    # https://cadence.localfirsthealth.com). Seed = the cadence hub below (its
+    # HTTPRoute host; QUIC on cadence.publicAddr). ONE engine on this DB, metadata in
+    # `public`, so /sync/scopes reads public.cadence_scope for EasyJoey grants too.
+    EASYJOEY_CADENCE_FLEET_ID: "easyjoey-staging"
+    EASYJOEY_CADENCE_SEED_URL: "https://cadence.staging.localfirsthealth.com"
+    EASYJOEY_CADENCE_METADATA_SCHEMA: "public"
+    # EasyJoey daily backups (#4956): encrypted device snapshots in their own bucket on
+    # the in-cluster MinIO (same creds as STORAGE_S3_*). Devices PUT/GET pre-signed URLs,
+    # so they are signed against MinIO's tailnet route (charts/minio-httproute, host
+    # storage.<domain>), not the in-cluster endpoint. BACKUPS_MASTER_KEY (secret) is
+    # wired in env + externalSecrets below; unset = backups answer 503.
+    BACKUPS_BUCKET: "easyjoey-backups-staging"
+    BACKUPS_PUBLIC_ENDPOINT: "https://storage.staging.localfirsthealth.com"
+    # Pin the file bucket: the chart derives STORAGE_BUCKET from minio.defaultBuckets,
+    # which now also lists the backups bucket (config wins after the env dedupe).
+    STORAGE_BUCKET: "monobase-files"
     # Medical-AI stack (medgemma-worker + openmed + medley) is ENABLED (preprod parity).
   env:
     - name: BETTER_AUTH_RATE_LIMIT_ENABLED
@@ -97,6 +127,16 @@ hapihub:
       value: "https://cadence.staging.localfirsthealth.com"
     - name: CADENCE_ISSUER_DEVICE_VERIFICATION_URI
       value: "https://mycure.staging.localfirsthealth.com/oauth/device"
+    # EasyJoey backups master key (32 bytes, hex or base64) — wraps each clinic's
+    # backup key. The chart maps only a fixed list of secret keys to env, so it is
+    # wired here from the hapihub-secrets ExternalSecret (key synced below).
+    # optional: a missing key disables backups (503) instead of blocking the pod.
+    - name: BACKUPS_MASTER_KEY
+      valueFrom:
+        secretKeyRef:
+          name: hapihub-secrets
+          key: BACKUPS_MASTER_KEY
+          optional: true
   autoscaling:
     enabled: false
   # Staging's own mycure-staging-* GCP keys. ENC_*/PRIVATE_KEY/PUBLIC_KEY/
@@ -155,6 +195,11 @@ hapihub:
       # (single-line, \n-escaped; hapihub un-escapes). Generated for staging.
       - secretKey: CADENCE_ISSUER_KEY
         remoteKey: mycure-staging-cadence-issuer-key-pem
+      # EasyJoey backups master key (#4956). CREATE the GCP secret BEFORE this
+      # reaches the cluster: a missing remote key fails the WHOLE hapihub-secrets
+      # ExternalSecret sync (SecretSyncedError; ESO keeps the last-synced Secret).
+      - secretKey: BACKUPS_MASTER_KEY
+        remoteKey: mycure-staging-easyjoey-backups-master-key
   postgresql:
     # HA replication renames the writer service to postgresql-primary (the read
     # replica is postgresql-read). hapihub writes to the primary.
@@ -178,6 +223,51 @@ hapihub-docs:
   enabled: false
 nocodb:
   enabled: false
+# ===== EASYJOEY: static web frontends (owner decision 2026-10-12) =====
+# Images from monobase-mycure .github/workflows/easyjoey-web-release.yml (run
+# 38160087617, staging target), tag <package version>-staging.<git sha>. Static
+# Caddy on :8080; they only call hapihub from the browser. Ride the *.staging
+# wildcard listener/cert (https-staging-lfh); external-dns publishes each host
+# (tailnet-only, like the rest of staging). easyjoey-website + easyjoey-accounts bake
+# their URLs at build time; only the web app reads a runtime /config.json. All three
+# origins are in hapihub CORS_ORIGINS above.
+# !! The ghcr.io packages are PRIVATE at the time of this change and this cluster
+# has no ghcr pull secret: the pods ImagePullBackOff until the packages are made
+# public (owner action) or an imagePullSecrets entry is added here.
+easyjoey:
+  enabled: true
+  image:
+    tag: "0.2.0-staging.028955b"
+  resources:
+    requests:
+      cpu: 10m
+  gateway:
+    hostname: "easyjoey.staging.localfirsthealth.com"
+    sectionName: https-staging-lfh
+  # Runtime override written to /config.json by the image entrypoint.
+  config:
+    API_URL: "https://hapihub.staging.localfirsthealth.com"
+    HAPIHUB_URL: "https://hapihub.staging.localfirsthealth.com"
+easyjoeyWebsite:
+  enabled: true
+  image:
+    tag: "0.1.0-staging.028955b"
+  resources:
+    requests:
+      cpu: 10m
+  gateway:
+    hostname: "easyjoey-website.staging.localfirsthealth.com"
+    sectionName: https-staging-lfh
+easyjoeyAccounts:
+  enabled: true
+  image:
+    tag: "0.1.0-staging.028955b"
+  resources:
+    requests:
+      cpu: 10m
+  gateway:
+    hostname: "easyjoey-accounts.staging.localfirsthealth.com"
+    sectionName: https-staging-lfh
 # ===== MEDICAL AI: full parity with preprod (mirrored) =====
 # Ollama runs on the vanaheim HOST — the AI services reach it via host.k3d.internal
 # (k3d's host gateway) instead of preprod's ollama.tailscale.svc egress (ollamaEgress
@@ -341,6 +431,11 @@ minio:
   enabled: true
   gateway:
     sectionName: https-staging-lfh
+  # Bitnami MINIO_DEFAULT_BUCKETS (comma-separated STRING): the base file bucket +
+  # the EasyJoey backups bucket (hapihub BACKUPS_BUCKET). hapihub also creates the
+  # bucket lazily on the first presign, so this is belt-and-braces; changing it
+  # restarts the MinIO pod. hapihub pins STORAGE_BUCKET=monobase-files in config.
+  defaultBuckets: "monobase-files,easyjoey-backups-staging"
   # WORM 6-year audit cold-archive is OFF in lean staging.
   auditArchive:
     enabled: false
@@ -363,6 +458,24 @@ cadenceRelay:
     hostname: cadence-relay.staging.localfirsthealth.com
     sectionName: https-staging-lfh
     udpListener: relay-quic-staging
+# ===== P2P SYNC: the staging hub, REPURPOSED as the EasyJoey cloud anchor =====
+# Owner decision 2026-10-12. Mirrors the working local EasyJoey dev anchor
+# (alpn easyjoey/1, require_responder_grant, require_entitlement easyjoey.cloud,
+# retention 35d, a finite clinic-scoped grant from `cadence auth login --client-id
+# easyjoey-native`), on staging's hapihub DB (authoritative PostgreSQL, metadata in
+# `public` — the ONLY engine on this DB). Sync manifest = charts/cadence/files/
+# cadence.yaml with dropUnusedTables, verified identical to monobase-mycure
+# feat/easyjoey services/hapihub/cadence.yaml (76 collections) — do NOT add
+# staging-only collections, the schema fingerprint must match the devices exactly.
+#
+# ENROLLMENT (chicken-and-egg): the hub can only enroll clinics that EXIST in the
+# easyjoey realm, and none do on a fresh deploy. With auth.enrollScope empty the
+# enroll initContainer WAITS (pod stays Init, logs a hint). Operator, once the first
+# EasyJoey clinic is created on staging: put its org id(s) in auth.enrollScope
+# ("org:<id> org:<id>") on cluster/vanaheim -> ArgoCD rolls the pod -> it enrolls
+# (issuer checks each org's realm and adds the fam: topic) -> the hub syncs those
+# clinics. Each new clinic = append + commit. The grant is capped at 30 days and not
+# refreshed by the hub: restart the cadence Deployment (ArgoCD "Restart") within 30d.
 cadence:
   enabled: true
   # No Prometheus Operator on this lean k3d cluster — the ServiceMonitor CRD
@@ -370,10 +483,23 @@ cadence:
   serviceMonitor:
     enabled: false
   image:
-    tag: "2.1.105"
+    # EasyJoey build from monobase-mycure feat/easyjoey (registered-client enroll,
+    # require_entitlement + setup window, retain_application_rows_on_eviction).
+    # Published by the cadence release run — until then the pod is ImagePullBackOff.
+    tag: "2.1.108-easyjoey.0"
+  # EasyJoey application protocol (MYCURE is hapihub/2 — the two never cross-talk).
+  alpn: "easyjoey/1"
   # staging hapihub (11.20.120) already dropped file_links + organization_partners,
   # so gate those collection entries off or cadence crash-loops (same as preprod).
+  # Also = the feat/easyjoey manifest (see above).
   dropUnusedTables: true
+  tuning:
+    # 35d: tombstones outlive the 30-day backup window (#4956) — dev-anchor parity.
+    retentionSecs: 3024000
+    # REQUIRED before a finite scope on this authoritative DB: losing the old
+    # MYCURE '*' scope (and any later clinic removal) must drop sync metadata only,
+    # never the canonical hapihub rows.
+    retainApplicationRowsOnEviction: true
   # no nodePool: k3d nodes are untainted (preprod pins nonprod, which doesn't exist here).
   nodePool: ""
   resources:
@@ -411,10 +537,24 @@ cadence:
   auth:
     issuerUrl: https://hapihub.staging.localfirsthealth.com
     grantJwksUri: https://hapihub.staging.localfirsthealth.com/.well-known/jwks.json
-    fleetId: mycure-staging
+    # = hapihub EASYJOEY_CADENCE_FLEET_ID (the easyjoey-native audience).
+    fleetId: easyjoey-staging
     authorizeUrl: https://hapihub.staging.localfirsthealth.com/sync/authorize
+    # Registered product client: finite clinic enrollment (no '*'), presented with
+    # the trusted service-account key below (membership bypass for the hub).
+    clientId: easyjoey-native
+    # EMPTY until the first EasyJoey clinic exists on staging — see ENROLLMENT above.
+    # Format: "org:<id> org:<id>" (wildcards fail the render).
+    enrollScope: ""
+    requireResponderGrant: true
+    # Paid cloud-sync gate (#4967): only clinics with EasyJoey Cloud sync here; the
+    # download-only setup window (easyjoey.setup) is derived automatically.
+    requireEntitlement: easyjoey.cloud
   # Service-account API key (service@mycure.md, non-expiring) minted into hapihub-staging's
-  # better-auth by scripts/seed.ts and stored at mycure-staging-cadence-sa-api-key.
+  # better-auth by scripts/seed.ts and stored at mycure-staging-cadence-sa-api-key. The key
+  # MUST be a trusted sync service account (operator-tagged metadata.serviceAccount: true —
+  # hapihub sync/trusted-caller.ts): the easyjoey-native enroll relies on its membership
+  # bypass. Re-seed (with that tag) whenever the staging DB is wiped.
   externalSecrets:
     secrets:
       - secretKey: sa-api-key
