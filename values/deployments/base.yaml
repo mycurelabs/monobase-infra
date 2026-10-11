@@ -49,6 +49,17 @@ appRegistry:
   developer-portal:
     key: developerPortal
     chart: app
+  # EasyJoey static frontends (monobase-mycure feat/easyjoey) — off everywhere
+  # by default; enabled per overlay (staging only today).
+  easyjoey:
+    key: easyjoey
+    chart: app
+  easyjoey-accounts:
+    key: easyjoeyAccounts
+    chart: app
+  easyjoey-website:
+    key: easyjoeyWebsite
+    chart: app
   hapihub-docs:
     key: hapihub-docs
     chart: app
@@ -375,6 +386,69 @@ developerPortal:
 
   gateway:
     hostname: ""  # defaults to developer-portal.<domain>
+  podDisruptionBudget:
+    enabled: false
+
+# ===== EASYJOEY: static web frontends (monobase-mycure feat/easyjoey) =====
+# Static Vite SPAs served by Caddy on :8080 (app chart contract), built by
+# monobase-mycure .github/workflows/easyjoey-web-release.yml and tagged
+# <package version>-<env>.<git sha> (never :latest).
+#   easyjoey          — the EasyJoey web app; reads a runtime /config.json
+#                       (config.API_URL / HAPIHUB_URL).
+#   easyjoey-website  — marketing site; URLs baked at build time.
+#   easyjoey-accounts — LF Accounts; URLs baked at build time.
+# OFF by default: each overlay that runs EasyJoey enables them. The base blocks
+# exist so generic-app.yaml's fail-closed guard can tell a legitimately-off app
+# from a misspelled registry key. Pure frontends — no secrets. The ghcr.io
+# packages must be public (or the overlay must set imagePullSecrets).
+easyjoey:
+  enabled: false
+  image:
+    repository: ghcr.io/mycurelabs/easyjoey
+    pullPolicy: IfNotPresent
+  replicaCount: 1
+  resources:
+    requests:
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 128Mi
+  gateway:
+    hostname: ""  # defaults to easyjoey.<domain>
+  podDisruptionBudget:
+    enabled: false
+
+easyjoeyWebsite:
+  enabled: false
+  image:
+    repository: ghcr.io/mycurelabs/easyjoey-website
+    pullPolicy: IfNotPresent
+  replicaCount: 1
+  resources:
+    requests:
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 128Mi
+  gateway:
+    hostname: ""  # defaults to easyjoey-website.<domain>
+  podDisruptionBudget:
+    enabled: false
+
+easyjoeyAccounts:
+  enabled: false
+  image:
+    repository: ghcr.io/mycurelabs/easyjoey-accounts
+    pullPolicy: IfNotPresent
+  replicaCount: 1
+  resources:
+    requests:
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 128Mi
+  gateway:
+    hostname: ""  # defaults to easyjoey-accounts.<domain>
   podDisruptionBudget:
     enabled: false
 

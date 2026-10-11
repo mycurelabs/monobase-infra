@@ -62,7 +62,7 @@ baseline_for() {
     mycure-production)
       echo "mycure-production-cadence mycure-production-cadence-relay mycure-production-hapihub-docs mycure-production-mycure mycure-production-mycure-dashboard mycure-production-mycure-myaccount mycure-production-mycure-pxp mycure-production-mycurelocal" ;;
     mycure-staging)
-      echo "mycure-staging-cadence mycure-staging-cadence-relay mycure-staging-medgemma-worker mycure-staging-medleyapp mycure-staging-mycure mycure-staging-mycure-dashboard mycure-staging-mycure-pxp mycure-staging-openmed" ;;
+      echo "mycure-staging-cadence mycure-staging-cadence-relay mycure-staging-easyjoey mycure-staging-easyjoey-accounts mycure-staging-easyjoey-website mycure-staging-medgemma-worker mycure-staging-medleyapp mycure-staging-mycure mycure-staging-mycure-dashboard mycure-staging-mycure-pxp mycure-staging-openmed" ;;
     mycure-preprod)
       echo "mycure-preprod-cadence mycure-preprod-cadence-relay mycure-preprod-hapihub-docs mycure-preprod-medley mycure-preprod-mycure mycure-preprod-mycure-dashboard mycure-preprod-mycure-myaccount mycure-preprod-mycure-pxp mycure-preprod-mycurelocal" ;;
     *)
