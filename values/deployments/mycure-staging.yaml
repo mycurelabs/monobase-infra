@@ -524,7 +524,7 @@ cadence:
     # EasyJoey build from monobase-mycure feat/easyjoey (registered-client enroll,
     # require_entitlement + setup window, retain_application_rows_on_eviction).
     # Published by the cadence release run — until then the pod is ImagePullBackOff.
-    tag: "2.1.108-easyjoey.0"
+    tag: "2.1.108-easyjoey.1"
   # EasyJoey application protocol (MYCURE is hapihub/2 — the two never cross-talk).
   alpn: "easyjoey/1"
   # staging hapihub (11.20.120) already dropped file_links + organization_partners,
@@ -583,7 +583,12 @@ cadence:
     clientId: easyjoey-native
     # EMPTY until the first EasyJoey clinic exists on staging — see ENROLLMENT above.
     # Format: "org:<id> org:<id>" (wildcards fail the render).
-    enrollScope: "org:ejYQ4_lcu3_689T4S4WmtfAq"
+    # Follow mode (owner request 2026-10-12): the hub enrolls for every EasyJoey-realm clinic hapihub
+    # lists to its trusted service key and re-enrolls when a clinic is added or removed, so new
+    # signups sync without an infra edit. enrollScope is ignored while followScopes is on.
+    enrollScope: ""
+    followScopes: true
+    followScopesEverySecs: 120
     requireResponderGrant: true
     # Paid cloud-sync gate (#4967): only clinics with EasyJoey Cloud sync here; the
     # download-only setup window (easyjoey.setup) is derived automatically.

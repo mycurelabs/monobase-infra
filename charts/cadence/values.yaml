@@ -114,6 +114,13 @@ auth:
   # (the pod rolls and re-enrolls). Product grants are one-shot and capped (EasyJoey: 30d) — restart
   # the pod before the grant expires.
   enrollScope: ""
+  # With clientId only: follow the product's clinics automatically instead of enrollScope (cadence >=
+  # 2.1.108-easyjoey.1). The main container enrolls with `cadence auth scopes` (hapihub lists the
+  # registered client's realm clinics to the trusted hub service account), then runs
+  # `--follow-scopes-every`: a changed clinic list or a grant near expiry exits 75 and the container
+  # restarts and re-enrolls. No enroll initContainer; enrollScope is ignored.
+  followScopes: false
+  followScopesEverySecs: 300
   # cadence auth.require_responder_grant: refuse catch-up data to/from peers without an issuer-verified,
   # transport-bound grant for this fleet. Required for the entitlement setup window.
   requireResponderGrant: false
