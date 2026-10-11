@@ -66,6 +66,15 @@ service:
   targetPort: 7500
   annotations: {}
 
+# Public webhook ingress (Tailscale Funnel) for third-party callbacks only — see
+# templates/public-webhook-ingress.yaml. Off by default.
+publicWebhook:
+  enabled: false
+  # MagicDNS name: https://<hostname>.<tailnet>.ts.net
+  hostname: ""
+  # Exact path prefixes made public, e.g. ["/billing/webhooks/stripe"].
+  paths: []
+
 # Gateway API HTTPRoute configuration
 gateway:
   enabled: true

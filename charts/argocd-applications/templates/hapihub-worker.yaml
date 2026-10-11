@@ -76,6 +76,13 @@ spec:
         {{- if (($merged.pruneExpiredDpopJti) | default dict).enabled }}
         {{- $merged = mergeOverwrite $merged (dict "pruneExpiredDpopJti" (dict "provision" (dict "enabled" false))) }}
         {{- end }}
+        {{- /* The public (Tailscale Funnel) webhook Ingress fronts the API release only —
+             a worker copy would publish a second funnel device pointing at the worker.
+             Injected only when the overlay enables it, so other envs render
+             byte-identical. */ -}}
+        {{- if (($merged.publicWebhook) | default dict).enabled }}
+        {{- $merged = mergeOverwrite $merged (dict "publicWebhook" (dict "enabled" false)) }}
+        {{- end }}
         {{- toYaml $merged | nindent 8 }}
         global: {{ .Values.global | toYaml | nindent 10 }}
         {{- /* chartRepo/chartVersion pin the standalone Application's OCI source, not

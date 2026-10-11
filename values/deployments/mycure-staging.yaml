@@ -58,6 +58,32 @@ hapihub:
     tag: "11.20.135-easyjoey.0-staging.48dd82a"
   cache:
     enabled: true
+  # Stripe webhooks for EasyJoey payments (monobase-mycure #4955/#4967). Staging is
+  # tailnet-only, so Stripe reaches ONLY this path through a Tailscale Funnel:
+  # https://easyjoey-stripe-staging.tail06ec7f.ts.net/billing/webhooks/stripe
+  # Everything else stays tailnet-only; Stripe's signing secret authenticates calls.
+  publicWebhook:
+    enabled: true
+    hostname: easyjoey-stripe-staging
+    paths:
+      - /billing/webhooks/stripe
+  # Base allows only the nginx gateway; the Funnel proxy runs in the tailscale
+  # namespace, so it is allowed too (lists replace, so base's rule is restated).
+  networkPolicy:
+    enabled: true
+    policyTypes:
+      - Ingress
+    ingress:
+      - from:
+          - namespaceSelector:
+              matchLabels:
+                kubernetes.io/metadata.name: nginx-gateway-system
+          - namespaceSelector:
+              matchLabels:
+                kubernetes.io/metadata.name: tailscale
+        ports:
+          - protocol: TCP
+            port: 7500
   # no Prometheus Operator on this lean k3d cluster (monitoring disabled)
   serviceMonitor:
     enabled: false

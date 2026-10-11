@@ -1,0 +1,45 @@
+{{- /*
+Public (Tailscale Funnel) ingress for third-party webhooks ONLY, e.g. Stripe's
+/billing/webhooks/stripe. The rest of hapihub stays tailnet-only: the Tailscale
+operator proxies only the listed paths (path preserved); any other path has no
+handler. Off by default. Needs the tailnet policy to grant the `funnel` node
+attribute to the operator's proxy tag (tag:k8s).
+*/}}
+{{- if and .Values.enabled .Values.publicWebhook (default false .Values.publicWebhook.enabled) }}
+{{- /* Fail closed: an empty list would render an Ingress with no paths, and a bare "/" would publish
+       ALL of hapihub to the internet. Every entry must be a specific absolute path prefix. */}}
+{{- if not .Values.publicWebhook.paths }}
+{{- fail "publicWebhook.paths must list at least one path prefix (e.g. /billing/webhooks/stripe)" }}
+{{- end }}
+{{- range .Values.publicWebhook.paths }}
+{{- if or (not (hasPrefix "/" .)) (eq . "/") }}
+{{- fail (printf "publicWebhook.paths entry %q must be a specific absolute path prefix (not \"/\")" .) }}
+{{- end }}
+{{- end }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "hapihub.fullname" . }}-public-webhook
+  namespace: {{ include "hapihub.namespace" . }}
+  labels:
+    {{- include "hapihub.labels" . | nindent 4 }}
+  annotations:
+    tailscale.com/funnel: "true"
+spec:
+  ingressClassName: tailscale
+  tls:
+    - hosts:
+        - {{ required "publicWebhook.hostname is required" .Values.publicWebhook.hostname | quote }}
+  rules:
+    - http:
+        paths:
+          {{- range .Values.publicWebhook.paths }}
+          - path: {{ . | quote }}
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "hapihub.fullname" $ }}
+                port:
+                  number: {{ $.Values.service.port }}
+          {{- end }}
+{{- end }}
