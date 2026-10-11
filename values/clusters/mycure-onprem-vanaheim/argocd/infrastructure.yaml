@@ -170,6 +170,13 @@ nginxGatewayResources:
         - name: relay-quic-preprod
           port: 7842
           protocol: UDP
+        # EasyJoey Cadence hub on shared preprod (release cadence-easyjoey, ALPN
+        # easyjoey/1): its own UDP port — cadenceEasyjoey.publicAddr advertises
+        # <this gateway's tailnet IP>:6475. 6472 = prod, 6473 = preprod MYCURE hub,
+        # 6474 = staging.
+        - name: cadence-quic-easyjoey-preprod
+          port: 6475
+          protocol: UDP
 
     # ---- SANDBOX gateway (isolated MediCard sandbox, monobase-mycure#4509).
     # Own Gateway so the sandbox can live on a SEPARATE Tailscale account:

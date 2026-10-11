@@ -6,7 +6,7 @@
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
-  name: cadence
+  name: {{ include "cadence.fullname" . }}
   namespace: {{ include "cadence.namespace" . }}
   labels:
     {{- include "cadence.labels" . | nindent 4 }}

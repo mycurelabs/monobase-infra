@@ -360,3 +360,7 @@ roleSplit:
   appRw:
     statementTimeout: "30s"
     idleInTransactionTimeout: "60s"
+  # Extra Cadence metadata schemas to pre-create (owner `cadence`; app_rw read-only)
+  # for additional Cadence engines sharing this DB, e.g. [cadence_easyjoey]. Empty ⇒
+  # the provision SQL is unchanged. See charts/cadence postgresql.metadataSchema.
+  cadenceMetadataSchemas: []

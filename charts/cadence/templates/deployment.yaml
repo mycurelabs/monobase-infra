@@ -1,18 +1,31 @@
 {{- if .Values.enabled }}
 {{- $pgHost := printf "%s.%s.svc.cluster.local" (.Values.postgresql.serviceName | default "postgresql") (include "cadence.namespace" .) -}}
-{{- $db := printf "postgres://%s:$(PGPASS)@%s:%v/%s" (include "cadence.postgresql.username" .) $pgHost (.Values.postgresql.port | default 5432) (include "cadence.postgresql.database" .) -}}
+{{- /* postgresql.metadataSchema (empty for the stock hub) appends the SQLx search_path option so a second
+       engine on the SAME database keeps its identity/grant/capture/metadata in its own schema; it is
+       applied to BOTH the primary and the read URL (the engine fails startup on a mismatched read
+       schema). Empty ⇒ "" ⇒ the historical URL, byte-for-byte. */ -}}
+{{- $dbOpts := include "cadence.postgresql.urlOptions" . -}}
+{{- $db := printf "postgres://%s:$(PGPASS)@%s:%v/%s%s" (include "cadence.postgresql.username" .) $pgHost (.Values.postgresql.port | default 5432) (include "cadence.postgresql.database" .) $dbOpts -}}
 {{- /* Read-plane URL (postgresql.readServiceName, e.g. the streaming replica's service): the hub's
        reconcile/serve scan queries go there; writes + LWW admission reads stay on $db. Unset ⇒ no env,
        everything on $db. */ -}}
 {{- $dbRead := "" -}}
 {{- if .Values.postgresql.readServiceName -}}
 {{- $readHost := printf "%s.%s.svc.cluster.local" .Values.postgresql.readServiceName (include "cadence.namespace" .) -}}
-{{- $dbRead = printf "postgres://%s:$(PGPASS)@%s:%v/%s" (include "cadence.postgresql.username" .) $readHost (.Values.postgresql.port | default 5432) (include "cadence.postgresql.database" .) -}}
+{{- $dbRead = printf "postgres://%s:$(PGPASS)@%s:%v/%s%s" (include "cadence.postgresql.username" .) $readHost (.Values.postgresql.port | default 5432) (include "cadence.postgresql.database" .) $dbOpts -}}
+{{- end -}}
+{{- /* A second engine must not share the stock hub's selector: with the default name label its pods
+       would join the `cadence` Service/NetworkPolicy and receive the MYCURE hub's traffic. */ -}}
+{{- if and (ne (include "cadence.fullname" .) .Chart.Name) (eq (include "cadence.name" .) .Chart.Name) -}}
+{{- fail (printf "release %q renders as %q but keeps the stock selector app.kubernetes.io/name=%s: set nameOverride (e.g. nameOverride: %s) so a second Cadence engine gets its own pods/Service selector." .Release.Name (include "cadence.fullname" .) .Chart.Name (include "cadence.fullname" .)) -}}
+{{- end -}}
+{{- if and .Values.auth.enrollScope (not .Values.auth.clientId) -}}
+{{- fail "auth.enrollScope is only honored with auth.clientId (a registered product client); the stock hub always enrolls '*'." -}}
 {{- end -}}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: cadence
+  name: {{ include "cadence.fullname" . }}
   namespace: {{ include "cadence.namespace" . }}
   labels:
     {{- include "cadence.labels" . | nindent 4 }}
@@ -60,10 +73,21 @@ spec:
         args:
           - |
             set -u
+            {{- if .Values.auth.clientId }}
+            # Registered product client (auth.clientId): finite org:<id> scopes only — the engine verifies
+            # the signed audience, key binding and the exact requested clinic set before persisting, and
+            # refuses '*'. The grant is one-shot (no refresh persisted; EasyJoey caps it at 30d): restart
+            # the pod (re-enroll) before it expires.
+            until cadence auth login --db "$CADENCE_DB" --issuer-url "$CADENCE_ISSUER_URL" --client-id "$CADENCE_AUTH_CLIENT_ID" --scope "$CADENCE_ENROLL_SCOPE"; do
+              echo "waiting for hapihub AS ($CADENCE_ISSUER_URL) + metadata schema / scope ($CADENCE_ENROLL_SCOPE)…"; sleep 3
+            done
+            echo "hub authorized — finite $CADENCE_AUTH_CLIENT_ID grant persisted (minted by hapihub)"
+            {{- else }}
             until cadence auth login --db "$CADENCE_DB" --issuer-url "$CADENCE_ISSUER_URL" --scope '*'; do
               echo "waiting for hapihub AS ($CADENCE_ISSUER_URL) + cadence_v2 DB…"; sleep 3
             done
             echo "hub authorized — '*' grant persisted (minted by hapihub)"
+            {{- end }}
         env:
         - name: PGPASS
           valueFrom:
@@ -76,11 +100,17 @@ spec:
           value: {{ .Values.auth.issuerUrl | quote }}
         - name: CADENCE_AUTH_AUTHORIZE_URL
           value: {{ .Values.auth.authorizeUrl | quote }}
+        {{- if .Values.auth.clientId }}
+        - name: CADENCE_AUTH_CLIENT_ID
+          value: {{ .Values.auth.clientId | quote }}
+        - name: CADENCE_ENROLL_SCOPE
+          value: {{ include "cadence.enrollScope" . | quote }}
+        {{- end }}
         # Non-expiring service-account API key, presented as the Bearer credential on the authorize call.
         - name: CADENCE_AUTH_BEARER
           valueFrom:
             secretKeyRef:
-              name: cadence-secrets
+              name: {{ include "cadence.fullname" . }}-secrets
               key: sa-api-key
       {{- end }}
       containers:
@@ -184,6 +214,10 @@ spec:
         - name: CADENCE_MAX_CONCURRENT_SERVES
           value: {{ . | quote }}
         {{- end }}
+        {{- with .Values.extraEnv }}
+        # Extra engine env (verbatim k8s EnvVar list) — per-release knobs without a dedicated value.
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
         ports:
         - name: quic
           containerPort: {{ .Values.udpPort }}
@@ -229,7 +263,7 @@ spec:
       volumes:
       - name: config
         configMap:
-          name: cadence-config
+          name: {{ include "cadence.fullname" . }}-config
       # Disk-backed (medium="" = node disk, NOT Memory — a Memory emptyDir would count against the
       # container mem limit we are protecting). Survives the OOM CONTAINER-restart (the hub OOMs are
       # same-pod container restarts, not reschedules), so the heap dump persists for kubectl-cp post-crest.

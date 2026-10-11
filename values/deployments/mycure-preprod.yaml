@@ -87,13 +87,28 @@ hapihub:
       # migrator password (2026-09-09 rotation, monobase-mycure#4147). ArgoCD
       # otherwise adopts an unchanged succeeded hook without re-running it.
       activeDeadlineSeconds: 900
+    # EasyJoey (shared-preprod decision 2026-10-12): pre-create the second Cadence
+    # engine's metadata schema in the provision-db-roles PreSync Job — owner
+    # `cadence`, USAGE + SELECT (incl. default privileges) to app_rw so hapihub's
+    # /sync/scopes can read cadence_easyjoey.cadence_scope. Must exist before the
+    # cadenceEasyjoey hub starts (the engine refuses a missing schema).
+    cadenceMetadataSchemas:
+      - cadence_easyjoey
   # Application/migration parity with prod, NOT a proven admission fix.
   # .124 already includes billing_items.taxes; 0101-0103 are cloud-only for
   # the 76-collection sync contract. The isolated .126 rehearsal left that
   # catalog fingerprint unchanged; the running hub's startup/admission
   # fingerprint remains unverified. Fresh admission requires separate checks.
+  #
+  # EasyJoey on shared preprod (owner decision 2026-10-12): realm-tagged orgs
+  # (organizations.data_realm, migration 0113) + realm-filtered grants, so EasyJoey
+  # and MYCURE share this hapihub + DB. Built from monobase-mycure feat/easyjoey;
+  # target ledger = 0123. NOT PUBLISHED at the time of this change — the release
+  # must exist before the (manual, runbook-gated) sync. manualDeployment above means
+  # merging this does NOT roll hapihub; follow
+  # docs/operations/preprod-hapihub-manual-deployment.md.
   image:
-    tag: "11.20.129"
+    tag: "11.20.135-easyjoey.0"
   cache:
     # Prod parity: response cache OFF (the #2839/#2617 bentocache stampede
     # mitigation). Re-enable here first when re-validating the serve-stale fix.
@@ -128,7 +143,24 @@ hapihub:
       rpId: "preprod.localfirsthealth.com"
 
   config:
-    CORS_ORIGINS: "https://hapihub.preprod.localfirsthealth.com,https://mycure.preprod.localfirsthealth.com,https://mycurelocal.preprod.localfirsthealth.com,https://mycure-myaccount.preprod.localfirsthealth.com,https://mycure-dashboard.preprod.localfirsthealth.com,https://mycure-pxp.preprod.localfirsthealth.com,https://developer-portal.preprod.localfirsthealth.com,https://mycure-pr--*.web.app,https://mycure-reconstruct.web.app,https://mycure-reconstruct.firebaseapp.com"
+    CORS_ORIGINS: "https://hapihub.preprod.localfirsthealth.com,https://mycure.preprod.localfirsthealth.com,https://mycurelocal.preprod.localfirsthealth.com,https://mycure-myaccount.preprod.localfirsthealth.com,https://mycure-dashboard.preprod.localfirsthealth.com,https://mycure-pxp.preprod.localfirsthealth.com,https://developer-portal.preprod.localfirsthealth.com,https://mycure-pr--*.web.app,https://mycure-reconstruct.web.app,https://mycure-reconstruct.firebaseapp.com,https://easyjoey.preprod.localfirsthealth.com,https://lf-accounts.preprod.localfirsthealth.com,https://easyjoey-app.preprod.localfirsthealth.com,tauri://localhost,http://tauri.localhost"
+    # ---- EasyJoey (shared preprod) ----
+    # Cadence AS client profile `easyjoey-native` (#4835): its own fleet/audience
+    # (must start with `easyjoey-` and differ from CADENCE_ISSUER_FLEET_ID), its own
+    # hub (cadenceEasyjoey below, ALPN easyjoey/1) and its own metadata schema, so
+    # /sync/scopes reads cadence_easyjoey.cadence_scope for EasyJoey grants.
+    # MYCURE keeps CADENCE_METADATA_SCHEMA unset (= public).
+    EASYJOEY_CADENCE_FLEET_ID: "easyjoey-preprod"
+    EASYJOEY_CADENCE_SEED_URL: "https://cadence-easyjoey.preprod.localfirsthealth.com"
+    EASYJOEY_CADENCE_METADATA_SCHEMA: "cadence_easyjoey"
+    # EasyJoey daily backups (#4956): encrypted device snapshots in their own bucket
+    # of the S3 storage provider (same MinIO creds as STORAGE_S3_*). Devices PUT/GET
+    # pre-signed URLs, so they are signed against the tailnet-reachable MinIO route
+    # (minio-httproute default host storage.<domain>), not the in-cluster endpoint.
+    # BACKUPS_MASTER_KEY (secret) is wired in externalSecrets + env below; unset =
+    # backups answer 503 "not configured".
+    BACKUPS_BUCKET: "easyjoey-backups-preprod"
+    BACKUPS_PUBLIC_ENDPOINT: "https://storage.preprod.localfirsthealth.com"
     # File storage — preprod-own in-cluster MinIO (S3-compatible), isolated
     # from prod's GCS bucket. Access creds (STORAGE_S3_ACCESS_KEY_ID/SECRET)
     # come from the minio secret via the externalSecret below; MinIO
@@ -197,6 +229,17 @@ hapihub:
       # the helper-composed DATABASE_URI, host postgresql-primary -> postgresql-read.
     - name: DATABASE_READ_URI
       value: "postgres://$(POSTGRESQL_USER):$(POSTGRESQL_PASSWORD)@postgresql-read.mycure-preprod.svc.cluster.local:5432/hapihub"
+      # EasyJoey backups master key (32 bytes, hex or base64) — wraps each clinic's
+      # backup key. The chart only maps a fixed list of secret keys to env, so this
+      # one is wired here from the hapihub-secrets ExternalSecret (key synced below;
+      # the worker inherits this list and reads the same Secret). optional: a
+      # missing key disables backups (503) instead of blocking the pod.
+    - name: BACKUPS_MASTER_KEY
+      valueFrom:
+        secretKeyRef:
+          name: hapihub-secrets
+          key: BACKUPS_MASTER_KEY
+          optional: true
       # NOTE: AUDIT_SINK_URL is NOT set on the API block — it is set on the
       # worker block below (only the worker emits the audit sink). Tenzir IS
       # enabled on this cluster now (tenzir.enabled=true in the vanaheim infra
@@ -253,6 +296,11 @@ hapihub:
         # RUN_WORKERS=true below); the API has the key but no URL so its sink never starts.
       - secretKey: AUDIT_SINK_SECRET
         remoteKey: mycure-preprod-tenzir-ingest-hmac
+        # EasyJoey backups master key (#4956). CREATE the GCP secret BEFORE merging:
+        # a missing remote key fails the WHOLE ExternalSecret sync (SecretSyncedError;
+        # ESO keeps the last-synced Secret, so later rotations would silently stall).
+      - secretKey: BACKUPS_MASTER_KEY
+        remoteKey: mycure-preprod-easyjoey-backups-master-key
 
   postgresql:
     serviceName: postgresql-primary
@@ -380,6 +428,53 @@ developerPortal:
   gateway:
     sectionName: https-preprod-lfh  # *.preprod.localfirsthealth.com wildcard listener (tailnet-only)
 
+  config:
+    API_URL: "https://hapihub.preprod.localfirsthealth.com"
+    HAPIHUB_URL: "https://hapihub.preprod.localfirsthealth.com"
+
+# ===== EASYJOEY: static web apps (shared preprod, owner decision 2026-10-12) =====
+# Images from monobase-mycure .github/workflows/easyjoey-web-release.yml (run
+# 38157717418), tag <package version>-preprod.<git sha>. Static Caddy on :8080;
+# safe to serve before hapihub is upgraded (they only call the API from the
+# browser). Ride the *.preprod wildcard listener/cert (https-preprod-lfh);
+# external-dns publishes each hostname. The website + LF Accounts bake their URLs
+# (apps/*/deploy/preprod.env: API https://hapihub.preprod…, accounts
+# https://lf-accounts.preprod…, site https://easyjoey.preprod…); only the web app
+# reads a runtime /config.json. All three origins are in hapihub CORS_ORIGINS.
+easyjoeyWebsite:
+  enabled: true
+  image:
+    tag: "0.1.0-preprod.4219531"
+  resources:
+    requests:
+      cpu: 10m
+  gateway:
+    hostname: "easyjoey.preprod.localfirsthealth.com"
+    sectionName: https-preprod-lfh
+
+lfAccounts:
+  enabled: true
+  image:
+    tag: "0.1.0-preprod.4219531"
+  resources:
+    requests:
+      cpu: 10m
+  gateway:
+    hostname: "lf-accounts.preprod.localfirsthealth.com"
+    sectionName: https-preprod-lfh
+
+easyjoeyWeb:
+  enabled: true
+  image:
+    tag: "0.2.0-preprod.4219531"
+  resources:
+    requests:
+      cpu: 10m
+  gateway:
+    hostname: "easyjoey-app.preprod.localfirsthealth.com"
+    sectionName: https-preprod-lfh
+  # Runtime override written to /tmp/config.json by the image entrypoint (empty =
+  # the baked VITE_API_URL, which is already the preprod hapihub).
   config:
     API_URL: "https://hapihub.preprod.localfirsthealth.com"
     HAPIHUB_URL: "https://hapihub.preprod.localfirsthealth.com"
@@ -515,8 +610,13 @@ postgresql:
       replicationPasswordKey: postgres-replication-password
 
   primary:
-    # Prod GUCs minus the archive_* block (walg off above). max_connections 300:
-    # cadence boot opens ~99 per-collection ensure connections simultaneously.
+    # Prod GUCs minus the archive_* block (walg off above). max_connections 400
+    # (was 300): cadence boot opens ~99 per-collection ensure connections
+    # simultaneously, and preprod now runs TWO Cadence engines on this DB (the
+    # MYCURE hub + cadenceEasyjoey, each up to a 16-conn sync pool plus boot-time
+    # ensure bursts) next to hapihub/worker/medley. The read replica below MUST
+    # stay >= the primary (a hot standby refuses to replay with a lower value).
+    # Changing it RESTARTS both PG pods (brief preprod DB outage) — coordinate.
     # max_slot_wal_keep_size 20GB: a dead replica must not fill the volume.
     extendedConfiguration: |
       shared_preload_libraries = 'pgaudit, pg_stat_statements'
@@ -526,7 +626,7 @@ postgresql:
       maintenance_work_mem = 256MB
       random_page_cost = 1.1
       effective_io_concurrency = 200
-      max_connections = 300
+      max_connections = 400
       max_slot_wal_keep_size = 20GB
       log_min_duration_statement = 1000
       autovacuum_max_workers = 6
@@ -565,7 +665,7 @@ postgresql:
       maintenance_work_mem = 256MB
       random_page_cost = 1.1
       effective_io_concurrency = 200
-      max_connections = 300
+      max_connections = 400
       log_min_duration_statement = 1000
       autovacuum_max_workers = 6
       autovacuum_vacuum_cost_limit = 2000
@@ -613,6 +713,13 @@ minio:
   gateway:
     sectionName: https-preprod-lfh
 
+  # Bitnami MINIO_DEFAULT_BUCKETS (comma-separated STRING, not a list): restate the
+  # base bucket + the EasyJoey backups bucket (BACKUPS_BUCKET on hapihub). hapihub
+  # also creates buckets lazily, so this is belt-and-braces; changing it restarts
+  # the MinIO pod. hapihub's own STORAGE_BUCKET stays "hapihub" (config wins over
+  # the chart's minio-derived default after the containerEnv dedupe).
+  defaultBuckets: "monobase-files,easyjoey-backups-preprod"
+
   # #3484 cold-archive rehearsal bed (WORM object-lock bucket for pruned
   # audit_events) — preprod-only prep, prod adoption still held for review.
   auditArchive:
@@ -656,8 +763,24 @@ cadence:
   # Prod parity (#415): manifest fingerprint matches current main (file_links +
   # organization_partners dropped).
   dropUnusedTables: true
+  # !!! OPERATOR SIGN-OFF REQUIRED — THIS ROLLS THE LIVE MYCURE HUB !!!
+  # The cadence Application auto-syncs, so this tag + the tuning flag below restart
+  # the MYCURE hub as soon as this file reaches the cluster's tracked branch
+  # (cluster/vanaheim). The preprod runbook forbids a Cadence restart without
+  # separate approval: time the main -> cluster/vanaheim merge with the operator,
+  # then run services/cadence/scripts/preprod-box-smoke.sh (monobase-mycure) against
+  # the existing box(es) BEFORE enabling cadenceEasyjoey.
+  # Why the upgrade is a prerequisite (services/cadence/docs/config.md
+  # #authoritative-application-database): the PUBLIC peer's capture function must be
+  # namespace-aware before a second engine starts (an older binary's global apply
+  # suppression would miss writes received through the EasyJoey peer), and BOTH
+  # authoritative peers must retain application rows on scope eviction (they share
+  # public.cadence_application_versions). Image NOT PUBLISHED at the time of this
+  # change (built from monobase-mycure feat/easyjoey).
   image:
-    tag: "2.1.103"
+    tag: "2.1.108-easyjoey.0"
+  tuning:
+    retainApplicationRowsOnEviction: true
   readIdleMs: 600000
   leafidsGlobalBudget: 150000
   maxConcurrentServes: 8
@@ -704,6 +827,110 @@ cadence:
   # belongs to the old (deleted) preprod DB. See the sa-api-key runbook in
   # the preprod reset notes.
   externalSecrets:
+    secrets:
+      - secretKey: sa-api-key
+        remoteKey: mycure-preprod-cadence-sa-api-key
+
+# ===== P2P SYNC: EasyJoey Cadence hub — second engine on the SAME hapihub DB =====
+# Owner decision 2026-10-12: EasyJoey runs on shared mycure-preprod (orgs are
+# realm-tagged via organizations.data_realm; hapihub filters grants by realm) with
+# ONE CADENCE ENGINE PER APPLICATION. Isolation from the MYCURE hub above:
+#   - ALPN easyjoey/1 (vs hapihub/2) + fleet/audience easyjoey-preprod (vs
+#     mycure-preprod): the fleets never cross-talk or cross-verify grants;
+#   - own metadata schema cadence_easyjoey (identity, grant, capture queue +
+#     functions, scope metadata) — application tables stay shared in public;
+#   - finite org scopes via the registered client easyjoey-native (no '*');
+#   - own Service/selector/routes (release cadence-easyjoey, nameOverride).
+# Sync manifest = charts/cadence/files/cadence.yaml with dropUnusedTables, which
+# matches monobase-mycure feat/easyjoey services/hapihub/cadence.yaml (the devices'
+# manifest; the schema fingerprint must match exactly).
+#
+# DISABLED until the rollout steps are done, in order (see the PR):
+#   1. hapihub 11.20.135-easyjoey.0 synced via the manual runbook (ledger 0123) —
+#      its provision-db-roles PreSync creates schema cadence_easyjoey;
+#   2. the MYCURE hub above upgraded to 2.1.108-easyjoey.0 + box smoke passed;
+#   3. auth.enrollScope set to the EasyJoey preprod test clinic org ids.
+# Then flip enabled: true in a follow-up change.
+cadenceEasyjoey:
+  enabled: false
+  # Distinct selector/name (charts/cadence multi-instance). REQUIRED: without it the
+  # pods would carry app.kubernetes.io/name=cadence and join the MYCURE hub's Service.
+  nameOverride: cadence-easyjoey
+  rustLog: "cadence=info,warn"
+  image:
+    repository: ghcr.io/mycurelabs/cadence
+    # NOT PUBLISHED at the time of this change (monobase-mycure feat/easyjoey).
+    tag: "2.1.108-easyjoey.0"
+    pullPolicy: IfNotPresent
+  alpn: "easyjoey/1"
+  # Same vanaheim internal-gateway tailnet IP as the MYCURE hub, own UDP listener
+  # port 6475 (cadence-quic-easyjoey-preprod in the vanaheim infrastructure.yaml).
+  # Changes on cluster nuke+rebootstrap, like cadence.publicAddr.
+  publicAddr: "100.124.242.71:6475"
+  nodePool: "infra"
+  relayUrl: ""
+  dropUnusedTables: true
+  readIdleMs: 600000
+  leafidsGlobalBudget: 150000
+  maxConcurrentServes: 8
+  serviceMonitor:
+    enabled: false
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: "2"
+      memory: 3Gi
+  postgresql:
+    serviceName: postgresql-primary
+    readServiceName: postgresql-read
+    # Applied to BOTH CADENCE_DB and CADENCE_DB_READ_URL as
+    # ?options[search_path]=cadence_easyjoey,pg_temp. Pre-created by hapihub
+    # roleSplit.cadenceMetadataSchemas (owner cadence).
+    metadataSchema: cadence_easyjoey
+    # Same least-privilege `cadence` role + secret as the MYCURE hub.
+    auth:
+      database: hapihub
+      username: cadence
+      existingSecret: postgresql-app-roles
+      secretKey: cadence-password
+  gateway:
+    sectionName: https-preprod-lfh
+    hostnames:
+      # = hapihub EASYJOEY_CADENCE_SEED_URL (bootstrap doc for EasyJoey devices).
+      - cadence-easyjoey.preprod.localfirsthealth.com
+    udpListener: cadence-quic-easyjoey-preprod
+  auth:
+    issuerUrl: https://hapihub.preprod.localfirsthealth.com
+    grantJwksUri: https://hapihub.preprod.localfirsthealth.com/.well-known/jwks.json
+    # = hapihub EASYJOEY_CADENCE_FLEET_ID.
+    fleetId: easyjoey-preprod
+    authorizeUrl: https://hapihub.preprod.localfirsthealth.com/sync/authorize
+    # Registered product client: the issuer selects the EasyJoey fleet/realm and
+    # verifies each org is data_realm=easyjoey. Wildcards fail the chart render.
+    clientId: easyjoey-native
+    # PLACEHOLDER — replace with the EasyJoey preprod test clinic org ids
+    # ("org:<id> org:<id>") before enabling. Adding a clinic later = edit + restart.
+    # The EasyJoey grant is capped at 30d and not refreshed by the hub: restart the
+    # pod (re-enroll) within 30 days.
+    enrollScope: "org:REPLACE_WITH_EASYJOEY_PREPROD_CLINIC_ORG_ID"
+    requireResponderGrant: true
+    # Paid cloud-sync gate (#4967): only clinics with EasyJoey Cloud sync here; the
+    # download-only setup window (easyjoey.setup) is derived automatically.
+    requireEntitlement: easyjoey.cloud
+  tuning:
+    # 35d: tombstones outlive the 30-day backup window (#4956).
+    retentionSecs: 3024000
+    # Authoritative shared PG DB: both engines MUST retain canonical rows.
+    retainApplicationRowsOnEviction: true
+  # Same service-account API key as the MYCURE hub (service@mycure.md, a trusted
+  # sync service account) — its own ExternalSecret cadence-easyjoey-secrets.
+  externalSecrets:
+    enabled: true
+    secretStore: gcp-secretstore
+    secretStoreKind: ClusterSecretStore
+    refreshInterval: 1h
     secrets:
       - secretKey: sa-api-key
         remoteKey: mycure-preprod-cadence-sa-api-key

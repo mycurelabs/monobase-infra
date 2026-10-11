@@ -146,4 +146,25 @@ data:
     --    raise roleSplit.appRw.statementTimeout in the prod overlay first. ──
     ALTER ROLE app_rw SET statement_timeout = '{{ (((.Values.roleSplit | default dict).appRw | default dict).statementTimeout) | default "30s" }}';
     ALTER ROLE app_rw SET idle_in_transaction_session_timeout = '{{ (((.Values.roleSplit | default dict).appRw | default dict).idleInTransactionTimeout) | default "60s" }}';
+    {{- range ((.Values.roleSplit | default dict).cadenceMetadataSchemas | default list) }}
+    {{- if or (not (regexMatch "^[a-z_][a-z0-9_]{0,39}$" .)) (hasPrefix "pg_" .) (has . (list "public" "information_schema" "drizzle" "pgboss")) }}
+    {{- fail (printf "roleSplit.cadenceMetadataSchemas entry %q is not a usable Cadence metadata schema (lowercase [a-z0-9_], <= 40 chars, not pg_*/public/information_schema/drizzle/pgboss)." .) }}
+    {{- end }}
+
+    -- ── Cadence metadata schema {{ . }} (a second engine on this DB; cadence
+    --    docs/config.md#authoritative-application-database). Owned by `cadence`:
+    --    that engine's identity, grant, capture queue + SECURITY DEFINER capture
+    --    functions and scope metadata live here (app tables stay in public, where
+    --    `cadence` already has DML + TRIGGER + CREATE for the shared
+    --    cadence_application_versions floor). app_rw gets read-only access so
+    --    hapihub /sync/scopes can read {{ . }}.cadence_scope. Idempotent. ──
+    SELECT 'CREATE SCHEMA {{ . }} AUTHORIZATION cadence'
+    WHERE NOT EXISTS (SELECT FROM pg_namespace WHERE nspname = '{{ . }}') \gexec
+    SELECT 'ALTER SCHEMA {{ . }} OWNER TO cadence'
+    WHERE (SELECT nspowner::regrole::text FROM pg_namespace WHERE nspname = '{{ . }}') <> 'cadence' \gexec
+    GRANT USAGE ON SCHEMA {{ . }} TO app_rw;
+    GRANT SELECT ON ALL TABLES IN SCHEMA {{ . }} TO app_rw;
+    ALTER DEFAULT PRIVILEGES FOR ROLE cadence IN SCHEMA {{ . }}
+      GRANT SELECT ON TABLES TO app_rw;
+    {{- end }}
 {{- end }}

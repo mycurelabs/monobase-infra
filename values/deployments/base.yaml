@@ -44,13 +44,27 @@ global:
 appRegistry:
   cadence:
     key: cadence
+  # Second Cadence engine (EasyJoey, ALPN easyjoey/1) on the SAME hapihub DB, own metadata schema.
+  # charts/cadence is multi-instance: resources are named after the release (cadence-easyjoey).
+  cadence-easyjoey:
+    key: cadenceEasyjoey
+    chart: cadence
   cadence-relay:
     key: cadenceRelay
   developer-portal:
     key: developerPortal
     chart: app
+  easyjoey-web:
+    key: easyjoeyWeb
+    chart: app
+  easyjoey-website:
+    key: easyjoeyWebsite
+    chart: app
   hapihub-docs:
     key: hapihub-docs
+    chart: app
+  lf-accounts:
+    key: lfAccounts
     chart: app
   maestroapp:
     key: maestroapp
@@ -378,6 +392,66 @@ developerPortal:
   podDisruptionBudget:
     enabled: false
 
+# ===== EASYJOEY: static web apps (monobase-mycure feat/easyjoey) =====
+# Static Vite SPAs served by Caddy on :8080 (app chart contract), images built by
+# monobase-mycure .github/workflows/easyjoey-web-release.yml and tagged
+# <package version>-preprod.<git sha> (never :latest). The website and LF Accounts bake
+# their URLs at build time (apps/*/deploy/preprod.env); only the web app reads a
+# runtime /config.json (API_URL / HAPIHUB_URL -> /tmp/config.json). OFF by default:
+# enabled per-overlay (preprod only). Base blocks exist so generic-app.yaml's
+# fail-closed guard can tell a legitimately-off app from a misspelled registry key.
+# No secrets (pure frontends).
+easyjoeyWebsite:
+  enabled: false
+  image:
+    repository: ghcr.io/mycurelabs/easyjoey-website
+    pullPolicy: IfNotPresent
+  replicaCount: 1
+  resources:
+    requests:
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 128Mi
+  gateway:
+    hostname: ""  # set per overlay (defaults to easyjoey-website.<domain>)
+  podDisruptionBudget:
+    enabled: false
+
+lfAccounts:
+  enabled: false
+  image:
+    repository: ghcr.io/mycurelabs/lf-accounts
+    pullPolicy: IfNotPresent
+  replicaCount: 1
+  resources:
+    requests:
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 128Mi
+  gateway:
+    hostname: ""  # defaults to lf-accounts.<domain>
+  podDisruptionBudget:
+    enabled: false
+
+easyjoeyWeb:
+  enabled: false
+  image:
+    repository: ghcr.io/mycurelabs/easyjoey-web
+    pullPolicy: IfNotPresent
+  replicaCount: 1
+  resources:
+    requests:
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 128Mi
+  gateway:
+    hostname: ""  # set per overlay (defaults to easyjoey-web.<domain>)
+  podDisruptionBudget:
+    enabled: false
+
 # ===== HEALTHCARE: HapiHub API Documentation =====
 hapihub-docs:
   image:
@@ -553,6 +627,13 @@ cadence:
     secretStore: gcp-secretstore
     secretStoreKind: ClusterSecretStore
     refreshInterval: 1h
+# EasyJoey Cadence hub (second engine on the hapihub DB). Off everywhere by
+# default; only the preprod overlay stages real config. Base block exists so
+# generic-app.yaml's fail-closed guard can tell a legitimately-off app from a
+# misspelled registry key. NOT a copy of the `cadence` block above — the two
+# engines must never share a metadata schema, ALPN, fleet or Service selector.
+cadenceEasyjoey:
+  enabled: false
 backup:
   enabled: false
 

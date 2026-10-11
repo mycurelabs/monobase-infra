@@ -6,7 +6,7 @@
 apiVersion: gateway.networking.k8s.io/v1alpha2
 kind: UDPRoute
 metadata:
-  name: cadence
+  name: {{ include "cadence.fullname" . }}
   namespace: {{ include "cadence.namespace" . }}
   labels:
     {{- include "cadence.labels" . | nindent 4 }}
@@ -17,7 +17,7 @@ spec:
       sectionName: {{ .Values.gateway.udpListener }}
   rules:
     - backendRefs:
-        - name: cadence
+        - name: {{ include "cadence.fullname" . }}
           port: {{ .Values.udpPort }}
           weight: 1
 {{- end }}

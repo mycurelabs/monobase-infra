@@ -1,5 +1,18 @@
 enabled: true
 
+# Multi-instance: one Cadence engine per application can share a namespace + the hapihub database.
+# Every resource is named after `cadence.fullname` (release name, or nameOverride/fullnameOverride) and
+# selected by `app.kubernetes.io/name: <cadence.name>`, so the stock `cadence` release renders exactly
+# as before while e.g. release `cadence-easyjoey` (nameOverride: cadence-easyjoey) gets its own
+# Deployment/Service/ConfigMap/ExternalSecret (`<fullname>-secrets`)/routes/NetworkPolicies. A second
+# engine on the same DB MUST also set postgresql.metadataSchema (one engine per database/schema).
+nameOverride: ""
+fullnameOverride: ""
+
+# Application protocol (ALPN) — the app boundary: gates catch-up + namespaces gossip topics. Empty ⇒
+# hapihub/2 (MYCURE). A second product's hub sets its own (e.g. easyjoey/1) so the fleets never cross-talk.
+alpn: ""
+
 image:
   repository: ghcr.io/mycurelabs/cadence
   tag: "2.0.1"
@@ -90,6 +103,12 @@ postgresql:
     # Bitnami superuser secret; the monobase-mycure#4147 least-privilege split points
     # this at postgresql-app-roles/cadence-password with username `cadence`.
     secretKey: postgres-password
+  # Metadata schema (services/cadence/docs/config.md#authoritative-application-database). Empty ⇒ the
+  # historical public metadata (the stock MYCURE hub; URL unchanged). Set (e.g. cadence_easyjoey) ⇒
+  # `?options[search_path]=<schema>,pg_temp` on BOTH CADENCE_DB and CADENCE_DB_READ_URL: node identity,
+  # grant, capture queue/functions and scope metadata live there; app tables stay in public. The schema
+  # must be PRE-CREATED (owner = the cadence role) — hapihub roleSplit.cadenceMetadataSchemas does it.
+  metadataSchema: ""
 
 # hapihub is the sole AS + grant minter — env-driven per env (the deployment sets CADENCE_ISSUER_URL /
 # CADENCE_GRANT_JWKS_URI / CADENCE_FLEET_ID / CADENCE_AUTH_AUTHORIZE_URL from these; env wins over the
@@ -99,6 +118,29 @@ auth:
   grantJwksUri: ""    # e.g. https://hapihub.<env>.localfirsthealth.com/.well-known/jwks.json (advertised in bootstrap doc)
   fleetId: ""         # required `aud`, e.g. mycure-preprod
   authorizeUrl: ""    # programmatic authorize for the headless hub enroll, e.g. https://hapihub.<env>…/sync/authorize
+  # Registered product client for the boot enroll (e.g. easyjoey-native). Empty ⇒ the stock all-scope
+  # '*' anchor grant. Set ⇒ `cadence auth login --client-id <id> --scope <enrollScope>`; the issuer then
+  # selects the product fleet/realm. Requires enrollScope.
+  clientId: ""
+  # Finite, space-separated `org:<id>` list the hub enrolls for (with clientId only). Wildcards fail the
+  # render (and the engine). Adding a clinic = edit this list + restart; the grant is one-shot and
+  # product-capped (EasyJoey: 30d) — restart the pod before it expires.
+  enrollScope: ""
+  # Refuse sync with peers lacking a valid grant for this fleet (cadence auth.require_responder_grant).
+  requireResponderGrant: false
+  # Paid-tier gate (cadence auth.require_entitlement, e.g. easyjoey.cloud). Empty ⇒ no gate.
+  requireEntitlement: ""
+
+# Engine tuning knobs templated into files/cadence.yaml (the rest stay at the file's defaults).
+tuning:
+  # Tombstone/change retention. Empty ⇒ 604800 (7d). MUST exceed the longest peer offline window.
+  retentionSecs: ""
+  # REQUIRED for every engine on hapihub's authoritative PostgreSQL DB once a second engine shares it:
+  # scope eviction keeps canonical rows (see files/cadence.yaml).
+  retainApplicationRowsOnEviction: false
+
+# Extra container env for the engine (verbatim k8s EnvVar list).
+extraEnv: []
 
 # Service-account API key (non-expiring better-auth key) the enroll initContainer presents to hapihub as
 # --bearer to authorize the hub's '*' grant → k8s secret `cadence-secrets` key `sa-api-key` → CADENCE_AUTH_BEARER.

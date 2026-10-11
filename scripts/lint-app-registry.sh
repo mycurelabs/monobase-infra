@@ -64,7 +64,7 @@ baseline_for() {
     mycure-staging)
       echo "mycure-staging-cadence mycure-staging-cadence-relay mycure-staging-medgemma-worker mycure-staging-medleyapp mycure-staging-mycure mycure-staging-mycure-dashboard mycure-staging-mycure-pxp mycure-staging-openmed" ;;
     mycure-preprod)
-      echo "mycure-preprod-cadence mycure-preprod-cadence-relay mycure-preprod-hapihub-docs mycure-preprod-medley mycure-preprod-mycure mycure-preprod-mycure-dashboard mycure-preprod-mycure-myaccount mycure-preprod-mycure-pxp mycure-preprod-mycurelocal" ;;
+      echo "mycure-preprod-cadence mycure-preprod-cadence-relay mycure-preprod-easyjoey-web mycure-preprod-easyjoey-website mycure-preprod-hapihub-docs mycure-preprod-lf-accounts mycure-preprod-medley mycure-preprod-mycure mycure-preprod-mycure-dashboard mycure-preprod-mycure-myaccount mycure-preprod-mycure-pxp mycure-preprod-mycurelocal" ;;
     *)
       echo "[app-registry] no baseline defined for overlay '$1'" >&2; return 1 ;;
   esac
