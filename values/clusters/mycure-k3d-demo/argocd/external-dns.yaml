@@ -1,0 +1,133 @@
+# External DNS - Infrastructure Configuration
+# mycure-k3d-demo: publishes *.demo.localfirsthealth.com A records -> the VPS public IP
+
+enabled: true
+
+# External DNS image configuration
+image:
+  registry: registry.k8s.io
+  repository: external-dns/external-dns
+  tag: "v0.19.0"
+  pullPolicy: IfNotPresent
+
+# Multiple External DNS instances
+# Each instance can manage different DNS provider and domains
+instances:
+  # Primary instance: Cloudflare for localfirsthealth.com
+  - name: primary
+    enabled: true
+    provider: cloudflare
+
+    # UNIQUE owner id — DOKS is `external-dns-primary` (chart default),
+    # vanaheim is `mycure-onprem-vanaheim`; sharing one would let instances
+    # fight over each other's records.
+    txtOwnerId: mycure-k3d-demo
+
+    # Manage DNS subdomains across all namespaces
+    domainFilters:
+      - localfirsthealth.com
+
+    # Cloudflare-specific configuration
+    cloudflare:
+      proxied: false  # DNS only, no Cloudflare proxy
+      apiTokenSecretRef:
+        name: cloudflare-api-token
+        key: api-token
+
+    # Resource limits. Memory must exceed the v0.19 binary's cold-start working
+    # set: at 64Mi the container sat pinned on the limit, thrashed its own text
+    # pages (~56GB of file reads in 9 minutes, 11k major faults) and never
+    # finished the informer cache sync inside external-dns's hard-coded 60s
+    # deadline ("failed to sync *v1beta1.HTTPRoute: context deadline exceeded"),
+    # crash-looping for 45h (2026-09-21 → 09-23). Steady state is ~45Mi.
+    resources:
+      requests:
+        cpu: 10m
+        memory: 64Mi
+      limits:
+        cpu: 50m
+        memory: 256Mi
+
+  # Example: Add new client with different DNS provider
+  # - name: client-a
+  #   enabled: true
+  #   provider: route53
+  #   domainFilters:
+  #     - clienta.com
+  #   aws:
+  #     region: us-east-1
+  #     zoneType: public
+  #   resources:
+  #     requests:
+  #       cpu: 10m
+  #       memory: 32Mi
+  #     limits:
+  #       cpu: 50m
+  #       memory: 64Mi
+
+# Ops plane runs on the tainted infra pool.
+nodeSelector:
+  node-pool: infra
+tolerations:
+  - key: node-pool
+    operator: Equal
+    value: infra
+    effect: NoSchedule
+
+# Global configuration applied to all instances
+global:
+  # Self-hosted k3d apiserver listens on 6443, so the external-dns informer
+  # needs the broad TCP 6443 egress (same as vanaheim). DOKS (managed, 443)
+  # leaves this OFF (chart default) so its NetworkPolicy stays tighter.
+  selfHostedAPIServerEgress: true
+
+  # Sources to watch (applied to all instances)
+  sources:
+    - gateway-httproute
+    - gateway-tcproute
+    - gateway-tlsroute
+    - service
+
+  # Policy: sync (create+update+delete) or upsert-only (create+update).
+  # DEMO = upsert-only (NEVER DELETE), same reasoning as vanaheim: this cluster
+  # shares the prod `localfirsthealth.com` Cloudflare zone with DOKS, guarded
+  # only by a distinct txtOwnerId. upsert-only can create/update but never
+  # delete, so a demo fault can't take down a prod DNS record. Stale *.demo
+  # records are pruned by hand.
+  policy: upsert-only
+
+  # Registry type for tracking ownership
+  registry: txt
+
+  # TXT record prefix
+  txtPrefix: "external-dns-"
+
+  # Log level: panic, debug, info, warning, error, fatal
+  logLevel: info
+
+  # Log format: text or json
+  logFormat: text
+
+  # Interval between DNS updates
+  interval: 1m
+
+  # Trigger loop on create (in addition to interval)
+  triggerLoopOnEvent: true
+
+# Pod-level security context (PodSecurity restricted compliant)
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 65534  # nobody user
+  fsGroup: 65534
+  seccompProfile:
+    type: RuntimeDefault
+
+# Schedule on infrastructure node pool
+# nodeSelector:
+#   workload-type: general
+
+# tolerations:
+#   - key: "workload-type"
+#     operator: "Equal"
+#     value: "infrastructure"
+#     effect: "NoSchedule"

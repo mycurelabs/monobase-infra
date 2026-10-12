@@ -3,7 +3,7 @@
 **Date:** 2026-05-31
 **Repo:** `mycure-infra` (`git@github.com:mycurelabs/monobase-infra.git`)
 **Author:** jofftiquez (with Claude)
-**Status:** Draft — awaiting review
+**Status:** Superseded by `2026-10-12-mycure-demo-k3d-cluster-design.md` (own public k3d cluster, isolated secrets)
 
 ## 1. Goal
 

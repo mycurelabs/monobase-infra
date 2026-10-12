@@ -60,3 +60,12 @@ argocd:
     # effect once the bootstrap chart is re-applied to DOKS — must be done before #420 merges.
     - path: "values/deployments/mycure-sandbox.yaml"
       exclude: true
+    # PUBLIC demo env — runs ONLY on its own k3d cluster (values/clusters/
+    # mycure-k3d-demo). LOAD-BEARING — do NOT delete: without it the wildcard
+    # above deploys mycure-demo onto DOKS prod. monobase-auto-discover is applied
+    # OUT-OF-BAND, so re-apply this bootstrap to DOKS BEFORE mycure-demo.yaml
+    # reaches main:
+    #   helm template argocd-bootstrap charts/argocd-bootstrap \
+    #     -f values/clusters/mycure-doks-main/argocd/bootstrap.yaml | kubectl --context <doks> apply -f -
+    - path: "values/deployments/mycure-demo.yaml"
+      exclude: true

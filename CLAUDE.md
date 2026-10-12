@@ -3,6 +3,9 @@
 Multi-tenant Kubernetes infrastructure for healthcare SaaS (MyCure, HapiHub).
 GitOps-driven with ArgoCD, Helm charts, and Terraform/OpenTofu for 6 cloud providers.
 The live DOKS cluster is OpenTofu-managed from values/cluster (mise run cluster-plan|cluster-apply).
+Clusters: `mycure-doks-main` (production), `mycure-onprem-vanaheim` (office k3d, tailnet-only:
+staging, preprod, sandbox), `mycure-k3d-demo` (public VPS k3d: `mycure-demo`). Each runs its own
+ArgoCD; see `values/clusters/<name>/README.md`.
 
 ## Repository Structure
 
