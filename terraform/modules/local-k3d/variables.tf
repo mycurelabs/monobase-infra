@@ -59,3 +59,21 @@ variable "create_timeout" {
   type        = string
   default     = "180s"
 }
+
+variable "storage_path" {
+  description = "Host directory mounted as k3s local-path storage on every node. Empty = /tmp/k3d-<cluster_name> (wiped on reboot). Set a persistent path for long-lived clusters."
+  type        = string
+  default     = ""
+}
+
+variable "extra_port_mappings" {
+  description = "Additional k3d port mappings (k3d -p syntax), e.g. [\"6472:6472/udp@loadbalancer\"] for UDP gateway listeners."
+  type        = list(string)
+  default     = []
+}
+
+variable "api_port" {
+  description = "k3d --api-port value ([HOST:]PORT), e.g. \"127.0.0.1:6445\" to keep the apiserver off public interfaces. Empty = k3d default (random port on 0.0.0.0)."
+  type        = string
+  default     = ""
+}

@@ -34,6 +34,7 @@ extraGateways: []
 #       tailscale.com/expose: "true"     # lands on the data-plane Service
 #   nginxProxy:
 #     serviceType: ClusterIP
+#     externalTrafficPolicy: Cluster   # optional; e.g. k3d servicelb (no source IP to keep)
 #     replicas: 1
 #   listeners: []                        # same schema as gateway.listeners
 
