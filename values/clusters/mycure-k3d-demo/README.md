@@ -134,7 +134,8 @@ kubectl --context $KCTX -n argocd set env deploy/argocd-repo-server ARGOCD_EXEC_
 kubectl --context $KCTX -n argocd set env statefulset/argocd-application-controller ARGOCD_REPO_SERVER_TIMEOUT_SECONDS=300
 kubectl --context $KCTX -n argocd set resources deploy/argocd-repo-server --limits=cpu=1,memory=2Gi --requests=cpu=250m,memory=1Gi
 
-# 3. ArgoCD private-repo creds (mycurebot token)
+# 3. Repo creds — OPTIONAL: monobase-infra is public, so ArgoCD reads it anonymously
+#    (skipped on the first standup). Add only if GitHub rate-limits the repo-server.
 kubectl --context $KCTX -n argocd apply -f - <<EOT
 apiVersion: v1
 kind: Secret
