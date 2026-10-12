@@ -97,16 +97,15 @@ hapihub:
   # catalog fingerprint unchanged; the running hub's startup/admission
   # fingerprint remains unverified. Fresh admission requires separate checks.
   #
-  # CARE-branch build (feat/care-inc1-governed-copilot@fd919f8a1, monobase-mycure
-  # PR #4570: Inc3 governed write-path + L2 ontology SoT + coded backbone + main-sync).
-  # Distinct -care.<sha> tag built off throwaway deploy/care-preprod-fd919f8a so it
-  # does NOT clobber main images. TEMPORARY: preprod tracks the CARE branch for the
-  # feature's duration; supersedes the 11.20.135-rc.0 pin (its rc-only
-  # 0112_portable_two_factor stays applied in the DB — orphaned but harmless; the
-  # CARE journal's 0112_care_resync/0113 timestamps sort AFTER it, so drizzle
-  # applies them cleanly). Re-pin to a plain main tag when preprod must be pristine.
+  # CARE-branch build (feat/care-inc1-governed-copilot@eda012d77, monobase-mycure
+  # PR #4570). Bumped fd919f8a1 → eda012d77 = resolveCareTeam v2 (CARE Inc7 P1): unions
+  # record.providers[] + the patient's encounter doctors[]/providers[]/createdBy, and
+  # /care/ask now fetches encounters alongside records. Rebuilt off throwaway
+  # deploy/care-preprod-eda012d7 to run the live /care/ask e2e against the #4005 real
+  # anonymized dataset (burn-in measured residual 67%→19% after this broadening).
+  # TEMPORARY: preprod tracks the CARE branch for the feature's duration.
   image:
-    tag: "11.20.134-care.fd919f8a@sha256:023d0f417414d12009e250e8325117238560f5c6433c9380432146e83c6c1b4c"
+    tag: "11.20.134-care.eda012d7@sha256:cc806533269a113fce1ca60c31ef8502deeea7471585acccc42f6fda5f29aaa2"
   cache:
     # Prod parity: response cache OFF (the #2839/#2617 bentocache stampede
     # mitigation). Re-enable here first when re-validating the serve-stale fix.
