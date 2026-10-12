@@ -48,7 +48,7 @@ corednsCustom:
   # Exact hairpin first: relay hostname -> relay Service (must win over the
   # wildcard, matching the DOKS ordering).
   exactRewrites:
-    - from: cadence-relay.demo.localfirsthealth.com
+    - from: mycure-cadence-relay.demo.localfirsthealth.com
       to: cadence-relay.mycure-demo.svc.cluster.local
   # Wildcard hairpin: *.demo -> the public gateway data plane (same
   # listeners/certs, so in-cluster https keeps validating).

@@ -14,6 +14,9 @@
 #   - mailpit UI + MinIO console NOT routed (public cluster; port-forward only)
 #   - no walg/velero/serviceMonitor/nodePools/tenzir/medical-AI
 #   - nonprod sizing on PG/valkey/cadence
+# Hostnames are named after the product: <app>.demo.localfirsthealth.com —
+#   mycure, hapihub, hapihub-docs, mycure-dashboard, mycure-pxp, mycurelocal,
+#   mycure-myaccount, mycure-developer-portal, mycure-cadence, mycure-cadence-relay.
 # SYNTHETIC DATA ONLY — seeded fresh: `mise run seed -- --env demo`.
 # Never clone prod data here: this env is on the public internet.
 
@@ -107,7 +110,7 @@ hapihub:
       rpId: "demo.localfirsthealth.com"
 
   config:
-    CORS_ORIGINS: "https://hapihub.demo.localfirsthealth.com,https://mycure.demo.localfirsthealth.com,https://mycurelocal.demo.localfirsthealth.com,https://mycure-myaccount.demo.localfirsthealth.com,https://mycure-dashboard.demo.localfirsthealth.com,https://mycure-pxp.demo.localfirsthealth.com,https://developer-portal.demo.localfirsthealth.com"
+    CORS_ORIGINS: "https://hapihub.demo.localfirsthealth.com,https://mycure.demo.localfirsthealth.com,https://mycurelocal.demo.localfirsthealth.com,https://mycure-myaccount.demo.localfirsthealth.com,https://mycure-dashboard.demo.localfirsthealth.com,https://mycure-pxp.demo.localfirsthealth.com,https://mycure-developer-portal.demo.localfirsthealth.com"
     # File storage — demo-own in-cluster MinIO (S3), isolated from prod's GCS.
     # Access creds come from the minio secret via externalSecrets below; MinIO
     # auto-creates the bucket.
@@ -150,7 +153,7 @@ hapihub:
     - name: CADENCE_ISSUER_AUTHORIZE_URL
       value: "https://mycure.demo.localfirsthealth.com/oauth/authorize"
     - name: CADENCE_ISSUER_SEED_URL
-      value: "https://cadence.demo.localfirsthealth.com"
+      value: "https://mycure-cadence.demo.localfirsthealth.com"
       # RFC 8628 device grant (#2992) — fail-closed if unset; demos box onboarding.
     - name: CADENCE_ISSUER_DEVICE_VERIFICATION_URI
       value: "https://mycure.demo.localfirsthealth.com/oauth/device"
@@ -290,12 +293,12 @@ hapihub-docs:
     requests:
       cpu: 10m
   gateway:
-    hostname: "docs.demo.localfirsthealth.com"
+    hostname: "hapihub-docs.demo.localfirsthealth.com"
     sectionName: https-demo-lfh
 
 # ===== DEVELOPER PLATFORM: MYCURE Developer Portal =====
 # Static Vite SPA on the generic `app` chart. Rides the *.demo wildcard
-# listener (https-demo-lfh) → developer-portal.demo.localfirsthealth.com.
+# listener (https-demo-lfh) → mycure-developer-portal.demo.localfirsthealth.com.
 developerPortal:
   enabled: true
 
@@ -306,6 +309,7 @@ developerPortal:
     requests:
       cpu: 10m
   gateway:
+    hostname: "mycure-developer-portal.demo.localfirsthealth.com"
     sectionName: https-demo-lfh
 
   config:
@@ -454,9 +458,13 @@ cadenceRelay:
   # chart defaults (relay: nonprod, cadence: staging) match no node here.
   nodePool: "infra"
   serviceType: ClusterIP
+  # Relay hostname — drives the relay's own Certificate + external-dns name
+  # (chart default would be cadence-relay.<domain>); keep in lockstep with
+  # gatewayRoute.hostname below and the CoreDNS exact rewrite.
+  hostname: mycure-cadence-relay.demo.localfirsthealth.com
   gatewayRoute:
     enabled: true
-    hostname: cadence-relay.demo.localfirsthealth.com
+    hostname: mycure-cadence-relay.demo.localfirsthealth.com
     sectionName: https-demo-lfh
     udpListener: relay-quic-demo
 
@@ -500,7 +508,7 @@ cadence:
   gateway:
     sectionName: https-demo-lfh
     hostnames:
-      - cadence.demo.localfirsthealth.com
+      - mycure-cadence.demo.localfirsthealth.com
     # QUIC via the public gateway (UDPRoute), port 6472.
     udpListener: cadence-quic-demo
   # hapihub is the SOLE AS (mints box grants + the hub's own '*' grant).

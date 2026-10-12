@@ -177,6 +177,23 @@ kubectl --context $KCTX -n mycure-demo rollout restart deploy/cadence
 Demo users log in at `https://mycure.demo.localfirsthealth.com` and
 `https://mycure-dashboard.demo.localfirsthealth.com`.
 
+## Hostnames
+
+Every host is named after its product: `<app>.demo.localfirsthealth.com`.
+
+| Host | Serves |
+|---|---|
+| `mycure.demo` | MyCure clinic app (login) |
+| `hapihub.demo` | HapiHub API |
+| `hapihub-docs.demo` | API docs |
+| `mycure-dashboard.demo` | Admin dashboard |
+| `mycure-pxp.demo` | Patient app |
+| `mycurelocal.demo` | MyCure Local |
+| `mycure-myaccount.demo` | Account portal |
+| `mycure-developer-portal.demo` | Developer portal |
+| `mycure-cadence.demo` | Cadence sync hub (+ QUIC on UDP 6472) |
+| `mycure-cadence-relay.demo` | Cadence relay (+ QUIC on UDP 7842) |
+
 ## Internal UIs (no public routes)
 
 The mailpit UI has no auth and the MinIO console is admin-only, so neither is routed.
