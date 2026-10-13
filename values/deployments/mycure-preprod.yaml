@@ -339,12 +339,13 @@ hapihubWorker:
 
 # ===== HEALTHCARE: Frontend Application =====
 mycure:
-  # Prod parity — moves with hapihub 11.20.121 (0098 medical_records.updated_by).
-  # CARE-branch build (feat/care-inc1-governed-copilot@d385970) — CareCopilotPanel
-  # UI arm of the e2e. Distinct -care.<sha> tag (does not clobber main :10.25.139).
-  # Re-pin to "10.25.139" after the e2e.
+  # CARE-branch build (feat/care-inc1-governed-copilot@ae7f4b399) — CareCopilotPanel.vue
+  # + care.copilot.ts, the L4 copilot UI arm. Bumped from plain main 10.25.142 (which had
+  # NO copilot — drifted to main during the #4005 clean-slate) to the CARE head so the
+  # copilot is testable in the browser at mycure.preprod.localfirsthealth.com against the
+  # enforced CARE backend (hapihub ae7f4b39 + medley eda012d7). Distinct -care.<sha> tag.
   image:
-    tag: "10.25.142"
+    tag: "10.25.143-care.ae7f4b39@sha256:54db2bc7afb3f1e766d26410878b2e2bc32795580c22d29b1340ae0e8d3699a4"
   resources:
     requests:
       cpu: 10m
