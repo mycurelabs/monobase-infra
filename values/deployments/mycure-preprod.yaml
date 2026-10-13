@@ -106,7 +106,7 @@ hapihub:
   # caller ∉ careTeam ⇒ 403 NO_TREATMENT_RELATIONSHIP + denied audit. Builds on
   # resolveCareTeam v2 (eda012d77). TEMPORARY: preprod tracks the CARE branch.
   image:
-    tag: "11.20.134-care.ae7f4b39@sha256:32a0a3eb2e5b9d06a6632b6517e7e502382ae40ac72074f2c9c01b1c65426f06"
+    tag: "11.20.134-care.90e71789@sha256:41f8ff23351aac2191c5c16737f6033deeae20a9cb9b5f8c763cf6c2b69dbbea"
   cache:
     # Prod parity: response cache OFF (the #2839/#2617 bentocache stampede
     # mitigation). Re-enable here first when re-validating the serve-stale fix.
@@ -345,7 +345,7 @@ mycure:
   # copilot is testable in the browser at mycure.preprod.localfirsthealth.com against the
   # enforced CARE backend (hapihub ae7f4b39 + medley eda012d7). Distinct -care.<sha> tag.
   image:
-    tag: "10.25.143-care.ae7f4b39@sha256:54db2bc7afb3f1e766d26410878b2e2bc32795580c22d29b1340ae0e8d3699a4"
+    tag: "10.25.143-care.90e71789@sha256:5cbcccbe2ef918ebe1ca87303a8ec097e1f230bccad36570e16677ec3439b6b5"
   resources:
     requests:
       cpu: 10m
