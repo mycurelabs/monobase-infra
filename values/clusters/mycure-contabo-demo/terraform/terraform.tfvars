@@ -1,4 +1,4 @@
-cluster_name = "mycure-k3d-demo"
+cluster_name = "mycure-contabo-demo"
 
 # Match DOKS prod (1.33), same as vanaheim.
 k3s_version = "v1.33.4-k3s1"
@@ -13,7 +13,7 @@ https_port = 443
 
 # Persistent PV storage (Docker creates it on first create). Changing this
 # recreates the cluster.
-storage_path = "/var/lib/k3d/mycure-k3d-demo"
+storage_path = "/var/lib/k3d/mycure-contabo-demo"
 
 # Cadence QUIC legs (UDP has no SNI → port-demuxed). Must match the UDP
 # listeners in argocd/infrastructure.yaml and cadence.publicAddr in

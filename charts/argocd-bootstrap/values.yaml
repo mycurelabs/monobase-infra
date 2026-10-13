@@ -36,6 +36,6 @@ argocd:
     # preprod runs on the local vanaheim cluster (mycure#4135), not DOKS (PR #409).
     - path: "values/deployments/mycure-preprod.yaml"
       exclude: true
-    # demo runs on its own public k3d cluster (values/clusters/mycure-k3d-demo).
+    # demo runs on its own public k3d cluster (values/clusters/mycure-contabo-demo).
     - path: "values/deployments/mycure-demo.yaml"
       exclude: true

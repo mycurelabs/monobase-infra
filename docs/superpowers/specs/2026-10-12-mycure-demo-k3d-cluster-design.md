@@ -1,4 +1,4 @@
-# mycure-demo on a public k3d cluster (mycure-k3d-demo) — Design
+# mycure-demo on a public k3d cluster (mycure-contabo-demo) — Design
 
 **Date:** 2026-10-12
 **Author:** jofftiquez (with Claude)
@@ -15,9 +15,9 @@ k3d cluster on a public VPS rather than on vanaheim or DOKS.
 | Decision | Choice |
 |---|---|
 | Env name | `mycure-demo`, domain `demo.localfirsthealth.com`, `global.environment: demo` (schema enum extended) |
-| Cluster | `mycure-k3d-demo`, k3d on the VPS (1 server + 2 agents, k3s v1.33.4), own ArgoCD |
+| Cluster | `mycure-contabo-demo`, k3d on the VPS (1 server + 2 agents, k3s v1.33.4), own ArgoCD |
 | Access | Public internet. VPS 80/443 + UDP 6472/7842 → k3d loadbalancer → servicelb → `nginx-public-gateway` |
-| TLS / DNS | Let's Encrypt DNS-01 (Cloudflare); external-dns `upsert-only`, `txtOwnerId: mycure-k3d-demo`, A records → VPS IP |
+| TLS / DNS | Let's Encrypt DNS-01 (Cloudflare); external-dns `upsert-only`, `txtOwnerId: mycure-contabo-demo`, A records → VPS IP |
 | Footprint | Full prod shape (HA PG + read replica, API/worker split, roleSplit, HPA, cadence hub + relay, MinIO, mailpit) on prod image tags |
 | Off | Medical AI (no GPU), tenzir, Loki, monitoring, velero, tailscale |
 | Git ref | `main` (HEAD). Long-lived clusters track `main`; see "Revision" below |
@@ -30,7 +30,7 @@ k3d cluster on a public VPS rather than on vanaheim or DOKS.
 - **Source IP is lost** at the k3d loadbalancer, so the gateway Service uses
   `externalTrafficPolicy: Cluster` and the better-auth rate limit is one shared bucket.
 - **Persistent PVs:** the `local-k3d` module gained `storage_path`; the demo uses
-  `/var/lib/k3d/mycure-k3d-demo` so data survives reboots.
+  `/var/lib/k3d/mycure-contabo-demo` so data survives reboots.
 - **Module changes are vanaheim-safe:** new inputs (`storage_path`, `extra_port_mappings`,
   `api_port`) add trigger keys only when set, so vanaheim's plan stays a no-op.
 - **nginx-gateway chart:** the per-gateway NginxProxy now also applies to the main
@@ -49,7 +49,7 @@ into `argocd/argocd.yaml` so `mise run bootstrap` covers the install end to end.
 
 ## Runbook
 
-`values/clusters/mycure-k3d-demo/README.md`.
+`values/clusters/mycure-contabo-demo/README.md`.
 
 ## Out of scope
 

@@ -2,8 +2,8 @@
 # base first, this file wins per key; arrays replace wholesale).
 # MyCure Demo Configuration — PUBLIC, client-facing demo / sales / training env.
 #
-# Runs on its OWN public k3d cluster `mycure-k3d-demo` (a VPS, not vanaheim,
-# not DOKS; values/clusters/mycure-k3d-demo/), reachable from the INTERNET at
+# Runs on its OWN public k3d cluster `mycure-contabo-demo` (a VPS, not vanaheim,
+# not DOKS; values/clusters/mycure-contabo-demo/), reachable from the INTERNET at
 # *.demo.localfirsthealth.com. Same component shape as mycure-preprod / prod
 # (HA Postgres + read plane, hapihub API/worker split, least-privilege DB roles,
 # HPA, cadence hub + relay) on PROD image tags, so demos show what customers get.
@@ -28,7 +28,7 @@ global:
   environment: demo
 
   # The demo cluster's single, internet-facing gateway
-  # (values/clusters/mycure-k3d-demo/argocd/infrastructure.yaml).
+  # (values/clusters/mycure-contabo-demo/argocd/infrastructure.yaml).
   gateway:
     name: nginx-public-gateway
   # No nodePool: k3d nodes are untainted.
@@ -473,7 +473,7 @@ cadence:
   nodePool: "infra" # see cadenceRelay note
   # VPS public IP + the demo gateway's QUIC port (UDP 6472, mapped VPS ->
   # k3d loadbalancer). Update alongside the external-dns target annotation in
-  # values/clusters/mycure-k3d-demo/argocd/infrastructure.yaml if the IP changes.
+  # values/clusters/mycure-contabo-demo/argocd/infrastructure.yaml if the IP changes.
   publicAddr: "62.146.233.59:6472"
   # Prod parity: n0 public relays.
   relayUrl: ""

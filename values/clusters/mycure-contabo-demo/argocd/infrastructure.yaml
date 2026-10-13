@@ -1,4 +1,4 @@
-# Infrastructure values for mycure-k3d-demo (public k3d cluster on the demo VPS).
+# Infrastructure values for mycure-contabo-demo (public k3d cluster on the demo VPS).
 # PUBLIC-INTERNET profile: cert-manager (Let's Encrypt DNS-01), External Secrets,
 # external-dns, and ONE internet-facing NGINX gateway. Everything heavy or
 # tailnet-specific (tailscale operator, Loki, tenzir, velero, monitoring) is OFF.
@@ -13,7 +13,7 @@
 # Which cluster this infra config belongs to. LOAD-BEARING: velero-resources
 # and external-dns resolve their per-cluster valueFiles path from it and
 # `required` it (no fallback, #436).
-clusterName: mycure-k3d-demo
+clusterName: mycure-contabo-demo
 
 # Cert Manager - TLS certificate automation
 certManager:

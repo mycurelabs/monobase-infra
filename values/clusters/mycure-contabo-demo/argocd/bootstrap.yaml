@@ -1,9 +1,9 @@
-# argocd-bootstrap override for the public demo k3d cluster (mycure-k3d-demo).
+# argocd-bootstrap override for the public demo k3d cluster (mycure-contabo-demo).
 #
 # Bootstrap (run from a checkout of main, on the VPS; bootstrap.ts uses the
 # CURRENT kubectl context and ignores --context):
-#   kubectl config use-context k3d-mycure-k3d-demo
-#   mise run bootstrap -- --cluster-name mycure-k3d-demo --skip-github-app
+#   kubectl config use-context k3d-mycure-contabo-demo
+#   mise run bootstrap -- --cluster-name mycure-contabo-demo --skip-github-app
 #
 # Effect: this cluster's own ArgoCD uses the per-cluster infra config
 # (clusterName) and its auto-discover ApplicationSet deploys ONLY the
@@ -16,6 +16,6 @@
 # "Branch Conventions"). Do not add a cluster/<name> branch here: those are
 # throwaway refs for disposable dev clusters only.
 argocd:
-  clusterName: mycure-k3d-demo
+  clusterName: mycure-contabo-demo
   deploymentPaths:
     - path: "values/deployments/mycure-demo.yaml"

@@ -61,7 +61,7 @@ argocd:
     - path: "values/deployments/mycure-sandbox.yaml"
       exclude: true
     # PUBLIC demo env — runs ONLY on its own k3d cluster (values/clusters/
-    # mycure-k3d-demo). LOAD-BEARING — do NOT delete: without it the wildcard
+    # mycure-contabo-demo). LOAD-BEARING — do NOT delete: without it the wildcard
     # above deploys mycure-demo onto DOKS prod. monobase-auto-discover is applied
     # OUT-OF-BAND, so re-apply this bootstrap to DOKS BEFORE mycure-demo.yaml
     # reaches main:

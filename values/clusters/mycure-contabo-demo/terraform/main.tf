@@ -1,8 +1,8 @@
-# Public k3d cluster (mycure-k3d-demo) — OpenTofu root for the demo VPS.
+# Public k3d cluster (mycure-contabo-demo) — OpenTofu root for the demo Contabo VPS.
 # LOCAL state, no remote backend (same as vanaheim). Hosts the internet-facing
 # `mycure-demo` environment (sales / client demos / training) with its own
 # in-cluster ArgoCD tracking `main` (long-lived cluster — no cluster/<name> branch).
-# Entry points: mise run cluster-{init,plan,apply,destroy} mycure-k3d-demo.
+# Entry points: mise run cluster-{init,plan,apply,destroy} mycure-contabo-demo.
 # Requires: Docker running, host ports 80/443 TCP + 6472/7842 UDP free.
 #
 # Unlike vanaheim, this cluster is LONG-LIVED: PV data lives under

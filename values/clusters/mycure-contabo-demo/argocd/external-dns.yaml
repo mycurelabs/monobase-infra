@@ -1,5 +1,5 @@
 # External DNS - Infrastructure Configuration
-# mycure-k3d-demo: publishes *.demo.localfirsthealth.com A records -> the VPS public IP
+# mycure-contabo-demo: publishes *.demo.localfirsthealth.com A records -> the VPS public IP
 
 enabled: true
 
@@ -21,7 +21,7 @@ instances:
     # UNIQUE owner id — DOKS is `external-dns-primary` (chart default),
     # vanaheim is `mycure-onprem-vanaheim`; sharing one would let instances
     # fight over each other's records.
-    txtOwnerId: mycure-k3d-demo
+    txtOwnerId: mycure-contabo-demo
 
     # Manage DNS subdomains across all namespaces
     domainFilters:

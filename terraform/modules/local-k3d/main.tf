@@ -11,7 +11,7 @@ locals {
 
   # Host dir backing k3s local-path PVs. Default keeps the historical /tmp path
   # (wiped on reboot — fine for nuke-friendly dev clusters); long-lived clusters
-  # (e.g. mycure-k3d-demo) set a persistent path so PVC data survives reboots.
+  # (e.g. mycure-contabo-demo) set a persistent path so PVC data survives reboots.
   storage_path = var.storage_path != "" ? var.storage_path : "/tmp/k3d-${var.cluster_name}"
 
   create_cmd = join(" ", compact([

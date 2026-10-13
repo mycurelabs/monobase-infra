@@ -101,9 +101,9 @@ helm template lint charts/argocd-applications -f values/deployments/base.yaml -f
 # values file, not the generic aws-main chart default.
 helm template lint charts/argocd-infrastructure -f values/clusters/mycure-doks-main/argocd/infrastructure.yaml --set argocd.repoURL=lint --set argocd.targetRevision=lint > /dev/null
 helm template lint charts/argocd-bootstrap -f values/clusters/mycure-doks-main/argocd/bootstrap.yaml > /dev/null
-# Public demo k3d cluster (mycure-k3d-demo): its own infra + bootstrap values.
-helm template lint charts/argocd-infrastructure -f values/clusters/mycure-k3d-demo/argocd/infrastructure.yaml --set argocd.repoURL=lint --set argocd.targetRevision=lint > /dev/null
-helm template lint charts/argocd-bootstrap -f values/clusters/mycure-k3d-demo/argocd/bootstrap.yaml > /dev/null
+# Public demo k3d cluster (mycure-contabo-demo): its own infra + bootstrap values.
+helm template lint charts/argocd-infrastructure -f values/clusters/mycure-contabo-demo/argocd/infrastructure.yaml --set argocd.repoURL=lint --set argocd.targetRevision=lint > /dev/null
+helm template lint charts/argocd-bootstrap -f values/clusters/mycure-contabo-demo/argocd/bootstrap.yaml > /dev/null
 # Leaf charts referenced BY the Applications above are not rendered by the
 # app-of-apps trees — render them directly or template bugs reach main green.
 helm template lint charts/database-secrets --set global.namespace=lint --set walg.enabled=true > /dev/null

@@ -1,19 +1,19 @@
-# mycure-k3d-demo — public k3d cluster (mycure-demo)
+# mycure-contabo-demo — public k3d cluster (mycure-demo)
 
-A **k3d** cluster on the demo VPS (`vmi3315250`, public IP `62.146.233.59`) that hosts
+A **k3d** cluster on the demo **Contabo** VPS (`vmi3315250`, public IP `62.146.233.59`) that hosts
 the **`mycure-demo`** environment: a client-facing demo / sales / training copy of
 MyCure, reachable from the **public internet** at `*.demo.localfirsthealth.com`. It
 runs its **own in-cluster ArgoCD** (standalone, like vanaheim), tracking **`main`**
 (see "Git ref" below — it is long-lived, so no `cluster/<name>` branch).
 
 ```
-values/clusters/mycure-k3d-demo/
+values/clusters/mycure-contabo-demo/
   terraform/   # k3d cluster via the local-k3d module (tofu, local state)
   argocd/      # this cluster's ArgoCD config: infra values, secrets registry,
                # argocd install values, bootstrap override
 ```
 
-- **Cluster ≠ environment.** Cluster = `mycure-k3d-demo`; env/namespace = `mycure-demo`
+- **Cluster ≠ environment.** Cluster = `mycure-contabo-demo`; env/namespace = `mycure-demo`
   (`values/deployments/mycure-demo.yaml`).
 - **Footprint:** full prod shape like preprod — HA Postgres + read replica, hapihub
   API/worker split, least-privilege DB roles, HPA, cadence hub + relay, MinIO, mailpit,
@@ -23,7 +23,7 @@ values/clusters/mycure-k3d-demo/
   prod data here.
 - **Secrets:** the env's own `mycure-demo-*` GCP keys, read by the scoped
   `external-secrets-demo` SA. **Google OAuth and Stripe are stubs.**
-- **Long-lived:** PV data lives under `/var/lib/k3d/mycure-k3d-demo` (persistent), not
+- **Long-lived:** PV data lives under `/var/lib/k3d/mycure-contabo-demo` (persistent), not
   `/tmp`, so a reboot keeps the database.
 
 ## Traffic path (and what it costs)
@@ -60,7 +60,7 @@ PN=$(gcloud projects describe $P --format='value(projectNumber)')
 
 # Scoped SA: reads ONLY mycure-demo-* + the shared Cloudflare token.
 gcloud iam service-accounts create external-secrets-demo --project=$P \
-  --display-name="ESO (mycure-k3d-demo)"
+  --display-name="ESO (mycure-contabo-demo)"
 gcloud projects add-iam-policy-binding $P \
   --member="serviceAccount:external-secrets-demo@$P.iam.gserviceaccount.com" \
   --role=roles/secretmanager.secretAccessor \
@@ -107,10 +107,10 @@ gcloud iam service-accounts keys create /tmp/eso-demo.json \
 ## 2. Provision the cluster (VPS)
 
 ```bash
-mise run cluster-init  mycure-k3d-demo
-mise run cluster-plan  mycure-k3d-demo     # review: 3 to add
-mise run cluster-apply mycure-k3d-demo     # k3d + Gateway API CRDs + node labels + CoreDNS AAAA fix
-# context: k3d-mycure-k3d-demo   (API at https://127.0.0.1:6445)
+mise run cluster-init  mycure-contabo-demo
+mise run cluster-plan  mycure-contabo-demo     # review: 3 to add
+mise run cluster-apply mycure-contabo-demo     # k3d + Gateway API CRDs + node labels + CoreDNS AAAA fix
+# context: k3d-mycure-contabo-demo   (API at https://127.0.0.1:6445)
 ```
 
 ## 3. Bootstrap ArgoCD (VPS)
@@ -121,7 +121,7 @@ already carries the repo-server timeouts/resources, plus the infra root and the
 auto-discover ApplicationSet from `argocd/bootstrap.yaml`).
 
 ```bash
-KCTX=k3d-mycure-k3d-demo
+KCTX=k3d-mycure-contabo-demo
 
 # 1. ESO auth: the scoped SA key from step 1 -> gcpsm-secret (bootstrap.ts does
 #    not create it; ESO, cert-manager and external-dns all depend on it).
@@ -134,7 +134,7 @@ kubectl --context $KCTX -n external-secrets-system create secret generic gcpsm-s
 #    so switch context first and ALWAYS pass --cluster-name.
 #    --skip-github-app: monobase-infra is public; ArgoCD reads it anonymously.
 kubectl config use-context $KCTX
-mise run bootstrap -- --cluster-name mycure-k3d-demo --skip-github-app
+mise run bootstrap -- --cluster-name mycure-contabo-demo --skip-github-app
 ```
 
 Repo credentials are not needed (public repo). Add a repository Secret only if
@@ -209,8 +209,8 @@ long-lived.
 ## Nuke & rebuild
 
 ```bash
-mise run cluster-destroy mycure-k3d-demo
-sudo rm -rf /var/lib/k3d/mycure-k3d-demo    # only if you also want to drop PV data
+mise run cluster-destroy mycure-contabo-demo
+sudo rm -rf /var/lib/k3d/mycure-contabo-demo    # only if you also want to drop PV data
 ```
 
 Then re-provision + re-bootstrap (steps 2-3) from a checkout of `main`. If PV data was dropped, reseed and
