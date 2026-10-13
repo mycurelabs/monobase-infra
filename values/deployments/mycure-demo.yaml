@@ -17,7 +17,7 @@
 # Hostnames are named after the product: <app>.demo.localfirsthealth.com —
 #   mycure, hapihub, hapihub-docs, mycure-dashboard, mycure-pxp, mycurelocal,
 #   mycure-myaccount, mycure-developer-portal, mycure-cadence, mycure-cadence-relay.
-# SYNTHETIC DATA ONLY — seeded fresh: `mise run seed -- --env demo`.
+# SYNTHETIC DATA ONLY — seeded fresh: `mise run seed -- --app mycure --env demo`.
 # Never clone prod data here: this env is on the public internet.
 
 extends: base
@@ -519,7 +519,7 @@ cadence:
     authorizeUrl: https://hapihub.demo.localfirsthealth.com/sync/authorize
   # Service-account API key (better-auth, service@mycure.md, non-expiring) →
   # secret cadence-secrets. MINT after the first seed (and after any reseed):
-  # `mise run seed -- --env demo --provision-cadence-key --gcp-project mc-v4-prod`.
+  # `mise run seed -- --app mycure --env demo --provision-cadence-key --gcp-project mc-v4-prod`.
   externalSecrets:
     secrets:
       - secretKey: sa-api-key

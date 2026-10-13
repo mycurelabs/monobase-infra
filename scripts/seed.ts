@@ -4,37 +4,108 @@
  * Creates a demo organization with 7 role-based user accounts.
  *
  * Usage:
- *   bun scripts/seed.ts --env preprod
+ *   bun scripts/seed.ts --env preprod                  # --app defaults to mycure
+ *   bun scripts/seed.ts --app mycure --env demo
  *   bun scripts/seed.ts --env production --confirm
  *   bun scripts/seed.ts --api-url https://custom-url.example.com
+ *
+ * Target resolution: --app/--env select values/deployments/<app>-<env>.yaml;
+ * its global.domain (following `extends`) gives API https://hapihub.<domain>
+ * and frontend https://<app>.<domain>. A new env/app needs no change here.
+ * The seeded DATA (orgs, roles, patients) is still MyCure-specific.
  */
 
 import chalk from "chalk";
 import ora from "ora";
+import { existsSync, readdirSync, readFileSync } from "fs";
+import { join } from "path";
 import { parseArgs } from "util";
+import { parse as parseYaml } from "yaml";
 
 // ---------------------------------------------------------------------------
 // CLI
 // ---------------------------------------------------------------------------
 
-const ENVS: Record<string, { api: string; cms: string }> = {
-  preprod: {
-    api: "https://hapihub.preprod.localfirsthealth.com",
-    cms: "https://mycure.preprod.localfirsthealth.com",
-  },
-  staging: {
-    api: "https://hapihub.staging.localfirsthealth.com",
-    cms: "https://mycure.staging.localfirsthealth.com",
-  },
-  demo: {
-    api: "https://hapihub.demo.localfirsthealth.com",
-    cms: "https://mycure.demo.localfirsthealth.com",
-  },
-  production: {
-    api: "https://hapihub.localfirsthealth.com",
-    cms: "https://mycure.localfirsthealth.com",
-  },
-};
+// Deployment overlays are the source of truth for every target: the file
+// values/deployments/<app>-<env>.yaml exists for each real env, and its
+// global.domain is the env's base domain. No per-env table to keep in sync.
+const DEPLOYMENTS_DIR = join(import.meta.dir, "..", "values", "deployments");
+const DEFAULT_APP = "mycure";
+// Only for an app whose hosts differ from the defaults (API hapihub.<domain>,
+// frontend <app>.<domain>). Empty while every app follows the convention.
+const APP_HOSTS: Record<string, { api?: string; cms?: string }> = {};
+// Path-safe name segment: blocks `--env ../x` from escaping DEPLOYMENTS_DIR.
+const NAME_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+
+interface Target {
+  app: string;
+  env: string;
+  overlay: string; // repo-relative path, for messages
+  doc: Record<string, any>; // parsed overlay (no extends merge)
+  domain: string;
+  api: string;
+  cms: string;
+}
+
+function readYamlFile(path: string): Record<string, any> {
+  return (parseYaml(readFileSync(path, "utf8")) ?? {}) as Record<string, any>;
+}
+
+// global.domain from the overlay, else from its `extends` chain (cycle-safe).
+function resolveDomain(path: string, seen = new Set<string>()): string | undefined {
+  if (seen.has(path) || !existsSync(path)) return undefined;
+  seen.add(path);
+  const doc = readYamlFile(path);
+  const domain = doc?.global?.domain;
+  if (typeof domain === "string" && domain) return domain;
+  if (typeof doc?.extends === "string" && NAME_RE.test(doc.extends)) {
+    return resolveDomain(join(DEPLOYMENTS_DIR, `${doc.extends}.yaml`), seen);
+  }
+  return undefined;
+}
+
+// Deployable overlays ("<app>-<env>"), for help and error messages.
+function listTargets(): string[] {
+  try {
+    return readdirSync(DEPLOYMENTS_DIR)
+      .filter((f) => f.endsWith(".yaml"))
+      .filter((f) => String(readYamlFile(join(DEPLOYMENTS_DIR, f)).disabled) !== "true")
+      .map((f) => f.replace(/\.yaml$/, ""))
+      .sort();
+  } catch {
+    return [];
+  }
+}
+
+function resolveTarget(app: string, env: string): Target {
+  if (!NAME_RE.test(app) || !NAME_RE.test(env)) {
+    throw new Error(`Invalid --app "${app}" / --env "${env}": use lowercase letters, digits and hyphens.`);
+  }
+  const overlay = `values/deployments/${app}-${env}.yaml`;
+  const path = join(DEPLOYMENTS_DIR, `${app}-${env}.yaml`);
+  if (!existsSync(path)) {
+    throw new Error(
+      `No deployment overlay ${overlay} — unknown app/env "${app}-${env}". ` +
+        `Known targets: ${listTargets().join(", ") || "(none found)"}`,
+    );
+  }
+  const doc = readYamlFile(path);
+  if (String(doc.disabled) === "true") {
+    throw new Error(`${overlay} is disabled (parent-only overlay), not a deployable env.`);
+  }
+  const domain = resolveDomain(path);
+  if (!domain) throw new Error(`${overlay} has no global.domain (and none via extends).`);
+  const hosts = APP_HOSTS[app] ?? {};
+  return {
+    app,
+    env,
+    overlay,
+    doc,
+    domain,
+    api: `https://${hosts.api ?? "hapihub"}.${domain}`,
+    cms: `https://${hosts.cms ?? app}.${domain}`,
+  };
+}
 
 function printUsage() {
   console.log(`
@@ -42,16 +113,22 @@ ${chalk.bold("MYCURE Seed Script")}
 Creates a demo organization with 7 role-based user accounts.
 
 ${chalk.yellow("Usage:")}
-  bun scripts/seed.ts --env <environment>
+  bun scripts/seed.ts [--app <app>] --env <environment>
   bun scripts/seed.ts --api-url <url>
 
 ${chalk.yellow("Options:")}
-  --env       Target environment: ${Object.keys(ENVS).join(", ")}
-  --api-url   Override API URL (skips env lookup)
-  --confirm   Required when targeting production
+  --app       App whose env to target (default: ${DEFAULT_APP}). Together with
+              --env it selects values/deployments/<app>-<env>.yaml; that
+              overlay's global.domain gives API https://hapihub.<domain> and
+              frontend https://<app>.<domain>.
+  --env       Target environment. Known <app>-<env> targets:
+              ${listTargets().join(", ")}
+  --api-url   Override API URL (escape hatch; skips the overlay lookup for
+              the URL — --env, if also given, still names the cadence secret)
+  --confirm   Required when targeting production (any app)
   --provision-cadence-key
               Mint the cadence service-account API key and write it to GCP
-              Secret Manager (mycure-<env>-cadence-sa-api-key). The cadence
+              Secret Manager (<app>-<env>-cadence-sa-api-key). The cadence
               ExternalSecret syncs it into the pod; without a fresh key after
               a reseed, cadence enroll fails with INVALID_API_KEY. Auto-runs
               at the end of a non-production --reset. Standalone (no --reset)
@@ -185,16 +262,19 @@ ${chalk.yellow("Options:")}
 
 ${chalk.yellow("Examples:")}
   bun scripts/seed.ts --env preprod
+  bun scripts/seed.ts --app mycure --env demo
   bun scripts/seed.ts --env production --confirm
   bun scripts/seed.ts --api-url http://localhost:7500 --reset
   bun scripts/seed.ts --api-url http://localhost:7500 --patients 25
   mise run seed -- --env preprod
+  mise run seed -- --app mycure --env demo
 `);
 }
 
 const { values: args } = parseArgs({
   args: Bun.argv.slice(2),
   options: {
+    app: { type: "string", default: DEFAULT_APP },
     env: { type: "string" },
     "api-url": { type: "string" },
     confirm: { type: "boolean", default: false },
@@ -206,7 +286,7 @@ const { values: args } = parseArgs({
     // the source of truth, parsed below.
     "patient-accounts": { type: "string" },
     // Mint the cadence service-account API key and write it to GCP Secret
-    // Manager (mycure-<env>-cadence-sa-api-key) so the cadence-secrets
+    // Manager (<app>-<env>-cadence-sa-api-key) so the cadence-secrets
     // ExternalSecret can sync it. Auto-runs at the end of a non-production
     // --reset (a reseed wipes the api_key row, so cadence's enroll would 401
     // until re-provisioned); pass this flag to force it (standalone, or on
@@ -254,23 +334,29 @@ if (args.help) {
 
 let API_URL: string;
 let CMS_URL: string;
+// Set whenever --env is given (even alongside --api-url): it names the env's
+// GCP secrets, so an --env that matches no overlay must fail loudly.
+let TARGET: Target | null = null;
+
+if (args.env) {
+  try {
+    TARGET = resolveTarget(args.app as string, args.env);
+  } catch (err) {
+    console.error(chalk.red((err as Error).message));
+    process.exit(1);
+  }
+}
+if (args.env === "production" && !args.confirm) {
+  console.error(chalk.red("Production requires --confirm flag"));
+  process.exit(1);
+}
 
 if (args["api-url"]) {
   API_URL = args["api-url"];
   CMS_URL = "(custom)";
-} else if (args.env) {
-  const env = ENVS[args.env];
-  if (!env) {
-    console.error(chalk.red(`Unknown environment: ${args.env}`));
-    console.error(`Valid options: ${Object.keys(ENVS).join(", ")}`);
-    process.exit(1);
-  }
-  if (args.env === "production" && !args.confirm) {
-    console.error(chalk.red("Production requires --confirm flag"));
-    process.exit(1);
-  }
-  API_URL = env.api;
-  CMS_URL = env.cms;
+} else if (TARGET) {
+  API_URL = TARGET.api;
+  CMS_URL = TARGET.cms;
 } else {
   printUsage();
   process.exit(1);
@@ -8016,15 +8102,27 @@ async function resetSeedData() {
 async function provisionCadenceSaKey(): Promise<void> {
   const spinner = ora("Provisioning cadence service-account API key...").start();
 
-  // The secret name is env-derived (mycure-<env>-cadence-sa-api-key) and prod +
-  // preprod share ONE GCP project (mc-v4-prod) — isolation is by name prefix,
-  // not project. So the env→name mapping is the real guardrail: a typo'd --env
-  // would write a mis-named secret into the shared project. Require a KNOWN env
-  // (not just any string, and not the --api-url path where env is unset).
-  if (!args.env || !ENVS[args.env]) {
+  // The secret name is derived (<app>-<env>-cadence-sa-api-key) and every env
+  // shares ONE GCP project (mc-v4-prod) — isolation is by name prefix, not
+  // project. So the name is the real guardrail: a typo'd --env would write a
+  // mis-named secret into the shared project. Require a resolved target (its
+  // overlay exists; not the bare --api-url path where env is unset) whose
+  // overlay actually reads this exact secret for cadence.
+  if (!TARGET) {
     spinner.warn(
-      `Cadence-key provisioning needs a known --env (${Object.keys(ENVS).join(", ")}) ` +
-        `to name the secret; got "${args.env ?? "(unset)"}". Skipping.`,
+      `Cadence-key provisioning needs --env (with --app, default ${DEFAULT_APP}) matching ` +
+        `a deployment overlay to name the secret. Known targets: ${listTargets().join(", ")}. Skipping.`,
+    );
+    return;
+  }
+  const secretName = `${TARGET.app}-${TARGET.env}-cadence-sa-api-key`;
+  const declared = ((TARGET.doc?.cadence?.externalSecrets?.secrets ?? []) as Array<Record<string, string>>)
+    .filter((s) => s?.secretKey === "sa-api-key")
+    .map((s) => s.remoteKey);
+  if (!declared.includes(secretName)) {
+    spinner.warn(
+      `${TARGET.overlay} does not read ${secretName} for cadence ` +
+        `(declares: ${declared.join(", ") || "none — cadence not configured"}). Skipping.`,
     );
     return;
   }
@@ -8042,7 +8140,6 @@ async function provisionCadenceSaKey(): Promise<void> {
     spinner.warn("No SERVICE_ACCOUNT_EMAILS configured; skipping cadence-key provisioning.");
     return;
   }
-  const secretName = `mycure-${args.env}-cadence-sa-api-key`;
 
   // Preflight the GCP write path BEFORE minting the key. The SDK needs
   // Application Default Credentials (ADC) — gcloud CLI auth is NOT enough. If
@@ -9799,7 +9896,7 @@ async function main() {
       console.log(
         chalk.yellow(
           `\n⚠️  Reseed succeeded but cadence-key provisioning failed: ${(err as Error).message}\n` +
-            `    Re-run: bun scripts/seed.ts --env ${args.env} --provision-cadence-key --gcp-project <id>`,
+            `    Re-run: bun scripts/seed.ts --app ${args.app} --env ${args.env} --provision-cadence-key --gcp-project <id>`,
         ),
       );
     }
