@@ -29,6 +29,11 @@ applicationSet:
     operator: Equal
     value: infra
 configs:
+  # Controller -> repo-server timeout (default 60s). Vanaheim's slow egress
+  # (tailnet-routed registry mirror) makes ESO CRD-heavy renders exceed it.
+  # Read via argocd-cmd-params-cm as ARGOCD_APPLICATION_CONTROLLER_REPO_SERVER_TIMEOUT_SECONDS.
+  params:
+    controller.repo.server.timeout.seconds: "300"
   secret:
     createSecret: true
   ssh:
@@ -136,6 +141,10 @@ redis:
 redis-ha:
   enabled: false
 repoServer:
+  # Pairs with configs.params controller.repo.server.timeout.seconds above.
+  env:
+  - name: ARGOCD_EXEC_TIMEOUT
+    value: "300s"
   metrics:
     enabled: true
     serviceMonitor:
@@ -148,7 +157,7 @@ repoServer:
       cpu: 1
       memory: 2Gi
     requests:
-      cpu: 100m
+      cpu: 250m
       memory: 1Gi
   tolerations:
   - effect: NoSchedule

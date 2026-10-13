@@ -156,19 +156,31 @@ curl -sI https://mail.demo.localfirsthealth.com            # must NOT serve mail
 ## 5. Seed + cadence key
 
 ```bash
-mise run seed -- --env demo
+mise run seed -- --app mycure --env demo
 # Mint the cadence service-account API key into mycure-demo-cadence-sa-api-key
-# (needs gcloud auth; run where gcloud is available, pointing at the demo API):
-mise run seed -- --env demo --provision-cadence-key --gcp-project mc-v4-prod
+# (needs gcloud ADC; run where gcloud is available, pointing at the demo API):
+mise run seed -- --app mycure --env demo --provision-cadence-key --gcp-project mc-v4-prod
 
-# cadence-secrets refreshes only hourly — force ESO to re-read the new key NOW,
-# wait until the Secret holds it, and only then restart cadence (a restart before
-# the refresh would boot on the old placeholder).
+# cadence-secrets refreshes only hourly: force ESO to re-read the new key now.
 kubectl --context $KCTX -n mycure-demo annotate externalsecret cadence-secrets \
   force-sync=$(date +%s) --overwrite
-until [ "$(kubectl --context $KCTX -n mycure-demo get secret cadence-secrets \
-  -o jsonpath='{.data.sa-api-key}' | base64 -d)" != placeholder ]; do sleep 5; done
-kubectl --context $KCTX -n mycure-demo rollout restart deploy/cadence
+
+# Wait (max 5 min) until the Secret holds a REAL key — not missing, not the
+# placeholder — and only then restart cadence. On timeout nothing restarts.
+deadline=$((SECONDS + 300)); ok=
+while [ "$SECONDS" -lt "$deadline" ]; do
+  v=$(kubectl --context $KCTX -n mycure-demo get secret cadence-secrets \
+        -o jsonpath='{.data.sa-api-key}' 2>/dev/null | base64 -d)
+  if [ -n "$v" ] && [ "$v" != placeholder ]; then ok=1; break; fi
+  sleep 5
+done
+if [ -n "$ok" ]; then
+  kubectl --context $KCTX -n mycure-demo rollout restart deploy/cadence
+else
+  echo "cadence-secrets never picked up the minted key within 5 min." >&2
+  echo "Check the mint step's output and: kubectl --context $KCTX -n mycure-demo describe externalsecret cadence-secrets" >&2
+fi
+unset v ok deadline
 ```
 
 Demo users log in at `https://mycure.demo.localfirsthealth.com` and

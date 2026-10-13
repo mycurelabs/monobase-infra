@@ -57,15 +57,13 @@ gcloud iam service-accounts keys create /tmp/eso.json \
 kubectl --context $KCTX -n external-secrets-system create secret generic gcpsm-secret \
   --from-file=secret-access-credentials=/tmp/eso.json && rm -f /tmp/eso.json
 
-# 2. Install ArgoCD (repo-server needs headroom for ESO CRD render)
+# 2. Install ArgoCD with this cluster's values (same file scripts/bootstrap.ts uses).
+#    It carries the repo-server headroom for the ESO CRD render: controller->repo-server
+#    timeout (configs.params), ARGOCD_EXEC_TIMEOUT and repo-server resources — no
+#    post-install `kubectl set env/patch` needed.
 helm repo add argo https://argoproj.github.io/argo-helm && helm repo update argo
-helm upgrade --install argocd argo/argo-cd --kube-context $KCTX -n argocd --version 9.0.3 --wait --timeout 8m
-kubectl --context $KCTX -n argocd set env deploy/argocd-repo-server ARGOCD_EXEC_TIMEOUT=300s
-# Controller->repo-server timeout lives in argocd-cmd-params-cm (an ARGOCD_REPO_SERVER_TIMEOUT_SECONDS
-# env var on the controller is ignored — it reads ARGOCD_APPLICATION_CONTROLLER_REPO_SERVER_TIMEOUT_SECONDS):
-kubectl --context $KCTX -n argocd patch configmap argocd-cmd-params-cm --type merge -p '{"data":{"controller.repo.server.timeout.seconds":"300"}}'
-kubectl --context $KCTX -n argocd rollout restart statefulset/argocd-application-controller
-kubectl --context $KCTX -n argocd set resources deploy/argocd-repo-server --limits=cpu=1,memory=2Gi --requests=cpu=250m,memory=1Gi
+helm upgrade --install argocd argo/argo-cd --kube-context $KCTX -n argocd --version 9.0.3 \
+  -f values/clusters/mycure-onprem-vanaheim/argocd/argocd.yaml --wait --timeout 8m
 
 # 3. ArgoCD private-repo creds (mycurebot token)
 kubectl --context $KCTX -n argocd apply -f - <<EOF
