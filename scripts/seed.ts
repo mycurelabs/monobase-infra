@@ -4,10 +4,10 @@
  * Creates a demo organization with 7 role-based user accounts.
  *
  * Usage:
- *   bun scripts/seed.ts --env preprod                  # --app defaults to mycure
- *   bun scripts/seed.ts --app mycure --env demo
- *   bun scripts/seed.ts --env production --confirm
- *   bun scripts/seed.ts --api-url https://custom-url.example.com
+ *   bun scripts/seed.ts --env preprod --password '<pw>'   # --app defaults to mycure
+ *   bun scripts/seed.ts --app mycure --env demo --password '<pw>'
+ *   bun scripts/seed.ts --env production --confirm --password '<pw>'
+ *   bun scripts/seed.ts --api-url https://custom-url.example.com --password '<pw>'
  *
  * Target resolution: --app/--env select values/deployments/<app>-<env>.yaml;
  * its global.domain (following `extends`) gives API https://hapihub.<domain>
@@ -31,6 +31,8 @@ import { parse as parseYaml } from "yaml";
 // global.domain is the env's base domain. No per-env table to keep in sync.
 const DEPLOYMENTS_DIR = join(import.meta.dir, "..", "values", "deployments");
 const DEFAULT_APP = "mycure";
+// better-auth's default minPasswordLength — fail up front, not mid-seed on signUp.
+const MIN_PASSWORD_LENGTH = 8;
 // Only for an app whose hosts differ from the defaults (API hapihub.<domain>,
 // frontend <app>.<domain>). Empty while every app follows the convention.
 const APP_HOSTS: Record<string, { api?: string; cms?: string }> = {};
@@ -113,8 +115,8 @@ ${chalk.bold("MYCURE Seed Script")}
 Creates a demo organization with 7 role-based user accounts.
 
 ${chalk.yellow("Usage:")}
-  bun scripts/seed.ts [--app <app>] --env <environment>
-  bun scripts/seed.ts --api-url <url>
+  bun scripts/seed.ts [--app <app>] --env <environment> --password <pw>
+  bun scripts/seed.ts --api-url <url> --password <pw>
 
 ${chalk.yellow("Options:")}
   --app       App whose env to target (default: ${DEFAULT_APP}). Together with
@@ -126,6 +128,11 @@ ${chalk.yellow("Options:")}
   --api-url   Override API URL (escape hatch; skips the overlay lookup for
               the URL — --env, if also given, still names the cadence secret)
   --confirm   Required when targeting production (any app)
+  --password <pw>
+              REQUIRED. Password for every seeded account (staff, service
+              account, patient accounts), and the one --reset / cadence-key
+              provisioning sign in with. No default: each env gets its own.
+              Min ${MIN_PASSWORD_LENGTH} chars. Never printed.
   --provision-cadence-key
               Mint the cadence service-account API key and write it to GCP
               Secret Manager (<app>-<env>-cadence-sa-api-key). The cadence
@@ -138,8 +145,8 @@ ${chalk.yellow("Options:")}
               secret-isolated — pass its own project.
   --reset     Delete all existing seed data before re-seeding (idempotent
               wipe of seed users + their memberships + the seed orgs).
-              Requires the current PASSWORD to still match what was used
-              when superadmin@mycure.test was created. If the password
+              Requires --password to match what was used when
+              superadmin@mycure.test was created. If the password
               has been rotated since the original seed, manually clear
               the seed user from the DB instead.
   --patients  Seed N random demo patients on the PARENT facility only
@@ -161,7 +168,7 @@ ${chalk.yellow("Options:")}
               ['pxp', 'seed', 'patient'] (the 'pxp' tag is hapihub's
               convention for self-claiming patient accounts) and the
               corresponding medical-patient row is PATCHed with
-              account=<uid>. Passwords are the same Mycure123! used for
+              account=<uid>. Same --password as the
               staff. Default: 5 (= 6 total accounts including the fixed).
               Pass --patient-accounts 0 to skip.
 
@@ -261,13 +268,14 @@ ${chalk.yellow("Options:")}
   --help      Show this help message
 
 ${chalk.yellow("Examples:")}
-  bun scripts/seed.ts --env preprod
-  bun scripts/seed.ts --app mycure --env demo
-  bun scripts/seed.ts --env production --confirm
-  bun scripts/seed.ts --api-url http://localhost:7500 --reset
-  bun scripts/seed.ts --api-url http://localhost:7500 --patients 25
-  mise run seed -- --env preprod
-  mise run seed -- --app mycure --env demo
+  read -rs SEED_PASSWORD   # keeps the password out of shell history
+  bun scripts/seed.ts --env preprod --password "$SEED_PASSWORD"
+  bun scripts/seed.ts --app mycure --env demo --password "$SEED_PASSWORD"
+  bun scripts/seed.ts --env production --confirm --password "$SEED_PASSWORD"
+  bun scripts/seed.ts --api-url http://localhost:7500 --reset --password "$SEED_PASSWORD"
+  bun scripts/seed.ts --api-url http://localhost:7500 --patients 25 --password "$SEED_PASSWORD"
+  mise run seed -- --env preprod --password "$SEED_PASSWORD"
+  mise run seed -- --app mycure --env demo --password "$SEED_PASSWORD"
 `);
 }
 
@@ -277,6 +285,9 @@ const { values: args } = parseArgs({
     app: { type: "string", default: DEFAULT_APP },
     env: { type: "string" },
     "api-url": { type: "string" },
+    // Password for every seeded account. Required — no default, so no env
+    // (least of all a public one) ends up with a password from this repo.
+    password: { type: "string" },
     confirm: { type: "boolean", default: false },
     reset: { type: "boolean", default: false },
     // No default here — DEFAULT_PATIENT_COUNT is applied below if the flag
@@ -362,7 +373,18 @@ if (args["api-url"]) {
   process.exit(1);
 }
 
-const PASSWORD = "Mycure123!";
+if (!args.password) {
+  console.error(chalk.red("--password is required (the password for every seeded account)."));
+  console.error(
+    `Pass the same one the env was first seeded with when using --reset. Tip: read -rs SEED_PASSWORD, then --password "$SEED_PASSWORD".`,
+  );
+  process.exit(1);
+}
+if (args.password.length < MIN_PASSWORD_LENGTH) {
+  console.error(chalk.red(`--password must be at least ${MIN_PASSWORD_LENGTH} characters (better-auth's minimum).`));
+  process.exit(1);
+}
+const PASSWORD: string = args.password;
 
 // ---------------------------------------------------------------------------
 // Role → privilege mapping (from @lfh/sdk organizations/constants)
@@ -9833,7 +9855,7 @@ async function main() {
   console.log(
     `${chalk.gray("Demo chart:")}  Pedro Demo Lopez (${FIXED_PATIENT_EXTERNAL_ID}) — 2 encounters, 9 medical records (T2DM + HTN storyline)`,
   );
-  console.log(`\n${chalk.gray("Accounts")} (password: ${chalk.yellow(PASSWORD)}):`);
+  console.log(`\n${chalk.gray("Accounts")} (password: the one passed via --password):`);
   console.log("-".repeat(64));
   console.log(
     `${"Email".padEnd(32)} ${"Role".padEnd(18)} ${"Privileges"}`,
@@ -9863,7 +9885,7 @@ async function main() {
   // Patient accounts breakdown — separate table since they're a distinct
   // identity tier (PXP self-service tag, not staff).
   if (patientAccounts.length > 0) {
-    console.log(`\n${chalk.gray("Patient Accounts")} (password: ${chalk.yellow(PASSWORD)}, tags: pxp/seed/patient):`);
+    console.log(`\n${chalk.gray("Patient Accounts")} (password: same, tags: pxp/seed/patient):`);
     console.log("-".repeat(72));
     console.log(
       `${"Email".padEnd(48)} ${"Patient externalId".padEnd(22)} ${"Status"}`,
@@ -9896,7 +9918,7 @@ async function main() {
       console.log(
         chalk.yellow(
           `\n⚠️  Reseed succeeded but cadence-key provisioning failed: ${(err as Error).message}\n` +
-            `    Re-run: bun scripts/seed.ts --app ${args.app} --env ${args.env} --provision-cadence-key --gcp-project <id>`,
+            `    Re-run: bun scripts/seed.ts --app ${args.app} --env ${args.env} --provision-cadence-key --gcp-project <id> --password <pw>`,
         ),
       );
     }
