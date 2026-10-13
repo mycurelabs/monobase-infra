@@ -418,7 +418,7 @@ medley:
   enabled: true
   image:
     repository: ghcr.io/mycurelabs/medley
-    tag: "2.0.6-care.fd919f8a"  # CARE-branch build @fd919f8a1 (Inc3 Phase 2b commit-seam wiring; keeps the 4adec3f pre-seed grounding fix). Distinct -care.<sha> tag (no clobber of main :2.0.6). MEDLEY_MODELS selfHosted:true attestation below REQUIRED or boot fails closed. Re-pin to plain tag when preprod must be pristine.
+    tag: "2.0.6-care.eda012d7@sha256:24819a1295daa92c24a65eec45728d1d2437517cd80da0d7c202ccc2dc7f8738"  # CARE branch head @eda012d77: enforce-default P1 (e29562e94) + Inc7 P0 disclosure-input fwd (4b1fd508a). Bumped from fd919f8a to flip EMR-access from SHADOW → ENFORCE for the #5084 live e2e DENY proof (422). MEDLEY_MODELS selfHosted:true attestation below REQUIRED or boot fails closed. Re-pin to plain tag when preprod must be pristine.
     pullPolicy: IfNotPresent
   replicaCount: 1
   resources:
@@ -459,6 +459,7 @@ medley:
     # Route chart-summary's cited-output role to MedGemma (qwen keeps the tool loop) — testers exercise
     # the multi-model path via "Summarise chart".
     MEDLEY_SKILL_MODELS: '{"chart-summary":{"output":"clinical"}}'
+    MEDLEY_EMR_ACCESS_ENFORCE: "true"                 # CARE Inc7 P1: flip EMR-access gate SHADOW → ENFORCE (explicit over the eda012d7 code default) for the #5084 live DENY proof (422). Reversible: unset/false → back to shadow.
     MEDLEY_SEED_DEMO: "true"                          # seed the synthetic analytics dataset (test setup)
     MEDLEY_TRANSCRIPT_DIR: "/tmp/medley-transcripts"  # 2.0.1 JSONL run transcripts (ephemeral; demo of monobase-mycure#4149)
   externalSecrets:
