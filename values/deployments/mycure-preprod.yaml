@@ -97,15 +97,16 @@ hapihub:
   # catalog fingerprint unchanged; the running hub's startup/admission
   # fingerprint remains unverified. Fresh admission requires separate checks.
   #
-  # CARE-branch build (feat/care-inc1-governed-copilot@eda012d77, monobase-mycure
-  # PR #4570). Bumped fd919f8a1 → eda012d77 = resolveCareTeam v2 (CARE Inc7 P1): unions
-  # record.providers[] + the patient's encounter doctors[]/providers[]/createdBy, and
-  # /care/ask now fetches encounters alongside records. Rebuilt off throwaway
-  # deploy/care-preprod-eda012d7 to run the live /care/ask e2e against the #4005 real
-  # anonymized dataset (burn-in measured residual 67%→19% after this broadening).
-  # TEMPORARY: preprod tracks the CARE branch for the feature's duration.
+  # CARE-branch build (feat/care-inc1-governed-copilot@ae7f4b399, monobase-mycure
+  # PR #4570). Bumped eda012d77 → ae7f4b399 = /care/ask now ENFORCES the treatment
+  # relationship at the care-ask layer itself (CARE Inc7 P1): the medley emr_access
+  # tool-gate doesn't cover summarize-context's seeded-grounding path (local model
+  # answers without calling the gated tool), so the live e2e DENY returned 200.
+  # ae7f4b399 fail-closes in /care/ask after org-scoped retrieval, before de-id/egress:
+  # caller ∉ careTeam ⇒ 403 NO_TREATMENT_RELATIONSHIP + denied audit. Builds on
+  # resolveCareTeam v2 (eda012d77). TEMPORARY: preprod tracks the CARE branch.
   image:
-    tag: "11.20.134-care.eda012d7@sha256:cc806533269a113fce1ca60c31ef8502deeea7471585acccc42f6fda5f29aaa2"
+    tag: "11.20.134-care.ae7f4b39@sha256:32a0a3eb2e5b9d06a6632b6517e7e502382ae40ac72074f2c9c01b1c65426f06"
   cache:
     # Prod parity: response cache OFF (the #2839/#2617 bentocache stampede
     # mitigation). Re-enable here first when re-validating the serve-stale fix.
@@ -182,6 +183,11 @@ hapihub:
     # qwen2.5:14b summarize-context runs ~140s; the default care→medley fetch timeout
     # socket-closed on the first (cold) call. 240s gives headroom incl. model cold-start.
     CARE_MEDLEY_TIMEOUT_MS: "240000"
+    # CARE Inc7 P1 (ae7f4b399): /care/ask self-enforces the treatment relationship
+    # (fail-closed) after org-scoped retrieval, before de-id/egress — covers the
+    # seeded-grounding path the medley tool-gate misses. Explicit over the code
+    # default (enforce). Reversible: =false opts out. caller ∉ careTeam ⇒ 403.
+    CARE_ASK_RELATIONSHIP_ENFORCE: "true"
 
   env:
       # Prod parity (#2114): cap the JSC heap below the 4Gi container limit.
