@@ -82,9 +82,6 @@ put minio-root-password "$(openssl rand -hex 24)"
 # Auth
 put auth-secret        "$(openssl rand -base64 48)"
 put better-auth-secret "$(openssl rand -base64 48)"
-# Password for the seeded demo accounts (step 5). Not synced into the cluster;
-# it's the shared login for demo users, so hand it out from here.
-put seed-password      "$(openssl rand -base64 18)"
 
 # PRIVATE_KEY — MATCH the format of an existing env's key before generating:
 #   gcloud secrets versions access latest --secret=mycure-staging-private-key --project=$P | head -1
@@ -159,9 +156,9 @@ curl -sI https://mail.demo.localfirsthealth.com            # must NOT serve mail
 ## 5. Seed + cadence key
 
 ```bash
-# The seed has no default password (--password is required); the demo's lives
-# in GCP (step 4). Read it into a variable so it stays out of shell history.
-SEED_PASSWORD=$(gcloud secrets versions access latest --secret=mycure-demo-seed-password --project=mc-v4-prod)
+# The seed has no default password: --password is required. Choose one when
+# you run it; read it silently so it stays out of shell history.
+read -rs SEED_PASSWORD
 mise run seed -- --app mycure --env demo --password "$SEED_PASSWORD"
 # Mint the cadence service-account API key into mycure-demo-cadence-sa-api-key
 # (needs gcloud ADC; run where gcloud is available, pointing at the demo API):
@@ -192,7 +189,7 @@ unset v ok deadline SEED_PASSWORD
 
 Demo users log in at `https://mycure.demo.localfirsthealth.com` and
 `https://mycure-dashboard.demo.localfirsthealth.com` with the seeded accounts and the
-`mycure-demo-seed-password` secret. A reseed (`--reset`) must pass that same password.
+password given at seed time. A reseed (`--reset`) must pass that same password.
 
 ## Hostnames
 

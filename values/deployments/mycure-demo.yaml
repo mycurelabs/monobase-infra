@@ -17,7 +17,7 @@
 # Hostnames are named after the product: <app>.demo.localfirsthealth.com —
 #   mycure, hapihub, hapihub-docs, mycure-dashboard, mycure-pxp, mycurelocal,
 #   mycure-myaccount, mycure-developer-portal, mycure-cadence, mycure-cadence-relay.
-# SYNTHETIC DATA ONLY — seeded fresh: `mise run seed -- --app mycure --env demo --password <mycure-demo-seed-password>`.
+# SYNTHETIC DATA ONLY — seeded fresh: `mise run seed -- --app mycure --env demo --password <pw>`.
 # Never clone prod data here: this env is on the public internet.
 
 extends: base
