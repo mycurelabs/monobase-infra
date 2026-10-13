@@ -20,9 +20,9 @@ argocd:
   clusterName: aws-main
 
   # Deployments the auto-discover ApplicationSet picks up (git-generator files).
-  # Default: all env overlays EXCEPT staging + preprod + demo (staging/preprod live only on the
+  # Default: all env overlays EXCEPT staging + preprod + sandbox + demo (staging/preprod/sandbox live only on the
   # on-prem vanaheim cluster, whose ArgoCD overrides this list to exactly those
-  # two). An exclude MUST be applied to the live DOKS ApplicationSet BEFORE the
+  # three). An exclude MUST be applied to the live DOKS ApplicationSet BEFORE the
   # excluded overlay file lands on main — the git generator globs at HEAD, so a
   # missing exclude auto-deploys the env onto DOKS.
   deploymentPaths:
@@ -35,6 +35,9 @@ argocd:
       exclude: true
     # preprod runs on the local vanaheim cluster (mycure#4135), not DOKS (PR #409).
     - path: "values/deployments/mycure-preprod.yaml"
+      exclude: true
+    # sandbox runs only on vanaheim (monobase-mycure#4509).
+    - path: "values/deployments/mycure-sandbox.yaml"
       exclude: true
     # demo runs on its own public k3d cluster (values/clusters/mycure-contabo-demo).
     - path: "values/deployments/mycure-demo.yaml"

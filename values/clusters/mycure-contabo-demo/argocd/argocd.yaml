@@ -29,18 +29,18 @@ applicationSet:
     operator: Equal
     value: infra
 configs:
+  # Controller -> repo-server timeout (default 60s; rendering the ESO CRD-heavy
+  # charts exceeds it). The controller reads it from argocd-cmd-params-cm as
+  # ARGOCD_APPLICATION_CONTROLLER_REPO_SERVER_TIMEOUT_SECONDS — a plain
+  # ARGOCD_REPO_SERVER_TIMEOUT_SECONDS env var on the controller is ignored.
+  params:
+    controller.repo.server.timeout.seconds: "300"
   secret:
     createSecret: true
   ssh:
     knownHosts: |
       github.com ssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAQEAq2A7hRGmdnm9tUDbO9IDSwBK6TbQa+PXYPCPy6rbTrTtw7PHkccKrpp0yVhp5HdEIcKr6pLlVDBfOLX9QUsyCOV0wzfjIJNlGEYsdlLJizHhbn2mUjvSAHQqZETYP81eFzLQNnPHt4EVVUh7VfDESU84KezmD5QlWpXLmvU31/yMf+Se8xhHTvKSCZIFImWwoG6mbUoWf9nzpIoaSjB+weqqUUmpaaasXVal72J+UX2B+2RPW3RcT0eOzQgqlJL3RKrTJvdsjE3JEAvGq3lGHSZXy28G3skua2SmVi/w4yCE6gbODqnTWlg7+wC604ydGXA8VJiS5ap43JXiUFFAaQ==
 controller:
-  # Repo-server render timeout (vanaheim needed this by hand: rendering the ESO
-  # CRD-heavy charts exceeds the 60s default). Here it is declarative, so
-  # `mise run bootstrap` applies it — no post-install `kubectl set env`.
-  env:
-  - name: ARGOCD_REPO_SERVER_TIMEOUT_SECONDS
-    value: "300"
   metrics:
     enabled: true
     serviceMonitor:
@@ -142,7 +142,7 @@ redis:
 redis-ha:
   enabled: false
 repoServer:
-  # Pairs with controller ARGOCD_REPO_SERVER_TIMEOUT_SECONDS above.
+  # Pairs with configs.params controller.repo.server.timeout.seconds above.
   env:
   - name: ARGOCD_EXEC_TIMEOUT
     value: "300s"

@@ -35,3 +35,20 @@ Gateway namespace — uses gateway.namespace or Release.Namespace
 {{- define "nginx-gateway.namespace" -}}
 {{- default .Release.Namespace .Values.gateway.namespace }}
 {{- end }}
+
+{{/*
+Every Gateway this chart renders: the main `gateway` (only when it has
+listeners) followed by each `extraGateways` entry. Single source for
+gateway.yaml and nginxproxy.yaml so the two can't drift. Returns YAML;
+consume with: include "nginx-gateway.allGateways" . | fromYamlArray
+*/}}
+{{- define "nginx-gateway.allGateways" -}}
+{{- $gateways := list }}
+{{- if .Values.gateway.listeners }}
+{{- $gateways = append $gateways .Values.gateway }}
+{{- end }}
+{{- range .Values.extraGateways }}
+{{- $gateways = append $gateways . }}
+{{- end }}
+{{- toYaml $gateways }}
+{{- end }}

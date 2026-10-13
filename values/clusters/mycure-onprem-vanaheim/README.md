@@ -61,7 +61,10 @@ kubectl --context $KCTX -n external-secrets-system create secret generic gcpsm-s
 helm repo add argo https://argoproj.github.io/argo-helm && helm repo update argo
 helm upgrade --install argocd argo/argo-cd --kube-context $KCTX -n argocd --version 9.0.3 --wait --timeout 8m
 kubectl --context $KCTX -n argocd set env deploy/argocd-repo-server ARGOCD_EXEC_TIMEOUT=300s
-kubectl --context $KCTX -n argocd set env statefulset/argocd-application-controller ARGOCD_REPO_SERVER_TIMEOUT_SECONDS=300
+# Controller->repo-server timeout lives in argocd-cmd-params-cm (an ARGOCD_REPO_SERVER_TIMEOUT_SECONDS
+# env var on the controller is ignored — it reads ARGOCD_APPLICATION_CONTROLLER_REPO_SERVER_TIMEOUT_SECONDS):
+kubectl --context $KCTX -n argocd patch configmap argocd-cmd-params-cm --type merge -p '{"data":{"controller.repo.server.timeout.seconds":"300"}}'
+kubectl --context $KCTX -n argocd rollout restart statefulset/argocd-application-controller
 kubectl --context $KCTX -n argocd set resources deploy/argocd-repo-server --limits=cpu=1,memory=2Gi --requests=cpu=250m,memory=1Gi
 
 # 3. ArgoCD private-repo creds (mycurebot token)

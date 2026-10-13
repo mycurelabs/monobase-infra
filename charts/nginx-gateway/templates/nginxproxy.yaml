@@ -8,13 +8,7 @@ gateway (mycure-contabo-demo) to set externalTrafficPolicy: Cluster.
 Applies to the main `gateway` AND every `extraGateways` entry that sets
 `nginxProxy` — same set gateway.yaml iterates.
 */ -}}
-{{- $gateways := list }}
-{{- if .Values.gateway.listeners }}
-{{- $gateways = append $gateways .Values.gateway }}
-{{- end }}
-{{- range .Values.extraGateways }}
-{{- $gateways = append $gateways . }}
-{{- end }}
+{{- $gateways := include "nginx-gateway.allGateways" . | fromYamlArray }}
 {{- range $gw := $gateways }}
 {{- if $gw.nginxProxy }}
 ---

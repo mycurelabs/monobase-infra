@@ -24,7 +24,8 @@ values/clusters/mycure-contabo-demo/
 - **Secrets:** the env's own `mycure-demo-*` GCP keys, read by the scoped
   `external-secrets-demo` SA. **Google OAuth and Stripe are stubs.**
 - **Long-lived:** PV data lives under `/var/lib/k3d/mycure-contabo-demo` (persistent), not
-  `/tmp`, so a reboot keeps the database.
+  `/tmp`, so a **reboot** keeps the database. A cluster **recreate** does NOT — see
+  "Nuke & rebuild".
 
 ## Traffic path (and what it costs)
 
@@ -47,7 +48,6 @@ client ──TCP 80/443, UDP 6472/7842──▶ VPS (docker-published ports)
 
 - `docker` (user in the `docker` group), `mise` (provides `k3d`, `kubectl`, `helm`,
   `tofu`, `bun` from the repo's `mise.toml`): `curl https://mise.run | sh && mise install`.
-- `gh` authed as **mycurebot** (repo scope) — ArgoCD's private-repo access.
 - Host ports **80, 443 (TCP)** and **6472, 7842 (UDP)** free. Check:
   `ss -tlnup | grep -E ':(80|443|6472|7842) '`.
 - A workstation with `gcloud` authed to `mc-v4-prod` (IAM + Secret Manager steps).
@@ -160,6 +160,14 @@ mise run seed -- --env demo
 # Mint the cadence service-account API key into mycure-demo-cadence-sa-api-key
 # (needs gcloud auth; run where gcloud is available, pointing at the demo API):
 mise run seed -- --env demo --provision-cadence-key --gcp-project mc-v4-prod
+
+# cadence-secrets refreshes only hourly — force ESO to re-read the new key NOW,
+# wait until the Secret holds it, and only then restart cadence (a restart before
+# the refresh would boot on the old placeholder).
+kubectl --context $KCTX -n mycure-demo annotate externalsecret cadence-secrets \
+  force-sync=$(date +%s) --overwrite
+until [ "$(kubectl --context $KCTX -n mycure-demo get secret cadence-secrets \
+  -o jsonpath='{.data.sa-api-key}' | base64 -d)" != placeholder ]; do sleep 5; done
 kubectl --context $KCTX -n mycure-demo rollout restart deploy/cadence
 ```
 
@@ -210,11 +218,14 @@ long-lived.
 
 ```bash
 mise run cluster-destroy mycure-contabo-demo
-sudo rm -rf /var/lib/k3d/mycure-contabo-demo    # only if you also want to drop PV data
+sudo rm -rf /var/lib/k3d/mycure-contabo-demo    # reclaim disk: the old volumes are orphaned anyway
 ```
 
-Then re-provision + re-bootstrap (steps 2-3) from a checkout of `main`. If PV data was dropped, reseed and
-re-mint the cadence key (step 5) — better-auth keys die with the DB.
+**A recreate is a data reset.** k3s local-path names each volume directory
+`pvc-<UID>_<namespace>_<pvc>`. A new cluster creates new PVCs with new UIDs, so Postgres,
+MinIO and Valkey start on new, empty directories; the old ones stay on disk, orphaned
+(recoverable only by hand). Then re-provision + re-bootstrap (steps 2-3) from a checkout of
+`main`, reseed and re-mint the cadence key (step 5) — better-auth keys die with the DB.
 
 If the VPS IP ever changes, update `external-dns.alpha.kubernetes.io/target` in
 `argocd/infrastructure.yaml` and `cadence.publicAddr` in
@@ -223,8 +234,9 @@ prod zone, so stale records must be removed by hand in Cloudflare.
 
 ## Known caveats / follow-ups
 
-- **Changing ports, storage_path or api_port recreates the cluster** (k3d can't remap
-  them live). PV data under `storage_path` survives the recreate.
+- **Changing ports, storage_path, api_port, k3s_version or node counts recreates the
+  cluster** (k3d can't change them live) — and a recreate is a data reset (see "Nuke &
+  rebuild"). Fine for synthetic demo data; pin static PVs first if that ever changes.
 - **Cadence QUIC through the k3d loadbalancer is unproven** — UDP is proxied by k3d's
   nginx stream proxy. Validate a box enroll + sync; if sessions drop, check the proxy's
   UDP timeouts.
