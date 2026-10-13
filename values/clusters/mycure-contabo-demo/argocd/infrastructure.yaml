@@ -18,7 +18,13 @@ clusterName: mycure-contabo-demo
 # Cert Manager - TLS certificate automation
 certManager:
   enabled: true
-  version: v1.16.2
+  # v1.16.4, not v1.16.2: Cloudflare's API change (cert-manager#7540) makes
+  # v1.16.2 DNS-01 cleanup DELETE /zones//dns_records/<id> (empty zone id) and
+  # fail, so every issue/renewal leaves an _acme-challenge TXT record behind.
+  # Those leftovers filled the shared localfirsthealth.com zone to its
+  # 200-record quota on 2026-10-13 and blocked this cluster's DNS. Fixed
+  # upstream in v1.16.4 (#7566). DOKS/vanaheim are still on v1.16.2.
+  version: v1.16.4
 
 # Cert Manager Resources - ClusterIssuers and certificate configuration
 certManagerIssuers:
