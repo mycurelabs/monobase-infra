@@ -3,8 +3,8 @@
 A **k3d** cluster on the demo VPS (`vmi3315250`, public IP `62.146.233.59`) that hosts
 the **`mycure-demo`** environment: a client-facing demo / sales / training copy of
 MyCure, reachable from the **public internet** at `*.demo.localfirsthealth.com`. It
-runs its **own in-cluster ArgoCD** (standalone, like vanaheim), tracking
-`cluster/demo`.
+runs its **own in-cluster ArgoCD** (standalone, like vanaheim), tracking **`main`**
+(see "Git ref" below — it is long-lived, so no `cluster/<name>` branch).
 
 ```
 values/clusters/mycure-k3d-demo/
@@ -115,42 +115,30 @@ mise run cluster-apply mycure-k3d-demo     # k3d + Gateway API CRDs + node label
 
 ## 3. Bootstrap ArgoCD (VPS)
 
-Same one-time seeds as vanaheim (not yet automated in `bootstrap.ts`):
+Run from a checkout of **`main`** on the VPS. Two one-time seeds come first; then
+`mise run bootstrap` does the rest (ArgoCD install with `argocd/argocd.yaml`, which
+already carries the repo-server timeouts/resources, plus the infra root and the
+auto-discover ApplicationSet from `argocd/bootstrap.yaml`).
 
 ```bash
 KCTX=k3d-mycure-k3d-demo
-kubectl --context $KCTX create ns argocd
-kubectl --context $KCTX create ns external-secrets-system
 
-# 1. ESO auth: the scoped SA key from step 1 -> gcpsm-secret
+# 1. ESO auth: the scoped SA key from step 1 -> gcpsm-secret (bootstrap.ts does
+#    not create it; ESO, cert-manager and external-dns all depend on it).
+kubectl --context $KCTX create ns external-secrets-system
 kubectl --context $KCTX -n external-secrets-system create secret generic gcpsm-secret \
   --from-file=secret-access-credentials=/tmp/eso-demo.json && shred -u /tmp/eso-demo.json
 
-# 2. Install ArgoCD with this cluster's values (repo-server needs headroom for ESO CRD render)
-helm repo add argo https://argoproj.github.io/argo-helm && helm repo update argo
-helm upgrade --install argocd argo/argo-cd --kube-context $KCTX -n argocd --version 9.0.3 \
-  -f values/clusters/mycure-k3d-demo/argocd/argocd.yaml --wait --timeout 8m
-kubectl --context $KCTX -n argocd set env deploy/argocd-repo-server ARGOCD_EXEC_TIMEOUT=300s
-kubectl --context $KCTX -n argocd set env statefulset/argocd-application-controller ARGOCD_REPO_SERVER_TIMEOUT_SECONDS=300
-kubectl --context $KCTX -n argocd set resources deploy/argocd-repo-server --limits=cpu=1,memory=2Gi --requests=cpu=250m,memory=1Gi
-
-# 3. Repo creds — OPTIONAL: monobase-infra is public, so ArgoCD reads it anonymously
-#    (skipped on the first standup). Add only if GitHub rate-limits the repo-server.
-kubectl --context $KCTX -n argocd apply -f - <<EOT
-apiVersion: v1
-kind: Secret
-metadata: { name: repo-monobase-infra, namespace: argocd, labels: { argocd.argoproj.io/secret-type: repository } }
-stringData: { type: git, url: https://github.com/mycurelabs/monobase-infra.git, username: mycurebot, password: $(gh auth token) }
-EOT
-
-# 4. Bootstrap objects (infra root + auto-discover ApplicationSet, demo-only, cluster/demo)
-helm template argocd-bootstrap charts/argocd-bootstrap \
-  -f values/clusters/mycure-k3d-demo/argocd/bootstrap.yaml | kubectl --context $KCTX apply -f -
+# 2. Install ArgoCD + bootstrap. bootstrap.ts uses the CURRENT context (it ignores
+#    --context) and defaults --cluster-name to mycure-doks-main (PRODUCTION) —
+#    so switch context first and ALWAYS pass --cluster-name.
+#    --skip-github-app: monobase-infra is public; ArgoCD reads it anonymously.
+kubectl config use-context $KCTX
+mise run bootstrap -- --cluster-name mycure-k3d-demo --skip-github-app
 ```
 
-> Do NOT run `mise run bootstrap` without `--cluster-name mycure-k3d-demo`: it defaults
-> to `mycure-doks-main`, and `bootstrap.ts` ignores `--context` (it uses the CURRENT
-> kubectl context).
+Repo credentials are not needed (public repo). Add a repository Secret only if
+GitHub rate-limits the repo-server.
 
 ArgoCD then deploys ESO → cert-manager → nginx-gateway → external-dns → the
 `mycure-demo` stack. Watch: `kubectl --context $KCTX -n argocd get applications`.
@@ -204,16 +192,19 @@ kubectl --context $KCTX -n mycure-demo port-forward svc/mailpit-http 8025:80   #
 kubectl --context $KCTX -n mycure-demo port-forward svc/minio 9001:9001       # MinIO console, http://localhost:9001
 ```
 
-## Cluster-tracking branch
+## Git ref: `main`
 
-Dev-cluster convention (docs/architecture/GITOPS-ARGOCD.md → "Branch Conventions"):
-**one ref for the whole cluster**, `cluster/demo`, declared in `argocd/bootstrap.yaml`.
+This cluster tracks **`main` (HEAD)**, the chart default — `argocd/bootstrap.yaml`
+deliberately sets no `argocd.targetRevision`. Rule (docs/architecture/GITOPS-ARGOCD.md
+→ "Branch Conventions"): **long-lived clusters track `main`; `cluster/<name>` branches
+are throwaway refs for disposable dev clusters only.** The demo serves clients, so it is
+long-lived.
 
-- **Deploy** = merge into `cluster/demo` and push. **Promote** = PR to `main`.
-- **Re-merge `main` into `cluster/demo` regularly**, or prod image bumps and infra
-  fixes never reach the demo. Merge-only, no force-push.
-- The AppSet controller does not update EXISTING root apps on template change — after
-  changing the tracked ref, patch live roots' `targetRevision` or recreate them.
+- **Deploy** = PR to `main` and merge. That is the only thing that changes the demo.
+- **App versions** are pinned in `values/deployments/mycure-demo.yaml`; bump them there
+  (a prod bump in `mycure-production.yaml` does not move the demo).
+- `charts/argocd-bootstrap` and `argocd/bootstrap.yaml` changes only apply on
+  re-bootstrap (step 3), not on merge.
 
 ## Nuke & rebuild
 
@@ -222,7 +213,7 @@ mise run cluster-destroy mycure-k3d-demo
 sudo rm -rf /var/lib/k3d/mycure-k3d-demo    # only if you also want to drop PV data
 ```
 
-Then re-provision + re-bootstrap (steps 2-3). If PV data was dropped, reseed and
+Then re-provision + re-bootstrap (steps 2-3) from a checkout of `main`. If PV data was dropped, reseed and
 re-mint the cadence key (step 5) — better-auth keys die with the DB.
 
 If the VPS IP ever changes, update `external-dns.alpha.kubernetes.io/target` in

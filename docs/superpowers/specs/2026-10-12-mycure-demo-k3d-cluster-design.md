@@ -20,7 +20,7 @@ k3d cluster on a public VPS rather than on vanaheim or DOKS.
 | TLS / DNS | Let's Encrypt DNS-01 (Cloudflare); external-dns `upsert-only`, `txtOwnerId: mycure-k3d-demo`, A records → VPS IP |
 | Footprint | Full prod shape (HA PG + read replica, API/worker split, roleSplit, HPA, cadence hub + relay, MinIO, mailpit) on prod image tags |
 | Off | Medical AI (no GPU), tenzir, Loki, monitoring, velero, tailscale |
-| Git ref | `cluster/demo` (dev-cluster convention) |
+| Git ref | `main` (HEAD). Long-lived clusters track `main`; see "Revision" below |
 | Secrets | Fresh `mycure-demo-*` keys; scoped SA `external-secrets-demo`; Google OAuth/Stripe stubbed |
 | Data | Synthetic, seeded with `scripts/seed.ts --env demo` |
 | Hardening | `strictGatewayIngress`, better-auth rate limits, no public route for mailpit or MinIO, apiserver bound to loopback |
@@ -37,6 +37,15 @@ k3d cluster on a public VPS rather than on vanaheim or DOKS.
   `gateway` block and accepts `externalTrafficPolicy`. DOKS and vanaheim render unchanged.
 - **DOKS guard:** `mycure-demo.yaml` is excluded in the DOKS bootstrap and the chart
   default. The DOKS AppSet must be re-applied before the overlay reaches `main`.
+
+## Revision (2026-10-13): track `main`, not `cluster/demo`
+
+The first draft pointed this cluster at a `cluster/demo` branch, copied from vanaheim.
+That was wrong: `cluster/<name>` branches are throwaway refs for disposable dev clusters,
+and the demo is long-lived. The cluster now tracks `main` (no `argocd.targetRevision`
+override). Consequences: the demo only deploys once the PR merges to `main`, so the DOKS
+exclude must be re-applied BEFORE that merge; and the ArgoCD repo-server timeouts moved
+into `argocd/argocd.yaml` so `mise run bootstrap` covers the install end to end.
 
 ## Runbook
 

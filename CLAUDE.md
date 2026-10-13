@@ -58,6 +58,12 @@ Key tasks: `lint`, `validate`, `check`, `fmt`, `bootstrap`, `provision`, `secret
 - Conventional commits: `feat:`, `fix:`, `chore:`, `docs:`, `refactor:`
 - Never commit secrets, credentials, or `.env` files
 - Fork-based workflow for external contributors
+- **`cluster/<name>` branches are THROWAWAY refs for disposable dev clusters only**
+  (today: `cluster/vanaheim`). New clusters are set up from `main` — add
+  `values/clusters/<name>/`, then `mise run bootstrap -- --cluster-name <name>` —
+  and any long-lived cluster (prod, client demos) tracks `main`: leave
+  `argocd.targetRevision` unset. Never copy vanaheim's `targetRevision`. See
+  docs/architecture/GITOPS-ARGOCD.md → "Branch Conventions".
 - **Worktrees live under `.claude/worktrees/<branch>`** (gitignored) — NOT a sibling
   `../infra-worktrees/`. Branch development never happens in the main checkout (it's
   shared across concurrent sessions); create the worktree with the `EnterWorktree` tool,

@@ -1,19 +1,21 @@
 # argocd-bootstrap override for the public demo k3d cluster (mycure-k3d-demo).
 #
-# Bootstrap (kubectl CURRENT context must be k3d-mycure-k3d-demo —
-# scripts/bootstrap.ts ignores --context):
+# Bootstrap (run from a checkout of main, on the VPS; bootstrap.ts uses the
+# CURRENT kubectl context and ignores --context):
 #   kubectl config use-context k3d-mycure-k3d-demo
-#   mise run bootstrap -- --cluster-name mycure-k3d-demo
+#   mise run bootstrap -- --cluster-name mycure-k3d-demo --skip-github-app
 #
 # Effect: this cluster's own ArgoCD uses the per-cluster infra config
 # (clusterName) and its auto-discover ApplicationSet deploys ONLY the
 # mycure-demo overlay, in-cluster. The DOKS ArgoCD excludes it
 # (values/clusters/mycure-doks-main/argocd/bootstrap.yaml).
+#
+# Git ref: NO argocd.targetRevision override — this cluster tracks HEAD (main),
+# the chart default. It is LONG-LIVED and client-facing, so it follows the
+# "long-lived clusters track HEAD" rule (docs/architecture/GITOPS-ARGOCD.md →
+# "Branch Conventions"). Do not add a cluster/<name> branch here: those are
+# throwaway refs for disposable dev clusters only.
 argocd:
   clusterName: mycure-k3d-demo
-  # One-ref-per-cluster convention (docs/architecture/GITOPS-ARGOCD.md):
-  # this cluster tracks its cluster branch. Deploy = merge into cluster/demo;
-  # promote = PR to main; re-merge main regularly. Merge-only, no force-push.
-  targetRevision: cluster/demo
   deploymentPaths:
     - path: "values/deployments/mycure-demo.yaml"
