@@ -1,0 +1,264 @@
+# Infrastructure values for mycure-contabo-demo (public k3d cluster on the demo VPS).
+# PUBLIC-INTERNET profile: cert-manager (Let's Encrypt DNS-01), External Secrets,
+# external-dns, and ONE internet-facing NGINX gateway. Everything heavy or
+# tailnet-specific (tailscale operator, Loki, tenzir, velero, monitoring) is OFF.
+# Note: argocd.repoURL is injected from infrastructure-root.yaml bootstrap file
+#
+# Traffic path: client -> VPS :80/:443 (+ UDP 6472/7842) -> k3d loadbalancer
+# container -> k3s servicelb (klipper) -> nginx-public-gateway data plane.
+# The k3d loadbalancer is a plain nginx stream proxy (no PROXY protocol), so
+# CLIENT SOURCE IPs DO NOT REACH THE CLUSTER — every request appears to come
+# from a docker-bridge IP. Keep that in mind for any per-IP rate limit.
+
+# Which cluster this infra config belongs to. LOAD-BEARING: velero-resources
+# and external-dns resolve their per-cluster valueFiles path from it and
+# `required` it (no fallback, #436).
+clusterName: mycure-contabo-demo
+
+# Cert Manager - TLS certificate automation
+certManager:
+  enabled: true
+  version: v1.16.2
+
+# Cert Manager Resources - ClusterIssuers and certificate configuration
+certManagerIssuers:
+  enabled: true
+  issuers:
+    # Cloudflare DNS-01 challenge (wildcard + exact-name certs; no HTTP-01 so
+    # issuance never depends on the public path being up).
+    - name: letsencrypt-mycure-cloudflare-prod
+      email: "caretheextramile@gmail.com"
+      server: production
+      provider: cloudflare
+      cloudflare:
+        apiTokenSecretRef:
+          name: mycure-cloudflare-api-token
+          key: api-token
+        dnsZones:
+          - localfirsthealth.com
+
+# CoreDNS overrides — in-cluster hairpin for *.demo (same pattern as vanaheim's
+# *.preprod). Pods resolving the public *.demo A records would otherwise leave
+# the cluster and hairpin back through the VPS public IP + docker NAT; keep
+# cadence -> hapihub auth/JWKS and app -> api calls in-cluster instead.
+# NOTE: the k3s Corefile has no `reload` plugin — `kubectl -n kube-system
+# rollout restart deploy/coredns` after changing these rewrites.
+corednsCustom:
+  enabled: true
+  # Exact hairpin first: relay hostname -> relay Service (must win over the
+  # wildcard, matching the DOKS ordering).
+  exactRewrites:
+    - from: mycure-cadence-relay.demo.localfirsthealth.com
+      to: cadence-relay.mycure-demo.svc.cluster.local
+  # Wildcard hairpin: *.demo -> the public gateway data plane (same
+  # listeners/certs, so in-cluster https keeps validating).
+  regexRewrites:
+    - pattern: (.*)\.demo\.localfirsthealth\.com
+      to: nginx-public-gateway-nginx.nginx-gateway-system.svc.cluster.local
+  # AAAA suppression (host may lack IPv6 egress) — ArgoCD replaces the CM data
+  # wholesale on sync, so the key must render from this chart. Keep in
+  # lockstep with the local-k3d module's copy.
+  extraOverrides:
+    aaaa: |
+      template IN AAAA {
+        rcode NOERROR
+      }
+
+# NGINX Gateway Fabric - primary Gateway API implementation
+nginxGateway:
+  enabled: true
+  # Keep in lockstep with the Gateway API CRD bundle —
+  # scripts/upgrade-gateway-api-crds.sh (2.6.7 -> Gateway API 1.5.1).
+  version: "2.6.7"
+
+# NGINX Gateway Resources
+nginxGatewayResources:
+  gatewayClass:
+    enabled: false  # GatewayClass created by operator chart
+
+  # PUBLIC gateway — internet-facing BY INTENT (client demos). Its data-plane
+  # Service is type LoadBalancer, served by k3s servicelb on every node and
+  # reached from the VPS ports via the k3d loadbalancer.
+  gateway:
+    name: nginx-public-gateway
+    namespace: nginx-gateway-system
+    gatewayClassName: nginx
+    annotations:
+      # external-dns publishes attached routes' hostnames as A records -> the
+      # VPS public IP. Without this it would publish the servicelb status IPs
+      # (docker-bridge node IPs, unreachable from the internet).
+      # NOTE: update if the VPS IP ever changes.
+      external-dns.alpha.kubernetes.io/target: "62.146.233.59"
+    nginxProxy:
+      serviceType: LoadBalancer
+      # Cluster, not NGF's default Local: source IP is already lost at the k3d
+      # loadbalancer, and Local would black-hole the share of traffic the k3d
+      # proxy sends to a node with no gateway pod (UDP has no retry).
+      externalTrafficPolicy: Cluster
+    listeners:
+      # Exact-hostname listeners for the app<->api pair (anti-HTTP/2-coalescing,
+      # mono#2540) + wildcard for the rest — same pattern as preprod/sandbox.
+      - name: https-demo-mycure
+        port: 443
+        protocol: HTTPS
+        hostname: "mycure.demo.localfirsthealth.com"
+        tlsSecretName: nginx-gateway-tls-demo-mycure
+      - name: https-demo-hapihub
+        port: 443
+        protocol: HTTPS
+        hostname: "hapihub.demo.localfirsthealth.com"
+        tlsSecretName: nginx-gateway-tls-demo-hapihub
+      - name: https-demo-lfh
+        port: 443
+        protocol: HTTPS
+        hostname: "*.demo.localfirsthealth.com"
+        tlsSecretName: nginx-gateway-tls-demo
+      - name: http-demo-lfh
+        port: 80
+        protocol: HTTP
+        hostname: "*.demo.localfirsthealth.com"
+      # Cadence QUIC (UDPRoute). UDP has no SNI → port-demuxed. These ports are
+      # also mapped VPS -> k3d loadbalancer in terraform/terraform.tfvars
+      # (extra_port_mappings); cadence.publicAddr in the overlay advertises
+      # <VPS IP>:6472. Same numbers as prod's DOKS gateway — separate IP, no clash.
+      - name: cadence-quic-demo
+        port: 6472
+        protocol: UDP
+      - name: relay-quic-demo
+        port: 7842
+        protocol: UDP
+
+  extraGateways: []
+
+  tls:
+    certificates:
+      # Exact-name certs MUST stay single-hostname — extra dnsNames would
+      # re-enable HTTP/2 coalescing.
+      - secretName: nginx-gateway-tls-demo-mycure
+        clusterIssuer: letsencrypt-mycure-cloudflare-prod  # DNS-01
+        dnsNames:
+          - mycure.demo.localfirsthealth.com
+      - secretName: nginx-gateway-tls-demo-hapihub
+        clusterIssuer: letsencrypt-mycure-cloudflare-prod  # DNS-01
+        dnsNames:
+          - hapihub.demo.localfirsthealth.com
+      - secretName: nginx-gateway-tls-demo
+        clusterIssuer: letsencrypt-mycure-cloudflare-prod  # DNS-01, wildcard
+        dnsNames:
+          - "*.demo.localfirsthealth.com"
+
+  # Cluster-wide SnippetsPolicies for the shared nginx Gateway.
+  snippetsPolicies:
+    - name: hapihub-proxy-timeout
+      snippets:
+        - context: http.server.location
+          value: |
+            proxy_read_timeout 3600s;
+            client_max_body_size 50m;
+    # vapt-2025#10 L-001: strip the `Server` response header via the bundled njs
+    # module (ngx_http_js_module). Script: charts/nginx-gateway/files/security-headers.js
+    - name: nginx-strip-server-header
+      snippets:
+        - context: http
+          value: |
+            js_import securityHeaders from /etc/nginx/njs-security/security-headers.js;
+        - context: http.server.location
+          value: |
+            js_header_filter securityHeaders.clearServer;
+
+# Gateway metadata consumed by the grafana Application template.
+# Grafana is disabled on this cluster — these values are inert.
+gateway:
+  domain: demo.localfirsthealth.com
+  gateway:
+    name: nginx-public-gateway
+    namespace: nginx-gateway-system
+
+# External Secrets - Secret management (pulls from GCP Secret Manager)
+externalSecrets:
+  enabled: true
+  version: 0.9.11
+  provider: gcp
+
+  # Store the cluster-scoped ExternalSecrets (cert-manager/external-dns) read from.
+  secretStoreName: gcp-secretstore
+  cloudflare:
+    enabled: true
+  cloudflareSecretName: mycure-cloudflare-api-token
+
+  stores:
+    - name: gcp-secretstore
+      provider: gcp
+      gcp:
+        projectId: mc-v4-prod
+        # k3d (no Workload Identity) — auth via the gcpsm-secret SA key of the
+        # scoped external-secrets-demo SA (IAM condition: mycure-demo-* +
+        # infrastructure-cloudflare-api-token only), seeded at bootstrap.
+        auth:
+          serviceAccountKey:
+            enabled: true
+            secretRef:
+              name: gcpsm-secret
+              key: secret-access-credentials
+              namespace: external-secrets-system
+
+  # AWS Secrets Manager configuration
+  aws:
+    region: us-east-1
+    roleArn: ""
+    serviceAccountName: external-secrets-sa
+
+  # Azure Key Vault configuration
+  azure:
+    vaultUrl: ""
+    identityId: ""
+    tenantId: ""
+
+  # GCP Secret Manager configuration
+  gcp:
+    projectId: ""
+    region: us-central1
+    clusterName: ""
+    serviceAccountEmail: ""
+
+# External DNS - publishes *.demo A records -> the VPS IP (full config in
+# external-dns.yaml; cluster-unique txtOwnerId, upsert-only).
+externalDNS:
+  enabled: true
+
+# Kyverno - Policy engine
+kyverno:
+  enabled: false
+
+# Velero - Backup and disaster recovery (demo data is seeded/synthetic)
+velero:
+  enabled: false
+
+# Falco - Runtime security monitoring
+falco:
+  enabled: false
+
+# Monitoring - Prometheus + Grafana stack
+monitoring:
+  enabled: false
+  # grafana.enabled kept (=false) because templates/grafana.yaml gates on this
+  # nested key directly, not monitoring.enabled.
+  grafana:
+    enabled: false
+
+# Loki + Promtail - off (follow-up if demo log retention is ever needed)
+loki:
+  enabled: false
+
+# Tailscale egress to a workstation Ollama — no AI on this cluster
+ollamaEgress:
+  enabled: false
+
+# Tailscale K8s operator — not used: this cluster is reached over the public
+# internet, not the tailnet.
+tailscaleOperator:
+  enabled: false
+
+# Tenzir security detection pipeline — off (no audit sink in the demo overlay).
+tenzir:
+  enabled: false

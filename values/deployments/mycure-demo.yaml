@@ -1,0 +1,526 @@
+# Demo overlay; extends: base (values/deployments/base.yaml, helm merge:
+# base first, this file wins per key; arrays replace wholesale).
+# MyCure Demo Configuration — PUBLIC, client-facing demo / sales / training env.
+#
+# Runs on its OWN public k3d cluster `mycure-contabo-demo` (a VPS, not vanaheim,
+# not DOKS; values/clusters/mycure-contabo-demo/), reachable from the INTERNET at
+# *.demo.localfirsthealth.com. Same component shape as mycure-preprod / prod
+# (HA Postgres + read plane, hapihub API/worker split, least-privilege DB roles,
+# HPA, cadence hub + relay) on PROD image tags, so demos show what customers get.
+# Deltas from prod, each commented in place:
+#   - public gateway is the demo cluster's own nginx-public-gateway (VPS IP)
+#   - demo-own secrets (mycure-demo-* GCP keys) — NEVER prod's
+#   - mailpit instead of Postmark, in-cluster MinIO instead of GCS
+#   - mailpit UI + MinIO console NOT routed (public cluster; port-forward only)
+#   - no walg/velero/serviceMonitor/nodePools/tenzir/medical-AI
+#   - nonprod sizing on PG/valkey/cadence
+# Hostnames are named after the product: <app>.demo.localfirsthealth.com —
+#   mycure, hapihub, hapihub-docs, mycure-dashboard, mycure-pxp, mycurelocal,
+#   mycure-myaccount, mycure-developer-portal, mycure-cadence, mycure-cadence-relay.
+# SYNTHETIC DATA ONLY — seeded fresh: `mise run seed -- --app mycure --env demo --password <pw>`.
+# Never clone prod data here: this env is on the public internet.
+
+extends: base
+
+global:
+  domain: demo.localfirsthealth.com
+  namespace: mycure-demo
+  environment: demo
+
+  # The demo cluster's single, internet-facing gateway
+  # (values/clusters/mycure-contabo-demo/argocd/infrastructure.yaml).
+  gateway:
+    name: nginx-public-gateway
+  # No nodePool: k3d nodes are untainted.
+
+  # Demo-own DB/cache/storage credentials, isolated from every other env.
+  # database-secrets pulls mycure-demo-* GCP keys for Postgres/Valkey/Minio.
+  secretPrefix: "mycure-demo"
+
+# Least-privilege DB role split (monobase-mycure#4147), prod/preprod parity —
+# syncs postgresql-app-roles (GCP keys mycure-demo-postgresql-{migrator,app-rw,
+# cadence}-password, hex-only). Workload flip: hapihub.roleSplit below.
+roleSplit:
+  enabled: true
+
+# Prod parity — deny-first gateway ingress; apps rely on their own port-scoped
+# rules. Load-bearing on a public cluster.
+securityBaseline:
+  strictGatewayIngress: true
+
+mycure-dashboard:
+  resources:
+    requests:
+      cpu: 10m
+  gateway:
+    sectionName: https-demo-lfh
+
+  config:
+    API_URL: "https://hapihub.demo.localfirsthealth.com"
+
+mycure-pxp:
+  resources:
+    requests:
+      cpu: 10m
+  gateway:
+    sectionName: https-demo-lfh
+
+  config:
+    API_URL: "https://hapihub.demo.localfirsthealth.com"
+
+hapihub:
+  # Demo tracks pinned tags with normal auto-sync (no manual rollout gate —
+  # that's a preprod rehearsal control).
+  manualDeployment: false
+  # Least-privilege DB role split (monobase-mycure#4147): PreSync
+  # provision-db-roles (superuser: roles/grants) then migrate (as migrator);
+  # Deployment + worker run as DML-only app_rw with DATABASE_SKIP_MIGRATIONS=true.
+  roleSplit:
+    enabled: true
+    provision:
+      activeDeadlineSeconds: 900
+  # Prod-current tag (moves with prod bumps — demos show what customers run).
+  image:
+    tag: "11.20.135"
+  cache:
+    # Prod parity: response cache OFF (the #2839/#2617 bentocache stampede).
+    enabled: false
+
+  replicaCount: 2
+
+  resources:
+    requests:
+      memory: 1Gi
+    limits:
+      memory: 4Gi
+
+  # No Prometheus Operator on this cluster — a ServiceMonitor would fail to apply.
+  serviceMonitor:
+    enabled: false
+  pruneAuditEvents:
+    enabled: true
+
+  gateway:
+    hostnames:
+      - hapihub.demo.localfirsthealth.com
+    sectionName: https-demo-hapihub # anti-coalescing exact listener, pairs with mycure block
+  betterAuth:
+    passkey:
+      rpName: "Mycure (demo)"
+      rpId: "demo.localfirsthealth.com"
+
+  config:
+    CORS_ORIGINS: "https://hapihub.demo.localfirsthealth.com,https://mycure.demo.localfirsthealth.com,https://mycurelocal.demo.localfirsthealth.com,https://mycure-myaccount.demo.localfirsthealth.com,https://mycure-dashboard.demo.localfirsthealth.com,https://mycure-pxp.demo.localfirsthealth.com,https://mycure-developer-portal.demo.localfirsthealth.com"
+    # File storage — demo-own in-cluster MinIO (S3), isolated from prod's GCS.
+    # Access creds come from the minio secret via externalSecrets below; MinIO
+    # auto-creates the bucket.
+    STORAGE_TYPE: "s3"
+    STORAGE_S3_ENDPOINT: "http://minio.mycure-demo.svc.cluster.local:9000"
+    STORAGE_S3_REGION: "us-east-1"
+    STORAGE_S3_FORCE_PATH_STYLE: "true"
+    STORAGE_BUCKET: "hapihub"
+    # Prod parity (mono#2114): background jobs run in the hapihubWorker release.
+    RUN_WORKERS: "false"
+    # Developer-platform API_*_ENFORCE flags stay UNSET — prod parity (they are a
+    # preprod-only rollout).
+
+  env:
+      # Prod parity (#2114): cap the JSC heap below the 4Gi container limit.
+    - name: BUN_JSC_forceRAMSize
+      value: "3221225472"
+      # Public cluster: keep better-auth rate limiting ON. NOTE: client IPs are
+      # lost at the k3d loadbalancer, so this bucket is effectively SHARED by
+      # all demo users — fine for a handful of people; raise MAX if a group
+      # training session trips it.
+    - name: BETTER_AUTH_RATE_LIMIT_ENABLED
+      value: "true"
+    - name: BETTER_AUTH_RATE_LIMIT_WINDOW
+      value: "60"
+    - name: BETTER_AUTH_RATE_LIMIT_MAX
+      value: "300"
+    - name: BETTER_AUTH_SESSION_COOKIE_CACHE_ENABLED
+      value: "false"
+      # Email: mailpit (chart default SMTP → in-namespace mailpit). The demo
+      # must never send real mail; no mycure-demo-postmark-api-key exists.
+      # cadence OAuth Authorization Server — hapihub is the SOLE AS: it mints
+      # box grants AND the hub's own '*' grant with this EdDSA key.
+    - name: CADENCE_ISSUER_ISS
+      value: "cadence-demo-issuer"
+    - name: CADENCE_ISSUER_KID
+      value: "k1"
+    - name: CADENCE_ISSUER_FLEET_ID
+      value: "mycure-demo"
+    - name: CADENCE_ISSUER_AUTHORIZE_URL
+      value: "https://mycure.demo.localfirsthealth.com/oauth/authorize"
+    - name: CADENCE_ISSUER_SEED_URL
+      value: "https://mycure-cadence.demo.localfirsthealth.com"
+      # RFC 8628 device grant (#2992) — fail-closed if unset; demos box onboarding.
+    - name: CADENCE_ISSUER_DEVICE_VERIFICATION_URI
+      value: "https://mycure.demo.localfirsthealth.com/oauth/device"
+      # Read replica for device-telemetry parity recompute (mono#3747).
+    - name: DATABASE_READ_URI
+      value: "postgres://$(POSTGRESQL_USER):$(POSTGRESQL_PASSWORD)@postgresql-read.mycure-demo.svc.cluster.local:5432/hapihub"
+
+  # Prod parity: HPA owns replicas (k3s bundles metrics-server).
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 4
+
+  # Demo-own secrets (mycure-demo-* GCP keys). Dropped like preprod: ENC_*
+  # (field-encryption unused), PUBLIC_KEY (derived from PRIVATE_KEY at runtime),
+  # STRIPE_SECRET_KEY/STRIPE_KEY (billing_providers DB row), GCS storage keys
+  # (MinIO above), POSTMARK_API_KEY (mailpit), AUDIT_SINK_SECRET (no tenzir).
+  # GOOGLE_* and STRIPE_CHECKOUT_* are STUBS until real demo values exist.
+  externalSecrets:
+    secrets:
+        # Google OAuth (stub)
+      - secretKey: GOOGLE_CLIENT_ID
+        remoteKey: mycure-demo-google-oauth-client-id
+      - secretKey: GOOGLE_CLIENT_SECRET
+        remoteKey: mycure-demo-google-oauth-client-secret
+        # JWT/Auth keys (PUBLIC_KEY derived from PRIVATE_KEY at runtime)
+      - secretKey: PRIVATE_KEY
+        remoteKey: mycure-demo-private-key
+        # cadence issuer EdDSA signing key (PEM, single-line \n-escaped)
+      - secretKey: CADENCE_ISSUER_KEY
+        remoteKey: mycure-demo-cadence-issuer-key-pem
+        # Storage — in-cluster MinIO (S3) access creds
+      - secretKey: STORAGE_S3_ACCESS_KEY_ID
+        remoteKey: mycure-demo-minio-root-user
+      - secretKey: STORAGE_S3_SECRET_ACCESS_KEY
+        remoteKey: mycure-demo-minio-root-password
+        # Stripe checkout redirect URLs (stub)
+      - secretKey: STRIPE_CHECKOUT_SUCCESS_URL
+        remoteKey: mycure-demo-stripe-checkout-success-url
+      - secretKey: STRIPE_CHECKOUT_CANCEL_URL
+        remoteKey: mycure-demo-stripe-checkout-cancel-url
+      - secretKey: AUTH_SECRET
+        remoteKey: mycure-demo-auth-secret
+      - secretKey: BETTER_AUTH_SECRET
+        remoteKey: mycure-demo-better-auth-secret
+
+  postgresql:
+    serviceName: postgresql-primary
+
+# Prod parity (mono#2114): background-job consumer split out of the API pods.
+hapihubWorker:
+  enabled: true
+
+  # roleSplit: the worker release deep-merges the hapihub block, so it inherits
+  # app_rw + DATABASE_SKIP_MIGRATIONS. Hook Jobs render only ONCE (hapihub).
+  roleSplit:
+    provision:
+      enabled: false
+    migrateJob:
+      enabled: false
+
+  replicaCount: 1
+
+  resources:
+    requests:
+      cpu: 500m
+      memory: 2Gi
+    limits:
+      cpu: "2"
+      memory: 4Gi
+
+  config:
+    RUN_WORKERS: "true"
+
+  # No external traffic: keep the Service (probes) but no routes.
+  gateway:
+    enabled: false
+    storageRoute:
+      enabled: false
+    snippetsPolicy:
+      enabled: false
+
+  # The API release owns the daily session-prune cronjob.
+  pruneExpiredSessions:
+    enabled: false
+
+  autoscaling:
+    enabled: false
+
+  podDisruptionBudget:
+    enabled: false
+
+# ===== HEALTHCARE: Frontend Application =====
+mycure:
+  # Prod-current tag — moves with hapihub.
+  image:
+    tag: "10.25.144"
+  resources:
+    requests:
+      cpu: 10m
+  gateway:
+    sectionName: https-demo-mycure # anti-coalescing exact listener (exact-name cert kills HTTP/2 cross-host reuse -> 421s)
+
+  config:
+    API_URL: "https://hapihub.demo.localfirsthealth.com"
+    HAPIHUB_URL: "https://hapihub.demo.localfirsthealth.com"
+    # No POSTHOG_KEY / GA4_MEASUREMENT_ID: blank outside prod keeps analytics off.
+
+mycurelocal:
+  enabled: true
+
+  resources:
+    requests:
+      cpu: 10m
+  gateway:
+    hostnames:
+      - hostname: mycurelocal.demo.localfirsthealth.com
+        sectionName: https-demo-lfh
+
+mycure-myaccount:
+  enabled: true
+
+  resources:
+    requests:
+      cpu: 10m
+  gateway:
+    sectionName: https-demo-lfh
+
+  config:
+    API_URL: "https://hapihub.demo.localfirsthealth.com"
+    HAPIHUB_URL: "https://hapihub.demo.localfirsthealth.com"
+
+hapihub-docs:
+  enabled: true
+
+  resources:
+    requests:
+      cpu: 10m
+  gateway:
+    hostname: "hapihub-docs.demo.localfirsthealth.com"
+    sectionName: https-demo-lfh
+
+# ===== DEVELOPER PLATFORM: MYCURE Developer Portal =====
+# Static Vite SPA on the generic `app` chart. Rides the *.demo wildcard
+# listener (https-demo-lfh) → mycure-developer-portal.demo.localfirsthealth.com.
+developerPortal:
+  enabled: true
+
+  image:
+    tag: "0.1.0"
+
+  resources:
+    requests:
+      cpu: 10m
+  gateway:
+    hostname: "mycure-developer-portal.demo.localfirsthealth.com"
+    sectionName: https-demo-lfh
+
+  config:
+    API_URL: "https://hapihub.demo.localfirsthealth.com"
+    HAPIHUB_URL: "https://hapihub.demo.localfirsthealth.com"
+
+# ===== MEDICAL AI: disabled — no GPU / Ollama on the demo VPS =====
+medley:
+  enabled: false
+medleyapp:
+  enabled: false
+medgemmaWorker:
+  enabled: false
+openmed:
+  enabled: false
+
+# WAL archiving OFF — demo data is seeded/synthetic and disposable.
+walg:
+  enabled: false
+
+# Logical backup OFF (synthetic data).
+pgLogicalBackup:
+  enabled: false
+
+# ===== DATABASE: PostgreSQL (HA — 1 primary + 1 read replica, prod parity) =====
+# The cadence hub's reconcile/serve scan plane reads from the replica
+# (CADENCE_DB_READ_URL), same read-plane split as prod. Local-path storage
+# under the VPS's persistent storage_path; nonprod sizing.
+postgresql:
+  architecture: replication
+
+  auth:
+    replicationUsername: repl_user
+    secretKeys:
+      replicationPasswordKey: postgres-replication-password
+
+  primary:
+    # Prod GUCs minus the archive_* block (walg off). max_connections 300:
+    # cadence boot opens ~99 per-collection ensure connections simultaneously.
+    # max_slot_wal_keep_size 20GB: a dead replica must not fill the volume.
+    extendedConfiguration: |
+      shared_preload_libraries = 'pgaudit, pg_stat_statements'
+      shared_buffers = 2GB
+      effective_cache_size = 5GB
+      work_mem = 16MB
+      maintenance_work_mem = 256MB
+      random_page_cost = 1.1
+      effective_io_concurrency = 200
+      max_connections = 300
+      max_slot_wal_keep_size = 20GB
+      log_min_duration_statement = 1000
+      autovacuum_max_workers = 6
+      autovacuum_vacuum_cost_limit = 2000
+      autovacuum_naptime = 30s
+    persistence:
+      size: 50Gi
+    resources:
+      requests:
+        cpu: 500m
+        memory: 2Gi
+      limits:
+        cpu: 2000m
+        memory: 8Gi
+
+  readReplicas:
+    replicaCount: 1
+    persistence:
+      enabled: true
+      storageClass: "" # k3d default (local-path)
+      size: 50Gi
+    resources:
+      requests:
+        cpu: 100m
+        memory: 1Gi
+      limits:
+        cpu: 1000m
+        memory: 4Gi
+    # In lockstep with the primary; slot pin + standby-conflict tuning as prod.
+    extendedConfiguration: |
+      shared_preload_libraries = 'pgaudit, pg_stat_statements'
+      shared_buffers = 2GB
+      effective_cache_size = 5GB
+      work_mem = 16MB
+      maintenance_work_mem = 256MB
+      random_page_cost = 1.1
+      effective_io_concurrency = 200
+      max_connections = 300
+      log_min_duration_statement = 1000
+      autovacuum_max_workers = 6
+      autovacuum_vacuum_cost_limit = 2000
+      autovacuum_naptime = 30s
+      primary_slot_name = 'pg_read_replica'
+      hot_standby_feedback = on
+      max_standby_streaming_delay = 120s
+    customStartupProbe:
+      exec:
+        command:
+          - /bin/sh
+          - -c
+          - exec pg_isready -U postgres -d dbname=hapihub -h 127.0.0.1 -p 5432
+      initialDelaySeconds: 30
+      periodSeconds: 15
+      timeoutSeconds: 5
+      failureThreshold: 60
+      successThreshold: 1
+
+  podDisruptionBudget:
+    enabled: false
+
+# ===== CACHE: Valkey (Redis) =====
+valkey:
+  master:
+    persistence:
+      size: 4Gi
+    resources:
+      requests:
+        cpu: 100m
+        memory: 1Gi
+      limits:
+        cpu: 500m
+        memory: 2Gi
+
+# ===== STORAGE: MinIO Object Storage (demo-own, isolated) =====
+# Deviation from prod (GCS): hapihub STORAGE_TYPE=s3 above points here.
+minio:
+  enabled: true
+  # NO public route for the MinIO console/API (base default storage.<domain>):
+  # this cluster is on the internet. hapihub talks to it in-cluster. Use
+  # `kubectl -n mycure-demo port-forward svc/minio 9001:9001` for the console.
+  gateway:
+    enabled: false
+  auditArchive:
+    enabled: false
+
+mailpit:
+  enabled: true
+  # NO public route: the mailpit UI has no auth, and this cluster is on the
+  # internet. Read demo mail (OTPs, invites) with
+  # `kubectl -n mycure-demo port-forward svc/mailpit-http 8025:80`.
+  gateway:
+    enabled: false
+
+# ===== cadence-relay — prod parity =====
+cadenceRelay:
+  # k3d nodes are all node-pool=infra (baked by the local-k3d module); the
+  # chart defaults (relay: nonprod, cadence: staging) match no node here.
+  nodePool: "infra"
+  serviceType: ClusterIP
+  # Relay hostname — drives the relay's own Certificate + external-dns name
+  # (chart default would be cadence-relay.<domain>); keep in lockstep with
+  # gatewayRoute.hostname below and the CoreDNS exact rewrite.
+  hostname: mycure-cadence-relay.demo.localfirsthealth.com
+  gatewayRoute:
+    enabled: true
+    hostname: mycure-cadence-relay.demo.localfirsthealth.com
+    sectionName: https-demo-lfh
+    udpListener: relay-quic-demo
+
+# ===== P2P SYNC: Cadence v2 hub — prod parity =====
+cadence:
+  nodePool: "infra" # see cadenceRelay note
+  # VPS public IP + the demo gateway's QUIC port (UDP 6472, mapped VPS ->
+  # k3d loadbalancer). Update alongside the external-dns target annotation in
+  # values/clusters/mycure-contabo-demo/argocd/infrastructure.yaml if the IP changes.
+  publicAddr: "62.146.233.59:6472"
+  # Prod parity: n0 public relays.
+  relayUrl: ""
+  dropUnusedTables: true
+  image:
+    tag: "2.1.103"
+  readIdleMs: 600000
+  leafidsGlobalBudget: 150000
+  maxConcurrentServes: 8
+  # base sets serviceMonitor.enabled=true; no Prometheus Operator here.
+  serviceMonitor:
+    enabled: false
+  # Nonprod ceiling (a few demo boxes, not the fleet).
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: "2"
+      memory: 3Gi
+  postgresql:
+    serviceName: postgresql-primary
+    # Read-plane split (prod parity).
+    readServiceName: postgresql-read
+    # Least-privilege split stage 3 (monobase-mycure#4147): the hub runs as the
+    # `cadence` role, provisioned by the hapihub provision-db-roles PreSync Job.
+    auth:
+      database: hapihub
+      username: cadence
+      existingSecret: postgresql-app-roles
+      secretKey: cadence-password
+  gateway:
+    sectionName: https-demo-lfh
+    hostnames:
+      - mycure-cadence.demo.localfirsthealth.com
+    # QUIC via the public gateway (UDPRoute), port 6472.
+    udpListener: cadence-quic-demo
+  # hapihub is the SOLE AS (mints box grants + the hub's own '*' grant).
+  auth:
+    issuerUrl: https://hapihub.demo.localfirsthealth.com
+    grantJwksUri: https://hapihub.demo.localfirsthealth.com/.well-known/jwks.json
+    fleetId: mycure-demo
+    authorizeUrl: https://hapihub.demo.localfirsthealth.com/sync/authorize
+  # Service-account API key (better-auth, service@mycure.md, non-expiring) →
+  # secret cadence-secrets. MINT after the first seed (and after any reseed):
+  # `mise run seed -- --app mycure --env demo --password <pw> --provision-cadence-key --gcp-project mc-v4-prod`.
+  externalSecrets:
+    secrets:
+      - secretKey: sa-api-key
+        remoteKey: mycure-demo-cadence-sa-api-key

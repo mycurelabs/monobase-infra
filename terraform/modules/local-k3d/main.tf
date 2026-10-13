@@ -9,19 +9,29 @@
 locals {
   context = "k3d-${var.cluster_name}"
 
+  # Host dir backing k3s local-path PVs. Default keeps the historical /tmp path
+  # (wiped on reboot — fine for nuke-friendly dev clusters); long-lived clusters
+  # (e.g. mycure-contabo-demo) set a persistent path so PVC data survives reboots.
+  storage_path = var.storage_path != "" ? var.storage_path : "/tmp/k3d-${var.cluster_name}"
+
   create_cmd = join(" ", compact([
     "k3d cluster create ${var.cluster_name}",
     "--servers ${var.servers}",
     "--agents ${var.agents}",
     "--image rancher/k3s:${var.k3s_version}",
+    # Pin the Kubernetes API host binding. k3d's default is a random port on
+    # 0.0.0.0 — on an internet-facing host that publishes the apiserver.
+    var.api_port != "" ? "--api-port '${var.api_port}'" : "",
     "-p '${var.http_port}:80@loadbalancer'",
     "-p '${var.https_port}:443@loadbalancer'",
+    # Extra host->loadbalancer mappings, e.g. cadence QUIC "6472:6472/udp@loadbalancer".
+    join(" ", [for m in var.extra_port_mappings : "-p '${m}'"]),
     var.disable_traefik ? "--k3s-arg '--disable=traefik@server:*'" : "",
     # node-pool=infra label so infra components (ESO/tailscale/gateway) that carry
     # the DOKS node-pool=infra nodeSelector schedule here (k3d has no real pools).
     "--k3s-node-label 'node-pool=infra@server:*'",
     "--k3s-node-label 'node-pool=infra@agent:*'",
-    "--volume '/tmp/k3d-${var.cluster_name}:/var/lib/rancher/k3s/storage@all'",
+    "--volume '${local.storage_path}:/var/lib/rancher/k3s/storage@all'",
     "--wait --timeout ${var.create_timeout}",
   ]))
 
@@ -34,15 +44,26 @@ locals {
 
 resource "null_resource" "cluster" {
   # Any change to these recreates the cluster (destroy-then-create).
-  triggers = {
-    cluster_name = var.cluster_name
-    k3s_version  = var.k3s_version
-    servers      = var.servers
-    agents       = var.agents
-    http_port    = var.http_port
-    https_port   = var.https_port
-    traefik      = tostring(var.disable_traefik)
-  }
+  triggers = merge(
+    {
+      cluster_name = var.cluster_name
+      k3s_version  = var.k3s_version
+      servers      = var.servers
+      agents       = var.agents
+      http_port    = var.http_port
+      https_port   = var.https_port
+      traefik      = tostring(var.disable_traefik)
+    },
+    # storage_path / extra_port_mappings / api_port also recreate the cluster when changed
+    # (k3d can't remap volumes or ports live). Keys are ONLY added when set, so
+    # clusters on the defaults (vanaheim) keep an identical trigger map and a
+    # module upgrade never forces them to be replaced.
+    { for k, v in {
+      storage_path = var.storage_path
+      extra_ports  = join(",", var.extra_port_mappings)
+      api_port     = var.api_port
+    } : k => v if v != "" },
+  )
 
   # Create. Delete-if-exists first so a partial/failed prior run doesn't wedge
   # the nuke-and-reprovision loop. k3d updates ~/.kube/config and switches to

@@ -13,7 +13,9 @@
 argocd:
   clusterName: mycure-onprem-vanaheim
   # One-ref-per-cluster convention (docs/architecture/GITOPS-ARGOCD.md): this
-  # dev cluster tracks its cluster branch, not HEAD. Deploy = merge into
+  # DISPOSABLE dev cluster tracks its throwaway cluster branch, not HEAD.
+  # DO NOT COPY this line into a new cluster's bootstrap.yaml — long-lived
+  # clusters (prod, demos) track HEAD/main by leaving targetRevision unset. Deploy = merge into
   # cluster/vanaheim; promote = PR to main; re-merge main regularly.
   targetRevision: cluster/vanaheim
   deploymentPaths:

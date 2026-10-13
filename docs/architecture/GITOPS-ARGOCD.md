@@ -63,6 +63,18 @@ Application it generates — because all of them template the same value.
 |---|---|---|
 | `mycure-doks-main` | `HEAD` (i.e. `main`) | chart default, `charts/argocd-bootstrap/values.yaml` |
 | `mycure-onprem-vanaheim` | `cluster/vanaheim` | `values/clusters/mycure-onprem-vanaheim/argocd/bootstrap.yaml` |
+| `mycure-contabo-demo` | `HEAD` (i.e. `main`) | chart default — no override in its `bootstrap.yaml` |
+
+> **New cluster? It tracks `main` unless it is disposable.** `main` already has
+> everything needed to stand up a cluster: a `values/clusters/<name>/` directory
+> (terraform + argocd values), `mise run cluster-{plan,apply} <name>`, and
+> `mise run bootstrap -- --cluster-name <name>`. None of that needs a branch. Leave
+> `argocd.targetRevision` UNSET in the new `bootstrap.yaml` (chart default `HEAD`).
+> **Do not copy vanaheim's `targetRevision: cluster/vanaheim`** — it is the one
+> exception, because vanaheim is a disposable dev cluster. A `cluster/<name>` branch is
+> a throwaway ref for such a cluster; it is never how a new cluster is introduced and
+> never where a long-lived cluster's config lives. (`mycure-contabo-demo` was first wired to
+> a `cluster/demo` branch by copying vanaheim and had to be moved back to `main`.)
 
 For a cluster on its own branch the flow is:
 
@@ -146,7 +158,7 @@ infrastructure root, every deployment root):
    branches. Long-lived env branches drift and rot into cherry-pick hell —
    the standard ArgoCD guidance applies.
 2. **Dev/iteration clusters — disposable ones you nuke and rebuild, on any
-   provider: a single
+   provider: a single, THROWAWAY
    cluster-tracking branch, `cluster/<name>`.** It carries `main` + whatever
    unmerged work is being tested on that cluster. Set it ONCE in the cluster's
    `values/clusters/<name>/argocd/bootstrap.yaml` (`argocd.targetRevision`) so
@@ -156,7 +168,9 @@ infrastructure root, every deployment root):
 
 The split is by **cluster role** (long-lived vs dev), not by provider or
 location — an on-prem k3s cluster serving real users tracks `HEAD` like any
-production cluster.
+production cluster. Quick test: *if this cluster vanished tonight, would anyone
+outside the team notice?* Yes (clients, demos, real users) → `HEAD`. No, and you
+would happily rebuild it → a `cluster/<name>` branch is allowed. When unsure, `HEAD`.
 
 Working with a cluster-tracking branch:
 
