@@ -137,15 +137,20 @@ spec:
         args:
           - |
             set -u
+            # Re-list on EVERY attempt: a list taken while hapihub is mid-rollout (an older build that
+            # ignores ?client_id= returns every scope) would otherwise be retried forever and refused
+            # ("No authorized organizations for this client"). Seen on mycure-demo 2026-10-14.
             while :; do
               if ! SCOPES="$(cadence auth scopes --issuer-url "$CADENCE_ISSUER_URL" --client-id "$CADENCE_AUTH_CLIENT_ID")"; then
                 echo "cadence auth scopes failed; retrying in 30s" >&2; sleep 30; continue
               fi
-              [ -n "$SCOPES" ] && break
-              echo "no $CADENCE_AUTH_CLIENT_ID clinics yet; waiting" >&2; sleep 60
-            done
-            until cadence auth login --db "$CADENCE_DB" --issuer-url "$CADENCE_ISSUER_URL" --client-id "$CADENCE_AUTH_CLIENT_ID" --scope "$SCOPES"; do
-              echo "waiting for hapihub to grant $CADENCE_AUTH_CLIENT_ID [$SCOPES]…" >&2; sleep 15
+              if [ -z "$SCOPES" ]; then
+                echo "no $CADENCE_AUTH_CLIENT_ID clinics yet; waiting" >&2; sleep 60; continue
+              fi
+              if cadence auth login --db "$CADENCE_DB" --issuer-url "$CADENCE_ISSUER_URL" --client-id "$CADENCE_AUTH_CLIENT_ID" --scope "$SCOPES"; then
+                break
+              fi
+              echo "waiting for hapihub to grant $CADENCE_AUTH_CLIENT_ID [$SCOPES] — re-listing…" >&2; sleep 15
             done
             exec cadence run --config /etc/cadence/cadence.yaml --follow-scopes-every {{ .Values.auth.followScopesEverySecs | default 300 | int }}
         {{- else }}
