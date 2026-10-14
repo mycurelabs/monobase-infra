@@ -427,19 +427,24 @@ $(POSTGRESQL_USER)).
       name: {{ include "hapihub.fullname" . }}-secrets
       key: CADENCE_ISSUER_KEY
       optional: true
-# v11 auth secrets
+# v11 auth secrets. REQUIRED (not optional): with optional:true a pod scheduled
+# before ESO creates <fullname>-secrets starts with EMPTY values, and Better Auth
+# falls back to its built-in default secret — it then encrypts the jwks private
+# key with that default, so every pod holding the real secret 500s on
+# /auth/get-session ("Failed to decrypt private key"), and that pod signs
+# sessions with a publicly known secret. Required = the kubelet holds the
+# container in CreateContainerConfigError until the Secret exists, then starts
+# it with the real values (mycure-demo, 2026-10-13).
 - name: AUTH_SECRET
   valueFrom:
     secretKeyRef:
       name: {{ include "hapihub.fullname" . }}-secrets
       key: AUTH_SECRET
-      optional: true
 - name: BETTER_AUTH_SECRET
   valueFrom:
     secretKeyRef:
       name: {{ include "hapihub.fullname" . }}-secrets
       key: BETTER_AUTH_SECRET
-      optional: true
 # Security detection pipeline: HMAC key the audit/sink worker signs its POSTs
 # with (standard-webhooks; mono#3708). optional:true → envs without the key
 # (e.g. prod) just skip it. Set on preprod via externalSecrets →
