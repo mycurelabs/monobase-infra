@@ -225,8 +225,82 @@ Every host is named after its product: `<app>.demo.localfirsthealth.com`.
 | `mycurelocal.demo` | MyCure Local |
 | `mycure-myaccount.demo` | Account portal |
 | `mycure-developer-portal.demo` | Developer portal |
-| `mycure-cadence.demo` | Cadence sync hub (+ QUIC on UDP 6472) |
+| `mycure-cadence.demo` | Cadence sync hub, **the EasyJoey anchor** (+ QUIC on UDP 6472) |
 | `mycure-cadence-relay.demo` | Cadence relay (+ QUIC on UDP 7842) |
+| `easyjoey.demo` | EasyJoey web app |
+| `easyjoey-website.demo` | EasyJoey marketing website |
+| `easyjoey-accounts.demo` | EasyJoey accounts (sign-up / sign-in) |
+
+## EasyJoey
+
+The demo also runs EasyJoey, set up the same way as staging (owner decision 2026-10-12):
+
+- **hapihub runs the EasyJoey build,** `11.20.135-easyjoey.0-staging.cb7e137` (feat/easyjoey).
+  Plain prod tags lack EasyJoey; don't move to one while EasyJoey runs here.
+- **The single cadence hub is the EasyJoey anchor** (`easyjoey/1`, fleet `easyjoey-demo`,
+  client `easyjoey-native`, `requireEntitlement: easyjoey.cloud`). It no longer serves MyCure
+  boxes. One cadence engine per hapihub DB, so there is no second hub.
+- **Three static frontends** on the hosts above, built for the demo (URLs are baked in).
+
+### One-time database prerequisite
+
+This DB was created by prod `11.20.135`. Its `0112_add_clock_correction_requests`
+(2026-10-05) sits above EasyJoey's migrations 0112–0119 (2026-10-04), so Drizzle and
+hapihub's history reconciler would leave those 8 **blocked** (logged as errors, exit 0) and
+EasyJoey would run on a half-migrated schema. Before hapihub moves to the EasyJoey build,
+an operator runs the back-fill (it also tags the cadence key, see below):
+
+```bash
+eval "$(~/.local/bin/mise env -s bash)"
+SUP=$(kubectl --context k3d-mycure-contabo-demo -n mycure-demo get secret postgresql -o jsonpath='{.data.postgres-password}' | base64 -d)
+kubectl --context k3d-mycure-contabo-demo -n mycure-demo exec -i postgresql-primary-0 -c postgresql -- \
+  env PGPASSWORD="$SUP" psql -h 127.0.0.1 -U postgres -d hapihub -v ON_ERROR_STOP=1 --single-transaction -f - \
+  < ~/backups/mycure-demo/easyjoey-demo-db-changes.sql
+unset SUP
+```
+
+The script (on the VPS, `~/backups/mycure-demo/`) was tested on a restored copy of this DB:
+without it the EasyJoey migrate reports the 8 blocked; with it 0120–0123 apply with zero
+errors and hapihub boots as `app_rw`. A full backup taken before it sits next to it.
+
+### Cadence: follow mode and the trusted key
+
+- **Follow mode** enrolls every EasyJoey-realm clinic hapihub lists, and re-enrolls when one
+  is added or removed. Until the first EasyJoey clinic exists (sign up at
+  `easyjoey-accounts.demo`), the hub logs `no easyjoey-native clinics yet; waiting` and the
+  30-minute startup probe restarts it. That is expected.
+- **The `sa-api-key` must be a trusted service key:** `api_key.metadata` =
+  `{"serviceAccount":true}` (hapihub `auth/authorizer.ts`). A key minted by
+  `scripts/seed.ts --provision-cadence-key` is **not** tagged. Re-tag after every re-mint
+  (PART 2 of the script above, with the new key id).
+
+### Frontend images (local, not in ghcr.io)
+
+`easyjoey:0.2.0-demo.102d596`, `easyjoey-website:0.1.0-demo.102d596` and
+`easyjoey-accounts:0.1.0-demo.102d596` were built **on the VPS** and loaded into the nodes
+(`k3d image import`). The release workflow only builds on `feat/easyjoey` with staging URLs.
+After a cluster rebuild, rebuild and re-import them:
+
+```bash
+# monobase-mycure at 102d596 (the web build staging validated with hapihub cb7e137), in
+# ~/workspace/easyjoey-demo-build/monobase-mycure, plus apps/*/deploy/demo.env:
+bun install --frozen-lockfile
+for a in easyjoey-website lf-accounts easyjoey; do (cd apps/$a && DEPLOY_ENV=demo ./build-docker.sh); done
+k3d image import -c mycure-contabo-demo \
+  ghcr.io/mycurelabs/easyjoey:0.2.0-demo.102d596 \
+  ghcr.io/mycurelabs/easyjoey-website:0.1.0-demo.102d596 \
+  ghcr.io/mycurelabs/easyjoey-accounts:0.1.0-demo.102d596
+```
+
+`demo.env` = the app's `staging.env` with `.staging.` replaced by `.demo.` (public URLs
+only).
+
+### Stubbed until real values exist
+
+- **Stripe:** the existing `mycure-demo-stripe-*` placeholders. Checkout won't work.
+- **Backups (#4956):** no `BACKUPS_*` or master key, so the backup endpoints answer 503.
+  Needs a `mycure-demo-easyjoey-backups-master-key` secret and a public MinIO route.
+- **Google sign-in:** placeholder, as for MyCure.
 
 ## Internal UIs (no public routes)
 

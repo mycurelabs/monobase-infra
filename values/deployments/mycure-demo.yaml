@@ -17,6 +17,11 @@
 # Hostnames are named after the product: <app>.demo.localfirsthealth.com —
 #   mycure, hapihub, hapihub-docs, mycure-dashboard, mycure-pxp, mycurelocal,
 #   mycure-myaccount, mycure-developer-portal, mycure-cadence, mycure-cadence-relay.
+# EASYJOEY (2026-10-14, owner request): the EasyJoey product runs here too —
+#   hapihub on the EasyJoey build, the single cadence hub REPURPOSED as the EasyJoey
+#   cloud anchor (same pattern as staging, owner decision 2026-10-12: MYCURE boxes do
+#   not sync with this hub), and the three EasyJoey frontends (easyjoey,
+#   easyjoey-website, easyjoey-accounts). See the README "EasyJoey" section.
 # SYNTHETIC DATA ONLY — seeded fresh: `mise run seed -- --app mycure --env demo --password <pw>`.
 # Never clone prod data here: this env is on the public internet.
 
@@ -79,9 +84,19 @@ hapihub:
     enabled: true
     provision:
       activeDeadlineSeconds: 900
-  # Prod-current tag (moves with prod bumps — demos show what customers run).
+  # EasyJoey build: monobase-mycure feat/easyjoey merged into environment/staging at
+  # cb7e137 (2026-10-11) = 11.20.135 + EasyJoey (data realms, cadence client profiles,
+  # licenses, backups). The exact hapihub staging validated with the EasyJoey hub
+  # (cadence 2.1.108-easyjoey.1) and web 102d596. Do NOT move this to a plain prod
+  # tag while EasyJoey runs here — those builds lack EasyJoey.
+  # PREREQUISITE (one-time, operator): this DB was created by prod 11.20.135, whose
+  # 0112_add_clock_correction_requests (2026-10-05) sits ABOVE EasyJoey's migrations
+  # 0112–0119 (2026-10-04) — Drizzle/hapihub's reconciler would leave those 8 BLOCKED
+  # (logged, exit 0) and EasyJoey would run on a half-migrated schema. Back-fill them
+  # first: ~/backups/mycure-demo/easyjoey-demo-db-changes.sql on the VPS (tested on a
+  # restored copy: 0120–0123 then apply with zero errors, hapihub boots).
   image:
-    tag: "11.20.135"
+    tag: "11.20.135-easyjoey.0-staging.cb7e137"
   cache:
     # Prod parity: response cache OFF (the #2839/#2617 bentocache stampede).
     enabled: false
@@ -110,7 +125,7 @@ hapihub:
       rpId: "demo.localfirsthealth.com"
 
   config:
-    CORS_ORIGINS: "https://hapihub.demo.localfirsthealth.com,https://mycure.demo.localfirsthealth.com,https://mycurelocal.demo.localfirsthealth.com,https://mycure-myaccount.demo.localfirsthealth.com,https://mycure-dashboard.demo.localfirsthealth.com,https://mycure-pxp.demo.localfirsthealth.com,https://mycure-developer-portal.demo.localfirsthealth.com"
+    CORS_ORIGINS: "https://hapihub.demo.localfirsthealth.com,https://mycure.demo.localfirsthealth.com,https://mycurelocal.demo.localfirsthealth.com,https://mycure-myaccount.demo.localfirsthealth.com,https://mycure-dashboard.demo.localfirsthealth.com,https://mycure-pxp.demo.localfirsthealth.com,https://mycure-developer-portal.demo.localfirsthealth.com,https://easyjoey.demo.localfirsthealth.com,https://easyjoey-website.demo.localfirsthealth.com,https://easyjoey-accounts.demo.localfirsthealth.com,tauri://localhost,http://tauri.localhost"
     # File storage — demo-own in-cluster MinIO (S3), isolated from prod's GCS.
     # Access creds come from the minio secret via externalSecrets below; MinIO
     # auto-creates the bucket.
@@ -121,6 +136,18 @@ hapihub:
     STORAGE_BUCKET: "hapihub"
     # Prod parity (mono#2114): background jobs run in the hapihubWorker release.
     RUN_WORKERS: "false"
+    # ---- EasyJoey (monobase-mycure services/hapihub/docs/modules/sync.md "Cadence AS
+    # client profiles"). Registered client `easyjoey-native`: its own audience — must
+    # start with `easyjoey-` and differ from CADENCE_ISSUER_FLEET_ID (mycure-demo). Seed =
+    # the cadence hub below (its HTTPRoute host; QUIC on cadence.publicAddr). ONE engine
+    # on this DB with metadata in `public`, so /sync/scopes reads public.cadence_scope.
+    EASYJOEY_CADENCE_FLEET_ID: "easyjoey-demo"
+    EASYJOEY_CADENCE_SEED_URL: "https://mycure-cadence.demo.localfirsthealth.com"
+    EASYJOEY_CADENCE_METADATA_SCHEMA: "public"
+    # EasyJoey daily backups (#4956) are NOT configured here (stub): no BACKUPS_* and no
+    # BACKUPS_MASTER_KEY (needs a mycure-demo-easyjoey-backups-master-key GCP secret, and
+    # devices need a public MinIO route, which this public cluster deliberately lacks).
+    # Unset = the backups endpoints answer 503; everything else works.
     # Developer-platform API_*_ENFORCE flags stay UNSET — prod parity (they are a
     # preprod-only rollout).
 
@@ -316,6 +343,53 @@ developerPortal:
     API_URL: "https://hapihub.demo.localfirsthealth.com"
     HAPIHUB_URL: "https://hapihub.demo.localfirsthealth.com"
 
+# ===== EASYJOEY: static web frontends =====
+# Static Vite SPAs (Caddy :8080, app chart). Their URLs are BAKED IN at build time, so
+# the images are DEMO builds: monobase-mycure 102d596 (the web build staging validated
+# with hapihub cb7e137) + deploy/demo.env, built with DEPLOY_ENV=demo by each app's
+# build-docker.sh. Tag <version>-demo.102d596.
+# !! These images are NOT in ghcr.io: they were built on the demo VPS and loaded into
+# the cluster nodes with `k3d image import` (the release workflow only builds on
+# feat/easyjoey and can't be dispatched; base pullPolicy IfNotPresent uses the local
+# copy). A cluster rebuild needs them rebuilt + re-imported — README "EasyJoey".
+# Hostnames match the baked URLs. All three origins are in hapihub CORS_ORIGINS.
+easyjoey:
+  enabled: true
+  image:
+    tag: "0.2.0-demo.102d596"
+  resources:
+    requests:
+      cpu: 10m
+  gateway:
+    hostname: "easyjoey.demo.localfirsthealth.com"
+    sectionName: https-demo-lfh
+  # Runtime override written to /config.json by the image entrypoint.
+  config:
+    API_URL: "https://hapihub.demo.localfirsthealth.com"
+    HAPIHUB_URL: "https://hapihub.demo.localfirsthealth.com"
+
+easyjoeyWebsite:
+  enabled: true
+  image:
+    tag: "0.1.0-demo.102d596"
+  resources:
+    requests:
+      cpu: 10m
+  gateway:
+    hostname: "easyjoey-website.demo.localfirsthealth.com"
+    sectionName: https-demo-lfh
+
+easyjoeyAccounts:
+  enabled: true
+  image:
+    tag: "0.1.0-demo.102d596"
+  resources:
+    requests:
+      cpu: 10m
+  gateway:
+    hostname: "easyjoey-accounts.demo.localfirsthealth.com"
+    sectionName: https-demo-lfh
+
 # ===== MEDICAL AI: disabled — no GPU / Ollama on the demo VPS =====
 medley:
   enabled: false
@@ -468,7 +542,20 @@ cadenceRelay:
     sectionName: https-demo-lfh
     udpListener: relay-quic-demo
 
-# ===== P2P SYNC: Cadence v2 hub — prod parity =====
+# ===== P2P SYNC: the demo hub, REPURPOSED as the EasyJoey cloud anchor =====
+# Same pattern as staging (owner decision 2026-10-12, cluster/vanaheim #466/#471):
+# ALPN easyjoey/1, fleet easyjoey-demo, registered client easyjoey-native, finite
+# clinic scopes, paid-sync gate easyjoey.cloud, 35d retention, canonical rows kept on
+# scope eviction. It no longer serves MYCURE boxes (fleet mycure-demo / ALPN hapihub/2)
+# — accepted: no MYCURE boxes are enrolled on the demo. One cadence engine per DB, so
+# a second (MYCURE) hub is not an option on this hapihub DB.
+# FOLLOW MODE: the hub enrolls every EasyJoey-realm clinic hapihub lists to its trusted
+# service key and re-enrolls when one is added/removed. Until the FIRST EasyJoey clinic
+# exists (sign up through easyjoey-accounts) the container waits ("no easyjoey-native
+# clinics yet"), and the 30-min startup probe restarts it — expected, not a fault.
+# The sa-api-key MUST be a trusted service key (api_key.metadata.serviceAccount=true —
+# hapihub auth/authorizer.ts); a fresh mint from scripts/seed.ts is NOT tagged — re-tag
+# after every re-mint (PART 2 of ~/backups/mycure-demo/easyjoey-demo-db-changes.sql).
 cadence:
   nodePool: "infra" # see cadenceRelay note
   # VPS public IP + the demo gateway's QUIC port (UDP 6472, mapped VPS ->
@@ -479,7 +566,17 @@ cadence:
   relayUrl: ""
   dropUnusedTables: true
   image:
-    tag: "2.1.103"
+    # EasyJoey build from monobase-mycure feat/easyjoey (registered-client enroll,
+    # follow mode, require_entitlement + setup window, retain rows on eviction).
+    tag: "2.1.108-easyjoey.1"
+  # EasyJoey application protocol (MYCURE is hapihub/2 — the two never cross-talk).
+  alpn: "easyjoey/1"
+  tuning:
+    # 35d: tombstones outlive the 30-day backup window (#4956) — staging parity.
+    retentionSecs: 3024000
+    # REQUIRED before a finite scope on this authoritative DB: losing the old MYCURE
+    # '*' scope (and any later clinic removal) drops sync metadata only, never rows.
+    retainApplicationRowsOnEviction: true
   readIdleMs: 600000
   leafidsGlobalBudget: 150000
   maxConcurrentServes: 8
@@ -515,8 +612,19 @@ cadence:
   auth:
     issuerUrl: https://hapihub.demo.localfirsthealth.com
     grantJwksUri: https://hapihub.demo.localfirsthealth.com/.well-known/jwks.json
-    fleetId: mycure-demo
+    # = hapihub EASYJOEY_CADENCE_FLEET_ID (the easyjoey-native audience).
+    fleetId: easyjoey-demo
     authorizeUrl: https://hapihub.demo.localfirsthealth.com/sync/authorize
+    # Registered product client: finite clinic enrollment (no '*').
+    clientId: easyjoey-native
+    # Follow mode (see the block comment above); enrollScope is ignored while on.
+    enrollScope: ""
+    followScopes: true
+    followScopesEverySecs: 120
+    requireResponderGrant: true
+    # Paid cloud-sync gate (#4967): only clinics with EasyJoey Cloud sync here; the
+    # download-only setup window (easyjoey.setup) is derived automatically.
+    requireEntitlement: easyjoey.cloud
   # Service-account API key (better-auth, service@mycure.md, non-expiring) →
   # secret cadence-secrets. MINT after the first seed (and after any reseed):
   # `mise run seed -- --app mycure --env demo --password <pw> --provision-cadence-key --gcp-project mc-v4-prod`.
