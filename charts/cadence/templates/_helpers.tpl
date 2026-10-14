@@ -76,3 +76,16 @@ app.kubernetes.io/name: cadence
 {{- define "cadence.postgresql.username" -}}
 {{- .Values.postgresql.auth.username | default "postgres" -}}
 {{- end }}
+
+{{/*
+retention_secs for files/cadence.yaml: values tuning.retentionSecs, else the 7d default. A short name
+on purpose — files/cadence.yaml is yamllinted and that line must stay <= 120 chars.
+*/}}
+{{- define "cadence.ret" -}}
+{{- with (.Values.tuning | default dict).retentionSecs -}}
+{{- $s := int64 . -}}
+{{ $s }}  # {{ div $s 86400 }}d via values tuning.retentionSecs; default
+{{- else -}}
+604800
+{{- end -}}
+{{- end -}}

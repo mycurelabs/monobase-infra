@@ -1,5 +1,10 @@
 enabled: true
 
+# Application protocol (ALPN) — the app boundary: gates catch-up + namespaces gossip topics. Empty ⇒
+# hapihub/2 (MYCURE). A hub repurposed as another product's anchor sets that product's (e.g. easyjoey/1);
+# peers on a different ALPN never sync with it.
+alpn: ""
+
 image:
   repository: ghcr.io/mycurelabs/cadence
   tag: "2.0.1"
@@ -99,6 +104,36 @@ auth:
   grantJwksUri: ""    # e.g. https://hapihub.<env>.localfirsthealth.com/.well-known/jwks.json (advertised in bootstrap doc)
   fleetId: ""         # required `aud`, e.g. mycure-preprod
   authorizeUrl: ""    # programmatic authorize for the headless hub enroll, e.g. https://hapihub.<env>…/sync/authorize
+  # Registered product client for the enroll initContainer (e.g. easyjoey-native). Empty ⇒ the stock
+  # all-scope '*' MYCURE anchor grant (unchanged). Set ⇒ `cadence auth login --client-id <id> --scope
+  # <enrollScope>`: the issuer selects that product's fleet/audience and verifies every org's realm.
+  clientId: ""
+  # With clientId only: the finite, space-separated `org:<id>` list the hub enrolls for (the issuer adds
+  # each org's `fam:` topic). Wildcards fail the render (and the CLI). Empty ⇒ the enroll initContainer
+  # WAITS (logs a hint, pod stays Init) until an operator sets it. Adding a clinic = edit this list
+  # (the pod rolls and re-enrolls). Product grants are one-shot and capped (EasyJoey: 30d) — restart
+  # the pod before the grant expires.
+  enrollScope: ""
+  # With clientId only: follow the product's clinics automatically instead of enrollScope (cadence >=
+  # 2.1.108-easyjoey.1). The main container enrolls with `cadence auth scopes` (hapihub lists the
+  # registered client's realm clinics to the trusted hub service account), then runs
+  # `--follow-scopes-every`: a changed clinic list or a grant near expiry exits 75 and the container
+  # restarts and re-enrolls. No enroll initContainer; enrollScope is ignored.
+  followScopes: false
+  followScopesEverySecs: 300
+  # cadence auth.require_responder_grant: refuse catch-up data to/from peers without an issuer-verified,
+  # transport-bound grant for this fleet. Required for the entitlement setup window.
+  requireResponderGrant: false
+  # cadence auth.require_entitlement (e.g. easyjoey.cloud): paid cloud-sync gate. Empty ⇒ no gate.
+  requireEntitlement: ""
+
+# Engine tuning knobs templated into files/cadence.yaml (the rest stay at the file's defaults).
+tuning:
+  # Tombstone/change retention in seconds. Empty ⇒ 604800 (7d). MUST exceed the longest peer offline window.
+  retentionSecs: ""
+  # Required when this hub enrolls a FINITE scope on hapihub's authoritative PostgreSQL DB: scope
+  # eviction then keeps canonical rows + pending writes instead of reclaiming them.
+  retainApplicationRowsOnEviction: false
 
 # Service-account API key (non-expiring better-auth key) the enroll initContainer presents to hapihub as
 # --bearer to authorize the hub's '*' grant → k8s secret `cadence-secrets` key `sa-api-key` → CADENCE_AUTH_BEARER.

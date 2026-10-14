@@ -9,6 +9,15 @@
 {{- $readHost := printf "%s.%s.svc.cluster.local" .Values.postgresql.readServiceName (include "cadence.namespace" .) -}}
 {{- $dbRead = printf "postgres://%s:$(PGPASS)@%s:%v/%s" (include "cadence.postgresql.username" .) $readHost (.Values.postgresql.port | default 5432) (include "cadence.postgresql.database" .) -}}
 {{- end -}}
+{{- /* Registered-client (product) enrollment: auth.enrollScope must be finite org:<id> tokens. The CLI
+       refuses wildcards too, but failing the render keeps a bad value from ever reaching the pod. */ -}}
+{{- if .Values.auth.clientId -}}
+{{- range (splitList " " (.Values.auth.enrollScope | default "")) -}}
+{{- if and . (or (contains "*" .) (not (hasPrefix "org:" .)) (eq . "org:")) -}}
+{{- fail (printf "cadence auth.enrollScope token %q is not a finite org:<id> scope (auth.clientId is set; wildcards and non-org scopes are refused)." .) -}}
+{{- end -}}
+{{- end -}}
+{{- end -}}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -46,7 +55,7 @@ spec:
       # since its advertised authorization_endpoint is the browser SPA) with a non-expiring service-account API
       # key (CADENCE_AUTH_BEARER → x-api-key-equivalent via Bearer). hapihub mints with a coherent status_list;
       # the hub verifies box + own grants against hapihub's JWKS. Retries until hapihub + the DB are reachable.
-      {{- if not .Values.args }}
+      {{- if and (not .Values.args) (not (and .Values.auth.clientId .Values.auth.followScopes)) }}
       initContainers:
       - name: enroll
         image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
@@ -60,10 +69,24 @@ spec:
         args:
           - |
             set -u
+            {{- if .Values.auth.clientId }}
+            # Registered product client (values auth.clientId): finite clinic scopes only. The issuer
+            # selects the product fleet/audience, checks every org's realm and adds its fam: topic; the CLI
+            # verifies audience, key binding and the exact org set before persisting the grant.
+            if [ -z "$CADENCE_ENROLL_SCOPE" ]; then
+              echo "no enroll scope: set auth.enrollScope (\"org:<clinic-id> ...\") for client $CADENCE_AUTH_CLIENT_ID in the deployment values — the hub waits here until then"
+              while :; do sleep 300; done
+            fi
+            until cadence auth login --db "$CADENCE_DB" --issuer-url "$CADENCE_ISSUER_URL" --client-id "$CADENCE_AUTH_CLIENT_ID" --scope "$CADENCE_ENROLL_SCOPE"; do
+              echo "waiting for hapihub AS ($CADENCE_ISSUER_URL) to grant $CADENCE_AUTH_CLIENT_ID [$CADENCE_ENROLL_SCOPE] (each org must exist in that product's realm) + the DB…"; sleep 15
+            done
+            echo "hub authorized — $CADENCE_AUTH_CLIENT_ID grant for [$CADENCE_ENROLL_SCOPE] persisted (one-shot: restart the pod before it expires)"
+            {{- else }}
             until cadence auth login --db "$CADENCE_DB" --issuer-url "$CADENCE_ISSUER_URL" --scope '*'; do
               echo "waiting for hapihub AS ($CADENCE_ISSUER_URL) + cadence_v2 DB…"; sleep 3
             done
             echo "hub authorized — '*' grant persisted (minted by hapihub)"
+            {{- end }}
         env:
         - name: PGPASS
           valueFrom:
@@ -82,6 +105,12 @@ spec:
             secretKeyRef:
               name: cadence-secrets
               key: sa-api-key
+        {{- if .Values.auth.clientId }}
+        - name: CADENCE_AUTH_CLIENT_ID
+          value: {{ .Values.auth.clientId | quote }}
+        - name: CADENCE_ENROLL_SCOPE
+          value: {{ .Values.auth.enrollScope | default "" | quote }}
+        {{- end }}
       {{- end }}
       containers:
       - name: cadence
@@ -99,6 +128,26 @@ spec:
         # no grant prerequisite).
         {{- if .Values.args }}
         args: {{ toYaml .Values.args | nindent 10 }}
+        {{- else if and .Values.auth.clientId .Values.auth.followScopes }}
+        # Follow mode (auth.followScopes): enroll with the product's CURRENT clinic list from hapihub
+        # (`cadence auth scopes`, realm-filtered for the trusted hub service account), then run with the
+        # scope follower: when the list changes or the grant nears expiry the engine exits 75 and the
+        # kubelet restarts this container, which re-enrolls. `exec` keeps the engine as PID 1.
+        command: ["/bin/sh", "-c"]
+        args:
+          - |
+            set -u
+            while :; do
+              if ! SCOPES="$(cadence auth scopes --issuer-url "$CADENCE_ISSUER_URL" --client-id "$CADENCE_AUTH_CLIENT_ID")"; then
+                echo "cadence auth scopes failed; retrying in 30s" >&2; sleep 30; continue
+              fi
+              [ -n "$SCOPES" ] && break
+              echo "no $CADENCE_AUTH_CLIENT_ID clinics yet; waiting" >&2; sleep 60
+            done
+            until cadence auth login --db "$CADENCE_DB" --issuer-url "$CADENCE_ISSUER_URL" --client-id "$CADENCE_AUTH_CLIENT_ID" --scope "$SCOPES"; do
+              echo "waiting for hapihub to grant $CADENCE_AUTH_CLIENT_ID [$SCOPES]…" >&2; sleep 15
+            done
+            exec cadence run --config /etc/cadence/cadence.yaml --follow-scopes-every {{ .Values.auth.followScopesEverySecs | default 300 | int }}
         {{- else }}
         args: ["run", "--config", "/etc/cadence/cadence.yaml"]
         {{- end }}
@@ -130,6 +179,18 @@ spec:
           value: {{ .Values.auth.grantJwksUri | quote }}
         - name: CADENCE_FLEET_ID
           value: {{ .Values.auth.fleetId | quote }}
+        {{- if and .Values.auth.clientId .Values.auth.followScopes }}
+        # Follow mode: the main container enrolls itself (see args) with the trusted hub service key.
+        - name: CADENCE_AUTH_AUTHORIZE_URL
+          value: {{ .Values.auth.authorizeUrl | quote }}
+        - name: CADENCE_AUTH_BEARER
+          valueFrom:
+            secretKeyRef:
+              name: cadence-secrets
+              key: sa-api-key
+        - name: CADENCE_AUTH_CLIENT_ID
+          value: {{ .Values.auth.clientId | quote }}
+        {{- end }}
         {{- if .Values.relayUrl }}
         # Self-hosted relay: the anchor homes on it AND advertises it in the bootstrap doc so hard-NAT
         # boxes adopt the same relay (shared-relay rendezvous). Unset ⇒ n0 relays.
@@ -200,6 +261,16 @@ spec:
         # negotiate work can stall /healthz past the 1s default → 3 strikes → SIGKILL → another
         # cold storm, and each kill tears down every box's in-flight baseline round (2026-08-13
         # #3406/#3404 restart loop). 5s×6 tolerates ~90s of stall before killing a truly dead pod.
+        {{- if and .Values.auth.clientId .Values.auth.followScopes }}
+        # Follow mode enrolls before the engine binds /healthz (and waits while the product has no
+        # clinics), so give startup up to 30 min before liveness applies.
+        startupProbe:
+          httpGet:
+            path: /healthz
+            port: api
+          periodSeconds: 10
+          failureThreshold: 180
+        {{- end }}
         livenessProbe:
           httpGet:
             path: /healthz
