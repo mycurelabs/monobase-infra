@@ -40,8 +40,12 @@ client ──TCP 80/443, UDP 6472/7842──▶ VPS (docker-published ports)
   effectively one shared bucket for all demo users. Fine for a handful of people.
   Raise `BETTER_AUTH_RATE_LIMIT_MAX` in the overlay if a group session trips it.
 - The gateway Service uses `externalTrafficPolicy: Cluster` for the same reason.
-- **Docker-published ports bypass ufw.** No ufw rule is needed (or effective) for
-  80/443/6472/7842. The **VPS provider's firewall** must allow them.
+- **This host filters Docker traffic with ufw ("ufw-docker" rules in
+  `/etc/ufw/after.rules`).** Its `DOCKER-USER` chain drops new inbound TCP and
+  UDP (ports 0-32767) to containers unless allowed — so on THIS VPS, plain Docker
+  publishing is NOT enough. 80/443/6472/7842 are opened with `ufw route allow`
+  (Prerequisites). Symptom when missing: everything works from the VPS itself
+  (local/private sources are exempt) but times out from the internet.
 - The **Kubernetes API is bound to `127.0.0.1:6445`** (`api_port`), never public.
 
 ## Prerequisites (on the VPS)
@@ -50,6 +54,21 @@ client ──TCP 80/443, UDP 6472/7842──▶ VPS (docker-published ports)
   `tofu`, `bun` from the repo's `mise.toml`): `curl https://mise.run | sh && mise install`.
 - Host ports **80, 443 (TCP)** and **6472, 7842 (UDP)** free. Check:
   `ss -tlnup | grep -E ':(80|443|6472|7842) '`.
+- Those ports **allowed through ufw to Docker** (one-time, needs sudo; `ufw route`
+  rules land in `ufw-user-forward`, which `DOCKER-USER` checks before its drop). The
+  k3d loadbalancer listens on the same port numbers inside its container, so these
+  match:
+
+  ```bash
+  sudo ufw route allow proto tcp from any to any port 80
+  sudo ufw route allow proto tcp from any to any port 443
+  sudo ufw route allow proto udp from any to any port 6472
+  sudo ufw route allow proto udp from any to any port 7842
+  ```
+
+  Verify from OUTSIDE the VPS (a check from the VPS itself always passes), e.g.
+  `curl -sI https://mycure.demo.localfirsthealth.com` from your laptop. Any
+  provider-side firewall (Contabo panel) must allow the same ports.
 - A workstation with `gcloud` authed to `mc-v4-prod` (IAM + Secret Manager steps).
 
 ## 1. GCP: scoped ESO service account + demo secrets (workstation)
