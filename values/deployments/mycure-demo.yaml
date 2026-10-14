@@ -109,6 +109,33 @@ hapihub:
     limits:
       memory: 4Gi
 
+  # Outbound HTTPS to the internet for Stripe (EasyJoey checkout, billing-provider setup
+  # in the dashboard) and other third-party APIs. The security baseline's
+  # default-deny-egress allows 443 only to in-cluster pods, so without this hapihub cannot
+  # reach api.stripe.com. Same rule as staging (cluster/vanaheim #468, owner-approved
+  # 2026-10-12): TCP 443 only. Lists replace, so base's ingress rule is restated. No
+  # Tailscale Funnel ingress here: Stripe reaches hapihub.demo directly (public cluster).
+  networkPolicy:
+    enabled: true
+    policyTypes:
+      - Ingress
+      - Egress
+    ingress:
+      - from:
+          - namespaceSelector:
+              matchLabels:
+                kubernetes.io/metadata.name: nginx-gateway-system
+        ports:
+          - protocol: TCP
+            port: 7500
+    egress:
+      - to:
+          - ipBlock:
+              cidr: 0.0.0.0/0
+        ports:
+          - protocol: TCP
+            port: 443
+
   # No Prometheus Operator on this cluster — a ServiceMonitor would fail to apply.
   serviceMonitor:
     enabled: false
