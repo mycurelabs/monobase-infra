@@ -519,6 +519,12 @@ interface SeedUser {
 // fires and the account stays as a regular user. The post-flight check
 // in main() asserts isServiceAccount=true and aborts if it isn't.
 const SERVICE_ACCOUNT_EMAILS = new Set<string>(["service@mycure.md"]);
+// better-auth user.role the service account must hold after auto-elevation.
+// hapihub's admin RBAC (docs/superpowers/specs/2026-09-06-admin-dashboard-rbac-design.md
+// in monobase-mycure) elevates ACCOUNTS_SERVICE_ACCOUNT_EMAILS to 'owner' — the
+// all-permissions platform role, "parity with the access an admin had before roles
+// existed". Older hapihub builds set 'admin'. Accept both.
+const SERVICE_ACCOUNT_ROLES = new Set<string>(["owner", "admin"]);
 const isServiceAccount = (u: SeedUser) => SERVICE_ACCOUNT_EMAILS.has(u.email);
 
 const USERS: SeedUser[] = [
@@ -7564,10 +7570,10 @@ async function resetSeedData() {
   const session = (await api("GET", "/auth/get-session")) as
     | { user?: { role?: string } }
     | null;
-  if (session?.user?.role !== "admin") {
+  if (!SERVICE_ACCOUNT_ROLES.has(session?.user?.role ?? "")) {
     spinner.fail(
       chalk.red(
-        `${serviceEmail} signed in but better-auth user.role='${session?.user?.role}' (expected 'admin').\n` +
+        `${serviceEmail} signed in but better-auth user.role='${session?.user?.role}' (expected one of: ${[...SERVICE_ACCOUNT_ROLES].join(", ")}).\n` +
           `Auto-elevation did not fire. Make sure ACCOUNTS_SERVICE_ACCOUNT_EMAILS\n` +
           `on the running hapihub pod includes "${serviceEmail}", restart hapihub,\n` +
           `then re-run.`,
@@ -9458,9 +9464,9 @@ async function main() {
         | { user?: { role?: string; email?: string } }
         | null;
       const role = session?.user?.role;
-      if (role !== "admin") {
+      if (!SERVICE_ACCOUNT_ROLES.has(role ?? "")) {
         svcSpinner.fail(
-          `${email} signed in but better-auth user.role='${role}' (expected 'admin').\n` +
+          `${email} signed in but better-auth user.role='${role}' (expected one of: ${[...SERVICE_ACCOUNT_ROLES].join(", ")}).\n` +
             `   Auto-elevation did not fire. Likely causes (most-common first):\n` +
             `     1. ACCOUNTS_SERVICE_ACCOUNT_EMAILS is not set on the running\n` +
             `        hapihub (env var or values misconfig). On local dev: add\n` +
