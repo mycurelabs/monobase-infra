@@ -40,8 +40,12 @@ client ──TCP 80/443, UDP 6472/7842──▶ VPS (docker-published ports)
   effectively one shared bucket for all demo users. Fine for a handful of people.
   Raise `BETTER_AUTH_RATE_LIMIT_MAX` in the overlay if a group session trips it.
 - The gateway Service uses `externalTrafficPolicy: Cluster` for the same reason.
-- **Docker-published ports bypass ufw.** No ufw rule is needed (or effective) for
-  80/443/6472/7842. The **VPS provider's firewall** must allow them.
+- **This host filters Docker traffic with ufw ("ufw-docker" rules in
+  `/etc/ufw/after.rules`).** Its `DOCKER-USER` chain drops new inbound TCP and
+  UDP (ports 0-32767) to containers unless allowed — so on THIS VPS, plain Docker
+  publishing is NOT enough. 80/443/6472/7842 are opened with `ufw route allow`
+  (Prerequisites). Symptom when missing: everything works from the VPS itself
+  (local/private sources are exempt) but times out from the internet.
 - The **Kubernetes API is bound to `127.0.0.1:6445`** (`api_port`), never public.
 
 ## Prerequisites (on the VPS)
@@ -50,6 +54,21 @@ client ──TCP 80/443, UDP 6472/7842──▶ VPS (docker-published ports)
   `tofu`, `bun` from the repo's `mise.toml`): `curl https://mise.run | sh && mise install`.
 - Host ports **80, 443 (TCP)** and **6472, 7842 (UDP)** free. Check:
   `ss -tlnup | grep -E ':(80|443|6472|7842) '`.
+- Those ports **allowed through ufw to Docker** (one-time, needs sudo; `ufw route`
+  rules land in `ufw-user-forward`, which `DOCKER-USER` checks before its drop). The
+  k3d loadbalancer listens on the same port numbers inside its container, so these
+  match:
+
+  ```bash
+  sudo ufw route allow proto tcp from any to any port 80
+  sudo ufw route allow proto tcp from any to any port 443
+  sudo ufw route allow proto udp from any to any port 6472
+  sudo ufw route allow proto udp from any to any port 7842
+  ```
+
+  Verify from OUTSIDE the VPS (a check from the VPS itself always passes), e.g.
+  `curl -sI https://mycure.demo.localfirsthealth.com` from your laptop. Any
+  provider-side firewall (Contabo panel) must allow the same ports.
 - A workstation with `gcloud` authed to `mc-v4-prod` (IAM + Secret Manager steps).
 
 ## 1. GCP: scoped ESO service account + demo secrets (workstation)
@@ -83,11 +102,12 @@ put minio-root-password "$(openssl rand -hex 24)"
 put auth-secret        "$(openssl rand -base64 48)"
 put better-auth-secret "$(openssl rand -base64 48)"
 
-# PRIVATE_KEY — MATCH the format of an existing env's key before generating:
-#   gcloud secrets versions access latest --secret=mycure-staging-private-key --project=$P | head -1
-#   (key type + whether it is multi-line or single-line \n-escaped)
-# e.g. for an unescaped RSA PKCS#8 PEM:
-put private-key "$(openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 2>/dev/null)"
+# PRIVATE_KEY — must be an ECDSA P-256 (ES256) PKCS#8 PEM: hapihub's config schema
+# ("ECDSA private key for JWT signing") and generateJWKS() import it as ES256, so an
+# RSA key makes /.well-known/jwks.json 500 ("Data provided to an operation does not
+# meet requirements"). Single-line \n-escaped is fine (hapihub un-escapes). Do NOT
+# copy another env's key TYPE without checking — sandbox's is RSA and has this bug.
+put private-key "$(openssl genpkey -algorithm EC -pkeyopt ec_paramgen_curve:P-256 2>/dev/null | awk '{printf "%s\\n",$0}')"
 
 # cadence OAuth AS signing key — EdDSA PEM, SINGLE-LINE \n-escaped (hapihub un-escapes).
 put cadence-issuer-key-pem "$(openssl genpkey -algorithm ed25519 | awk '{printf "%s\\n",$0}')"
