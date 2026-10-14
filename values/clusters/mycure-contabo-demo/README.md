@@ -102,11 +102,12 @@ put minio-root-password "$(openssl rand -hex 24)"
 put auth-secret        "$(openssl rand -base64 48)"
 put better-auth-secret "$(openssl rand -base64 48)"
 
-# PRIVATE_KEY — MATCH the format of an existing env's key before generating:
-#   gcloud secrets versions access latest --secret=mycure-staging-private-key --project=$P | head -1
-#   (key type + whether it is multi-line or single-line \n-escaped)
-# e.g. for an unescaped RSA PKCS#8 PEM:
-put private-key "$(openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 2>/dev/null)"
+# PRIVATE_KEY — must be an ECDSA P-256 (ES256) PKCS#8 PEM: hapihub's config schema
+# ("ECDSA private key for JWT signing") and generateJWKS() import it as ES256, so an
+# RSA key makes /.well-known/jwks.json 500 ("Data provided to an operation does not
+# meet requirements"). Single-line \n-escaped is fine (hapihub un-escapes). Do NOT
+# copy another env's key TYPE without checking — sandbox's is RSA and has this bug.
+put private-key "$(openssl genpkey -algorithm EC -pkeyopt ec_paramgen_curve:P-256 2>/dev/null | awk '{printf "%s\\n",$0}')"
 
 # cadence OAuth AS signing key — EdDSA PEM, SINGLE-LINE \n-escaped (hapihub un-escapes).
 put cadence-issuer-key-pem "$(openssl genpkey -algorithm ed25519 | awk '{printf "%s\\n",$0}')"
