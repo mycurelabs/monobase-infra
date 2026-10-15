@@ -594,8 +594,9 @@ cadence:
   dropUnusedTables: true
   image:
     # EasyJoey build from monobase-mycure feat/easyjoey (registered-client enroll,
-    # follow mode, require_entitlement + setup window, retain rows on eviction).
-    tag: "2.1.108-easyjoey.1"
+    # follow mode, require_entitlement + setup window, retain rows on eviction;
+    # .2 applies SQLite epoch timestamps to PG time columns — device-created rows).
+    tag: "2.1.108-easyjoey.2"
   # EasyJoey application protocol (MYCURE is hapihub/2 — the two never cross-talk).
   alpn: "easyjoey/1"
   tuning:
