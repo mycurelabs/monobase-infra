@@ -106,7 +106,7 @@ hapihub:
   # caller ∉ careTeam ⇒ 403 NO_TREATMENT_RELATIONSHIP + denied audit. Builds on
   # resolveCareTeam v2 (eda012d77). TEMPORARY: preprod tracks the CARE branch.
   image:
-    tag: "11.20.134-care.90e71789@sha256:41f8ff23351aac2191c5c16737f6033deeae20a9cb9b5f8c763cf6c2b69dbbea"
+    tag: "11.20.135-care.643a3b95@sha256:5072210f3d2f52b7e8dff6833b4c1b78d9d67ee58caa188cc2502062f24711d5"
   cache:
     # Prod parity: response cache OFF (the #2839/#2617 bentocache stampede
     # mitigation). Re-enable here first when re-validating the serve-stale fix.
@@ -345,7 +345,7 @@ mycure:
   # copilot is testable in the browser at mycure.preprod.localfirsthealth.com against the
   # enforced CARE backend (hapihub ae7f4b39 + medley eda012d7). Distinct -care.<sha> tag.
   image:
-    tag: "10.25.143-care.90e71789@sha256:5cbcccbe2ef918ebe1ca87303a8ec097e1f230bccad36570e16677ec3439b6b5"
+    tag: "10.25.144-care.643a3b95@sha256:9b991830fb71c0f715acd5e5c0d00e57009a52436991b3da600b9fe70fcbf5ac"
   resources:
     requests:
       cpu: 10m
@@ -425,7 +425,7 @@ medley:
   enabled: true
   image:
     repository: ghcr.io/mycurelabs/medley
-    tag: "2.0.6-care.eda012d7@sha256:24819a1295daa92c24a65eec45728d1d2437517cd80da0d7c202ccc2dc7f8738"  # CARE branch head @eda012d77: enforce-default P1 (e29562e94) + Inc7 P0 disclosure-input fwd (4b1fd508a). Bumped from fd919f8a to flip EMR-access from SHADOW → ENFORCE for the #5084 live e2e DENY proof (422). MEDLEY_MODELS selfHosted:true attestation below REQUIRED or boot fails closed. Re-pin to plain tag when preprod must be pristine.
+    tag: "2.0.6-care.643a3b95@sha256:33d83d4af03ba4a8ec6ddec5b1a2a4e0fae995ac6763bd74dfddde4feb3e7eb3"  # CARE branch head @643a3b95 (PR #4570 merged-state, resynced from main, CI-green). Keeps enforce-default P1 + disclosure-input fwd. MEDLEY_EMR_ACCESS_ENFORCE stays true. MEDLEY_MODELS selfHosted:true attestation below REQUIRED or boot fails closed. Re-pin to plain tag when preprod must be pristine.
     pullPolicy: IfNotPresent
   replicaCount: 1
   resources:
