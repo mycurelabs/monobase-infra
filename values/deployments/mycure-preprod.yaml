@@ -183,11 +183,14 @@ hapihub:
     # qwen2.5:14b summarize-context runs ~140s; the default care→medley fetch timeout
     # socket-closed on the first (cold) call. 240s gives headroom incl. model cold-start.
     CARE_MEDLEY_TIMEOUT_MS: "240000"
-    # CARE Inc7 P1 (ae7f4b399): /care/ask self-enforces the treatment relationship
-    # (fail-closed) after org-scoped retrieval, before de-id/egress — covers the
-    # seeded-grounding path the medley tool-gate misses. Explicit over the code
-    # default (enforce). Reversible: =false opts out. caller ∉ careTeam ⇒ 403.
-    CARE_ASK_RELATIONSHIP_ENFORCE: "true"
+    # CARE Inc7 P1 (ae7f4b399): /care/ask relationship (§45(b)) gate.
+    # 2026-10-15 freyr product decision — RELAXED to "allow any chart-reader" on
+    # PREPROD: =false flips the relationship block ENFORCE→SHADOW (still logs/audits,
+    # no 403). The ORG-SCOPED read gate (6b87612c, caller's own read) stays ON, so
+    # cross-tenant reads remain impossible. This is the deliberate flags burn-in path.
+    # PREPROD-ONLY: code default stays enforce; enforce=off to PROD needs DPO/clinical
+    # sign-off. Flip back to "true" to re-enforce.
+    CARE_ASK_RELATIONSHIP_ENFORCE: "false"
 
   env:
       # Prod parity (#2114): cap the JSC heap below the 4Gi container limit.
