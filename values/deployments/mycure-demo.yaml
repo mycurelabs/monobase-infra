@@ -383,7 +383,7 @@ developerPortal:
 easyjoey:
   enabled: true
   image:
-    tag: "0.2.0-demo.102d596"
+    tag: "0.3.0-demo.d7af774"
   resources:
     requests:
       cpu: 10m
@@ -398,7 +398,7 @@ easyjoey:
 easyjoeyWebsite:
   enabled: true
   image:
-    tag: "0.1.0-demo.102d596"
+    tag: "0.1.0-demo.d7af774"
   resources:
     requests:
       cpu: 10m
@@ -409,7 +409,7 @@ easyjoeyWebsite:
 easyjoeyAccounts:
   enabled: true
   image:
-    tag: "0.1.0-demo.102d596"
+    tag: "0.1.0-demo.d7af774"
   resources:
     requests:
       cpu: 10m
