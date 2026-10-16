@@ -342,13 +342,13 @@ hapihubWorker:
 
 # ===== HEALTHCARE: Frontend Application =====
 mycure:
-  # CARE-branch build (feat/care-inc1-governed-copilot@ae7f4b399) — CareCopilotPanel.vue
-  # + care.copilot.ts, the L4 copilot UI arm. Bumped from plain main 10.25.142 (which had
-  # NO copilot — drifted to main during the #4005 clean-slate) to the CARE head so the
-  # copilot is testable in the browser at mycure.preprod.localfirsthealth.com against the
-  # enforced CARE backend (hapihub ae7f4b39 + medley eda012d7). Distinct -care.<sha> tag.
+  # CARE-branch build (feat/care-inc1-governed-copilot@2355ec340) — CareCopilotPanel UI,
+  # now behind the RUNTIME flag care_copilot_enabled (docker-entrypoint emits it from
+  # $CARE_COPILOT_ENABLED, default false = chat HIDDEN). CARE_COPILOT_ENABLED=true is set
+  # in config below so the chat stays VISIBLE on preprod. PREPROD-ONLY — prod leaves the
+  # env unset so a future main-merge ships CARE copilot OFF by default.
   image:
-    tag: "10.25.144-care.643a3b95@sha256:9b991830fb71c0f715acd5e5c0d00e57009a52436991b3da600b9fe70fcbf5ac"
+    tag: "10.25.144-care.2355ec34@sha256:476be875b1c0eca7c1df04a4d72b825b654b4e73d9b91716d68a321f0687ba99"
   resources:
     requests:
       cpu: 10m
@@ -359,6 +359,10 @@ mycure:
     API_URL: "https://hapihub.preprod.localfirsthealth.com"
     HAPIHUB_URL: "https://hapihub.preprod.localfirsthealth.com"
     # No POSTHOG_KEY / GA4_MEASUREMENT_ID: blank outside prod keeps analytics off.
+    # Runtime flag (2355ec340): docker-entrypoint emits /config.json care_copilot_enabled
+    # from this env. =true keeps the CARE copilot chat VISIBLE on preprod. PREPROD-ONLY —
+    # prod MUST leave this unset (defaults false) so a main-merge ships CARE copilot OFF.
+    CARE_COPILOT_ENABLED: "true"
 
 mycurelocal:
   enabled: true
