@@ -84,11 +84,13 @@ hapihub:
     enabled: true
     provision:
       activeDeadlineSeconds: 900
-  # EasyJoey build: monobase-mycure feat/easyjoey merged into environment/staging at
-  # cb7e137 (2026-10-11) = 11.20.135 + EasyJoey (data realms, cadence client profiles,
-  # licenses, backups). The exact hapihub staging validated with the EasyJoey hub
-  # (cadence 2.1.108-easyjoey.1) and web 102d596. Do NOT move this to a plain prod
-  # tag while EasyJoey runs here — those builds lack EasyJoey.
+  # EasyJoey build: monobase-mycure feat/easyjoey 34fd3cf (2026-10-16) = main merged in
+  # (738e4cad1) + EasyJoey, released by Hapihub Release as 11.20.135-easyjoey.1 (a
+  # pre-release: never moves :latest). Runs with cadence 2.1.108-easyjoey.3 and web
+  # 0.3.1-demo.34fd3cf. Do NOT move this to a plain prod tag while EasyJoey runs here —
+  # those builds lack EasyJoey. Migrations: the main/EasyJoey clash is reconciled in
+  # code (docs/workflows/easyjoey-main-migration-reconciliation.md, third section), so
+  # this already-migrated DB plans nothing new.
   # PREREQUISITE (one-time, operator): this DB was created by prod 11.20.135, whose
   # 0112_add_clock_correction_requests (2026-10-05) sits ABOVE EasyJoey's migrations
   # 0112–0119 (2026-10-04) — Drizzle/hapihub's reconciler would leave those 8 BLOCKED
@@ -96,7 +98,7 @@ hapihub:
   # first: ~/backups/mycure-demo/easyjoey-demo-db-changes.sql on the VPS (tested on a
   # restored copy: 0120–0123 then apply with zero errors, hapihub boots).
   image:
-    tag: "11.20.135-easyjoey.0-staging.cb7e137"
+    tag: "11.20.135-easyjoey.1"
   cache:
     # Prod parity: response cache OFF (the #2839/#2617 bentocache stampede).
     enabled: false
@@ -372,18 +374,15 @@ developerPortal:
 
 # ===== EASYJOEY: static web frontends =====
 # Static Vite SPAs (Caddy :8080, app chart). Their URLs are BAKED IN at build time, so
-# the images are DEMO builds: monobase-mycure 102d596 (the web build staging validated
-# with hapihub cb7e137) + deploy/demo.env, built with DEPLOY_ENV=demo by each app's
-# build-docker.sh. Tag <version>-demo.102d596.
-# !! These images are NOT in ghcr.io: they were built on the demo VPS and loaded into
-# the cluster nodes with `k3d image import` (the release workflow only builds on
-# feat/easyjoey and can't be dispatched; base pullPolicy IfNotPresent uses the local
-# copy). A cluster rebuild needs them rebuilt + re-imported — README "EasyJoey".
+# the images are DEMO builds: each app's committed deploy/demo.env baked in by the
+# EasyJoey Web Release workflow (`gh workflow run easyjoey-web-release.yml --ref
+# feat/easyjoey -f app=all -f environment=demo`), pushed to ghcr.io as
+# <version>-demo.<sha>. Bump the three tags below together.
 # Hostnames match the baked URLs. All three origins are in hapihub CORS_ORIGINS.
 easyjoey:
   enabled: true
   image:
-    tag: "0.3.0-demo.d7af774"
+    tag: "0.3.1-demo.34fd3cf"
   resources:
     requests:
       cpu: 10m
@@ -398,7 +397,7 @@ easyjoey:
 easyjoeyWebsite:
   enabled: true
   image:
-    tag: "0.1.0-demo.d7af774"
+    tag: "0.1.1-demo.34fd3cf"
   resources:
     requests:
       cpu: 10m
@@ -409,7 +408,7 @@ easyjoeyWebsite:
 easyjoeyAccounts:
   enabled: true
   image:
-    tag: "0.1.0-demo.d7af774"
+    tag: "0.1.1-demo.34fd3cf"
   resources:
     requests:
       cpu: 10m
