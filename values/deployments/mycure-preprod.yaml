@@ -106,7 +106,7 @@ hapihub:
   # caller ∉ careTeam ⇒ 403 NO_TREATMENT_RELATIONSHIP + denied audit. Builds on
   # resolveCareTeam v2 (eda012d77). TEMPORARY: preprod tracks the CARE branch.
   image:
-    tag: "11.20.135-care.6b87612c@sha256:c8fa662f2bccf9f38a986c99cd83072d3ec61579927cdaac5db9582127577dd6"
+    tag: "11.20.135-care.7fecd0ab@sha256:48113211d8f063917408087f03f918f252dcbb71114628f587d46059b79905b6"
   cache:
     # Prod parity: response cache OFF (the #2839/#2617 bentocache stampede
     # mitigation). Re-enable here first when re-validating the serve-stale fix.
@@ -342,13 +342,13 @@ hapihubWorker:
 
 # ===== HEALTHCARE: Frontend Application =====
 mycure:
-  # CARE-branch build (feat/care-inc1-governed-copilot@2355ec340) — CareCopilotPanel UI,
-  # now behind the RUNTIME flag care_copilot_enabled (docker-entrypoint emits it from
-  # $CARE_COPILOT_ENABLED, default false = chat HIDDEN). CARE_COPILOT_ENABLED=true is set
-  # in config below so the chat stays VISIBLE on preprod. PREPROD-ONLY — prod leaves the
-  # env unset so a future main-merge ships CARE copilot OFF by default.
+  # CARE-branch build (feat/care-inc1-governed-copilot@7fecd0abb) — CareCopilotPanel UI,
+  # gate now reads the PER-ORG SUBSCRIPTION flag subscription.care (replaced the runtime
+  # /config.json care_copilot_enabled flag). Chat visible for orgs with subscriptions.care
+  # = true (preprod test org 668962 flipped true via SQL). PREPROD/prod both ship care
+  # default-false → CARE hidden until a superadmin enrolls an org (no env needed anymore).
   image:
-    tag: "10.25.144-care.2355ec34@sha256:476be875b1c0eca7c1df04a4d72b825b654b4e73d9b91716d68a321f0687ba99"
+    tag: "10.25.144-care.7fecd0ab@sha256:da09966c69af02d7e498e7c8ed1e78b6bfbb87a1882c600794fb06eed7c5a1b5"
   resources:
     requests:
       cpu: 10m
@@ -359,10 +359,8 @@ mycure:
     API_URL: "https://hapihub.preprod.localfirsthealth.com"
     HAPIHUB_URL: "https://hapihub.preprod.localfirsthealth.com"
     # No POSTHOG_KEY / GA4_MEASUREMENT_ID: blank outside prod keeps analytics off.
-    # Runtime flag (2355ec340): docker-entrypoint emits /config.json care_copilot_enabled
-    # from this env. =true keeps the CARE copilot chat VISIBLE on preprod. PREPROD-ONLY —
-    # prod MUST leave this unset (defaults false) so a main-merge ships CARE copilot OFF.
-    CARE_COPILOT_ENABLED: "true"
+    # CARE_COPILOT_ENABLED removed (7fecd0abb): the runtime /config.json flag was replaced
+    # by the per-org subscription.care flag; the gate no longer reads this env.
 
 mycurelocal:
   enabled: true
