@@ -106,7 +106,7 @@ hapihub:
   # caller ∉ careTeam ⇒ 403 NO_TREATMENT_RELATIONSHIP + denied audit. Builds on
   # resolveCareTeam v2 (eda012d77). TEMPORARY: preprod tracks the CARE branch.
   image:
-    tag: "11.20.135-care.7fecd0ab@sha256:48113211d8f063917408087f03f918f252dcbb71114628f587d46059b79905b6"
+    tag: "11.20.135-care.0400440f@sha256:282b9cb05298a469fc8da6f58b7fcbb09fdf451e7c38b4083c7295d6b7737e99"
   cache:
     # Prod parity: response cache OFF (the #2839/#2617 bentocache stampede
     # mitigation). Re-enable here first when re-validating the serve-stale fix.
