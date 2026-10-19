@@ -181,6 +181,11 @@ hapihub:
     CARE_MEDLEY_SKILL: "summarize-context"
     OPENMED_ENABLED: "true"
     OPENMED_URL: "http://openmed.mycure-preprod.svc.cluster.local:8920"
+    # 60s (default 15s): OpenMed reloads its NER model on a cold call — the FIRST
+    # /care/ask after an openmed (re)start exceeds 15s on source #1, aborts → local
+    # fallback → fail-closed 403 DEID_UNAVAILABLE. 60s absorbs the cold load so de-id
+    # goes through OpenMed (method=openmed) and the gate passes. Warm calls ~3s.
+    OPENMED_TIMEOUT_MS: "60000"
     # qwen2.5:14b summarize-context runs ~140s; the default care→medley fetch timeout
     # socket-closed on the first (cold) call. 240s gives headroom incl. model cold-start.
     CARE_MEDLEY_TIMEOUT_MS: "240000"
