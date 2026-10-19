@@ -499,6 +499,11 @@ medgemmaWorker:
   enabled: false
 openmed:
   enabled: true
+  # chart default storageClassName "" falls back to global.storage.className or
+  # longhorn — neither exists on vanaheim (k3d = local-path). Pin local-path or the
+  # model-cache PVC stays Pending (unbound) and the pod never schedules.
+  persistence:
+    storageClassName: "local-path"
 
 # WAL archiving OFF — deviation from prod: no Spaces credential is provisioned
 # for this cluster (the staging-scoped ESO SA can't read the shared
