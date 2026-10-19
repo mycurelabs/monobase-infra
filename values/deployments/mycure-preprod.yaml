@@ -507,21 +507,27 @@ medley:
   podDisruptionBudget:
     enabled: false
 medleyapp:
-  # CARE Chat mini-app (monobase-mycure #5235 / PR #5244, apps/medleyapp v0.2.0,
-  # branch feat/5235-care-chat-mini-app). Generic app chart (appRegistry chart:app) —
-  # NOT a bespoke chart. Static Vite SPA served by Caddy; it bakes VITE_API_URL at
-  # BUILD time (default = preprod hapihub) and talks ONLY to hapihub (Better Auth +
-  # POST /care/ask; hapihub proxies medley server-side). The old runtime HAPIHUB_URL/
-  # config.json path is a dead stub in 0.2.0, so no config: block is needed. CORS for
-  # this origin is added to hapihub.config.CORS_ORIGINS above (absolute baked URL →
-  # cross-origin). Image pinned by immutable digest (w1:p8D CI build; :latest moves but
-  # staging pins 0.1.4 so staging is unaffected).
+  # CARE Chat mini-app (monobase-mycure #5235 / PR #5244, apps/medleyapp, branch
+  # feat/5235-care-chat-mini-app). Generic app chart (appRegistry chart:app) — NOT a
+  # bespoke chart. Static Vite SPA served by Caddy; talks ONLY to hapihub (Better Auth +
+  # POST /care/ask; hapihub proxies medley server-side). CORS for this origin is on
+  # hapihub.config.CORS_ORIGINS above (absolute URL → cross-origin). Image pinned by
+  # immutable digest (w1:p8D CI build; :latest moves but staging pins 0.1.4, unaffected).
+  #
+  # 0.2.0 → 0.2.1 (digest 98105ec5): the app now reads /config.json at BOOT, which
+  # OVERRIDES the build-time baked VITE_API_URL (mirrors apps/dashboard). docker-entrypoint
+  # emits {api_url, hapihub_url} from env → HAPIHUB_URL below is now AUTHORITATIVE and the
+  # image is env-agnostic (baked URL = dev fallback only). Hence the new config: block.
   enabled: true
   image:
     repository: ghcr.io/mycurelabs/medleyapp
-    tag: "0.2.0@sha256:56346ab343518dab84e6f3c76473cb29908a155039156a927c9cb55422432da0"
+    tag: "0.2.1@sha256:98105ec5847a366d4071db3c17174ccf22382dbf33f68a76bcd7200970fd1042"
     pullPolicy: IfNotPresent
   replicaCount: 1
+  config:
+    # Runtime config.json (0.2.1+): point the FE at preprod hapihub. api_url would win if
+    # both set; hapihub_url alone is sufficient for the Better-Auth + /care/ask client.
+    HAPIHUB_URL: "https://hapihub.preprod.localfirsthealth.com"
   resources:
     requests:
       cpu: 50m
