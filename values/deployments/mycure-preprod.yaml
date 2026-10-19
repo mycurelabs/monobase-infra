@@ -141,7 +141,7 @@ hapihub:
       rpId: "preprod.localfirsthealth.com"
 
   config:
-    CORS_ORIGINS: "https://hapihub.preprod.localfirsthealth.com,https://mycure.preprod.localfirsthealth.com,https://mycurelocal.preprod.localfirsthealth.com,https://mycure-myaccount.preprod.localfirsthealth.com,https://mycure-dashboard.preprod.localfirsthealth.com,https://mycure-pxp.preprod.localfirsthealth.com,https://developer-portal.preprod.localfirsthealth.com,https://mycure-pr--*.web.app,https://mycure-reconstruct.web.app,https://mycure-reconstruct.firebaseapp.com"
+    CORS_ORIGINS: "https://hapihub.preprod.localfirsthealth.com,https://mycure.preprod.localfirsthealth.com,https://mycurelocal.preprod.localfirsthealth.com,https://mycure-myaccount.preprod.localfirsthealth.com,https://mycure-dashboard.preprod.localfirsthealth.com,https://mycure-pxp.preprod.localfirsthealth.com,https://developer-portal.preprod.localfirsthealth.com,https://medleyapp.preprod.localfirsthealth.com,https://mycure-pr--*.web.app,https://mycure-reconstruct.web.app,https://mycure-reconstruct.firebaseapp.com"
     # File storage — preprod-own in-cluster MinIO (S3-compatible), isolated
     # from prod's GCS bucket. Access creds (STORAGE_S3_ACCESS_KEY_ID/SECRET)
     # come from the minio secret via the externalSecret below; MinIO
@@ -499,7 +499,33 @@ medley:
   podDisruptionBudget:
     enabled: false
 medleyapp:
-  enabled: false
+  # CARE Chat mini-app (monobase-mycure #5235 / PR #5244, apps/medleyapp v0.2.0,
+  # branch feat/5235-care-chat-mini-app). Generic app chart (appRegistry chart:app) —
+  # NOT a bespoke chart. Static Vite SPA served by Caddy; it bakes VITE_API_URL at
+  # BUILD time (default = preprod hapihub) and talks ONLY to hapihub (Better Auth +
+  # POST /care/ask; hapihub proxies medley server-side). The old runtime HAPIHUB_URL/
+  # config.json path is a dead stub in 0.2.0, so no config: block is needed. CORS for
+  # this origin is added to hapihub.config.CORS_ORIGINS above (absolute baked URL →
+  # cross-origin). Image pinned by immutable digest (w1:p8D CI build; :latest moves but
+  # staging pins 0.1.4 so staging is unaffected).
+  enabled: true
+  image:
+    repository: ghcr.io/mycurelabs/medleyapp
+    tag: "0.2.0@sha256:56346ab343518dab84e6f3c76473cb29908a155039156a927c9cb55422432da0"
+    pullPolicy: IfNotPresent
+  replicaCount: 1
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 128Mi
+  gateway:
+    hostname: "" # defaults to medleyapp.preprod.localfirsthealth.com
+    sectionName: https-preprod-lfh # *.preprod.localfirsthealth.com wildcard (tailnet-only), same listener as medley
+  podDisruptionBudget:
+    enabled: false
 medgemmaWorker:
   enabled: false
 openmed:
