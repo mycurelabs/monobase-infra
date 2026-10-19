@@ -105,8 +105,16 @@ hapihub:
   # ae7f4b399 fail-closes in /care/ask after org-scoped retrieval, before de-id/egress:
   # caller ∉ careTeam ⇒ 403 NO_TREATMENT_RELATIONSHIP + denied audit. Builds on
   # resolveCareTeam v2 (eda012d77). TEMPORARY: preprod tracks the CARE branch.
+  #
+  # 2026-10-19 bump 0400440f → b8d844de0: _data refactor (PR #4570). Migration 0116
+  # (pg) / 0088 (sqlite) backfills CARE coded cols (allergy coded props on
+  # medical_records/_history, medicines.ingredients, subscriptions.care) INTO the
+  # _data jsonb overflow then DROP COLUMN — reverting the cadence schema-gate
+  # fingerprint so the 4 synced tables match origin/main column-for-column (no fleet
+  # roll needed). Backfill UPDATE runs as migrator on cadence-tracked medical_records
+  # (watch for 42501 if migrator lacks cadence_dirty grant; DROP COLUMN itself is fine).
   image:
-    tag: "11.20.135-care.0400440f@sha256:282b9cb05298a469fc8da6f58b7fcbb09fdf451e7c38b4083c7295d6b7737e99"
+    tag: "11.20.135-care.b8d844de@sha256:c8e5d10c58048000795bf848db0f193b93123a92d3ca40e5a8f3b02dbe1e7b77"
   cache:
     # Prod parity: response cache OFF (the #2839/#2617 bentocache stampede
     # mitigation). Re-enable here first when re-validating the serve-stale fix.
