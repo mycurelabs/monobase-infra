@@ -173,13 +173,14 @@ hapihub:
     # stay OFF. Sandbox stays OFF (baseline); prod untouched.
     API_AUDIENCE_ENFORCE: "true"
     # CARE governed copilot (monobase-mycure #4566/#4570) — point /care/ask at the
-    # preprod medley governed gateway; skill = summarize-context. openmed sidecar
-    # OFF → phi.ts regex de-id fallback (no openmed deployment in preprod). Route
-    # is always registered (services/care/index.ts:163), so this just wires the
-    # backend; the -care hapihub build lifts the /care/ask 404.
+    # preprod medley governed gateway; skill = summarize-context. OpenMed sidecar
+    # now DEPLOYED (openmed.enabled below) → real NER de-id (not the phi.ts regex
+    # fallback). Governance-correct path (product decision #4): with OpenMed up, the
+    # de-id fail-closed gate (CARE_ASK_REQUIRE_DEID, default ON) is satisfied.
     CARE_MEDLEY_URL: "http://medley.mycure-preprod.svc.cluster.local:8970"
     CARE_MEDLEY_SKILL: "summarize-context"
-    OPENMED_ENABLED: "false"
+    OPENMED_ENABLED: "true"
+    OPENMED_URL: "http://openmed.mycure-preprod.svc.cluster.local:8920"
     # qwen2.5:14b summarize-context runs ~140s; the default care→medley fetch timeout
     # socket-closed on the first (cold) call. 240s gives headroom incl. model cold-start.
     CARE_MEDLEY_TIMEOUT_MS: "240000"
@@ -497,7 +498,7 @@ medleyapp:
 medgemmaWorker:
   enabled: false
 openmed:
-  enabled: false
+  enabled: true
 
 # WAL archiving OFF — deviation from prod: no Spaces credential is provisioned
 # for this cluster (the staging-scoped ESO SA can't read the shared
