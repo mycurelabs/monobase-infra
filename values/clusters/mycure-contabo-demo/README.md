@@ -298,13 +298,16 @@ only).
 ### Stubbed until real values exist
 
 - **Stripe:** the existing `mycure-demo-stripe-*` placeholders. Checkout won't work.
-- **Backups (#4956):** no `BACKUPS_*` or master key, so the backup endpoints answer 503.
-  Needs a `mycure-demo-easyjoey-backups-master-key` secret and a public MinIO route.
 - **Google sign-in:** placeholder, as for MyCure.
 
 ## Internal UIs (no public routes)
 
 The mailpit UI has no auth and the MinIO console is admin-only, so neither is routed.
+Only the MinIO **S3 API** is public, at `storage.demo.localfirsthealth.com`, because
+EasyJoey devices upload and download backups through pre-signed URLs. It is gated by the
+MinIO root credentials and the URL signatures. The backups need the
+`mycure-demo-easyjoey-backups-master-key` GCP secret (64 hex chars); create it before
+the overlay references it, or the whole `hapihub-secrets` sync fails.
 
 ```bash
 kubectl --context $KCTX -n mycure-demo port-forward svc/mailpit-http 8025:80   # http://localhost:8025

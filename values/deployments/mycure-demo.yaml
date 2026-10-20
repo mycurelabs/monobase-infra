@@ -173,10 +173,14 @@ hapihub:
     EASYJOEY_CADENCE_FLEET_ID: "easyjoey-demo"
     EASYJOEY_CADENCE_SEED_URL: "https://mycure-cadence.demo.localfirsthealth.com"
     EASYJOEY_CADENCE_METADATA_SCHEMA: "public"
-    # EasyJoey daily backups (#4956) are NOT configured here (stub): no BACKUPS_* and no
-    # BACKUPS_MASTER_KEY (needs a mycure-demo-easyjoey-backups-master-key GCP secret, and
-    # devices need a public MinIO route, which this public cluster deliberately lacks).
-    # Unset = the backups endpoints answer 503; everything else works.
+    # EasyJoey daily backups (#4956): encrypted device snapshots in their own bucket on
+    # the in-cluster MinIO (same creds as STORAGE_S3_*). Devices PUT/GET pre-signed URLs,
+    # so they are signed against MinIO's PUBLIC S3 route (minio.gateway below, host
+    # storage.demo...), not the in-cluster endpoint. BACKUPS_MASTER_KEY (secret) is wired
+    # in env + externalSecrets below; unset = backups answer 503. STORAGE_BUCKET stays
+    # pinned to "hapihub" above (minio.defaultBuckets now lists both buckets).
+    BACKUPS_BUCKET: "easyjoey-backups-demo"
+    BACKUPS_PUBLIC_ENDPOINT: "https://storage.demo.localfirsthealth.com"
     # Developer-platform API_*_ENFORCE flags stay UNSET — prod parity (they are a
     # preprod-only rollout).
 
@@ -216,6 +220,14 @@ hapihub:
       # Read replica for device-telemetry parity recompute (mono#3747).
     - name: DATABASE_READ_URI
       value: "postgres://$(POSTGRESQL_USER):$(POSTGRESQL_PASSWORD)@postgresql-read.mycure-demo.svc.cluster.local:5432/hapihub"
+      # EasyJoey backups master key (#4956), from the hapihub-secrets ExternalSecret
+      # (key synced below). optional: a missing key = backups 503, pod still starts.
+    - name: BACKUPS_MASTER_KEY
+      valueFrom:
+        secretKeyRef:
+          name: hapihub-secrets
+          key: BACKUPS_MASTER_KEY
+          optional: true
 
   # Prod parity: HPA owns replicas (k3s bundles metrics-server).
   autoscaling:
@@ -255,6 +267,10 @@ hapihub:
         remoteKey: mycure-demo-auth-secret
       - secretKey: BETTER_AUTH_SECRET
         remoteKey: mycure-demo-better-auth-secret
+        # EasyJoey backups master key (#4956). The GCP secret MUST exist before this
+        # syncs: a missing remote key fails the WHOLE hapihub-secrets ExternalSecret.
+      - secretKey: BACKUPS_MASTER_KEY
+        remoteKey: mycure-demo-easyjoey-backups-master-key
 
   postgresql:
     serviceName: postgresql-primary
@@ -536,11 +552,17 @@ valkey:
 # Deviation from prod (GCS): hapihub STORAGE_TYPE=s3 above points here.
 minio:
   enabled: true
-  # NO public route for the MinIO console/API (base default storage.<domain>):
-  # this cluster is on the internet. hapihub talks to it in-cluster. Use
-  # `kubectl -n mycure-demo port-forward svc/minio 9001:9001` for the console.
+  # PUBLIC S3 API route storage.demo.localfirsthealth.com -> minio:9000 (charts/
+  # minio-httproute; the allow-gateway-to-minio NetworkPolicy admits it). Needed so
+  # EasyJoey devices can PUT/GET the pre-signed backup URLs hapihub hands out.
+  # Exposure: the S3 API is internet-facing, gated by the MinIO root creds
+  # (mycure-demo-minio-root-*, never public) + per-URL signatures. The CONSOLE
+  # (9001) stays private: `kubectl -n mycure-demo port-forward svc/minio 9001:9001`.
   gateway:
-    enabled: false
+    enabled: true
+  # Bitnami MINIO_DEFAULT_BUCKETS: hapihub's file bucket (STORAGE_BUCKET) + the
+  # EasyJoey backups bucket. Changing this restarts the MinIO pod.
+  defaultBuckets: "hapihub,easyjoey-backups-demo"
   auditArchive:
     enabled: false
 
