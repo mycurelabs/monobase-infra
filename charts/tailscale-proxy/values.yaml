@@ -54,3 +54,23 @@ resources:
 
 nodeSelector: {}
 tolerations: []
+
+# Optional access window. Two CronJobs scale the proxy to 0 at `stop` (tailnet
+# door closed) and back to 1 at `start`. Requires argocdApp.ignoreDifferences on
+# /spec/replicas below, or ArgoCD self-heal reverts each scale (render fails
+# without it). Manual override outside the window: kubectl scale --replicas=1.
+schedule:
+  enabled: false
+  timeZone: Asia/Manila
+  stop: ""       # cron, e.g. "0 10 * * *"
+  start: ""      # cron, e.g. "0 17 * * *"
+  image:
+    repository: docker.io/bitnamilegacy/kubectl
+    tag: "1.31.4"
+
+# Read by the argocd-applications factory, not by this chart's resources.
+argocdApp: {}
+#   ignoreDifferences:
+#     - group: apps
+#       kind: Deployment
+#       jsonPointers: [/spec/replicas]
