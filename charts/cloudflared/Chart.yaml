@@ -1,0 +1,9 @@
+apiVersion: v2
+name: cloudflared
+description: Cloudflare Tunnel connector publishing a namespace's gateway on public hostnames
+type: application
+version: 1.0.0
+appVersion: "2026.10.0"
+home: https://github.com/mycurelabs/monobase-infra
+sources:
+  - https://github.com/cloudflare/cloudflared
