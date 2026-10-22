@@ -1,0 +1,163 @@
+{{- if and .Values.enabled .Values.schedule.enabled }}
+{{- /* Keys are stop/start, not off/on: YAML 1.1 reads bare on/off as booleans. */}}
+{{- $stop := required "tailscale-proxy: schedule.stop (cron) is required when schedule.enabled" .Values.schedule.stop }}
+{{- $start := required "tailscale-proxy: schedule.start (cron) is required when schedule.enabled" .Values.schedule.start }}
+{{- /*
+  Fail closed: the Argo app runs selfHeal, so a scheduled scale-to-0 is undone
+  within minutes unless the Application ignores /spec/replicas. The
+  argocd-applications factory sets that from argocdApp.ignoreDifferences.
+*/}}
+{{- if not (.Values.argocdApp | default dict).ignoreDifferences }}
+{{- fail "tailscale-proxy: schedule.enabled needs argocdApp.ignoreDifferences on the Deployment's /spec/replicas, otherwise ArgoCD self-heal reverts every scheduled scale" }}
+{{- end }}
+{{- $fullname := include "tailscale-proxy.fullname" . }}
+{{- $ns := include "tailscale-proxy.namespace" . }}
+# Access window: the proxy is the namespace's only tailnet door. Scale it to 0
+# at `stop` and back to 1 at `start`. The node is non-ephemeral with state in a
+# Secret, so it rejoins as the same device + IP and DNS stays valid.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ $fullname }}-schedule
+  namespace: {{ $ns }}
+  labels:
+    {{- include "tailscale-proxy.labels" . | nindent 4 }}
+---
+# Scoped to this one Deployment: kubectl scale reads it, then patches /scale.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ $fullname }}-schedule
+  namespace: {{ $ns }}
+  labels:
+    {{- include "tailscale-proxy.labels" . | nindent 4 }}
+rules:
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    resourceNames: [{{ $fullname | quote }}]
+    verbs: ["get"]
+  - apiGroups: ["apps"]
+    resources: ["deployments/scale"]
+    resourceNames: [{{ $fullname | quote }}]
+    verbs: ["get", "patch", "update"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ $fullname }}-schedule
+  namespace: {{ $ns }}
+  labels:
+    {{- include "tailscale-proxy.labels" . | nindent 4 }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ $fullname }}-schedule
+    namespace: {{ $ns }}
+roleRef:
+  kind: Role
+  name: {{ $fullname }}-schedule
+  apiGroup: rbac.authorization.k8s.io
+---
+# The namespace default-denies egress; the schedule pods only need the API
+# server (TCP 443 managed / 6443 k3s). kubectl uses the in-cluster service IP,
+# so no DNS rule is needed.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ $fullname }}-schedule
+  namespace: {{ $ns }}
+  labels:
+    {{- include "tailscale-proxy.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: schedule
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+      ports:
+        - protocol: TCP
+          port: 443
+        - protocol: TCP
+          port: 6443
+{{- range $action := list (dict "name" "stop" "cron" $stop "replicas" 0) (dict "name" "start" "cron" $start "replicas" 1) }}
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ $fullname }}-{{ $action.name }}
+  namespace: {{ $ns }}
+  labels:
+    {{- include "tailscale-proxy.labels" $ | nindent 4 }}
+    app.kubernetes.io/component: schedule
+spec:
+  schedule: {{ $action.cron | quote }}
+  timeZone: {{ $.Values.schedule.timeZone | quote }}
+  concurrencyPolicy: Forbid
+  # Still fire if the controller was briefly down at the scheduled minute.
+  startingDeadlineSeconds: 600
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 3
+      activeDeadlineSeconds: 300
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/instance: {{ $.Release.Name }}
+            app.kubernetes.io/component: schedule
+        spec:
+          serviceAccountName: {{ $fullname }}-schedule
+          restartPolicy: Never
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1001
+            runAsGroup: 1001
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: kubectl
+              # Same image the wal-g backup CronJob pins (debian-based, has a shell).
+              image: "{{ $.Values.schedule.image.repository }}:{{ $.Values.schedule.image.tag }}"
+              imagePullPolicy: IfNotPresent
+              command:
+                - kubectl
+                - --namespace={{ $ns }}
+                - scale
+                - deployment/{{ $fullname }}
+                - --replicas={{ $action.replicas }}
+              env:
+                - name: HOME   # kubectl's discovery cache; root fs is read-only
+                  value: /tmp
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop: ["ALL"]
+              resources:
+                requests:
+                  cpu: 10m
+                  memory: 32Mi
+                limits:
+                  cpu: 100m
+                  memory: 128Mi
+              volumeMounts:
+                - name: tmp
+                  mountPath: /tmp
+          volumes:
+            - name: tmp
+              emptyDir: {}
+          {{- with $.Values.nodeSelector }}
+          nodeSelector:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with $.Values.tolerations }}
+          tolerations:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+{{- end }}
+{{- end }}

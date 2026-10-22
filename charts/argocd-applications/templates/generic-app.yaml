@@ -75,12 +75,26 @@ spec:
   destination:
     server: https://kubernetes.default.svc
     namespace: {{ $root.Values.global.namespace }}
+  {{- /*
+    Opt-in per app: `<key>.argocdApp.ignoreDifferences` (standard Argo list).
+    Use for fields something other than git owns, e.g. a replica count moved by
+    a schedule — without it selfHeal reverts the change within minutes.
+  */}}
+  {{- $ignore := ($vals.argocdApp | default dict).ignoreDifferences }}
+  {{- with $ignore }}
+  ignoreDifferences:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
   syncPolicy:
     automated:
       prune: true
       selfHeal: true
     syncOptions:
       - CreateNamespace=false
+      {{- if $ignore }}
+      # Keep ignored fields on sync too, not just in diffing.
+      - RespectIgnoreDifferences=true
+      {{- end }}
     retry:
       limit: 5
       backoff:
