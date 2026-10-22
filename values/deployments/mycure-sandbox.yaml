@@ -86,6 +86,8 @@ cloudflared:
           - /spec/replicas
 
 mycure-dashboard:
+  image:
+    tag: "0.14.33-sandbox.1" # feat/developer-portal-integration-lab prerelease (Developers page)
   resources:
     requests:
       cpu: 10m
@@ -104,9 +106,10 @@ mycure-pxp:
     API_URL: "https://hapihub.sandbox.localfirsthealth.com"
 
 hapihub:
-  # Prod-current image (known-good), same tag as the preprod copy.
+  # Developer Portal branch prerelease (Apps, webhooks, partner keys); back to a
+  # main release once feat/developer-portal-integration-lab merges.
   image:
-    tag: "11.20.128"
+    tag: "11.20.136-sandbox.1" # feat/developer-portal-integration-lab prerelease
   cache:
     enabled: false
   # No Prometheus Operator on this lean k3d cluster.
@@ -184,7 +187,7 @@ hapihub:
 
 mycure:
   image:
-    tag: "10.25.139"
+    tag: "10.25.145-sandbox.1" # feat/developer-portal-integration-lab prerelease
   resources:
     requests:
       cpu: 10m
@@ -204,7 +207,7 @@ mycure:
 developerPortal:
   enabled: true
   image:
-    tag: "0.1.0"
+    tag: "0.1.0-sandbox.1" # feat/developer-portal-integration-lab prerelease
   resources:
     requests:
       cpu: 10m
