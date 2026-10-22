@@ -54,14 +54,14 @@ tailscaleProxy:
   authkey:
     remoteKey: mycure-sandbox-tailscale-authkey
   target: nginx-sandbox-gateway-nginx.nginx-gateway-system.svc.cluster.local:443
-  # Access window: the tailnet door is CLOSED 10:00-17:00 PHT daily and open
+  # Access window: the tailnet door is OPEN 10:00-17:00 PHT daily and closed
   # the rest of the time. Override: kubectl -n mycure-sandbox scale
-  # deployment/tailscale-proxy --replicas=1 (holds until the next 10:00).
+  # deployment/tailscale-proxy --replicas=1 (holds until the next 17:00).
   schedule:
     enabled: true
     timeZone: Asia/Manila
-    stop: "0 10 * * *"
-    start: "0 17 * * *"
+    start: "0 10 * * *"
+    stop: "0 17 * * *"
   argocdApp:
     ignoreDifferences:
       - group: apps
