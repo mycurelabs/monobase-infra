@@ -1,0 +1,49 @@
+{{- if .Values.enabled }}
+# Egress allow-list for the connector (the namespace default-denies egress).
+# No ingress rule: public traffic arrives over the connections the pod itself
+# opened to Cloudflare's edge, so conntrack admits it.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "cloudflared.fullname" . }}
+  namespace: {{ include "cloudflared.namespace" . }}
+  labels:
+    {{- include "cloudflared.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "cloudflared.selectorLabels" . | nindent 6 }}
+  policyTypes:
+    - Egress
+  egress:
+    # Cluster DNS (edge discovery + the origin's cluster hostname).
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    # The origin: the gateway data plane.
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .Values.global.gateway.namespace }}
+      ports:
+        - protocol: TCP
+          port: 443
+    # Cloudflare edge: tunnel links on 7844 (QUIC over UDP, HTTP/2 over TCP
+    # fallback) and the Cloudflare API on 443.
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+      ports:
+        - protocol: UDP
+          port: 7844
+        - protocol: TCP
+          port: 7844
+        - protocol: TCP
+          port: 443
+{{- end }}

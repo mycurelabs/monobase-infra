@@ -1,0 +1,76 @@
+{{- if .Values.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "cloudflared.fullname" . }}
+  namespace: {{ include "cloudflared.namespace" . }}
+  labels:
+    {{- include "cloudflared.labels" . | nindent 4 }}
+spec:
+  # ponytail: one connector; the tunnel tolerates more (each is another edge
+  # link) if availability ever matters more than this sandbox needs.
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "cloudflared.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "cloudflared.selectorLabels" . | nindent 8 }}
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: cloudflared
+          image: {{ include "cloudflared.image" . | quote }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args:
+            - tunnel
+            - --no-autoupdate
+            - --metrics=0.0.0.0:2000
+            - run
+          env:
+            - name: TUNNEL_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "cloudflared.tokenSecret" . }}
+                  key: token
+          ports:
+            - name: metrics
+              containerPort: 2000
+              protocol: TCP
+          # /ready is 200 once at least one edge connection is registered.
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: metrics
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /ready
+              port: metrics
+            initialDelaySeconds: 60
+            periodSeconds: 30
+            failureThreshold: 6
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}

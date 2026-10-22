@@ -1,0 +1,62 @@
+# cloudflared — a Cloudflare Tunnel connector. It dials OUT to Cloudflare's edge
+# (no inbound port, no router change) and Cloudflare forwards the tunnel's
+# public hostnames down it. The tunnel is "remotely managed": its public
+# hostnames -> origin routes live in the Cloudflare dashboard (Zero Trust ->
+# Networks -> Tunnels), not here. Point each route at the namespace gateway
+# Service over HTTPS with Origin Server Name = the public hostname, so the
+# gateway still picks the right listener + cert by SNI.
+
+global:
+  namespace: ""      # injected by the argocd-applications factory
+  partOf: ""         # app.kubernetes.io/part-of; factory injects the tenant value
+  gateway:
+    namespace: nginx-gateway-system   # netpol: where the origin (gateway) lives
+
+enabled: false
+
+nameOverride: ""
+fullnameOverride: ""
+
+image:
+  repository: docker.io/cloudflare/cloudflared
+  tag: ""            # empty -> Chart.appVersion
+  pullPolicy: IfNotPresent
+
+# Tunnel token source: the GCP secret VALUE is the token shown in the dashboard
+# ("cloudflared tunnel run --token <TOKEN>"). Required.
+token:
+  secretStore: gcp-secretstore
+  secretStoreKind: ClusterSecretStore
+  refreshInterval: 1h
+  remoteKey: ""
+
+resources:
+  requests:
+    cpu: 10m
+    memory: 64Mi
+  limits:
+    cpu: 200m
+    memory: 256Mi
+
+nodeSelector: {}
+tolerations: []
+
+# Optional public access window. Two CronJobs scale the connector to 0 at
+# `stop` and back to 1 at `start`. Requires argocdApp.ignoreDifferences on
+# /spec/replicas below, or ArgoCD self-heal reverts each scale (render fails
+# without it). Manual override outside the window: kubectl scale --replicas=1.
+schedule:
+  enabled: false
+  timeZone: Asia/Manila
+  stop: ""       # cron, e.g. "0 17 * * *"
+  start: ""      # cron, e.g. "0 10 * * *"
+  image:
+    repository: docker.io/bitnamilegacy/kubectl
+    tag: "1.31.4"
+
+# Read by the argocd-applications factory, not by this chart's resources.
+argocdApp: {}
+#   ignoreDifferences:
+#     - group: apps
+#       kind: Deployment
+#       jsonPointers: [/spec/replicas]
