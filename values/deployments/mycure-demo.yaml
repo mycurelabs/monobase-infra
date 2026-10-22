@@ -84,10 +84,10 @@ hapihub:
     enabled: true
     provision:
       activeDeadlineSeconds: 900
-  # EasyJoey build: monobase-mycure feat/easyjoey 34fd3cf (2026-10-16) = main merged in
-  # (738e4cad1) + EasyJoey, released by Hapihub Release as 11.20.135-easyjoey.1 (a
+  # EasyJoey build: monobase-mycure feat/easyjoey 206e961 (2026-10-22) = main merged in
+  # (738e4cad1) + EasyJoey, released by Hapihub Release as 11.20.135-easyjoey.2 (a
   # pre-release: never moves :latest). Runs with cadence 2.1.108-easyjoey.3 and web
-  # 0.3.1-demo.34fd3cf. Do NOT move this to a plain prod tag while EasyJoey runs here —
+  # 0.3.2-demo.206e961. Do NOT move this to a plain prod tag while EasyJoey runs here —
   # those builds lack EasyJoey. Migrations: the main/EasyJoey clash is reconciled in
   # code (docs/workflows/easyjoey-main-migration-reconciliation.md, third section), so
   # this already-migrated DB plans nothing new.
@@ -98,7 +98,7 @@ hapihub:
   # first: ~/backups/mycure-demo/easyjoey-demo-db-changes.sql on the VPS (tested on a
   # restored copy: 0120–0123 then apply with zero errors, hapihub boots).
   image:
-    tag: "11.20.135-easyjoey.1"
+    tag: "11.20.135-easyjoey.2"
   cache:
     # Prod parity: response cache OFF (the #2839/#2617 bentocache stampede).
     enabled: false
@@ -398,7 +398,7 @@ developerPortal:
 easyjoey:
   enabled: true
   image:
-    tag: "0.3.1-demo.34fd3cf"
+    tag: "0.3.2-demo.206e961"
   resources:
     requests:
       cpu: 10m
@@ -413,7 +413,7 @@ easyjoey:
 easyjoeyWebsite:
   enabled: true
   image:
-    tag: "0.1.1-demo.34fd3cf"
+    tag: "0.1.2-demo.206e961"
   resources:
     requests:
       cpu: 10m
@@ -424,7 +424,7 @@ easyjoeyWebsite:
 easyjoeyAccounts:
   enabled: true
   image:
-    tag: "0.1.1-demo.34fd3cf"
+    tag: "0.1.2-demo.206e961"
   resources:
     requests:
       cpu: 10m
