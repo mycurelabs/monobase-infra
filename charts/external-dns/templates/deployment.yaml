@@ -67,6 +67,11 @@ spec:
         {{- range $instance.domainFilters }}
         - --domain-filter={{ . }}
         {{- end }}
+        {{- /* Names under a filter that something else owns (e.g. a Cloudflare
+               Tunnel CNAME); external-dns neither creates nor touches them. */}}
+        {{- range $instance.excludeDomains }}
+        - --exclude-domains={{ . }}
+        {{- end }}
 
         # Policy
         - --policy={{ $root.Values.global.policy }}

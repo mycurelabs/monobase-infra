@@ -95,6 +95,8 @@ appRegistry:
     key: pgLogicalBackup
   tailscale-proxy:
     key: tailscaleProxy
+  cloudflared:
+    key: cloudflared
 
 # ===== HEALTHCARE: MyCure Dashboard (operator/admin web UI) =====
 mycure-dashboard:
@@ -158,6 +160,11 @@ pgLogicalBackup:
 # overlay that must live on a DIFFERENT Tailscale account than the cluster-wide
 # operator (mycure-sandbox on vanaheim, monobase-mycure#4509).
 tailscaleProxy:
+  enabled: false
+# Cloudflare Tunnel connector (charts/cloudflared): publishes a namespace's
+# gateway on public hostnames without an inbound port. Off everywhere except
+# mycure-sandbox on vanaheim (office cluster behind NAT).
+cloudflared:
   enabled: false
 
 # ===== HEALTHCARE: MyCure PXP (patient-facing web app) =====

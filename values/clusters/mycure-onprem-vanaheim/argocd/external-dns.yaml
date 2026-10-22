@@ -26,6 +26,16 @@ instances:
     # Manage DNS subdomains across all namespaces
     domainFilters:
       - localfirsthealth.com
+    # Public sandbox names are CNAMEs to the mycure-sandbox Cloudflare Tunnel,
+    # managed in the dashboard (values/deployments/mycure-sandbox.yaml). Left to
+    # external-dns (upsert-only) they'd be re-asserted as A 100.64.33.33 and
+    # fail every minute against the CNAME.
+    excludeDomains:
+      - hapihub.sandbox.localfirsthealth.com
+      - mycure.sandbox.localfirsthealth.com
+      - mycure-dashboard.sandbox.localfirsthealth.com
+      - mycure-pxp.sandbox.localfirsthealth.com
+      - developer-portal.sandbox.localfirsthealth.com
 
     # Cloudflare-specific configuration
     cloudflare:
