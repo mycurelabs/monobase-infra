@@ -98,7 +98,7 @@ hapihub:
   # first: ~/backups/mycure-demo/easyjoey-demo-db-changes.sql on the VPS (tested on a
   # restored copy: 0120–0123 then apply with zero errors, hapihub boots).
   image:
-    tag: "11.20.135-easyjoey.3"
+    tag: "11.20.135-easyjoey.4"
   cache:
     # Prod parity: response cache OFF (the #2839/#2617 bentocache stampede).
     enabled: false
@@ -398,7 +398,7 @@ developerPortal:
 easyjoey:
   enabled: true
   image:
-    tag: "0.3.3-demo.3454961"
+    tag: "0.3.4-demo.f80f8be"
   resources:
     requests:
       cpu: 10m
@@ -424,7 +424,7 @@ easyjoeyWebsite:
 easyjoeyAccounts:
   enabled: true
   image:
-    tag: "0.1.3-demo.3454961"
+    tag: "0.1.4-demo.f80f8be"
   resources:
     requests:
       cpu: 10m
