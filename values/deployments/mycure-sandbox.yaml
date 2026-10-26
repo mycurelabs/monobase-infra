@@ -57,7 +57,7 @@ tailscaleProxy:
   # Always on: staff reach the sandbox over its tailnet 24/7. The PUBLIC
   # window is the cloudflared tunnel below.
 
-# ===== PUBLIC WINDOW: Cloudflare Tunnel, 10:00-17:00 PHT daily =====
+# ===== PUBLIC WINDOW: Cloudflare Tunnel, 10:00-22:00 PHT daily =====
 # vanaheim sits behind the office NAT, so the internet reaches the sandbox only
 # through this tunnel. Routes live in the Cloudflare dashboard (Zero Trust ->
 # Tunnels -> mycure-sandbox), each -> HTTPS
@@ -68,7 +68,7 @@ tailscaleProxy:
 # external-dns, so they also go through Cloudflare from the tailnet and show a
 # Cloudflare error page outside the window. Edge cert *.sandbox needs ACM.
 # Override: kubectl -n mycure-sandbox scale deployment/cloudflared --replicas=1
-# (holds until the next 17:00).
+# (holds until the next 22:00).
 cloudflared:
   enabled: true
   token:
@@ -77,7 +77,7 @@ cloudflared:
     enabled: true
     timeZone: Asia/Manila
     start: "0 10 * * *"
-    stop: "0 17 * * *"
+    stop: "0 22 * * *"
   argocdApp:
     ignoreDifferences:
       - group: apps
