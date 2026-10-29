@@ -113,8 +113,17 @@ hapihub:
   # fingerprint so the 4 synced tables match origin/main column-for-column (no fleet
   # roll needed). Backfill UPDATE runs as migrator on cadence-tracked medical_records
   # (watch for 42501 if migrator lacks cadence_dirty grant; DROP COLUMN itself is fine).
+  #
+  # 2026-10-29 bump b8d844de → 052153ba (PR #5681, CARE multi-turn /care/ask conversation
+  # store; #5571). Pre-merge test image off the green PR head (not a merge). Migrations
+  # 0117 (care_agent_tables, from #5335) + 0118 (care_conversations/messages) + 0119
+  # (care_preferences) — all hub-only, NOT in cadence.yaml (no fingerprint/cadence_dirty).
+  # #5335 agent code rides along but INERT (no /mcp HTTPRoutes + no agent env this pin).
+  # ⚠️ MIGRATE HAZARD: build carries the SCHEMA-ONLY 0116 (hash ≠ preprod's applied
+  # old-0116); the one-off migrate Job gets a drizzle.__drizzle_migrations INSERT of the
+  # new 0116 hash (from w1:p79, 052153ba bundle) FIRST so it skips 0116, then applies 17/18/19.
   image:
-    tag: "11.20.135-care.b8d844de@sha256:c8e5d10c58048000795bf848db0f193b93123a92d3ca40e5a8f3b02dbe1e7b77"
+    tag: "11.20.135-care.052153ba@sha256:6787c104bf33147f80bf1f256fbbae6c164ba38cd8c657c1117cd1b492b3e03b"
   cache:
     # Prod parity: response cache OFF (the #2839/#2617 bentocache stampede
     # mitigation). Re-enable here first when re-validating the serve-stale fix.
