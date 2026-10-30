@@ -709,8 +709,9 @@ minio-artifacts:
 # that platform.
 maestroapp:
   enabled: true
-  version: "2.1.123"
-  # macOS v2.1.123 is not published yet: leave its root pointer at v2.1.117.
+  version: "2.1.124"
+  # macOS v2.1.124 is not published yet (darwin release failed at Apple notarization,
+  # 401 bad APPLE_PASSWORD, pre-existing): leave its root pointer at v2.1.117.
   # Applies to both promotion and reconciliation; restore darwin_aarch64 once
   # its versioned manifest and installer are published for the pinned version.
   platforms:
