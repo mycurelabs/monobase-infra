@@ -523,14 +523,19 @@ medleyapp:
   # hapihub.config.CORS_ORIGINS above (absolute URL → cross-origin). Image pinned by
   # immutable digest (w1:p8D CI build; :latest moves but staging pins 0.1.4, unaffected).
   #
-  # 0.2.0 → 0.2.1 (digest 98105ec5): the app now reads /config.json at BOOT, which
-  # OVERRIDES the build-time baked VITE_API_URL (mirrors apps/dashboard). docker-entrypoint
-  # emits {api_url, hapihub_url} from env → HAPIHUB_URL below is now AUTHORITATIVE and the
-  # image is env-agnostic (baked URL = dev fallback only). Hence the new config: block.
+  # 0.2.1 app reads /config.json at BOOT (overrides build-time VITE_API_URL); docker-entrypoint
+  # emits {api_url, hapihub_url} from env → HAPIHUB_URL below is AUTHORITATIVE, image env-agnostic.
+  #
+  # 0.2.1 (Vue, single-turn) → 0.3.0 (React 19 + shadcn/ui + AI Elements rewrite; merged to CARE
+  # branch via PR #5711, CARE head 143c1a969 after build fixes #5726 types + #5729 brotli pin).
+  # SAME serving contract — Caddy static SPA on :8080, runtime /config.json from HAPIHUB_URL first —
+  # so a clean digest swap: no chart/env/HAPIHUB_URL change. Built via medleyapp-release.yml
+  # (tag-triggered medleyapp-v0.3.0-fix2 @ 143c1a969; image tag = package.json 0.3.0). :latest moves
+  # to 0.3.0 (benign; staging pins 0.1.4).
   enabled: true
   image:
     repository: ghcr.io/mycurelabs/medleyapp
-    tag: "0.2.1@sha256:98105ec5847a366d4071db3c17174ccf22382dbf33f68a76bcd7200970fd1042"
+    tag: "0.3.0@sha256:940ff67b640b545ab9c9215ad0339cf478fb22e3d499db50536c70c81b3e90ee"
     pullPolicy: IfNotPresent
   replicaCount: 1
   config:
