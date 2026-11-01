@@ -161,6 +161,8 @@ ${chalk.yellow("Options:")}
               (SEED-PATIENT-1-<NNN>) so reruns skip dupes.
               Default: 25 patients on the parent.
               Pass --patients 0 to skip patient seeding entirely.
+  --care      Enable the CARE copilot (subscriptions.care=true) on the parent
+              facility. Uses the service-account session; verified by read-back.
 
   --patient-accounts
               Seed Better-Auth user accounts for the first N random
@@ -290,6 +292,9 @@ const { values: args } = parseArgs({
     password: { type: "string" },
     confirm: { type: "boolean", default: false },
     reset: { type: "boolean", default: false },
+    // Turn on the CARE governed copilot (subscriptions.care) on the parent
+    // facility. Off by default: CARE is superadmin-provisioned, preprod-only.
+    care: { type: "boolean", default: false },
     // No default here — DEFAULT_PATIENT_COUNT is applied below if the flag
     // wasn't passed at all (vs. explicitly `--patients 0` to skip).
     patients: { type: "string" },
@@ -3821,6 +3826,35 @@ async function seedSubscriptions(
   spinner.succeed(
     `Subscriptions: ${created} new, ${patched} patched — all ${total} facilities active on '${SEED_SUBSCRIPTION_PACKAGE_ID}' (LIS, RIS, PME, dental, pharmacy, inventory verified)`,
   );
+}
+
+// CARE is superadmin/system-only: hapihub strips `care` from any patch whose
+// caller lacks a platform adminRole and only logs a warning. Patch as the
+// service account, then read back — a silent strip must fail the seed.
+async function seedCare(
+  facilities: Array<{ id: string; label: string; profile: OrgProfile }>,
+): Promise<void> {
+  const parent = facilities.find((f) => !f.profile.parentName);
+  if (!parent) throw new Error("--care: no parent facility to enable CARE on");
+  const spinner = ora(`[${parent.label}] enabling CARE copilot...`).start();
+  const serviceEmail = [...SERVICE_ACCOUNT_EMAILS][0];
+  if (!serviceEmail) throw new Error("--care: no service account configured");
+  const savedSession = sessionCookie;
+  try {
+    sessionCookie = "";
+    await signIn(serviceEmail, PASSWORD);
+    await api("PATCH", `/subscriptions/${parent.id}`, { care: true });
+    const after = (await api("GET", `/subscriptions/${parent.id}`)) as { care?: boolean };
+    if (after?.care !== true) {
+      throw new Error(`care flag did not stick on ${parent.id} (stripped: caller lacks adminRole?)`);
+    }
+    spinner.succeed(`[${parent.label}] CARE copilot enabled (subscriptions.care=true, verified)`);
+  } catch (err) {
+    spinner.fail(`[${parent.label}] CARE enable failed`);
+    throw err;
+  } finally {
+    sessionCookie = savedSession;
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -9573,6 +9607,9 @@ async function main() {
   // are hidden in the UI. Done after profiles so the spinner ordering
   // mirrors the user-facing setup flow.
   await seedSubscriptions(orgsToSeed);
+
+  // Step 8b (opt-in): CARE copilot on the parent facility.
+  if (args.care) await seedCare(orgsToSeed);
 
   // Step 4: Create organization members for ALL orgs.
   // Each user gets the same role/privileges in every org, satisfying the
