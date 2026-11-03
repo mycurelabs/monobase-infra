@@ -128,12 +128,14 @@ hapihub:
   # Behaviour note (since 3ef5c02f): hapihub registers the doc-ingestion pg-boss worker whenever a
   # job queue exists even with INGESTION_ENABLED unset — each job still checks the effective flag,
   # so nothing ingests unless enabled (INGESTION_ENABLED stays unset here).
-  # 2026-11-03 bump 3ef5c02f → 0f47290d (PR #5791 settings-page polish: shows values-in-use, model
-  # pickers, reset-to-default; new GET /care-settings/catalog). NO migration (0120 already applied),
-  # NO schema/egress/env change. #5335 agent entrypoint also live inert (MCP+OAuth; served tailnet-only
-  # on the catch-all HTTPRoute; CARE_ASK_RELATIONSHIP_ENFORCE left shadow per freyr 2026-11-03).
+  # PR #5791 settings-page polish (values-in-use, model pickers, reset-to-default; GET /care-settings/catalog).
+  # #5335 agent entrypoint also live inert (MCP+OAuth; served tailnet-only on the catch-all HTTPRoute;
+  # CARE_ASK_RELATIONSHIP_ENFORCE left shadow per freyr 2026-11-03).
+  # 2026-11-03 bump 0f47290d → 9e23c672 (PR #5791 bugfix: PATCH /care-settings now returns in-use values
+  # so the page stops showing safety controls as "Not set"; + UI label changes). NO migration, NO env/schema/
+  # egress change. (Routine CARE pin under freyr's standing approval — see care-preprod-pin-standing-approval.)
   image:
-    tag: "11.20.135-care.0f47290d@sha256:2300278e3d5936e3d9d429345abe5dcec9beef043ce295154f281e088623c8ec"
+    tag: "11.20.135-care.9e23c672@sha256:5480d7f147ff769391c74660e5998c8d02b00d83690ecc3f82109e65e95ed1a1"
   cache:
     # Prod parity: response cache OFF (the #2839/#2617 bentocache stampede
     # mitigation). Re-enable here first when re-validating the serve-stale fix.
@@ -463,7 +465,7 @@ medley:
   enabled: true
   image:
     repository: ghcr.io/mycurelabs/medley
-    tag: "2.0.6-care.0f47290d@sha256:f31dbb4290ffca4229ca0f942944c89b0e15d012d0140927286ecb7ca54f0a64"  # CARE @0f47290d (PR #5791; was 3ef5c02f). New GET /models (model picker). MEDLEY_EMR_ACCESS_ENFORCE stays true. MEDLEY_MODELS selfHosted:true attestation below REQUIRED or boot fails closed. Re-pin to plain tag when preprod must be pristine.
+    tag: "2.0.6-care.9e23c672@sha256:8a7dcbfa208c8f2136233c2aecac6c202faf6a01c2846bdff7a5796f2c8622cb"  # CARE @9e23c672 (PR #5791; was 0f47290d). GET /models (model picker). MEDLEY_EMR_ACCESS_ENFORCE stays true. MEDLEY_MODELS selfHosted:true attestation below REQUIRED or boot fails closed. Re-pin to plain tag when preprod must be pristine.
     pullPolicy: IfNotPresent
   replicaCount: 1
   resources:
@@ -545,7 +547,7 @@ medleyapp:
   enabled: true
   image:
     repository: ghcr.io/mycurelabs/medleyapp
-    tag: "0.3.3-care.0f47290d@sha256:f88f4bc867ca883354a886d3d9095a0502cc9710abfff987e380e1bef49a09f0"  # 0.3.2→0.3.3-care.0f47290d (PR #5791): settings page shows values-in-use + model pickers + reset-to-default. Same Caddy static-SPA/:8080/config.json contract — clean digest swap.
+    tag: "0.3.4-care.9e23c672@sha256:c6ed9de93bfbf3b86bc3163b33dac43b129e95d781b5c3f57f85ccc5644b9060"  # 0.3.3→0.3.4-care.9e23c672 (PR #5791): fix post-save "Not set" display + UI labels. Same Caddy static-SPA/:8080/config.json contract — clean digest swap.
     pullPolicy: IfNotPresent
   replicaCount: 1
   config:
