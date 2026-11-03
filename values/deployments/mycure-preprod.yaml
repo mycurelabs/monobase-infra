@@ -122,12 +122,16 @@ hapihub:
   # ⚠️ MIGRATE HAZARD: build carries the SCHEMA-ONLY 0116 (hash ≠ preprod's applied
   # old-0116); the one-off migrate Job gets a drizzle.__drizzle_migrations INSERT of the
   # new 0116 hash (from w1:p79, 052153ba bundle) FIRST so it skips 0116, then applies 17/18/19.
-  # 2026-11-03 bump 052153ba → a73fee71 (PR #5763 CARE settings; #5683). Adds /care-settings
-  # (owners + service accounts) + migration 0120_care_settings (CREATE TABLE care_settings +
-  # _history — additive, hub-only, no cadence/0116 impact; applies over the 052153ba journal).
-  # No new env. Pre-merge test image off deploy/care-preprod-a73fee71. freyr-greenlit.
+  # CARE settings (PR #5763 / #5683): /care-settings endpoint (owners+SA), migration
+  # 0120_care_settings (care_settings + _history, additive, hub-only). Pre-merge test images
+  # off deploy/care-preprod-<sha>. freyr-greenlit each pin.
+  # 2026-11-03 bump a73fee71 → 3ef5c02f (settings polish: form shows stored values, modelRegistry
+  # hosts validated, every care-settings field applied at runtime). NO new migration (0120 already
+  # applied). NO new env. Behaviour note: hapihub now registers the doc-ingestion pg-boss worker
+  # whenever a job queue exists even with INGESTION_ENABLED unset — each job still checks the
+  # effective flag, so nothing ingests unless enabled (INGESTION_ENABLED stays unset here).
   image:
-    tag: "11.20.135-care.a73fee71@sha256:732be77ca0e5cd12fdaa2b5adef26a2c48890dc18c3c84d7033ffc1b16a24833"
+    tag: "11.20.135-care.3ef5c02f@sha256:cd0a9a1811aff65017887b390ec7a456bf89f8d3fe29c077d8dc0769e852a772"
   cache:
     # Prod parity: response cache OFF (the #2839/#2617 bentocache stampede
     # mitigation). Re-enable here first when re-validating the serve-stale fix.
@@ -457,7 +461,7 @@ medley:
   enabled: true
   image:
     repository: ghcr.io/mycurelabs/medley
-    tag: "2.0.6-care.a73fee71@sha256:0544886f8f1cf3a5e763008cf7c3d4b36e567d48bae3b59fb379ae3c2808ebbf"  # CARE head @a73fee71 (PR #5763; was 643a3b95). Adds per-run model override re-validated vs the egress allow-list. MEDLEY_EMR_ACCESS_ENFORCE stays true. MEDLEY_MODELS selfHosted:true attestation below REQUIRED or boot fails closed. Re-pin to plain tag when preprod must be pristine.
+    tag: "2.0.6-care.3ef5c02f@sha256:c4468d3a58d3f39d1cb00dd536a5f80722b62cd91e98821723f663d827574613"  # CARE @3ef5c02f (PR #5763; was a73fee71). Per-run model override + modelRegistry host validation. MEDLEY_EMR_ACCESS_ENFORCE stays true. MEDLEY_MODELS selfHosted:true attestation below REQUIRED or boot fails closed. Re-pin to plain tag when preprod must be pristine.
     pullPolicy: IfNotPresent
   replicaCount: 1
   resources:
@@ -539,7 +543,7 @@ medleyapp:
   enabled: true
   image:
     repository: ghcr.io/mycurelabs/medleyapp
-    tag: "0.3.1-care.a73fee71@sha256:5182bd79c4c650b1675511ead178ab50fb6b9dbde956224cf086e898826cfbae"  # 0.3.0→0.3.1-care.a73fee71 (PR #5763): adds the CARE Settings view. Same Caddy static-SPA/:8080/config.json contract — clean digest swap.
+    tag: "0.3.2-care.3ef5c02f@sha256:5b7cf7caf4492a8e461a2d00a75e498fbdc5da6a9dd31c1907a04966bb3a21d9"  # 0.3.1→0.3.2-care.3ef5c02f (PR #5763): Settings form shows stored values. Same Caddy static-SPA/:8080/config.json contract — clean digest swap.
     pullPolicy: IfNotPresent
   replicaCount: 1
   config:
