@@ -326,14 +326,11 @@ sync:
     - name: two_factor
       tags:
         - { ty: user, field: user_id }
-{{- if eq .Values.global.environment "preprod" }}
-    - name: two_factor_disabled
-      tags:
-        - { ty: user, field: user_id }
-    - name: two_factor_backup_code_spent
-      tags:
-        - { ty: user, field: user_id }
-{{- end }}
+    # two_factor_disabled + two_factor_backup_code_spent are NOT synced: they exist only in
+    # the unmerged #4870 branch (PR 4874, migration 0120) — neither main nor the CARE branch
+    # creates those tables, so the hub fails its schema-gate ("collection two_factor_disabled
+    # has no table in schema public") and CrashLoopBackOffs. Removed the preprod-only gate that
+    # rendered them into preprod alone (2026-11-03, monobase-mycure#5683-adjacent).
     - name: user
       tags:
         - { ty: user, field: id }
