@@ -776,7 +776,13 @@ cadence:
   # organization_partners dropped).
   dropUnusedTables: true
   image:
-    tag: "2.1.107"
+    # 2026-11-03: 2.1.105→2.1.107 (commit 12a9def) crashlooped — 2.1.106/2.1.107 were
+    # cut Oct 1 from the UNMERGED #4870 branch (PR 4874), whose cadence.yaml adds a
+    # `two_factor_disabled` collection created only by that branch's migration 0120.
+    # Neither main nor the CARE branch has it, so the hub fails the schema-gate on boot:
+    # "collection two_factor_disabled has no table in schema public". 2.1.105 (2026-08-26)
+    # is the last main-built image → pin back to it (monobase-mycure#5683-adjacent).
+    tag: "2.1.105"
   readIdleMs: 600000
   leafidsGlobalBudget: 150000
   maxConcurrentServes: 8
