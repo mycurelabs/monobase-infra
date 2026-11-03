@@ -139,7 +139,7 @@ hapihub:
   # medley ollamaEgress NetworkPolicy UNCHANGED (host-Ollama-only) so external provider egress is network-blocked.
   # A real hosted-provider test = separate future freyr ask (would open ONE provider host, synthetic data).
   image:
-    tag: "11.20.135-care.d76c726f@sha256:28bf39558cd86604fbcb4cf7aeab182902f438d07071c636fa98019e0d6f70e9"
+    tag: "11.20.135-care.4f1964fd@sha256:9a287ddc67ce6360e6b8534e4a0c4f27cc5b350f23a060be959a8ce423c875fb"
   cache:
     # Prod parity: response cache OFF (the #2839/#2617 bentocache stampede
     # mitigation). Re-enable here first when re-validating the serve-stale fix.
@@ -469,7 +469,7 @@ medley:
   enabled: true
   image:
     repository: ghcr.io/mycurelabs/medley
-    tag: "2.0.6-care.d76c726f@sha256:a321a50069456d746a4a8972d7229e4a05fd735bed86fedb60ee1951f03bf67f"  # CARE @e8d86962 (PR #5795; was 9e23c672). Hosted-provider egress code present but netpol-fenced (ollamaEgress below UNCHANGED = host-Ollama-only). MEDLEY_EMR_ACCESS_ENFORCE stays true. MEDLEY_MODELS selfHosted:true attestation below REQUIRED or boot fails closed. Re-pin to plain tag when preprod must be pristine.
+    tag: "2.0.6-care.4f1964fd@sha256:d8369a8cc461d7b18d4d5974d4c1a5cf4f82284f8001908f20c5fa27c4497702"  # CARE @e8d86962 (PR #5795; was 9e23c672). Hosted-provider egress code present but netpol-fenced (ollamaEgress below UNCHANGED = host-Ollama-only). MEDLEY_EMR_ACCESS_ENFORCE stays true. MEDLEY_MODELS selfHosted:true attestation below REQUIRED or boot fails closed. Re-pin to plain tag when preprod must be pristine.
     pullPolicy: IfNotPresent
   replicaCount: 1
   resources:
@@ -551,7 +551,7 @@ medleyapp:
   enabled: true
   image:
     repository: ghcr.io/mycurelabs/medleyapp
-    tag: "0.3.6-care.d76c726f@sha256:7f8228f68d75dd9276ec06638dbc1392ba24db74fd66805bd43df6cabf1a29a9"  # 0.3.4→0.3.5-care.e8d86962 (PR #5795): hosted-provider picker UI (egress fenced server-side). Same Caddy static-SPA/:8080/config.json contract — clean digest swap.
+    tag: "0.3.7-care.4f1964fd@sha256:af437a4e6c31a81f9566a8ee6b605e69395f64b07b6ec2d5df69dc47b6952465"  # 0.3.4→0.3.5-care.e8d86962 (PR #5795): hosted-provider picker UI (egress fenced server-side). Same Caddy static-SPA/:8080/config.json contract — clean digest swap.
     pullPolicy: IfNotPresent
   replicaCount: 1
   config:
