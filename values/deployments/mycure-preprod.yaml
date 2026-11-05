@@ -139,7 +139,7 @@ hapihub:
   # medley ollamaEgress NetworkPolicy UNCHANGED (host-Ollama-only) so external provider egress is network-blocked.
   # A real hosted-provider test = separate future freyr ask (would open ONE provider host, synthetic data).
   image:
-    tag: "11.20.135-care.4f1964fd@sha256:9a287ddc67ce6360e6b8534e4a0c4f27cc5b350f23a060be959a8ce423c875fb"  # REVERTED f79c2892→4f1964fd 2026-11-05: the f79c2892 CARE tip re-lay (2b9f3aa82) migrate is NON-IDEMPOTENT vs preprod — `CREATE TABLE care_agent_proposals` fails ("already exists" from a prior pin). Deployment rolled ahead of the (gated) migrate and hit the schema-behind boot guard; DB never changed (txn rollback, ledger@116). Re-pin blocked until #5683 author makes the re-laid migrate idempotent. Worker inherits this tag.
+    tag: "11.20.135-care.2174e835@sha256:d78445721f362cb16d11e9d951a0956b894b071506f39d580f0c7f789e1541e9"  # 2026-11-05 re-pin after the f79c2892 re-lay revert: 2174e835 = deployed base dcd5945cb(=4f1964fd) + the two #5683 commits (care-settings provider test + medleyapp opt-in) ONLY. VERIFIED zero diff in migrations-bundle.ts/drizzle-pg/drizzle-sqlite vs 4f1964fd (migration-name set md5-identical) → ledger stays @116, NO migrate (plain image swap; boot guard passes, schema current). Worker inherits this tag. f79c2892 re-lay bug: PR #4570 issuecomment-6653442626.
   cache:
     # Prod parity: response cache OFF (the #2839/#2617 bentocache stampede
     # mitigation). Re-enable here first when re-validating the serve-stale fix.
