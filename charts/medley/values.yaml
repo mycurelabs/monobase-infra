@@ -199,6 +199,10 @@ networkPolicy:
   # medgemma-worker / openmed). Default empty — preprod uses the host Ollama only
   # and leaves these disabled. Scope by namespaceSelector/podSelector + port.
   inClusterEgress: []
+  # externalEgress: opt-in raw egress rules that reach OUTSIDE the cluster (e.g. CARE
+  # hosted model providers on 443). Default empty — prod leaves it empty (fenced).
+  # Only set in an overlay that intends internet egress. Scope tightly (443, non-RFC1918).
+  externalEgress: []
 
 serviceMonitor:
   enabled: false

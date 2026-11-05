@@ -90,4 +90,11 @@ spec:
           port: {{ .Values.networkPolicy.ollamaEgress.port }}
     {{- end }}
     {{- end }}
+    {{- with .Values.networkPolicy.externalEgress }}
+    # EXTERNAL (non-cluster) egress — opt-in, default empty. Distinct from the
+    # least-privilege in-cluster/Ollama rules above: these are raw egress rules
+    # that reach OUTSIDE the cluster (e.g. CARE hosted model providers on 443).
+    # Only ever set in an overlay that INTENDS internet egress; prod leaves empty.
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
 {{- end }}

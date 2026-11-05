@@ -145,6 +145,47 @@ hapihub:
     # mitigation). Re-enable here first when re-validating the serve-stale fix.
     enabled: false
 
+  # CARE hosted model providers (#5683): the provider test-on-save probe dials
+  # api.openai.com / api.anthropic.com etc. External egress is gated by NetworkPolicy
+  # on this cluster (in-cluster egress is NOT — postgres/minio/valkey unaffected), so
+  # permit TCP 443 to non-RFC1918 (RFC1918 except-list covers k3d pod 10.42/16 + svc
+  # 10.43/16 + node). PREPROD ONLY — prod stays fenced. freyr-approved 2026-11-05;
+  # permanent replacement for the 2026-11-03 temp netpols. policyTypes must list Egress
+  # or the egress rules are inert; ingress (gateway->7500) is restated to stay explicit.
+  networkPolicy:
+    enabled: true
+    policyTypes:
+      - Ingress
+      - Egress
+    ingress:
+      - from:
+          - namespaceSelector:
+              matchLabels:
+                kubernetes.io/metadata.name: nginx-gateway-system
+        ports:
+          - protocol: TCP
+            port: 7500
+    egress:
+      - to:
+          - namespaceSelector:
+              matchLabels:
+                kubernetes.io/metadata.name: kube-system
+        ports:
+          - protocol: UDP
+            port: 53
+          - protocol: TCP
+            port: 53
+      - to:
+          - ipBlock:
+              cidr: 0.0.0.0/0
+              except:
+                - 10.0.0.0/8
+                - 172.16.0.0/12
+                - 192.168.0.0/16
+        ports:
+          - protocol: TCP
+            port: 443
+
   replicaCount: 3
 
   resources:
@@ -529,6 +570,22 @@ medley:
       enabled: true
       cidr: "172.21.0.1/32"   # host.k3d.internal → vanaheim host Ollama (openai-compatible /v1)
       port: 11434
+    # CARE hosted model providers (#5683): medley sends de-identified runs to external
+    # providers on 443. External egress is NetworkPolicy-gated here; open 443 to
+    # non-RFC1918 only. PREPROD ONLY — prod leaves externalEgress empty. freyr-approved
+    # 2026-11-05; permanent replacement for the 2026-11-03 temp netpols. medley's DNS
+    # egress rule already exists above (kube-system :53), so provider hostnames resolve.
+    externalEgress:
+      - to:
+          - ipBlock:
+              cidr: 0.0.0.0/0
+              except:
+                - 10.0.0.0/8
+                - 172.16.0.0/12
+                - 192.168.0.0/16
+        ports:
+          - protocol: TCP
+            port: 443
   podDisruptionBudget:
     enabled: false
 medleyapp:
