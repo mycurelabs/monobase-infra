@@ -139,7 +139,7 @@ hapihub:
   # medley ollamaEgress NetworkPolicy UNCHANGED (host-Ollama-only) so external provider egress is network-blocked.
   # A real hosted-provider test = separate future freyr ask (would open ONE provider host, synthetic data).
   image:
-    tag: "11.20.136-care.f79c2892@sha256:ecf405ff083682e35535cb9c2e640e39c9e34f3a20db8750b5b699969183abef"  # 4f1964fd→f79c2892 (PR #5862 care-settings provider-test-on-save). ⚠️ CARE tip re-lays migrations (2b9f3aa82) ending a timestamp-collision skip: bundle 27→37, so the one-off migrate Job will run previously-skipped main-lineage migrations (0113_legacy_pk_to_id, 0114_history_pk_record_drop, 0118_restore_bir_tables, 0115/0116/0117 indexes) against the preprod clone. Worker inherits this tag.
+    tag: "11.20.135-care.4f1964fd@sha256:9a287ddc67ce6360e6b8534e4a0c4f27cc5b350f23a060be959a8ce423c875fb"  # REVERTED f79c2892→4f1964fd 2026-11-05: the f79c2892 CARE tip re-lay (2b9f3aa82) migrate is NON-IDEMPOTENT vs preprod — `CREATE TABLE care_agent_proposals` fails ("already exists" from a prior pin). Deployment rolled ahead of the (gated) migrate and hit the schema-behind boot guard; DB never changed (txn rollback, ledger@116). Re-pin blocked until #5683 author makes the re-laid migrate idempotent. Worker inherits this tag.
   cache:
     # Prod parity: response cache OFF (the #2839/#2617 bentocache stampede
     # mitigation). Re-enable here first when re-validating the serve-stale fix.
