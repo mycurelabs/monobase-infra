@@ -139,7 +139,7 @@ hapihub:
   # medley ollamaEgress NetworkPolicy UNCHANGED (host-Ollama-only) so external provider egress is network-blocked.
   # A real hosted-provider test = separate future freyr ask (would open ONE provider host, synthetic data).
   image:
-    tag: "11.20.135-care.4f1964fd@sha256:9a287ddc67ce6360e6b8534e4a0c4f27cc5b350f23a060be959a8ce423c875fb"
+    tag: "11.20.136-care.f79c2892@sha256:ecf405ff083682e35535cb9c2e640e39c9e34f3a20db8750b5b699969183abef"  # 4f1964fd→f79c2892 (PR #5862 care-settings provider-test-on-save). ⚠️ CARE tip re-lays migrations (2b9f3aa82) ending a timestamp-collision skip: bundle 27→37, so the one-off migrate Job will run previously-skipped main-lineage migrations (0113_legacy_pk_to_id, 0114_history_pk_record_drop, 0118_restore_bir_tables, 0115/0116/0117 indexes) against the preprod clone. Worker inherits this tag.
   cache:
     # Prod parity: response cache OFF (the #2839/#2617 bentocache stampede
     # mitigation). Re-enable here first when re-validating the serve-stale fix.
@@ -551,7 +551,7 @@ medleyapp:
   enabled: true
   image:
     repository: ghcr.io/mycurelabs/medleyapp
-    tag: "0.3.7-care.4f1964fd@sha256:af437a4e6c31a81f9566a8ee6b605e69395f64b07b6ec2d5df69dc47b6952465"  # 0.3.4→0.3.5-care.e8d86962 (PR #5795): hosted-provider picker UI (egress fenced server-side). Same Caddy static-SPA/:8080/config.json contract — clean digest swap.
+    tag: "0.3.9-care.f79c2892@sha256:9b770199b4f4ca17d7cd9e76f1725421e453c1aa2079d6add0342f88ab04008e"  # 0.3.7→0.3.9-care.f79c2892 (PR #5862 clinic opt-in frontend). Same Caddy static-SPA/:8080/config.json contract — clean digest swap.
     pullPolicy: IfNotPresent
   replicaCount: 1
   config:
