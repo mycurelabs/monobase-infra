@@ -139,7 +139,7 @@ hapihub:
   # medley ollamaEgress NetworkPolicy UNCHANGED (host-Ollama-only) so external provider egress is network-blocked.
   # A real hosted-provider test = separate future freyr ask (would open ONE provider host, synthetic data).
   image:
-    tag: "11.20.135-care.dcd8e5f4@sha256:6993ab0d621b546cbe1be5bd56f69ac272519932e3828ceaa3e6c3bd987994b7"  # 2026-11-05 swap 2174e835→dcd8e5f4 (#5683 fix: provider test forces a function-tool call like a real run). Same base dcd5945cb(=4f1964fd)+#5683 commits. VERIFIED zero diff in migrations-bundle.ts/drizzle-pg/drizzle-sqlite vs both 2174e835 and 4f1964fd (bundle md5-identical) → ledger stays @116, NO migrate (plain image swap). Worker inherits this tag.
+    tag: "11.20.136-care.b0002b3e@sha256:fabf36fbc2714a7d1542eca8ed9b8d666dd1c033cea118f7727bb27c05402c12"  # 2026-11-06 #5571 (memory+proactive, PR #5878 head b0002b3ee). Rebased on the idempotent re-lay fix fa60831b0 (#4570/#5912): re-laid CREATEs now IF NOT EXISTS, so the migrate applies the re-lay batch idempotently + NEW 0122_care_memory_tasks (tables care_memories/care_tasks + care_conversations.memory_scanned_at). RUN a migrate this time (not zero-diff). Worker inherits this tag.
   cache:
     # Prod parity: response cache OFF (the #2839/#2617 bentocache stampede
     # mitigation). Re-enable here first when re-validating the serve-stale fix.
@@ -608,7 +608,7 @@ medleyapp:
   enabled: true
   image:
     repository: ghcr.io/mycurelabs/medleyapp
-    tag: "0.3.9-care.f79c2892@sha256:9b770199b4f4ca17d7cd9e76f1725421e453c1aa2079d6add0342f88ab04008e"  # 0.3.7→0.3.9-care.f79c2892 (PR #5862 clinic opt-in frontend). Same Caddy static-SPA/:8080/config.json contract — clean digest swap.
+    tag: "0.3.10-care.b0002b3e@sha256:d2f7e04c4b2e387e8c306501ce55a34c122a89b1edd0535f3f791f7762eb1ca8"  # 0.3.9→0.3.10-care.b0002b3e (#5571 memory+proactive, PR #5878 b0002b3ee). Same Caddy static-SPA/:8080/config.json contract — clean digest swap.
     pullPolicy: IfNotPresent
   replicaCount: 1
   config:
