@@ -1,0 +1,70 @@
+#!/usr/bin/env bash
+# Amp orb setup: installs the ops toolchain. Runs once per fresh orb and is saved
+# in the project snapshot, so it must never write credentials (see .agents/resume).
+set -euo pipefail
+
+cd "$(dirname "${BASH_SOURCE[0]}")/.."
+export PATH="$HOME/.local/share/mise/shims:$PATH"
+
+step() {
+  local name="$1"
+  shift
+  local start=$SECONDS
+  echo "==> $name"
+  "$@"
+  echo "    $name took $((SECONDS - start))s"
+}
+
+add_apt_repo() {
+  local name="$1" key_url="$2" repo="$3"
+  local keyring="/etc/apt/keyrings/$name.gpg"
+  sudo install -dm 755 /etc/apt/keyrings
+  curl -fsSL "$key_url" | sudo gpg --dearmor --yes -o "$keyring"
+  echo "deb [signed-by=$keyring arch=amd64] $repo" | sudo tee "/etc/apt/sources.list.d/$name.list" >/dev/null
+}
+
+install_packages() {
+  # mise manages the tools pinned in mise.toml. scripts/ call gcloud (GCP Secret Manager,
+  # GKE provisioning), and GKE kubeconfigs need gke-gcloud-auth-plugin.
+  local packages=(mise google-cloud-cli google-cloud-cli-gke-gcloud-auth-plugin)
+  if dpkg -s "${packages[@]}" >/dev/null 2>&1; then
+    return
+  fi
+  add_apt_repo mise https://mise.jdx.dev/gpg-key.pub "https://mise.jdx.dev/deb stable main"
+  add_apt_repo google-cloud https://packages.cloud.google.com/apt/doc/apt-key.gpg \
+    "https://packages.cloud.google.com/apt cloud-sdk main"
+  sudo apt-get update -qq
+  sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq "${packages[@]}"
+}
+
+# The orb image ships bun, and mise.toml only asks for bun "latest", so use the
+# system bun instead of downloading another copy from GitHub releases.
+if [ -x /usr/local/bin/bun ]; then
+  export MISE_DISABLE_TOOLS=bun
+fi
+
+install_tools() {
+  # .env.local is loaded by mise.toml ([env] _.file); create it from the template if missing.
+  [ -f .env.local ] || cp -- .env.example .env.local
+  mise trust --yes mise.toml
+  mise install --yes
+}
+
+persist_path() {
+  # Amp and supervised services start in non-interactive login shells; give them mise's tools.
+  local marker="# monobase-infra: mise tools"
+  if ! grep -Fqx "$marker" "$HOME/.bash_profile" 2>/dev/null; then
+    cat >>"$HOME/.bash_profile" <<EOF
+
+$marker
+export PATH="\$HOME/.local/share/mise/shims:\$PATH"
+export USE_GKE_GCLOUD_AUTH_PLUGIN=True
+${MISE_DISABLE_TOOLS:+export MISE_DISABLE_TOOLS=$MISE_DISABLE_TOOLS}
+EOF
+  fi
+}
+
+step "apt packages (mise, gcloud)" install_packages
+step "mise tools" install_tools
+step "bun install" bun install --frozen-lockfile
+step "login shell PATH" persist_path
