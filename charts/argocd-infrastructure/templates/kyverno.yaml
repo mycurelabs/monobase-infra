@@ -44,6 +44,14 @@ spec:
           replicas: {{ .Values.kyverno.replicas | default 1 }}
           serviceMonitor:
             enabled: true
+          # The chart default (128Mi limit) OOMKills on startup once the
+          # ephemeral-report backlog grows (~14k on mycure-doks-main): the
+          # controller caches every report before it can aggregate them.
+          resources:
+            requests:
+              memory: 256Mi
+            limits:
+              memory: 1Gi
         cleanupController:
           replicas: {{ .Values.kyverno.replicas | default 1 }}
           serviceMonitor:

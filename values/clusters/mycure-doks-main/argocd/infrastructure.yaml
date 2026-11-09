@@ -228,7 +228,9 @@ nginxGatewayResources:
         dnsNames:
           - "*.localfirsthealth.com"
       - secretName: nginx-gateway-tls-prod-mycure
-        clusterIssuer: letsencrypt-nginx-http01  # HTTP-01 via NGINX Gateway
+        # DNS-01: find.mycure.md has no DNS record, so HTTP-01 could never
+        # validate it and renewal of both names stalled (expired 2026-09-03).
+        clusterIssuer: letsencrypt-mycure-cloudflare-prod  # DNS-01
         dnsNames:
           - api.mycure.md
           - find.mycure.md

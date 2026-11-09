@@ -106,3 +106,6 @@ node_modules/
 
 # OpenTofu working dir for the cluster stack (lockfile IS committed)
 /values/cluster/.terraform/
+
+# Amp orb portals (generated)
+.amp/portals/*

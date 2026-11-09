@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+# Amp orb resume: runs after the orb starts and on every wake, with this thread's
+# secrets. Writes the kubeconfig from the KUBECONFIG_B64 project secret and checks access.
+# Must finish within ~10 seconds; never install anything here (see .agents/setup).
+set -euo pipefail
+
+cd "$(dirname "${BASH_SOURCE[0]}")/.."
+export PATH="$HOME/.local/share/mise/shims:$PATH"
+
+if [ -z "${KUBECONFIG_B64:-}" ]; then
+  echo "KUBECONFIG_B64 is not set; skipping kubeconfig (add it as a project secret)" >&2
+  exit 0
+fi
+
+mkdir -p "$HOME/.kube"
+umask 077
+tmp="$(mktemp "$HOME/.kube/config.XXXXXX")"
+trap 'rm -f "$tmp"' EXIT
+printf '%s' "$KUBECONFIG_B64" | base64 -d >"$tmp"
+mv -f "$tmp" "$HOME/.kube/config"
+
+if kubectl --request-timeout=5s auth can-i list pods --all-namespaces >/dev/null 2>&1; then
+  echo "kube access OK ($(kubectl config current-context))"
+else
+  echo "kube access check failed; check the cluster address and credential in KUBECONFIG_B64" >&2
+fi
