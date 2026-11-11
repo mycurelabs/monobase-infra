@@ -160,7 +160,9 @@ hapihub:
       rpId: "localfirsthealth.com"
 
   config:
-    CORS_ORIGINS: "https://mycure.localfirsthealth.com,https://mycurelocal.localfirsthealth.com,https://mycure-myaccount.localfirsthealth.com,https://mycure-dashboard.localfirsthealth.com,https://mycure-pxp.localfirsthealth.com,https://mycure-reconstruct.localfirsthealth.com,https://mycure-reconstruct.web.app,https://mycure-reconstruct.firebaseapp.com"
+    # mycure.md / mycureapp.com: website support portal (#494). The workers.dev
+    # origin is the Cloudflare preview Worker: TEMPORARY, remove after the DNS switch.
+    CORS_ORIGINS: "https://mycure.localfirsthealth.com,https://mycurelocal.localfirsthealth.com,https://mycure-myaccount.localfirsthealth.com,https://mycure-dashboard.localfirsthealth.com,https://mycure-pxp.localfirsthealth.com,https://mycure-reconstruct.localfirsthealth.com,https://mycure-reconstruct.web.app,https://mycure-reconstruct.firebaseapp.com,https://mycure.md,https://www.mycure.md,https://mycureapp.com,https://www.mycureapp.com,https://mycure-website.localfirsthealth.workers.dev"
     STORAGE_DOWNLOAD_URL_HOST: "https://hapihub-next.localfirsthealth.com"
     # mono#2114: background jobs (exports, email, doc-ingestion, PDF/Chromium)
     # moved to the hapihub-worker release below — a single export/PDF
