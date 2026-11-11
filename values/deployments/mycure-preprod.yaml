@@ -55,7 +55,7 @@ mycure-dashboard:
   # Operator-gated preprod UI releases; no automatic rollout, pruning, or retries.
   manualDeployment: true
   image:
-    tag: "0.14.30@sha256:35cc62c1dd4cdbc65c9b52a3c774ab4a19d6687dee37715375985d71c8f79c93"
+    tag: "0.14.34@sha256:33a5a52e61a811228f1e3c32c6d51d7654dc93c32b56a6b92ba158b18c7b3e86"
   resources:
     requests:
       cpu: 10m
@@ -66,6 +66,8 @@ mycure-dashboard:
     API_URL: "https://hapihub.preprod.localfirsthealth.com"
 
 mycure-pxp:
+  image:
+    tag: "2.0.9@sha256:404731587a112b423699038e16415c67384ca3d59edfedb8c6124930b686803d"
   resources:
     requests:
       cpu: 10m
@@ -139,7 +141,7 @@ hapihub:
   # medley ollamaEgress NetworkPolicy UNCHANGED (host-Ollama-only) so external provider egress is network-blocked.
   # A real hosted-provider test = separate future freyr ask (would open ONE provider host, synthetic data).
   image:
-    tag: "11.20.136-care.b0002b3e@sha256:fabf36fbc2714a7d1542eca8ed9b8d666dd1c033cea118f7727bb27c05402c12"  # 2026-11-06 #5571 (memory+proactive, PR #5878 head b0002b3ee). Rebased on the idempotent re-lay fix fa60831b0 (#4570/#5912): re-laid CREATEs now IF NOT EXISTS, so the migrate applies the re-lay batch idempotently + NEW 0122_care_memory_tasks (tables care_memories/care_tasks + care_conversations.memory_scanned_at). RUN a migrate this time (not zero-diff). Worker inherits this tag.
+    tag: "11.20.137@sha256:bee018fe94b7bbccb2d018ca48149bbcacb0a09b33f984964e93e284fe1a29f1"  # 2026-11-12 mainline release (CARE merged: journal identical to b0002b3e through 0122). Pending here: 0123-0125 only (support_tickets/_messages + _history ADD COLUMN, additive). Worker inherits this tag.
   cache:
     # Prod parity: response cache OFF (the #2839/#2617 bentocache stampede
     # mitigation). Re-enable here first when re-validating the serve-stale fix.
@@ -428,7 +430,7 @@ mycure:
   # = true (preprod test org 668962 flipped true via SQL). PREPROD/prod both ship care
   # default-false → CARE hidden until a superadmin enrolls an org (no env needed anymore).
   image:
-    tag: "10.25.144-care.7fecd0ab@sha256:da09966c69af02d7e498e7c8ed1e78b6bfbb87a1882c600794fb06eed7c5a1b5"
+    tag: "10.25.146@sha256:caa6c0b16a0282e73befe95a2919fa2ede6f215caa3e558ee454eae35b703e27"
   resources:
     requests:
       cpu: 10m
@@ -843,7 +845,9 @@ cadence:
     # Neither main nor the CARE branch has it, so the hub fails the schema-gate on boot:
     # "collection two_factor_disabled has no table in schema public". 2.1.105 (2026-08-26)
     # is the last main-built image → pin back to it (monobase-mycure#5683-adjacent).
-    tag: "2.1.105"
+    # 2026-11-12: 2.1.108 = built from mono main 498ef8b7a (Maestroapp Release run), not a branch.
+    # sha256:585d8fe193e43207b659aa74f3a1c842b9a1765bfeae8cf4048a1e19ade2284a
+    tag: "2.1.108"
   readIdleMs: 600000
   leafidsGlobalBudget: 150000
   maxConcurrentServes: 8
