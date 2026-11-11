@@ -32,6 +32,9 @@ securityBaseline:
   strictGatewayIngress: true
 
 mycure-dashboard:
+  # Pinned here (not base.yaml) so mycure-demo, which inherits base, is not bumped.
+  image:
+    tag: "0.14.34"
   resources:
     requests:
       cpu: 10m
@@ -50,6 +53,8 @@ mycure-dashboard:
     HAPIHUB_URL: "https://hapihub-next.localfirsthealth.com"
 
 mycure-pxp:
+  image:
+    tag: "2.0.9"
   resources:
     requests:
       cpu: 10m
@@ -93,7 +98,11 @@ hapihub:
     # Preflight confirmed both columns and both tables are absent, so the bare ALTER/CREATE
     # statements will not collide with schema drift. No migration contains DROP or DELETE; as with
     # all forward-only migrations, rollback leaves these additive schema objects in place.
-    tag: "11.20.136"
+    # 11.20.137 applies 13 migrations (0113-0125): 0113/0114 PK swaps are no-ops on DBs created after
+    # 2026-03-10 (unlocked pre-check); 0115-0117/0121 are SELECT 1 stubs (indexes built CONCURRENTLY by
+    # the concurrent migrator); 0118/0120 idempotent; 0119/0122-0125 bare CREATE TABLE / ADD COLUMN on
+    # new tables + support_tickets(_messages)(_history). Applied on preprod via CARE b0002b3e (same journal).
+    tag: "11.20.137"
   cache:
     # Response cache OFF in prod — interim mitigation for the single-hot-key
     # bentocache stampede that wedged prod (#179, #2839, #2617). The serve-stale
@@ -373,7 +382,7 @@ mycure:
   image:
     # Ships with hapihub 11.20.126 — expects an API carrying the 0098
     # medical_records.updated_by changes, so these two move together.
-    tag: "10.25.145"
+    tag: "10.25.146"
   resources:
     requests:
       cpu: 10m
@@ -821,8 +830,9 @@ cadence:
   # IMPOSSIBLE (the meta_reconcile REINDEX 14→5.8GB was the acute fix; this is the durable one). Carries the
   # OOM fix (2.1.99+2.1.100+2.1.101) + the 2.1.102 PathId::ZERO guard. relay n0; 13Gi; RUST_BACKTRACE=full
   # kept until no-more-139 confirmed. sha256:582b10a6ef7db764af2d24bbcdd84d5def8b1014427c408b1145a643e9dad231
+  # 2.1.108 (2026-11-12): built from mono main 498ef8b7a. sha256:585d8fe193e43207b659aa74f3a1c842b9a1765bfeae8cf4048a1e19ade2284a
   image:
-    tag: "2.1.103"
+    tag: "2.1.108"
   # Read-idle: how long a catch-up serve stream stays alive on an idle read. 600s keeps the hub from
   # killing serves on slow single large frame bodies (keepalives bridge inter-frame idle, not intra-frame).
   # Safe at 600s as of 2.1.97: the payload-BYTE budget bounds concurrent live payload to 2GB regardless of
