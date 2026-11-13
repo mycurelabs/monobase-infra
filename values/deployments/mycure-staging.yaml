@@ -55,7 +55,7 @@ mycure-pxp:
 hapihub:
   # MediCard prerelease (release/medicard-staging) for testing while MediCard's AVD access is expired. CI staging bumps will replace it.
   image:
-    tag: "11.20.137-staging.85e6a0a"
+    tag: "11.20.137-staging.8e9902d"
   cache:
     enabled: true
   # Stripe webhooks for EasyJoey payments (monobase-mycure #4955/#4967). Staging is
