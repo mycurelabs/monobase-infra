@@ -141,7 +141,7 @@ hapihub:
   # medley ollamaEgress NetworkPolicy UNCHANGED (host-Ollama-only) so external provider egress is network-blocked.
   # A real hosted-provider test = separate future freyr ask (would open ONE provider host, synthetic data).
   image:
-    tag: "11.20.137@sha256:bee018fe94b7bbccb2d018ca48149bbcacb0a09b33f984964e93e284fe1a29f1"  # 2026-11-12 mainline release (CARE merged: journal identical to b0002b3e through 0122). Pending here: 0123-0125 only (support_tickets/_messages + _history ADD COLUMN, additive). Worker inherits this tag.
+    tag: "11.20.139@sha256:a8e10d01a45d8e70fd6dd6bbb712034c19aab7e46874a90fe38d251bc29de476"  # 2026-11-16 release. New: 0126 (5 list hot-path indexes, CONCURRENTLY at boot via pg-concurrent-migrator), 0127/0128 no-op stubs (#6214/#6217 data changes are operator scripts). Worker inherits this tag.
   cache:
     # Prod parity: response cache OFF (the #2839/#2617 bentocache stampede
     # mitigation). Re-enable here first when re-validating the serve-stale fix.
@@ -430,7 +430,7 @@ mycure:
   # = true (preprod test org 668962 flipped true via SQL). PREPROD/prod both ship care
   # default-false → CARE hidden until a superadmin enrolls an org (no env needed anymore).
   image:
-    tag: "10.25.146@sha256:caa6c0b16a0282e73befe95a2919fa2ede6f215caa3e558ee454eae35b703e27"
+    tag: "10.25.148@sha256:6fb43778480e2ec016aca9b0466072d60f3fdf0c32510277da0558bac68aa80e"
   resources:
     requests:
       cpu: 10m
