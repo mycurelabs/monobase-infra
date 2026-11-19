@@ -141,7 +141,7 @@ hapihub:
   # medley ollamaEgress NetworkPolicy UNCHANGED (host-Ollama-only) so external provider egress is network-blocked.
   # A real hosted-provider test = separate future freyr ask (would open ONE provider host, synthetic data).
   image:
-    tag: "11.20.140@sha256:fb3def754d929d725584b5eedbcb2d77e7f8c2c506822c7c60433fea522090f3"  # 2026-11-17 release. New: 0129 (medical_encounter_bulk_ends table + 3 nullable medical_encounters force_end_* cols, additive). Worker inherits this tag.
+    tag: "11.20.137@sha256:bee018fe94b7bbccb2d018ca48149bbcacb0a09b33f984964e93e284fe1a29f1"  # 2026-11-19 pinned to PROD-equivalent 11.20.137 (freyr: match mycure prod exactly) after full preprod cluster rebuild. Downgraded from 11.20.140. Fresh DB migrates on 11.20.137's own bundle. Worker inherits this tag.
   cache:
     # Prod parity: response cache OFF (the #2839/#2617 bentocache stampede
     # mitigation). Re-enable here first when re-validating the serve-stale fix.
@@ -430,7 +430,7 @@ mycure:
   # = true (preprod test org 668962 flipped true via SQL). PREPROD/prod both ship care
   # default-false → CARE hidden until a superadmin enrolls an org (no env needed anymore).
   image:
-    tag: "10.25.149@sha256:6496a4966f40ea555612905192e877b4a2b40cfa9b8388e1d8fd47ccd995f651"
+    tag: "10.25.146@sha256:caa6c0b16a0282e73befe95a2919fa2ede6f215caa3e558ee454eae35b703e27"  # 2026-11-19 pinned to PROD-equivalent 10.25.146 (mycureapp; freyr: match mycure prod) after cluster rebuild. Downgraded from 10.25.149.
   resources:
     requests:
       cpu: 10m
