@@ -229,25 +229,13 @@ hapihub:
     STORAGE_BUCKET: "hapihub"
     # Prod parity (mono#2114): background jobs run in the hapihubWorker release.
     RUN_WORKERS: "false"
-    # Developer-platform enforcement (epic #4290 / #4389) — PREPROD-only rollout.
-    # scope/origin/dpop are PARTNER/OAuth-audience-only (deriveAudience === 'partner')
-    # and never gate first-party 'app' session callers: scope pipeline.ts:993, origin
-    # pipeline.ts:1053/1083, dpop auth.ts:1037. AUDIENCE is the per-endpoint x-audience
-    # gate (pipeline.ts:872): fires for audience !== 'internal'; un-annotated ops
-    # default-allow ['internal','app'] so first-party 'app' passes unless an op sets
-    # x-audience WITHOUT 'app'. Enabled here only AFTER hapihub 11.20.129 shipped the
-    # #4552 annotation-coverage fixes (oauth mgmt ops → [internal,app]; patient-create
-    # → [internal,app,partner]). ENTITLEMENT/QUOTA stay OFF (unset). Sandbox stays OFF
-    # (joff's pre-enforcement baseline).
-    API_SCOPE_ENFORCE: "true"
-    API_ORIGIN_ENFORCE: "true"
-    API_DPOP_ENFORCE: "true"
-    # Final audience-rollout step (#4290/#4552). Enabled after hapihub 11.20.129 shipped
-    # the x-audience annotation-coverage fixes AND the chart's containerEnv dedupe (the
-    # hapihub Deployment env is now deduped by name so adding this flag no longer trips
-    # ArgoCD's strategic-merge-patch on the duplicate STORAGE_* env). ENTITLEMENT/QUOTA
-    # stay OFF. Sandbox stays OFF (baseline); prod untouched.
-    API_AUDIENCE_ENFORCE: "true"
+    # 2026-11-19: API_SCOPE/ORIGIN/DPOP/AUDIENCE_ENFORCE REMOVED to match PROD, which
+    # leaves all four UNSET. These were the preprod-only audience-rollout testing flags
+    # (#4290/#4552); with them ON, cadence-hub + maestro-box tokens carry audience
+    # 'partner' and get 403 "Operation not exposed to audience 'partner'" on
+    # heartbeatDevice / createCadenceAuthCode, so box<->hub sync is blocked. Unset here
+    # = prod-equivalent AND sync works (freyr, vanaheim rebuild). Re-add only to resume
+    # the audience-enforcement rollout test.
     # CARE governed copilot (monobase-mycure #4566/#4570) — point /care/ask at the
     # preprod medley governed gateway; skill = summarize-context. OpenMed sidecar
     # now DEPLOYED (openmed.enabled below) → real NER de-id (not the phi.ts regex
