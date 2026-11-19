@@ -558,7 +558,7 @@ cadence:
           topologyKey: kubernetes.io/hostname
   # <staging gateway tailnet IP>:<cadence-quic-staging port>. NOTE: the gateway IP changes
   # on cluster rebuild — repoint here + the DNS A record if the cluster is nuked.
-  publicAddr: "100.124.242.71:6474" # 6473 is preprod's cadence-quic leg on the shared gateway
+  publicAddr: "100.96.81.17:6474" # 6473 is preprod's cadence-quic leg on the shared gateway
   # n0 public relays (the self-hosted relay's HTTP-upgrade handshake is broken through the
   # shared gateway — same interim as preprod).
   relayUrl: ""

@@ -101,7 +101,7 @@ nginxGatewayResources:
         # NOTE: this tailnet IP is assigned by the tailscale operator and CHANGES
         # on cluster nuke+rebootstrap — update it (get: `tailscale status | grep
         # nginx-staging-gateway`) or re-point after a rebuild.
-        external-dns.alpha.kubernetes.io/target: "100.124.242.71"
+        external-dns.alpha.kubernetes.io/target: "100.96.81.17"
       infrastructure:
         annotations:
           tailscale.com/expose: "true"
